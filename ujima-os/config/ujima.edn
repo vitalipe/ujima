@@ -1,0 +1,15 @@
+{:http    {:host "0.0.0.0" :port 1337}
+ :log     {:level :debug}
+ :runtime {:target :mock
+           :mock    {:control-token-toggle-ms 5000
+                     :state {:hostname "ujima-mock"
+                             :timezone "UTC"
+                             :keyboard-layouts ["us"]
+                             :wallpaper nil
+                             :volume 50
+                             :screen-locked false
+                             :control-token {:present? true :type :usb}
+                             :settings {}}}
+
+            :rpi     {:paths {:settings "/var/lib/ujima/settings.edn"}}}}
+   

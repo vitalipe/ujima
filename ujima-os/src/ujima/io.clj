@@ -6,7 +6,7 @@
             [babashka.fs      :as fs]))
   
 
-(defn sh!
+(defn sh
   "Runs a command. Returns a result map. Does not throw."
   [cmd & args]
   (let [result (apply p/shell {:out :string
@@ -21,7 +21,24 @@
      :err   (str/trim (:err result))}))
 
 
+(defn sudo
+  [cmd & args]
+  (apply sh :sudo "-n" (name cmd) args))
+
+
+(defn sh!
+  "Runs a command. Throws on non-zero exit."
+  [cmd & args]
+  (let [result (apply sh cmd args)]
+    (when-not (:ok? result)
+      (throw
+        (ex-info (str "Command failed: " cmd args)
+                 result)))
+    result))
+
+
 (defn sudo!
+  "Runs sudo command. Throws on non-zero exit."
   [cmd & args]
   (apply sh! :sudo "-n" (name cmd) args))
 
@@ -69,3 +86,21 @@
   (let [[control-file] (fs/glob root token-pattern)]
     (when control-file
       (str control-file))))
+
+
+
+(defn require-file! [path]
+  (when-not (fs/regular-file? path)
+    (throw
+      (ex-info (str path " is not a regular file")
+               {:path (str path)})))
+  path)
+
+
+(defn require-block-device! [path]
+  (let [{:keys [ok?]} (sh :test "-b" (str path))]
+    (when-not ok?
+      (throw
+        (ex-info (str path " is not a block device")
+                 {:path (str path)}))))
+  path)

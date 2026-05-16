@@ -7,7 +7,7 @@
             [babashka.process :as p]            
 
             [ujima.log :as log]
-            [ujima.io :refer [sudo! sh! spit-file-atomic! slurp-edn! probe-file!]]
+            [ujima.io :refer [sudo sh spit-file-atomic! slurp-edn! probe-file!]]
             [ujima.runtime.protocols :refer [UjimaSystem UjimaDesktop UjimaDiscovery UjimaRuntime]]))
 
 
@@ -24,21 +24,21 @@
 
   UjimaSystem
   (hostname [_]
-    (:out (sh! :hostnamectl "--static")))
+    (:out (sh :hostnamectl "--static")))
 
 
   (hostname! [_ hostname]
-    (sudo! :hostnamectl "set-hostname" hostname)
-    (:out (sh! :hostnamectl "--static")))
+    (sudo :hostnamectl "set-hostname" hostname)
+    (:out (sh :hostnamectl "--static")))
 
 
   (timezone [_]
-    (:out (sh! :timedatectl "show" "-p" "Timezone" "--value")))
+    (:out (sh :timedatectl "show" "-p" "Timezone" "--value")))
 
 
   (timezone! [_ timezone]
-    (sudo! :timedatectl "set-timezone" timezone)
-    (:out (sh! :timedatectl "show" "-p" "Timezone" "--value")))
+    (sudo :timedatectl "set-timezone" timezone)
+    (:out (sh :timedatectl "show" "-p" "Timezone" "--value")))
   
 
   (keyboard-layouts [_])
@@ -46,30 +46,30 @@
 
 
   (keyboard-layouts! [_ layouts]
-    (sudo! :localectl "set-x11-keymap" (str/join "," layouts)))
+    (sudo :localectl "set-x11-keymap" (str/join "," layouts)))
 
 
   (reboot! [_]
-    (sudo! :systemctl "reboot"))
+    (sudo :systemctl "reboot"))
 
 
   (shutdown! [_]
-    (sudo! :systemctl "poweroff")) 
+    (sudo :systemctl "poweroff")) 
 
 
   UjimaDesktop
 
   (volume [_]
-    (let [out (:out (sh! :pactl "get-sink-volume" "@DEFAULT_SINK@"))]
+    (let [out (:out (sh :pactl "get-sink-volume" "@DEFAULT_SINK@"))]
       (Integer/parseInt (second (re-find #"(\d+)%" out)))))
 
 
   (volume! [this value]
     (let [value (-> value int (max 0) (min 100))]
-      (sh! :pactl "set-sink-volume" "@DEFAULT_SINK@" (str value "%"))
+      (sh :pactl "set-sink-volume" "@DEFAULT_SINK@" (str value "%"))
       
       ;; get volume
-      (let [out (:out (sh! :pactl "get-sink-volume" "@DEFAULT_SINK@"))]
+      (let [out (:out (sh :pactl "get-sink-volume" "@DEFAULT_SINK@"))]
         (Integer/parseInt (second (re-find #"(\d+)%" out))))))
 
 

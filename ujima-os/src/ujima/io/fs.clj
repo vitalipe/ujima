@@ -1,47 +1,11 @@
-(ns ujima.io
+(ns ujima.io.fs
   (:require [clojure.string  :as str]
             [clojure.java.io :as java-io]
-            [clojure.edn :as edn]
-            [babashka.process :as p]            
-            [babashka.fs      :as fs]))
+            [clojure.edn     :as edn]
+            
+            [babashka.fs      :as fs]
+            [ujima.io.shell   :refer [sh]]))
   
-
-(defn sh
-  "Runs a command. Returns a result map. Does not throw."
-  [cmd & args]
-  (let [result (apply p/shell {:out :string
-                               :err :string
-                               :continue true}
-                      (name cmd)
-                      args)]
-
-    {:ok?   (zero? (:exit result))
-     :exit  (:exit result)
-     :out   (str/trim (:out result))
-     :err   (str/trim (:err result))}))
-
-
-(defn sudo
-  [cmd & args]
-  (apply sh :sudo "-n" (name cmd) args))
-
-
-(defn sh!
-  "Runs a command. Throws on non-zero exit."
-  [cmd & args]
-  (let [result (apply sh cmd args)]
-    (when-not (:ok? result)
-      (throw
-        (ex-info (str "Command failed: " cmd args)
-                 result)))
-    result))
-
-
-(defn sudo!
-  "Runs sudo command. Throws on non-zero exit."
-  [cmd & args]
-  (apply sh! :sudo "-n" (name cmd) args))
-
 
 (defn slurp-edn!
   "Reads EDN. Returns default on error, Does not throw."
@@ -82,11 +46,10 @@
        :exception e})))
 
 
-(defn probe-file! [root token-pattern]
-  (let [[control-file] (fs/glob root token-pattern)]
-    (when control-file
-      (str control-file))))
-
+(defn probe-file! [root file-pattern]
+  (let [[first-matching] (fs/glob root file-pattern)]
+    (when first-matching
+      (str first-matching))))
 
 
 (defn require-file! [path]

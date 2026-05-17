@@ -1,4 +1,4 @@
-(ns ujima.runtime.protocols)
+(ns ujima.runtime.protocol)
 
 (defprotocol UjimaSystem
   "Low-level host/system operations.
@@ -165,3 +165,23 @@
     same shape as `probe-control-token`.
 
     Channel close means the watcher stopped."))
+
+
+(defprotocol UjimaTryBoot
+
+  (boot-status [this]
+    "Return boot/slot status for this target.")
+
+  (try-boot! [this]
+    "Mark the inactive slot for one-shot boot.
+
+     This should prepare the next boot and reboot.")
+
+  (commit-current-boot! [this]
+    "Promote the currently booted slot to the normal/default boot slot.
+
+     Call this after a try-booted system passes health checks.")
+
+  (revert-current-boot! [this]
+    "Reject the currently booted try slot and restore the previous/default slot
+     as the normal boot target."))

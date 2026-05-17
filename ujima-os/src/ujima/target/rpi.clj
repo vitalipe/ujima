@@ -1,4 +1,4 @@
-(ns ujima.runtime.target.rpi
+(ns ujima.target.rpi
   (:require 
             [clojure.core.async :as a]
             [clojure.string :as str]
@@ -6,9 +6,11 @@
 
             [babashka.process :as p]            
 
-            [ujima.log :as log]
-            [ujima.io :refer [sudo sh spit-file-atomic! slurp-edn! probe-file!]]
-            [ujima.runtime.protocols :refer [UjimaSystem UjimaDesktop UjimaDiscovery UjimaRuntime]]))
+            [ujima.log   :as log]
+            [ujima.io.shell :refer [sudo sh]]
+            [ujima.io.fs    :refer [spit-file-atomic! slurp-edn! probe-file!]]
+            
+            [ujima.runtime.protocol :refer [UjimaSystem UjimaDesktop UjimaDiscovery UjimaRuntime]]))
 
 
 (defn- do-probe-control-token! [_]

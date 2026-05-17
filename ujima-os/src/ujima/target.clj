@@ -1,8 +1,7 @@
-(ns ujima.runtime
+(ns ujima.target
   (:require
-   [ujima.runtime.protocols :as rt]
-   [ujima.runtime.target.mock :as mock]
-   [ujima.runtime.target.rpi :as rpi]))
+   [ujima.target.mock :as mock]
+   [ujima.target.rpi :as rpi]))
 
 
 (defn ->runtime [env]

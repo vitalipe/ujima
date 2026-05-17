@@ -1,9 +1,11 @@
 (ns ujima.cli
-  (:require [ujima.runtime.protocols :as runtime]
+  (:require [ujima.runtime.protocol  :as runtime]
+            [ujima.target            :refer [->runtime]] 
+            [ujima.runtime.settings  :as settings]
+
             [ujima.log               :as log] 
-            [ujima.runtime           :refer [->runtime]] 
-            [ujima.io                :refer [slurp-edn!]]
-            [ujima.agent.commands    :as commands]))
+            [ujima.io.fs             :refer [slurp-edn!]]))
+
 
 (defn usage []
   (println "Usage:")
@@ -29,17 +31,17 @@
     (case cmd
       "hostname"
       (if (seq rest)
-        (println (commands/hostname+settings! runtime* (first rest)))
+        (println (settings/hostname+settings! runtime* (first rest)))
         (println (runtime/hostname runtime*)))
 
       "timezone"
       (if (seq rest)
-        (println (commands/timezone+settings! runtime* (first rest)))
+        (println (settings/timezone+settings! runtime* (first rest)))
         (println (runtime/timezone runtime*)))
 
       "keyboard-layouts"
       (if (seq rest)
-        (println (commands/keyboard-layouts+settings! runtime* rest))
+        (println (settings/keyboard-layouts+settings! runtime* rest))
         (println (runtime/keyboard-layouts runtime*)))
 
       "volume"

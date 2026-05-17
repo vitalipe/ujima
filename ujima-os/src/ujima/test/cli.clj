@@ -1,6 +1,6 @@
 (ns ujima.test.cli
   (:require [babashka.process :as p]
-            [ujima.io :refer [slurp-edn!]]))
+            [ujima.io.fs :refer [slurp-edn!]]))
 
 (defn run-cmd! [env-path & args]
   (apply p/shell

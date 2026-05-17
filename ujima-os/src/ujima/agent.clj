@@ -2,9 +2,9 @@
   (:require [clojure.core.async      :as async]
             [ujima.log               :as log]
 
-            [ujima.runtime.protocols :as runtime]
-            
-            [ujima.agent.reconcile   :refer [reconcile-settings!]]
+            [ujima.runtime.protocol  :as runtime]
+            [ujima.runtime.settings  :refer [reconcile-settings!]]
+
             [ujima.agent.events      :as    events]))
 
 

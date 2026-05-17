@@ -1,7 +1,7 @@
 (ns ujima.test.http
   (:require [babashka.http-client :as http]
             [cheshire.core :as json]
-            [ujima.io :refer [slurp-edn!]]))
+            [ujima.io.fs :refer [slurp-edn!]]))
 
 
 (defn ->base-url [env]

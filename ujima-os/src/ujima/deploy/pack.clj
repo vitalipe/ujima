@@ -1,4 +1,4 @@
-(ns ujima.pack
+(ns ujima.deploy.pack
   (:require [clojure.edn :as edn]
             [clojure.string :as str]
             [babashka.fs :as fs]
@@ -99,7 +99,7 @@
 
 (defn unpack! [ujima-pack-path boot-partition-path root-partition-path]
   (let [shell-quote         (fn [x] (pr-str (str x)))
-        write-to-partition! (fn [ujima-pack-path member partition-path]
+        write-to-partition! (fn [member partition-path]
                               (io/sh! :bash "-lc"
                                       (str "tar --zstd -xOf "
                                            (shell-quote ujima-pack-path)
@@ -114,8 +114,8 @@
     (io/require-block-device! boot-partition-path)
     (io/require-block-device! root-partition-path)
 
-    (write-to-partition! ujima-pack-path "boot.img" boot-partition-path)
-    (write-to-partition! ujima-pack-path "root.img" root-partition-path)
+    (write-to-partition! "boot.img" boot-partition-path)
+    (write-to-partition! "root.img" root-partition-path)
 
     (io/sudo! :e2fsck "-fy" (str root-partition-path))
     (io/sudo! :resize2fs    (str root-partition-path))

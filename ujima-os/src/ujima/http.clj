@@ -4,12 +4,16 @@
             [org.httpkit.server :as http]
             
             [ujima.log :as log]
-            [ujima.runtime :refer [->runtime]]
-            [ujima.runtime.protocols :as runtime]
-            [ujima.io :refer [slurp-edn!]]
-            [ujima.edn :refer [edn->json json->edn]]
-            [ujima.agent :as ujima-agent]
-            [ujima.agent.commands :as commands]))
+
+            [ujima.target           :refer [->runtime]]
+            [ujima.runtime.protocol :as runtime]
+            [ujima.runtime.settings :as settings]
+
+
+            [ujima.io.fs :refer [slurp-edn!]]
+            [ujima.edn   :refer [edn->json json->edn]]
+
+            [ujima.agent :as ujima-agent]))
 
 
 (defn response
@@ -49,9 +53,9 @@
 (defn handle-system-post [runtime* resource request]
   (let [body (json->edn (:body request))]
     (case resource
-      "hostname"         (ok (commands/hostname+settings! runtime* (:hostname body)))
-      "timezone"         (ok (commands/timezone+settings! runtime* (:timezone body)))
-      "keyboard-layouts" (ok (commands/keyboard-layouts+settings! runtime* (:keyboard-layouts body)))
+      "hostname"         (ok (settings/hostname+settings! runtime* (:hostname body)))
+      "timezone"         (ok (settings/timezone+settings! runtime* (:timezone body)))
+      "keyboard-layouts" (ok (settings/keyboard-layouts+settings! runtime* (:keyboard-layouts body)))
       "reboot"           (ok (runtime/reboot! runtime*))
       "shutdown"         (ok (runtime/shutdown! runtime*))
       
@@ -72,7 +76,7 @@
   (let [body (json->edn (:body request))]
     (case resource
       "volume"          (ok (runtime/volume! runtime* (:volume body)))
-      "wallpaper"       (ok (commands/wallpaper+settings! runtime* (:wallpaper body)))
+      "wallpaper"       (ok (settings/wallpaper+settings! runtime* (:wallpaper body)))
       "screen-locked"   (if (:screen-locked body) 
                           (ok (runtime/screen-lock! runtime*))
                           (ok (runtime/screen-unlock! runtime*)))

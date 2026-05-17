@@ -1,6 +1,6 @@
 (ns ujima.io.mount
-  (:require [babashka.fs :as fs]
-            [ujima.io :as io]))
+  (:require [babashka.fs    :as fs]
+            [ujima.io.shell :as io]))
 
 (defn- mounted? [mnt]
   (:ok? (io/sh :findmnt "-rn" "--mountpoint" (str mnt))))

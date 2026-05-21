@@ -46,10 +46,19 @@
        :exception e})))
 
 
+(defn block-device? [path]
+  (:ok? (sh :test "-b" (str path))))
+
+
 (defn probe-file! [root file-pattern]
   (let [[first-matching] (fs/glob root file-pattern)]
     (when first-matching
       (str first-matching))))
+
+
+(defn file->number [path]
+  (when (fs/exists? path)
+    (-> path slurp str/trim parse-long))) 
 
 
 (defn require-file! [path]
@@ -61,9 +70,7 @@
 
 
 (defn require-block-device! [path]
-  (let [{:keys [ok?]} (sh :test "-b" (str path))]
-    (when-not ok?
-      (throw
-        (ex-info (str path " is not a block device")
-                 {:path (str path)}))))
+  (when-not (block-device? path)
+    (throw  (ex-info (str path " is not a block device")
+                     {:path (str path)})))
   path)

@@ -2,34 +2,66 @@
   (:require [babashka.fs    :as fs]
             [ujima.io.shell :as io]))
 
-(defn- mounted? [mnt]
-  (:ok? (io/sh :findmnt "-rn" "--mountpoint" (str mnt))))
+
+(defn mount-point? [mnt]
+  (:ok? (io/sh :mountpoint "-q" (str mnt))))
 
 
-(defn- temp-mount-dir! [prefix]
-  (str (fs/create-temp-dir {:dir "/tmp" :prefix prefix})))
+(defn device->mount-points [device-path]
+  (->> (io/sh :findmnt "--source" (str device-path)
+                       "--output" "TARGET"
+                       "--noheadings"
+                       "--raw")
+       (:out)
+       (str/split-lines)
+       (remove str/blank?)))
 
 
-(defn- mount! [fs-type device mnt]
-  (io/sudo! :mount "-t" fs-type (str device) (str mnt)))
+(defn device-mounted? [device-path]
+  (not (empty? (device->mount-points device-path))))
 
 
-(defn- umount! [mnt]
+(defn mounted? [mnt]
+  (or (mount-point? mnt)
+      (device-mounted? mnt)))
+
+
+(defn umount! [mnt]
   (io/sudo! :umount (str mnt)))
 
 
+(defn mount! [fs-type device mnt]
+  (io/sudo! :mount "-t" fs-type (str device) (str mnt)))
+
+
+(defn wait-until-unmounted-or-fail! [mnt]
+  (loop [wait-ms-left 3000]
+    (cond 
+      (not (mounted? mnt)) true
+      (pos? wait-ms-left)     (do
+                                (Thread/sleep 50)
+                                (recur (- wait-ms-left 50)))
+
+        :timeout-error     (throw 
+                             (ex-info "Mount point is still mounted after umount"
+                                      {:mount-point (str mnt)})))))
+
+
 (defn with-mounted* [fs-type device f]
-  (let [mnt (temp-mount-dir! (str "ujima-" fs-type "-"))]
+  ;; we don't use fs/with-temp-dir here because if we fail to unmount 
+  ;; we don't want to delete the entire tree 
+  (let [mnt (fs/create-temp-dir {:dir "/tmp" :prefix "ujima-tmp-mnt-"})]
     (try
       (mount! fs-type device mnt)
       (f mnt)
 
       (finally
         (when (mounted? mnt)
-          (umount! mnt))
+          (umount! mnt)
+          (wait-until-unmounted-or-fail! mnt))
 
-        (when (and (fs/exists? mnt)
-                   (not (mounted? mnt)))
+        ;; now we can cleanup tmpdir like a peasant
+        (when (fs/exists? mnt)
           (fs/delete-tree mnt))))))
 
 

@@ -5,10 +5,10 @@
 ;; mainly for the REPL
 (defn runtime-settings [runtime*]
   {:system {:hostname (runtime/hostname runtime*)
-            :timezone (runtime/timezone runtime*)}}
+            :timezone (runtime/timezone runtime*)}
 
-  :desktop {:wallpaper        (runtime/wallpaper runtime*)
-            :keyboard-layouts (runtime/keyboard-layouts runtime*)})
+   :desktop {:wallpaper        (runtime/wallpaper runtime*)
+             :keyboard-layouts (runtime/keyboard-layouts runtime*)}})
 
 
 (defn reconcile-settings! [runtime* desired-settings]

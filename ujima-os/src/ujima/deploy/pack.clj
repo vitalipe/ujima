@@ -64,6 +64,8 @@
       false)))
 
 
+;; FIXME: might the the wrong signature, we probably want to start with a disk image
+;;        not 2 partition images
 (defn pack!
    ([boot-img root-img ujima-pack-path]
     (pack! boot-img root-img ujima-pack-path {}))
@@ -73,29 +75,23 @@
     (io/require-file! boot-img)
     (io/require-file! root-img)
 
-    (let [work-dir (fs/create-temp-dir {:prefix "ujima-pack-"})]
-      (try
-        (spit (fs/path work-dir "metadata.edn") (pr-str (assoc pack-metadata :pack pack-version)))
+    (fs/with-temp-dir [work-dir {:prefix "ujima-pack-"}]
+      (spit (fs/path pack-dir "metadata.edn") (pr-str (assoc pack-metadata :pack pack-version)))
 
-        (io/sh! :cp (str boot-img) (str (fs/path work-dir "boot.img")))
-        (io/sh! :cp (str root-img) (str (fs/path work-dir "root.img")))
+      ;;FIXME: copy to rename, we might be able to tell tar to rename 
+      (io/sh! :cp (str boot-img) (str (fs/path work-dir "boot.img")))
+      (io/sh! :cp (str root-img) (str (fs/path work-dir "root.img")))
 
-        (io/sh! :tar
-                "--zstd"
-                "-cf" ujima-pack-path
-                "-C" (str work-dir)
-                "metadata.edn"
-                "boot.img"
-                "root.img")
+      (io/sh! :tar
+              "--zstd"
+              "-cf" ujima-pack-path
+              "-C" (str work-dir)
+              "metadata.edn"
+              "boot.img"
+              "root.img")
 
-        (validate! ujima-pack-path)
-
-        nil
-
-        (finally
-          (when (fs/exists? work-dir)
-            (fs/delete-tree work-dir)))))))
-
+      (validate! ujima-pack-path))))
+      
 
 (defn unpack! [ujima-pack-path boot-partition-path root-partition-path]
   (let [shell-quote         (fn [x] (pr-str (str x)))

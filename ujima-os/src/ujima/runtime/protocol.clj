@@ -169,9 +169,6 @@
 
 (defprotocol UjimaTryBoot
 
-  (boot-status [this]
-    "Return boot/slot status for this target.")
-
   (try-boot! [this]
     "Mark the inactive slot for one-shot boot.
 

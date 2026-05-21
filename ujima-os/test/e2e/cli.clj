@@ -1,4 +1,4 @@
-(ns ujima.test.cli
+(ns cli
   (:require [babashka.process :as p]
             [ujima.io.fs :refer [slurp-edn!]]))
 

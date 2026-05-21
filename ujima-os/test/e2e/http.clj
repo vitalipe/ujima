@@ -1,4 +1,4 @@
-(ns ujima.test.http
+(ns http
   (:require [babashka.http-client :as http]
             [cheshire.core :as json]
             [ujima.io.fs :refer [slurp-edn!]]))

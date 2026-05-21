@@ -11,5 +11,5 @@
                              :control-token {:present? true :type :usb}
                              :settings {}}}
 
-            :rpi     {:paths {:settings "/var/lib/ujima/settings.edn"}}}}
+            :rpi     {:paths {:settings "/var/lib/ujima/runtime.edn"}}}}
    

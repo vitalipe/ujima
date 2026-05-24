@@ -63,18 +63,19 @@
   [path]
   (let [kv-line (fn [line]
                  (let [[_ k v] (re-matches #"^\s*([^#=\s]+)\s*=\s*([^#\s]+).*$" line)]
-                   (when k [(keyword k) (parse-int v)]))
+                   (when k [(keyword k) (parse-int v)])))
 
         {:keys [boot_partition 
-        	    tryboot_partition 
-        	    tryboot_a_b]} (->> (fs/path path "autoboot.txt")  
-                                   (slurp)
-                                   (str/split-lines)
-                                   (keep kv-line)
-                                   (into {}))
+                tryboot_partition 
+                tryboot_a_b]} (->> (fs/path path "autoboot.txt"  
+                                    (slurp)
+                                    (str/split-lines)
+                                    (keep kv-line)
+                                    (into {})))]
+    
     (cond
        tryboot_a_b {:boot boot_partition :try-boot tryboot_partition}
-       :no-tryboot {:boot boot_partition}))
+       :no-tryboot {:boot boot_partition})))
 
 
 (defn autoboot!

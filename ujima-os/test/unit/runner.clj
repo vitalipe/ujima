@@ -3,13 +3,15 @@
 
             [ujima.task.timeline-test]
             [ujima.task.flow-test]
-            [ujima.task.task-test]))
+            [ujima.task.task-test]
+            [ujima.edn-test]))
 
 
 (def test-namespaces
   '[ujima.task.task-test
     ujima.task.timeline-test
-    ujima.task.flow-test])
+    ujima.task.flow-test
+    ujima.edn-test])
 
 
 (defn -main [& _]

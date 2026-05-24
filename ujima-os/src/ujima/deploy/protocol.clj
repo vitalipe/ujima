@@ -38,7 +38,7 @@
      This should only be used for fresh installs, image creation, or explicit
      full-device reinstall.
 
-     Returns a core.async channel of progress events.")
+     Returns Ujima.Task")
 
 
   (upgrade-ujima! [this ujima-pack-path target-device]
@@ -51,4 +51,4 @@
      It writes the Ujima OS pack into the inactive slot and destroys whatever
      content currently exists in that slot.
 
-     Returns a core.async channel of progress events."))
+     Returns Ujima.Task"))

@@ -275,22 +275,32 @@
 
 (deftest join!!-propagates-child-error-to-parent
   (let [parent (task/->task :install)
-        child  (task/->task :write-root)]
+        child  (task/->task :write-root)
+        continued?* (atom false)]
 
     (task/error! child (ex-info "child boom" {}) "write-root failed")
 
-    (task/join!! parent child)
+    (task/run!! parent
+      (fn [_]
+        (task/join!! parent child)
+        (reset! continued?* true)))
 
     (is (task/finished? parent))
 
-    (is (= [:error]
+    (is (false? @continued?*))
+
+    (is (= [:started :error]
            (event-types (task-events parent))))
 
-    (is (= :error/child-error
-           (:error (:payload (last (task-events parent))))))
+    (let [parent-error (:error (:payload (last (task-events parent))))]
+      (is (= "Child task failed"
+             (ex-message parent-error)))
 
-    (is (= "child task error"
-           (:message (:payload (last (task-events parent))))))))
+      (is (= :error/child-error
+             (:type (ex-data parent-error))))
+
+      (is (= "write-root failed"
+             (get-in (ex-data parent-error) [:child-error :message]))))))
 
 
 (deftest duplicate-join-does-not-duplicate-child-events

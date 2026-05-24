@@ -165,7 +165,10 @@
 (defn join!! 
   "Takes ownership of child, imports all child timeline events into task, 
    forwards imported events to task’s live channel, 
-   and blocks until `(finished? child)`."
+   and blocks until `(finished? child)`.
+
+   Throws when child fails so the parent runner can record its own failure and
+   stop dependent work."
   ([task child]  
    (join!! task child nil))
    
@@ -184,7 +187,10 @@
 
                        ;; propagate child errors
                        (when (= type :error)
-                         (error! task :error/child-error "child task error"))
+                         (throw
+                           (ex-info "Child task failed"
+                                    {:type        :error/child-error
+                                     :child-error (:payload evt)})))
 
                        ;; progress 
                        (when target-% 

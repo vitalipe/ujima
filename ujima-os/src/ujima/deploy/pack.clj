@@ -2,14 +2,16 @@
   (:require [clojure.edn :as edn]
             [clojure.string :as str]
             [babashka.fs :as fs]
-            [ujima.io :as io]))
+            
+            [ujima.io.shell :refer [sh! sh sudo!]]
+            [ujima.io.fs :as io]))
 
 
 (def pack-version 1)
 
 
 (defn metadata [ujima-pack-path]
-  (let [{:keys [ok? out]} (io/sh :tar "--zstd" "-xOf" ujima-pack-path "metadata.edn")]
+  (let [{:keys [ok? out]} (sh :tar "--zstd" "-xOf" ujima-pack-path "metadata.edn")]
     (when ok?
       (try
         (edn/read-string out)
@@ -18,7 +20,7 @@
 
 (defn entries [ujima-pack-path]
   (->> ujima-pack-path
-       (io/sh! :tar "--zstd" "-tf")
+       (sh! :tar "--zstd" "-tf")
        (:out)
        (str/split-lines)
        (into #{})))
@@ -79,16 +81,15 @@
       (spit (fs/path pack-dir "metadata.edn") (pr-str (assoc pack-metadata :pack pack-version)))
 
       ;;FIXME: copy to rename, we might be able to tell tar to rename 
-      (io/sh! :cp (str boot-img) (str (fs/path work-dir "boot.img")))
-      (io/sh! :cp (str root-img) (str (fs/path work-dir "root.img")))
+      (sh! :cp (str boot-img) (str (fs/path work-dir "boot.img")))
+      (sh! :cp (str root-img) (str (fs/path work-dir "root.img")))
 
-      (io/sh! :tar
-              "--zstd"
-              "-cf" ujima-pack-path
-              "-C" (str work-dir)
-              "metadata.edn"
-              "boot.img"
-              "root.img")
+      (sh! :tar "--zstd"
+                "-cf" ujima-pack-path
+                "-C" (str work-dir)
+                "metadata.edn"
+                "boot.img"
+                "root.img")
 
       (validate! ujima-pack-path))))
       
@@ -96,14 +97,13 @@
 (defn unpack! [ujima-pack-path boot-partition-path root-partition-path]
   (let [shell-quote         (fn [x] (pr-str (str x)))
         write-to-partition! (fn [member partition-path]
-                              (io/sh! :bash "-lc"
-                                      (str "tar --zstd -xOf "
-                                           (shell-quote ujima-pack-path)
-                                           " "
-                                           (shell-quote member)
-                                           " | sudo -n dd of="
-                                           (shell-quote partition-path)
-                                           " bs=4M conv=fsync status=progress")))]
+                              (sh! :bash "-lc" (str "tar --zstd -xOf "
+                                                 (shell-quote ujima-pack-path)
+                                                 " "
+                                                 (shell-quote member)
+                                                 " | sudo -n dd of="
+                                                 (shell-quote partition-path)
+                                                 " bs=4M conv=fsync status=progress")))]
 
     (validate! ujima-pack-path)
 
@@ -113,8 +113,8 @@
     (write-to-partition! "boot.img" boot-partition-path)
     (write-to-partition! "root.img" root-partition-path)
 
-    (io/sudo! :e2fsck "-fy" (str root-partition-path))
-    (io/sudo! :resize2fs    (str root-partition-path))
-    (io/sudo! :sync)
+    (sudo! :e2fsck "-fy" (str root-partition-path))
+    (sudo! :resize2fs    (str root-partition-path))
+    (sudo! :sync)
 
     nil))

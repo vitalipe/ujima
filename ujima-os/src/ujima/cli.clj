@@ -4,7 +4,7 @@
             [ujima.runtime.settings  :as settings]
 
             [ujima.log               :as log] 
-            [ujima.fs                :refer [slurp-edn!]]))
+            [ujima.fs                :refer [slurp-edn]]))
 
 
 (defn usage []
@@ -63,7 +63,7 @@
                                  
 (defn -main [& args]
   (let [[env-path & rest-args] args
-        env                   (slurp-edn! env-path {})]
+        env                   (slurp-edn env-path {})]
 
     (log/set-log-level! :report)
     (run! (->runtime env) rest-args)))

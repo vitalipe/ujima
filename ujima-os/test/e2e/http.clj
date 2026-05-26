@@ -1,7 +1,7 @@
 (ns http
   (:require [babashka.http-client :as http]
             [cheshire.core :as json]
-            [ujima.fs :refer [slurp-edn!]]))
+            [ujima.fs :refer [slurp-edn]]))
 
 
 (defn ->base-url [env]
@@ -67,6 +67,6 @@
 
 (defn -main [& args]
   (let [[env-path] args
-        env (slurp-edn! env-path {})]
+        env (slurp-edn env-path {})]
 
     (run! env)))

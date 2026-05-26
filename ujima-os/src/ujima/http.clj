@@ -10,7 +10,7 @@
             [ujima.runtime.settings :as settings]
 
 
-            [ujima.fs  :refer [slurp-edn!]]
+            [ujima.fs  :refer [slurp-edn]]
             [ujima.edn :refer [edn->json json->edn]]
 
             [ujima.agent :as ujima-agent]))
@@ -154,7 +154,7 @@
 
 (defn -main [& args]
   (let [[env-path] args
-        env      (slurp-edn! env-path {})]
+        env      (slurp-edn env-path {})]
         
     ;; first set log level
     (log/set-log-level! (get-in env [:log :level] :info))    

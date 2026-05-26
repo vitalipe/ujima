@@ -1,6 +1,6 @@
 (ns cli
   (:require [babashka.process :as p]
-            [ujima.fs :refer [slurp-edn!]]))
+            [ujima.fs :refer [slurp-edn]]))
 
 (defn run-cmd! [env-path & args]
   (apply p/shell

@@ -17,10 +17,10 @@
        :otherwise        default))))
      
 
-(defn slurp-edn!
+(defn slurp-edn
   "Reads EDN. Returns default on error, Does not throw."
   ([path]
-   (slurp-edn! path nil))
+   (slurp-edn path nil))
 
   ([path default]
    (try
@@ -74,4 +74,3 @@
       (ex-info (str path " is not a regular file")
                {:path (str path)})))
   path)
-

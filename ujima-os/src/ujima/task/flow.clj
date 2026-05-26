@@ -1,13 +1,19 @@
 (ns ujima.task.flow
+  "Macros for constructing task programs and joining nested steps.
+
+   `flow` creates a cold task, while `flow!` constructs and synchronously runs
+   a root task. Nested steps remain cold until joined by their parent."
   (:require [ujima.task :as task]))
 
 
-(defn flow-error-ex [type message]
+(defn flow-error-ex
+  "Creates the structured exception thrown by a flow's `error!` helper."
+  [type message]
   (ex-info message {:type type}))
 
 
 (defmacro flow
-  "Creates a cold task flow.
+  "Creates a cold task whose stored code executes `body`.
 
    Inside the body, these lexical helpers are available:
 
@@ -15,8 +21,9 @@
    - progress!
    - error!
 
-   Nested child tasks should be created with <step!.
-   Existing external tasks should be joined with <join!."
+   Construction does not run `body`. Start a root task with `task/run!` or
+   `task/run!!`; nested child tasks should be created with `<step!`, and
+   existing external tasks should be joined with `<join!`."
   [name & body]
   `(task/->task
      ~name
@@ -37,18 +44,19 @@
 
 
 (defmacro flow!
-  "Creates and synchronously runs a root task flow.
+  "Creates a root flow and runs it synchronously with `task/run!!`.
 
-   Returns the value returned by `task/run!!`."
+   Returns the completed root task timeline."
   [name & body]
   `(task/run!! (flow ~name ~@body)))
 
 
 (defmacro <join!
-  "Joins an existing child task into the current flow.
+  "Joins an existing child task into the current running flow.
 
-   target-progress is the parent progress value the child should map to when it
-   completes successfully.
+   `target-progress` is the parent progress value the child should map to when
+   it completes successfully. The child may be cold; `task/join!!` starts it
+   when necessary. Returns the child task.
 
    Must be used inside flow or flow!."
   [target-progress child-expr]
@@ -58,10 +66,11 @@
 
 
 (defmacro <step!
-  "Creates a cold child flow and joins it into the current flow.
+  "Creates a cold child flow and joins it into the current running flow.
 
-   target-progress is the parent progress value this step should reach when it
-   completes successfully. `task/join!!` owns starting the child.
+   `target-progress` is the parent progress value this step should reach when
+   it completes successfully. `task/join!!` owns starting the child. Returns
+   the child task after the blocking join completes.
 
    Must be used inside flow or flow!."
   [target-progress name & body]

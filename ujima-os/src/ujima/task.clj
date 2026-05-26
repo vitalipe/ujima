@@ -1,9 +1,11 @@
 (ns ujima.task
-  "Small task abstraction for long-running operations.
+  "Observable, single-start tasks for process-like operations.
 
-   A task is an observable unit of work. It owns an append-only timeline of
-   structured events and a core.async channel used for live wake-up/event
-   notifications."
+   A task is created cold with its code function and is started once by `run!`
+   or `run!!`. Its append-only timeline is the source of truth for state and
+   history; its core.async channel provides live notifications for consumers
+   that also read or poll that timeline. A running parent can import child task
+   events with `join!!`."
 
   (:require [clojure.core.async :as async]
             [ujima.task.timeline :refer [->TimelineEvent 
@@ -73,32 +75,39 @@
 
 
 (defn task->timeline 
-  "Returns the full task timeline.
+  "Returns a snapshot of the task's append-only event timeline.
 
-   The timeline is an immutable snapshot of the task's append-only event log at
-   the time this function is called. It may include imported child events."
+   This is the source of truth for polling clients and derived task state. A
+   parent task's timeline may include imported child events."
   
   [{timeline :timeline*}] 
   @timeline)
 
 
-(defn task->state [{timeline* :timeline*}] 
+(defn task->state
+  "Returns the root task state derived from its current timeline."
+  [{timeline* :timeline*}] 
   (timeline->state @timeline*))
 
 
-(defn finished? [{id :id timeline* :timeline*}]
+(defn finished?
+  "Returns true when the root task has recorded a terminal event."
+  [{id :id timeline* :timeline*}]
   (->  @timeline* 
     (timeline->last-of id)
     (terminal-event?)))
 
 
 (defn event! 
-  "Appends an event to task's timeline and publishes it to task's channel.
+  "Conditionally appends an event and publishes it to the task's channel.
 
-   This is the basic event-writing primitive. It mutates `timeline*` and then
-   writes the event to `ch*`.
+   With two arguments, appends when the root task is not terminal. 
 
-   Returns the event or nil."
+   With `allow?`, the predicate is checked against the current
+   timeline as part of the same compare-and-set retry loop used to append the
+   event.
+
+   Returns the committed event, or nil when the event was rejected."
   ([task event] (event! task event (constantly true)))
   ([{:keys [ch* id timeline*]} event allow?]
    (when-let [event (commit-event! timeline* id event allow?)]
@@ -107,10 +116,10 @@
 
 
 (defn progress!
-  "Records task progress.
+  "Records a progress event for a non-terminal task.
 
-   progress should be a number from 0 to 100.
-   message is optional human-readable status text."
+   Progress is rounded and clamped to the range 0 through 100. `message` is
+   optional human-readable status text."
 
   ([task progress]
    (progress! task progress nil))
@@ -122,13 +131,18 @@
                                                         (round))})))) 
 
 
-(defn done! [task value]  
+(defn done!
+  "Records successful completion with `value` and closes live notifications."
+  [task value]  
   (let [event (event! task (task-event task :done value))]
     (async/close! (:ch* task))
     event))
 
 
 (defn error! 
+  "Records failed completion with a Throwable and closes live notifications.
+
+   The event payload stores the error and a human-readable message."
   ([task error] (error! task error "task failed"))
   ([task error message]
    (let [event (event! task (task-event task :error {:error error :message message}))]
@@ -137,10 +151,11 @@
 
 
  (defn run!!
-  "Runs the task on the current thread (blocks).
+  "Claims and runs a cold task on the current thread.
 
-   Emits :started first. If f returns normally, emits :done. If f throws, emits
-   :error.
+   Claims `:started` atomically. If the stored code returns normally, records
+   `:done`; if it throws, records `:error`. Throws `:error/task-running` when
+   another runner has already claimed or completed this task.
 
    Returns the task timeline after execution finishes."
 
@@ -164,7 +179,13 @@
 
 
 (defn run!
-  "Runs the task an async thread and returns task immediately."
+  "Claims a cold task and runs its stored code on an async thread.
+
+   The `:started` claim occurs before this function returns, so competing starts
+   fail immediately with `:error/task-running`. Code completion or failure is
+   recorded as `:done` or `:error`.
+
+   Returns the started task immediately."
   [{f :code id :id name :name :as task}]
   (if (event! task
               (task-event task :started {})
@@ -185,17 +206,23 @@
 
 
 
-(defn take!! [task]
+(defn take!!
+  "Blocks for the next live task notification, or nil after channel closure."
+  [task]
   (async/<!! (:ch* task)))
  
 
 (defn join!! 
-  "Takes ownership of child, imports all child timeline events into task, 
-   forwards imported events to task’s live channel, 
-   and blocks until `(finished? child)`.
+  "Joins a child task into a running parent and blocks until the child ends.
 
-   Throws when child fails so the parent runner can record its own failure and
-   stop dependent work."
+   The parent must already be running. If `child` is cold, this function starts
+   it; otherwise it consumes its existing or live events. Child events are
+   imported into the parent timeline and published as parent notifications.
+   When `target-%` is supplied, child progress is mapped into the parent's
+   remaining progress span.
+
+   Throws when the parent is not running or when the child fails, allowing the
+   parent's runner to record its own failure and stop dependent work."
   ([task child]  
    (join!! task child nil))
    
@@ -256,15 +283,16 @@
 
 
 (defn ->task 
- "Creates a new task with name.
+ "Creates a cold task named `name` with stored execution function `f`.
 
-   name should be a keyword, for example:
+   `name` should be a keyword, for example:
 
    - `:install`
    - `:partition`
    - `:write-root`
 
-   Lifecycle events are added by `run!`, `event!`, `done!`, `error!`."
+   Construction does not execute `f` or add lifecycle events. Start the task
+   once with `run!` or `run!!`, or pass it as a cold child to `join!!`."
   [name f]
   (->UjimaTask (swap! next-id* inc)
                name

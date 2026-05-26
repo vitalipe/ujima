@@ -7,7 +7,7 @@
 
             [ujima.log :as log]
             [ujima.fs  :refer [spit-file-atomic! 
-                               slurp-edn! 
+                               slurp-edn
                                probe-file!]]
 
             [ujima.linux.system     :as linux]
@@ -83,7 +83,7 @@
   
   (settings [_]
     (let [path (get-in env [:paths :settings] "/var/lib/ujima/runtime.edn")]
-      (slurp-edn! path {})))
+      (slurp-edn path {})))
 
 
   (settings! [_ settings]
@@ -93,7 +93,7 @@
      (when-not (:ok? write-result)
        (log/error "Failed to write settings" write-result))
 
-     (slurp-edn! path {})))
+     (slurp-edn path {})))
 
 
   (probe-control-token [_]

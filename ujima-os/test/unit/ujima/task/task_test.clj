@@ -1,6 +1,7 @@
 (ns ujima.task.task-test
   (:require [clojure.test :refer [deftest is testing]]
-            [ujima.task :as task]))
+            [ujima.task :as task]
+            [ujima.task.timeline :as timeline]))
 
 
 (defn events-for-id [t id]
@@ -25,6 +26,22 @@
        (into [])))
 
 
+(defn test-task
+  ([name]
+   (test-task name (fn [_] nil)))
+  ([name code]
+   (task/->task name code)))
+
+
+(defn start-task! [t]
+  (task/event! t
+               (timeline/->TimelineEvent (:id t)
+                                         [(:name t)]
+                                         :started
+                                         nil
+                                         {})))
+
+
 (defn wait-finished [t]
   (loop [n 100]
     (cond
@@ -36,7 +53,7 @@
 
 
 (deftest ->task-creates-empty-task
-  (let [t (task/->task :install)]
+  (let [t (test-task :install)]
 
     (is (= :install (:name t)))
     (is (integer? (:id t)))
@@ -45,7 +62,7 @@
 
 
 (deftest progress!-records-clamped-rounded-progress
-  (let [t (task/->task :install)]
+  (let [t (test-task :install)]
 
     (task/progress! t -10 "too low")
     (task/progress! t 42.6 "middle")
@@ -63,7 +80,7 @@
 
 
 (deftest progress!-supports-message-less-progress
-  (let [t (task/->task :install)
+  (let [t (test-task :install)
         e (task/progress! t 25)]
 
     (is (= :progress (:type e)))
@@ -73,14 +90,14 @@
 
 
 (deftest event!-publishes-to-channel
-  (let [t (task/->task :install)
+  (let [t (test-task :install)
         e (task/progress! t 10 "started")]
 
     (is (= e (task/take!! t)))))
 
 
 (deftest done!-records-terminal-event-and-closes-channel
-  (let [t (task/->task :install)
+  (let [t (test-task :install)
         e (task/done! t {:ok? true})]
 
     (is (= :done (:type e)))
@@ -95,7 +112,7 @@
 
 
 (deftest error!-records-terminal-event-and-message
-  (let [t   (task/->task :install)
+  (let [t   (test-task :install)
         err (ex-info "boom" {:x 1})
         e   (task/error! t err "install failed")]
 
@@ -106,7 +123,7 @@
 
 
 (deftest error!-uses-default-message
-  (let [t   (task/->task :install)
+  (let [t   (test-task :install)
         err (ex-info "boom" {})
         e   (task/error! t err)]
 
@@ -115,7 +132,7 @@
 
 
 (deftest terminal-event-prevents-later-events-for-task
-  (let [t        (task/->task :install)
+  (let [t        (test-task :install)
         done     (task/done! t {:ok? true})
         rejected (task/progress! t 50 "should not append")]
 
@@ -126,10 +143,10 @@
 
 
 (deftest run!!-records-started-and-done
-  (let [t        (task/->task :install)
-        timeline (task/run!! t
-                   (fn [_]
-                     {:installed? true}))]
+  (let [t        (test-task :install
+                            (fn [_]
+                              {:installed? true}))
+        timeline (task/run!! t)]
 
     (is (= [:started :done]
            (event-types (task-events t))))
@@ -144,11 +161,11 @@
 
 
 (deftest run!!-records-error-when-body-throws
-  (let [t        (task/->task :install)
-        err      (ex-info "boom" {:x 1})
-        timeline (task/run!! t
-                   (fn [_]
-                     (throw err)))]
+  (let [err      (ex-info "boom" {:x 1})
+        t        (test-task :install
+                            (fn [_]
+                              (throw err)))
+        timeline (task/run!! t)]
 
     (is (= [:started :error]
            (event-types timeline)))
@@ -162,16 +179,23 @@
     (is (task/finished? t))))
 
 
-(deftest run!!-does-not-run-body-when-task-is-already-terminal
-  (let [t       (task/->task :install)
-        called? (atom false)]
+(deftest run!!-rejects-terminal-task-without-running-body
+  (let [called? (atom false)
+        t       (test-task :install
+                           (fn [_]
+                             (reset! called? true)
+                             :should-not-run))]
 
     (task/done! t {:ok? true})
 
-    (task/run!! t
-      (fn [_]
-        (reset! called? true)
-        :should-not-run))
+    (let [err (try
+                (task/run!! t)
+                nil
+                (catch clojure.lang.ExceptionInfo e
+                  e))]
+
+      (is (= :error/task-running
+             (:type (ex-data err)))))
 
     (is (false? @called?))
     (is (= [:done]
@@ -179,11 +203,11 @@
 
 
 (deftest run!-runs-async-and-returns-task
-  (let [t      (task/->task :install)
-        result (task/run! t
-                 (fn [_]
-                   (Thread/sleep 20)
-                   {:installed? true}))]
+  (let [t      (test-task :install
+                          (fn [_]
+                            (Thread/sleep 20)
+                            {:installed? true}))
+        result (task/run! t)]
 
     (is (= t result))
     (is (wait-finished t))
@@ -192,13 +216,14 @@
 
 
 (deftest join!!-imports-finished-child-events
-  (let [parent (task/->task :install)
-        child  (task/->task :write-root)]
+  (let [parent (test-task :install)
+        child  (test-task :write-root)]
 
     (task/progress! child 0 "writing root")
     (task/progress! child 50 "halfway")
     (task/done! child {:written? true})
 
+    (start-task! parent)
     (task/join!! parent child)
 
     (let [child-events (events-for-id parent (:id child))]
@@ -217,9 +242,34 @@
       (is (false? (task/finished? parent))))))
 
 
+(deftest join!!-rejects-unstarted-parent-without-importing-child-state
+  (let [parent (test-task :install)
+        child  (test-task :write-root)]
+
+    (task/done! child {:written? true})
+
+    (let [err (try
+                (task/join!! parent child)
+                nil
+                (catch clojure.lang.ExceptionInfo e
+                  e))]
+
+      (is (= :error/task-not-running
+             (:type (ex-data err))))
+
+      (is (= {:finished? false
+              :state :new
+              :progress 0}
+             {:finished? (task/finished? parent)
+              :state (timeline/timeline->state (task/task->timeline parent))
+              :progress (timeline/timeline->progress (task/task->timeline parent))})))))
+
+
 (deftest join!!-joins-running-child
-  (let [parent (task/->task :install)
-        child  (task/->task :partition)
+  (let [parent (test-task :install)
+        child  (test-task :partition)
+        _      (start-task! parent)
+        _      (start-task! child)
         joined (future
                  (task/join!! parent child))]
 
@@ -231,14 +281,15 @@
 
     (is (nil? (deref joined 1000 ::timeout)))
 
-    (is (= [:progress :progress :done]
+    (is (= [:started :progress :progress :done]
            (event-types (events-for-id parent (:id child)))))))
 
 
 (deftest join!!-maps-child-progress-into-parent-progress-span
-  (let [parent (task/->task :install)
-        child  (task/->task :write-root)]
+  (let [parent (test-task :install)
+        child  (test-task :write-root)]
 
+    (start-task! parent)
     (task/progress! parent 20 "before child")
 
     (task/progress! child 0 "child start")
@@ -259,9 +310,10 @@
 
 
 (deftest join!!-maps-child-progress-from-zero-when-parent-has-no-progress
-  (let [parent (task/->task :install)
-        child  (task/->task :unpack-pack)]
+  (let [parent (test-task :install)
+        child  (test-task :unpack-pack)]
 
+    (start-task! parent)
     (task/progress! child 50 "half unpacked")
     (task/done! child {:unpacked? true})
 
@@ -274,16 +326,16 @@
 
 
 (deftest join!!-propagates-child-error-to-parent
-  (let [parent (task/->task :install)
-        child  (task/->task :write-root)
-        continued?* (atom false)]
+  (let [continued?* (atom false)
+        child       (test-task :write-root)
+        parent      (test-task :install
+                               (fn [parent-task]
+                                 (task/join!! parent-task child)
+                                 (reset! continued?* true)))]
 
     (task/error! child (ex-info "child boom" {}) "write-root failed")
 
-    (task/run!! parent
-      (fn [_]
-        (task/join!! parent child)
-        (reset! continued?* true)))
+    (task/run!! parent)
 
     (is (task/finished? parent))
 
@@ -304,12 +356,13 @@
 
 
 (deftest duplicate-join-does-not-duplicate-child-events
-  (let [parent (task/->task :install)
-        child  (task/->task :write-root)]
+  (let [parent (test-task :install)
+        child  (test-task :write-root)]
 
     (task/progress! child 100 "written")
     (task/done! child {:written? true})
 
+    (start-task! parent)
     (task/join!! parent child)
 
     (let [before (task/task->timeline parent)]
@@ -320,18 +373,26 @@
              (event-types (events-for-id parent (:id child))))))))
 
 
-(deftest parent-terminal-prevents-later-child-import
-  (let [parent (task/->task :install)
-        child  (task/->task :write-root)]
+(deftest join!!-rejects-terminal-parent-without-importing-child-events
+  (let [parent (test-task :install)
+        child  (test-task :write-root)]
 
+    (start-task! parent)
     (task/done! parent {:installed? true})
 
     (task/progress! child 100 "written")
     (task/done! child {:written? true})
 
-    (task/join!! parent child)
+    (let [err (try
+                (task/join!! parent child)
+                nil
+                (catch clojure.lang.ExceptionInfo e
+                  e))]
 
-    (is (= [:done]
+      (is (= :error/task-not-running
+             (:type (ex-data err)))))
+
+    (is (= [:started :done]
            (event-types (task-events parent))))
 
     (is (= 0
@@ -339,9 +400,10 @@
 
 
 (deftest parent-can-finish-after-successful-join
-  (let [parent (task/->task :install)
-        child  (task/->task :prepare-device)]
+  (let [parent (test-task :install)
+        child  (test-task :prepare-device)]
 
+    (start-task! parent)
     (task/progress! parent 10 "starting")
 
     (task/progress! child 100 "prepared")
@@ -355,5 +417,5 @@
 
     (is (task/finished? parent))
 
-    (is (= [:progress :done]
+    (is (= [:started :progress :done]
            (event-types (task-events parent))))))

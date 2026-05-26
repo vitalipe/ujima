@@ -29,29 +29,34 @@
     (Math/round)))
 
 
-(defn- commit-event! [timeline* id event]
-  (loop []
+(defn- commit-event! 
+
+  ([timeline* id event] 
+   (commit-event! timeline* id event (constantly true)))
+  
+  ([timeline* id event allow?]  
+   (loop []
     
-    (let [prv    @timeline*
-          nxt    (conj prv event)
-          cas!   (partial compare-and-set! timeline*) 
+     (let [prv    @timeline*
+           nxt    (conj prv event)
+           cas!   (partial compare-and-set! timeline*) 
           
-          p-ended (terminal-event? (timeline->last-of prv id))  
-          e-ended (terminal-event? (timeline->last-of prv (:id event)))]
-                            
-      (cond 
+           ?parent-ended (terminal-event? (timeline->last-of prv id))  
+           ?event-ended  (terminal-event? (timeline->last-of prv (:id event)))
+           ?allowed      (allow? prv)]
+                             
+       (cond 
 
-        ;; parent task is terminal:
-        p-ended nil
+         ?parent-ended  nil
+         ?event-ended   nil
+         (not ?allowed) nil
 
-        ;; prevents duplicate child joins / late child events.
-        e-ended  nil
 
-        ;; try cmp-set!
-        (cas! prv nxt)  event
+         ;; try cmp-set!
+         (cas! prv nxt)  event
         
-        ;; retry
-        :otherwise      (recur)))))
+         ;; retry
+         :otherwise      (recur))))))
 
 
 (defn- task-event [{:keys [id name]} type payload]
@@ -60,11 +65,11 @@
 
 (defrecord UjimaTask [id          ;; task id, use this to filter 
                       name        ;; task name keyword, used to group child tasks etc
-                      
                       ch*         ;; carries wake-up/event notifications, must use a sliding buffer so `event!` 
                                   ;; does not block on slow consumers.
-                      
-                      timeline*]) ;; task timeline append only, the source of truth.
+
+                      timeline*   ;; task timeline append only, the source of truth.
+                      code])
 
 
 (defn task->timeline 
@@ -76,6 +81,9 @@
   [{timeline :timeline*}] 
   @timeline)
 
+
+(defn task->state [{timeline* :timeline*}] 
+  (timeline->state @timeline*))
 
 
 (defn finished? [{id :id timeline* :timeline*}]
@@ -91,12 +99,11 @@
    writes the event to `ch*`.
 
    Returns the event or nil."
-
-  [{:keys [ch* id timeline*]} event]
-
-  (when-let [event (commit-event! timeline* id event)]
-    (async/>!! ch* event)
-    event))
+  ([task event] (event! task event (constantly true)))
+  ([{:keys [ch* id timeline*]} event allow?]
+   (when-let [event (commit-event! timeline* id event allow?)]
+     (async/>!! ch* event)
+     event)))
 
 
 (defn progress!
@@ -129,33 +136,53 @@
      event)))
 
 
-(defn run!!
-  "Runs f against task on the current thread.
+ (defn run!!
+  "Runs the task on the current thread (blocks).
 
    Emits :started first. If f returns normally, emits :done. If f throws, emits
    :error.
 
-   Returns the task timeline after execution finishes.
+   Returns the task timeline after execution finishes."
 
-   Blocks until f finishes."
-  [task f]
-  (when (event! task (task-event task :started {}))
-    (try
-      (let [value (f task)]
-        (done! task value))
+  [{f :code id :id name :name :as task}]
+  (if (event! task
+              (task-event task :started {})
+              #(nil? (timeline->last-of % id)))
+    (do
+      (try
+        (done! task (f task))
+        (catch Throwable err
+          (error! task err)))
+        
+      (task->timeline task))
 
-      (catch Throwable err
-        (error! task err))))
-
-  (task->timeline task))
+    ;; nil on (event! ...)
+    (throw
+      (ex-info "Cannot run task that is already started"
+                {:type :error/task-running
+                 :task name}))))
 
 
 (defn run!
-  "Runs f in an async thread and returns task immediately."
-  [task f]
-  (async/thread
-    (run!! task f))
+  "Runs the task an async thread and returns task immediately."
+  [{f :code id :id name :name :as task}]
+  (if (event! task
+              (task-event task :started {})
+              #(nil? (timeline->last-of % id)))
+    
+    (async/thread
+      (try
+        (done! task (f task))
+        (catch Throwable err
+          (error! task err))))
+        
+    ;; nil on (event! ...)
+    (throw
+      (ex-info "Cannot run task that is already started"
+                {:type :error/task-running
+                 :task name})))
   task)
+
 
 
 (defn take!! [task]
@@ -200,6 +227,15 @@
                          (when (= type :done)
                            (progress! task target-% "done")))))]     
 
+
+     (when-not (= :running (task->state task))
+       (throw 
+         (ex-info "Cannot join child into a task that is not running"
+                  {:type :error/task-not-running :task task-name})))
+
+     (when (= :new (task->state child))
+       (run! child))     
+
      (loop [taken 0]
        (let [timeline (task->timeline child)
              [nxt]    (drop taken timeline)
@@ -229,8 +265,9 @@
    - `:write-root`
 
    Lifecycle events are added by `run!`, `event!`, `done!`, `error!`."
-  [name]
+  [name f]
   (->UjimaTask (swap! next-id* inc)
                name
                (async/chan (async/sliding-buffer 128))
-               (atom [])))
+               (atom [])
+               f))

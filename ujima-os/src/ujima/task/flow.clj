@@ -1,14 +1,13 @@
 (ns ujima.task.flow
-  (:require [clojure.core.async :as async]
-            [ujima.task :as task]))
+  (:require [ujima.task :as task]))
 
 
 (defn flow-error-ex [type message]
   (ex-info message {:type type}))
 
 
-(defmacro flow!
-  "Creates and starts a root task flow.
+(defmacro flow
+  "Creates a cold task flow.
 
    Inside the body, these lexical helpers are available:
 
@@ -19,25 +18,30 @@
    Nested child tasks should be created with <step!.
    Existing external tasks should be joined with <join!."
   [name & body]
-  `(let [task# (task/->task ~name)]
-     (task/run!
-       task#
-       (fn [~'task*]
-         (let [~'progress! (fn
-                             ([progress#]
-                              (task/progress! ~'task* progress#))
-                             ([progress# message#]
-                              (task/progress! ~'task* progress# message#)))
+  `(task/->task
+     ~name
+     (fn [~'task*]
+       (let [~'progress! (fn
+                           ([progress#]
+                            (task/progress! ~'task* progress#))
+                           ([progress# message#]
+                            (task/progress! ~'task* progress# message#)))
 
-               ~'error!    (fn
-                             ([type# message#]
-                              (throw (flow-error-ex type# message#)))
-                             ([error#]
-                              (throw error#)))]
+             ~'error!    (fn
+                           ([type# message#]
+                            (throw (flow-error-ex type# message#)))
+                           ([error#]
+                            (throw error#)))]
 
-           ~@body)))
+         ~@body))))
 
-     task#))
+
+(defmacro flow!
+  "Creates and synchronously runs a root task flow.
+
+   Returns the value returned by `task/run!!`."
+  [name & body]
+  `(task/run!! (flow ~name ~@body)))
 
 
 (defmacro <join!
@@ -46,7 +50,7 @@
    target-progress is the parent progress value the child should map to when it
    completes successfully.
 
-   Must be used inside flow!."
+   Must be used inside flow or flow!."
   [target-progress child-expr]
   `(let [child# ~child-expr]
      (task/join!! ~'task* child# ~target-progress)
@@ -54,19 +58,17 @@
 
 
 (defmacro <step!
-  "Creates a child flow and joins it into the current flow.
+  "Creates a cold child flow and joins it into the current flow.
 
    target-progress is the parent progress value this step should reach when it
-   completes successfully.
+   completes successfully. `task/join!!` owns starting the child.
 
-   Must be used inside flow!."
+   Must be used inside flow or flow!."
   [target-progress name & body]
-  `(let [child# (flow! ~name
+  `(let [child# (flow ~name
                   ~@body)]
      (task/join!! ~'task* child# ~target-progress)
      child#))
-
-
 
 
 (comment "example"

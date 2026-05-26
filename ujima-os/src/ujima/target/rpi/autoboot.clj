@@ -15,8 +15,7 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
 
-            [ujima.io.fs :refer [spit-file-atomic! file->number]]))
-
+            [ujima.fs :refer [spit-file-atomic! file->number slurp-text]]))
 
 
 (defn- parse-int [s] (when s (parse-long s)))
@@ -31,7 +30,7 @@
      \"/dev/mmcblk0p5\""
   [path]
   
-  (let [content (slurp (fs/path path "cmdline.txt"))]
+  (let [content (slurp-text (fs/path path "cmdline.txt"))]
     (some->> content
              (re-find #"(^|\s)root=(\S+)")
              (nth 2 nil))))
@@ -67,11 +66,12 @@
 
         {:keys [boot_partition 
                 tryboot_partition 
-                tryboot_a_b]} (->> (fs/path path "autoboot.txt"  
-                                    (slurp)
-                                    (str/split-lines)
-                                    (keep kv-line)
-                                    (into {})))]
+                tryboot_a_b]} (->> "autoboot.txt"  
+                                (fs/path path)
+                                (slurp-text)
+                                (str/split-lines)
+                                (keep kv-line)
+                                (into {}))]
     
     (cond
        tryboot_a_b {:boot boot_partition :try-boot tryboot_partition}

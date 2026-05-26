@@ -10,8 +10,8 @@
             [ujima.runtime.settings :as settings]
 
 
-            [ujima.io.fs :refer [slurp-edn!]]
-            [ujima.edn   :refer [edn->json json->edn]]
+            [ujima.fs  :refer [slurp-edn!]]
+            [ujima.edn :refer [edn->json json->edn]]
 
             [ujima.agent :as ujima-agent]))
 

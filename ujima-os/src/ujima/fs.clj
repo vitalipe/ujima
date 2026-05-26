@@ -1,11 +1,21 @@
-(ns ujima.io.fs
+(ns ujima.fs
   (:require [clojure.string  :as str]
             [clojure.java.io :as java-io]
             [clojure.edn     :as edn]
-            
-            [babashka.fs      :as fs]
-            [ujima.io.shell   :refer [sh]]))
-  
+            [babashka.fs      :as fs]))
+
+
+(defn slurp-text
+  "Returns file text, or default on error. Does not throw."
+  ([path]
+   (slurp-text path ""))
+
+  ([path default]
+   (try
+     (cond 
+       (fs/exists? path) (slurp (str (java-io/file path)))
+       :otherwise        default))))
+     
 
 (defn slurp-edn!
   "Reads EDN. Returns default on error, Does not throw."
@@ -14,14 +24,15 @@
 
   ([path default]
    (try
-     
-     (cond 
-       (fs/exists? path) (edn/read-string (slurp (java-io/file path)))
-       :otherwise        default)
-     
-     (catch Throwable _ default))))
+     (if-let [txt (slurp-text path nil)]            
+       (try 
+        (edn/read-string txt) 
+        (catch Throwable _ default))
 
-
+       ;; else 
+       default))))
+     
+     
 (defn spit-file-atomic!
   "Writes text atomically. Returns a result map. Does not throw."
   [path text]
@@ -46,10 +57,6 @@
        :exception e})))
 
 
-(defn block-device? [path]
-  (:ok? (sh :test "-b" (str path))))
-
-
 (defn probe-file! [root file-pattern]
   (let [[first-matching] (fs/glob root file-pattern)]
     (when first-matching
@@ -68,9 +75,3 @@
                {:path (str path)})))
   path)
 
-
-(defn require-block-device! [path]
-  (when-not (block-device? path)
-    (throw  (ex-info (str path " is not a block device")
-                     {:path (str path)})))
-  path)

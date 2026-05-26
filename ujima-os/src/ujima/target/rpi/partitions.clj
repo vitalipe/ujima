@@ -1,41 +1,12 @@
 (ns ujima.target.rpi.partitions
-  (:require  [clojure.string :as str]
-
-             [babashka.fs    :as fs] 
-             
-             [ujima.io.shell :refer [sh sh! sudo!]]
-             [ujima.io.fs    :refer [require-block-device! file->number]]))
+  (:require [ujima.linux.shell :refer [sh! sudo!]]
+            [ujima.linux.disk :refer [require-block-device!
+                                       device->partitions
+                                       partition->info]]))
 
 
 (defn- MiB [v] 
   (* 1024 1024 v))
-
-
-(defn- sys-file->path [partition file-name]
-  (fs/path "/sys/class/block" (fs/file-name partition) file-name))
-
-
-(defn- sys-file->long [partition file-name]
-  (file->number (sys-file->path partition file-name)))
-
-  
-(defn device->partitions [device]
-  (->> device
-    (sh :lsblk "-nrpo" "NAME")
-    (:out) 
-    (str/split-lines)
-    (filter  #(fs/exists? (sys-file->path % "partition")))
-    (sort-by #(sys-file->long % "partition"))))
-
-     
-(defn partition->info [path]
-  (let [start (sys-file->long  path "start") 
-        size  (sys-file->long  path "size")]
-
-    {:path  path
-     :start-sector start
-     :end-sector   (+ start size -1)
-     :size-bytes   (* 512 size)}))
 
 
 (defn require-ab-partition-layout! [device]
@@ -146,4 +117,3 @@
 
       (sudo! :mkfs.ext4 "-F" "-L" "UJCFG"   config)
       (sudo! :mkfs.ext4 "-F" "-L" "UJSTORE" storage))))
-

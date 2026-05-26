@@ -1,16 +1,19 @@
 (ns ujima.target.rpi.runtime
   (:require 
             [clojure.core.async :as a]
-            [clojure.string :as str]
             [clojure.java.io :as java-io]
 
             [babashka.process :as p]            
 
-            [ujima.log   :as log]
-            [ujima.io.shell :refer [sudo sh]]
-            [ujima.io.fs    :refer [spit-file-atomic! slurp-edn! probe-file!]]
-            
-            [ujima.runtime.protocol :refer [UjimaSystem UjimaDesktop UjimaDiscovery UjimaRuntime]]))
+            [ujima.log :as log]
+            [ujima.fs  :refer [spit-file-atomic! 
+                               slurp-edn! 
+                               probe-file!]]
+
+            [ujima.linux.system     :as linux]
+            [ujima.runtime.protocol :refer [UjimaSystem 
+                                            UjimaDesktop 
+                                            UjimaRuntime]]))
 
 
 (defn- do-probe-control-token! [_]
@@ -25,55 +28,24 @@
 (defrecord RpiRuntime [env]
 
   UjimaSystem
-  (hostname [_]
-    (:out (sh :hostnamectl "--static")))
-
-
-  (hostname! [_ hostname]
-    (sudo :hostnamectl "set-hostname" hostname)
-    (:out (sh :hostnamectl "--static")))
-
-
-  (timezone [_]
-    (:out (sh :timedatectl "show" "-p" "Timezone" "--value")))
-
-
-  (timezone! [_ timezone]
-    (sudo :timedatectl "set-timezone" timezone)
-    (:out (sh :timedatectl "show" "-p" "Timezone" "--value")))
   
-
-  (keyboard-layouts [_])
-    ;; TODO: test localectl status
-
-
-  (keyboard-layouts! [_ layouts]
-    (sudo :localectl "set-x11-keymap" (str/join "," layouts)))
-
-
-  (reboot! [_]
-    (sudo :systemctl "reboot"))
-
-
-  (shutdown! [_]
-    (sudo :systemctl "poweroff")) 
-
-
+  (hostname  [_]          (linux/hostname))  
+  (hostname! [_ hostname] (linux/hostname! hostname))  
+  
+  (timezone  [_]          (linux/timezone))
+  (timezone! [_ timezone] (linux/timezone! timezone))
+  
+  (keyboard-layouts [_]          (linux/keyboard-layouts))
+  (keyboard-layouts! [_ layouts] (linux/keyboard-layouts! layouts))
+    
+  (reboot!   [_] (linux/reboot!))
+  (shutdown! [_] (linux/shutdown!))
+   
   UjimaDesktop
 
-  (volume [_]
-    (let [out (:out (sh :pactl "get-sink-volume" "@DEFAULT_SINK@"))]
-      (Integer/parseInt (second (re-find #"(\d+)%" out)))))
-
-
-  (volume! [this value]
-    (let [value (-> value int (max 0) (min 100))]
-      (sh :pactl "set-sink-volume" "@DEFAULT_SINK@" (str value "%"))
-      
-      ;; get volume
-      (let [out (:out (sh :pactl "get-sink-volume" "@DEFAULT_SINK@"))]
-        (Integer/parseInt (second (re-find #"(\d+)%" out))))))
-
+  (volume  [_]       (linux/volume))
+  (volume! [_ value] (linux/volume! value))
+  
 
   (wallpaper [_])
     ;; TODO once desktop is stable
@@ -105,16 +77,6 @@
 
   (app-kill! [_ name])
     ;; TODO once desktop is stable
-
-
-  UjimaDiscovery
-  (discover-peers! [_ _opts]
-    ;; Placeholder. Later: avahi-browse / mDNS helper.
-    [])
-
-  (discover-content! [_ _opts]
-    ;; Placeholder. Later: local content manifest discovery.
-    [])
 
 
   UjimaRuntime

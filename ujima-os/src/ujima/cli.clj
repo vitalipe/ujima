@@ -4,7 +4,7 @@
             [ujima.runtime.settings  :as settings]
 
             [ujima.log               :as log] 
-            [ujima.io.fs             :refer [slurp-edn!]]))
+            [ujima.fs                :refer [slurp-edn!]]))
 
 
 (defn usage []

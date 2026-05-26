@@ -1,20 +1,62 @@
-(ns ujima.io.mount
-  (:require [babashka.fs    :as fs]
-            [ujima.io.shell :as io]))
+(ns ujima.linux.disk
+  (:require [clojure.string :as str]
+            [babashka.fs :as fs]
+            [ujima.fs :refer [file->number]]
+            [ujima.linux.shell :refer [sh sudo!]]))
 
 
+(defn- sys-file->path [partition file-name]
+  (fs/path "/sys/class/block" (fs/file-name partition) file-name))
+
+
+(defn- sys-file->long [partition file-name]
+  (file->number (sys-file->path partition file-name)))
+
+
+;; disk/block helpers
+(defn block-device? [path]
+  (:ok? (sh :test "-b" (str path))))
+
+
+(defn require-block-device! [path]
+  (when-not (block-device? path)
+    (throw  (ex-info (str path " is not a block device")
+                     {:path (str path)})))
+  path)
+
+  
+(defn device->partitions [device]
+  (->> device
+    (sh :lsblk "-nrpo" "NAME")
+    (:out) 
+    (str/split-lines)
+    (filter  #(fs/exists? (sys-file->path % "partition")))
+    (sort-by #(sys-file->long % "partition"))))
+
+
+(defn partition->info [path]
+  (let [start (sys-file->long  path "start") 
+        size  (sys-file->long  path "size")]
+
+    {:path  path
+     :start-sector start
+     :end-sector   (+ start size -1)
+     :size-bytes   (* 512 size)}))
+
+
+;; mount helpers
 (defn mount-point? [mnt]
-  (:ok? (io/sh :mountpoint "-q" (str mnt))))
+  (:ok? (sh :mountpoint "-q" (str mnt))))
 
 
 (defn device->mount-points [device-path]
-  (->> (io/sh :findmnt "--source" (str device-path)
-                       "--output" "TARGET"
-                       "--noheadings"
-                       "--raw")
-       (:out)
-       (str/split-lines)
-       (remove str/blank?)))
+  (->> (sh :findmnt "--source" (str device-path)
+                    "--output" "TARGET"
+                    "--noheadings"
+                    "--raw")
+    (:out)
+    (str/split-lines)
+    (remove str/blank?)))
 
 
 (defn device-mounted? [device-path]
@@ -27,11 +69,11 @@
 
 
 (defn umount! [mnt]
-  (io/sudo! :umount (str mnt)))
+  (sudo! :umount (str mnt)))
 
 
 (defn mount! [fs-type device mnt]
-  (io/sudo! :mount "-t" fs-type (str device) (str mnt)))
+  (sudo! :mount "-t" fs-type (str device) (str mnt)))
 
 
 (defn wait-until-unmounted-or-fail! [mnt]

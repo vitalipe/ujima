@@ -2,10 +2,11 @@
   (:require [clojure.edn :as edn]
             [clojure.string :as str]
             [babashka.fs :as fs]
-            
-            [ujima.io.shell :refer [sh! sh sudo!]]
-            [ujima.io.fs :as io]))
 
+            [ujima.fs :refer [require-file!]]
+            
+            [ujima.linux.shell :refer [sh! sh sudo!]]
+            [ujima.linux.disk  :refer [require-block-device!]]))
 
 (def pack-version 1)
 
@@ -74,11 +75,11 @@
    
    ([boot-img root-img ujima-pack-path pack-metadata]
    
-    (io/require-file! boot-img)
-    (io/require-file! root-img)
+    (require-file! boot-img)
+    (require-file! root-img)
 
     (fs/with-temp-dir [work-dir {:prefix "ujima-pack-"}]
-      (spit (fs/path pack-dir "metadata.edn") (pr-str (assoc pack-metadata :pack pack-version)))
+      (spit (fs/path work-dir "metadata.edn") (pr-str (assoc pack-metadata :pack pack-version)))
 
       ;;FIXME: copy to rename, we might be able to tell tar to rename 
       (sh! :cp (str boot-img) (str (fs/path work-dir "boot.img")))
@@ -107,8 +108,8 @@
 
     (validate! ujima-pack-path)
 
-    (io/require-block-device! boot-partition-path)
-    (io/require-block-device! root-partition-path)
+    (require-block-device! boot-partition-path)
+    (require-block-device! root-partition-path)
 
     (write-to-partition! "boot.img" boot-partition-path)
     (write-to-partition! "root.img" root-partition-path)

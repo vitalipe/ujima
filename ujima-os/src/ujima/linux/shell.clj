@@ -1,4 +1,4 @@
-(ns ujima.io.shell
+(ns ujima.linux.shell
   (:require [clojure.string  :as str]
             [babashka.process :as p]))            
 

@@ -18,6 +18,7 @@
      {:slots {:a {:boot \"/dev/sda2\"
                   :root \"/dev/sda3\"
                   :ujima-os \"1.0\"}
+                  
               :b {:boot \"/dev/sda4\"
                   :root \"/dev/sda5\"
                   :ujima-os nil}}

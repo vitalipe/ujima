@@ -1,5 +1,6 @@
 (ns ujima.shell-macro-test
-  (:require [clojure.test      :refer [deftest is testing]]
+  (:require [clojure.java.io  :as io]
+            [clojure.test     :refer [deftest is testing]]
             [babashka.process :as process]
             [ujima.linux.shell :as shell]))
 
@@ -23,7 +24,7 @@
                                       {:proc true})]
         (shell/$ printf "%s" 42 :ok)
 
-        (is (= [["printf" "%s" "42" ":ok"]]
+        (is (= [["printf" "%s" "42" "ok"]]
                @calls*)))))
 
   (testing "$ evaluates [expr] args and stringifies the result"
@@ -95,6 +96,83 @@
                @calls*))))))
 
 
+(deftest redirect-dollar-macro-test
+  (testing "$> redirects previous process stdout to a file path using cat"
+    (let [calls* (atom [])
+          prev   {:id 1}
+          target "/tmp/ujima/image.img"]
+      (with-redefs [process/process (fn [& args]
+                                      (swap! calls* conj args)
+                                      {:proc true})]
+        (is (= {:proc true}
+               (shell/$> prev target)))
+
+        (is (= [[{:prev prev
+                  :out  (io/file target)}
+                 "cat"]]
+               @calls*)))))
+
+  (testing "$> works in thread-first pipelines"
+    (let [calls* (atom [])
+          n*     (atom 0)
+          target "/tmp/ujima/image.img"]
+      (with-redefs [process/process (fn [& args]
+                                      (let [proc {:id   (swap! n* inc)
+                                                  :args args}]
+                                        (swap! calls* conj args)
+                                        proc))]
+        (let [result (-> (shell/$ curl --fail --location ["https://example.test/os.img.xz"])
+                         (shell/$ xz -dc)
+                         (shell/$> target))]
+          (is (= {:id   3
+                  :args [{:prev {:id   2
+                                 :args [{:prev {:id   1
+                                                :args ["curl"
+                                                       "--fail"
+                                                       "--location"
+                                                       "https://example.test/os.img.xz"]}}
+                                        "xz"
+                                        "-dc"]}
+                         :out  (io/file target)}
+                         "cat"]}
+                 result))
+
+          (is (= [["curl" "--fail" "--location" "https://example.test/os.img.xz"]
+                  [{:prev {:id   1
+                           :args ["curl"
+                                  "--fail"
+                                  "--location"
+                                  "https://example.test/os.img.xz"]}}
+                   "xz"
+                   "-dc"]
+                  [{:prev {:id   2
+                           :args [{:prev {:id   1
+                                          :args ["curl"
+                                                 "--fail"
+                                                 "--location"
+                                                 "https://example.test/os.img.xz"]}}
+                                  "xz"
+                                  "-dc"]}
+                   :out  (io/file target)}
+                   "cat"]]
+                 @calls*))))))
+
+  (testing "$> accepts evaluated target expressions through normal Clojure syntax"
+    (let [calls*    (atom [])
+          prev      {:id 1}
+          stage-dir "/tmp/ujima-stage"
+          filename  "image.img"]
+      (with-redefs [process/process (fn [& args]
+                                      (swap! calls* conj args)
+                                      {:proc true})]
+        (shell/$> prev (str stage-dir "/" filename))
+
+        (is (= [[{:prev prev
+                  :out  (io/file "/tmp/ujima-stage/image.img")}
+                 "cat"]]
+               @calls*))))))
+
+
 (deftest dollar-bang-macro-test
   (testing "$! converts tokens and delegates to sh!"
     (with-redefs [shell/sh! (fn [& args] (vec args))]
@@ -109,7 +187,7 @@
 
   (testing "$! stringifies literal non-symbol args"
     (with-redefs [shell/sh! (fn [& args] (vec args))]
-      (is (= ["printf" "%s" "42" ":ok"]
+      (is (= ["printf" "%s" "42" "ok"]
              (shell/$! printf "%s" 42 :ok))))))
 
 

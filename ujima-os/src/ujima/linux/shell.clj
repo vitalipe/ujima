@@ -22,7 +22,8 @@
     ;; Shell-like literal token:
     ;;   ($ curl --fail --location ...)
     ;; => "curl" "--fail" "--location"
-    (symbol? form) (name form)
+    (symbol? form)  (name form)
+    (keyword? form) (name form)
 
     ;; Explicit Clojure evaluation:
     ;;   ($ cat [path])
@@ -35,38 +36,24 @@
                   (ex-info "Use [...] for evaluated shell macro expressions"
                            {:form form}))
 
-    ;; Strings, numbers, keywords, paths, etc.
-    :else (str form)))
+    ;; Strings, numbers, paths, etc.
+    :otherwise (str form)))
 
 
-(defn- threaded-prev? [form]
-  ;; In:
-  ;;   (-> ($ echo hello)
-  ;;       ($ grep hell))
-  ;;
-  ;; the second form macroexpands as:
-  ;;   ($ ($ echo hello) grep hell)
-  ;;
-  ;; So a seq as the first form means "previous process".
-  (seq? form))
-
-
-(defn- process-call-form [sudo? forms]
-  (let [[maybe-prev & rest-forms] forms
-        [prev forms]              (if (threaded-prev? maybe-prev)
-                                    [maybe-prev rest-forms]
+(defn- process-call-form [forms prefix-forms]
+  (let [[maybe-prv & rest-forms] forms
+        [prv forms]              (if (seq? maybe-prv) ;; threaded?
+                                    [maybe-prv rest-forms]
                                     [nil forms])]
-
     (when-not (seq forms)
       (throw
         (ex-info "Shell macro requires a command" {:form forms})))
 
-    (let [tokens (mapv form->shell-token forms)
-          tokens (if sudo?
-                   (concat ["sudo" "-n"] tokens)
-                   tokens)]
-      (if prev
-        `(p/process {:prev ~prev} ~@tokens)
+    (let [tokens (->> forms
+                   (mapv form->shell-token)
+                   (concat prefix-forms))]
+      (if prv
+        `(p/process {:prev ~prv} ~@tokens)
         `(p/process ~@tokens)))))
 
 
@@ -120,7 +107,7 @@
          ($ grep hell)
          (out-or-fail!))"
   [& forms]
-  (process-call-form false forms))
+  (process-call-form forms []))
 
 
 (defmacro sudo$
@@ -134,7 +121,7 @@
          ($ grep ujima)
          (out-or-fail!))"
   [& forms]
-  (process-call-form true forms))
+  (process-call-form forms ["sudo" "-n"]))
 
 
 (defn pipeline-or-fail!
@@ -173,3 +160,20 @@
   "Shell syntax sugar over sudo!. Not pipeable. Returns trimmed stdout."
   [& forms]
   `(sudo! ~@(mapv form->shell-token forms)))
+
+
+(defmacro $>
+  "Redirects stdout from the previous process into target.
+
+   Intended for use inside thread-first process pipelines:
+
+     (-> ($ curl --fail --location [url])
+         ($ xz -dc)
+         ($> (fs/file image-path))
+         (result-or-fail!))
+
+   This starts a final `cat` process with:
+     :prev previous-process
+     :out  target"
+  [prev target]
+  `(p/process {:prev ~prev :out  (clojure.java.io/file ~target)} "cat"))

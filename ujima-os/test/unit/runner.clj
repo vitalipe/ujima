@@ -4,6 +4,9 @@
             [ujima.task.timeline-test]
             [ujima.task.flow-test]
             [ujima.task.task-test]
+
+            [ujima.shell-macro-test]
+
             [ujima.edn-test]))
 
 
@@ -11,6 +14,9 @@
   '[ujima.task.task-test
     ujima.task.timeline-test
     ujima.task.flow-test
+
+    ujima.shell-macro-test
+    
     ujima.edn-test])
 
 

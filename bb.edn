@@ -1,0 +1,7 @@
+{:paths ["ujima-os/src" "tools/src"]
+
+ :tasks
+ {tools
+  {:doc "Tools CLI"
+   :requires ([ujima.tools.cli :as cli])
+   :task (apply cli/-main *command-line-args*)}}}

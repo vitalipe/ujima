@@ -1,6 +1,6 @@
 (ns ujima.linux.disk.loop
   (:require [babashka.fs :as fs]
-            [ujima.linux.shell :refer [sudo!]]))
+            [ujima.linux.shell :refer [sudo$!]]))
 
 
 (defn attach-loopback-device! [image-path]

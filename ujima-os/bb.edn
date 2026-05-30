@@ -1,4 +1,4 @@
-{:paths ["src"]
+{:paths ["src" "test"]
 
  :deps {http-kit/http-kit {:mvn/version "2.8.0"}
         cheshire/cheshire {:mvn/version "5.13.0"}
@@ -18,25 +18,14 @@
                 (or (seq *command-line-args*)
                     ["config/ujima.edn"]))}
 
-  test-http
-  {:doc "Run HTTP e2e tests"
-   :task (apply shell "bb" "-cp" "src:test/e2e" "-m" "http"
-                (or (seq *command-line-args*)
-                    ["config/ujima.edn"]))}
-
-  test-cli
-  {:doc "Run CLI e2e tests"
-   :task (apply shell "bb" "-cp" "src:test/e2e" "-m" "cli"
-                (or (seq *command-line-args*)
-                    ["config/ujima.edn"]))}
-
   test-unit
   {:doc "Run unit tests"
    :task (shell "bb" "-cp" "src:test/unit" "-m" "runner")}
 
   test-e2e
-  {:doc "Run all e2e tests"
-   :depends [test-cli test-http]}
+  {:doc "Run an e2e test from test/e2e/tests"
+   :requires ([e2e.runner :as e2e])
+   :task (apply e2e/-main *command-line-args*)}
 
   test
   {:doc "Run all tests"

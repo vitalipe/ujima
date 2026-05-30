@@ -104,7 +104,7 @@
 
         ;; now we can cleanup tmpdir like a peasant
         (when (fs/exists? mnt)
-          (fs/delete-tree mnt))))))
+          (fs/delete mnt)))))) ;; will fail if not empty
 
 
 (defmacro with-mounted

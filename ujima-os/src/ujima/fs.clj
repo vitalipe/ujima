@@ -65,7 +65,7 @@
 
 (defn file->number [path]
   (when (fs/exists? path)
-    (-> path slurp str/trim parse-long))) 
+    (-> path str slurp str/trim parse-long))) 
 
 
 (defn require-file! [path]

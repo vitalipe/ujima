@@ -180,17 +180,12 @@
 
 
 (defn root? []
-  (= "0" (str/trim (:out (sh :id "-u")))))
+  (or (= "0" (str/trim (:out (sh :id "-u")))))
+      (:ok? (sh :sudo "-n" "true")))
 
 
-(defn can-sudo-without-password? []
-  (:ok? (sh :sudo "-n" "true")))
-
-
-(defn require-root-or-passwordless-sudo!
-  []
-  (when-not (or (root?)
-                (can-sudo-without-password?))
+(defn require-root! []
+  (when-not (root?)
     (throw
       (ex-info "This operation requires root or passwordless sudo"
                {:type :ujima/root-required}))))

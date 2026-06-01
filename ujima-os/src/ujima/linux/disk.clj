@@ -17,6 +17,14 @@
   (:ok? (sh :test "-b" (str path))))
 
 
+(defn partition? [device-path]
+  (let [device-name (-> device-path str fs/file-name)]
+    (fs/exists? 
+      (fs/path "/sys/class/block" 
+               device-name 
+               "partition"))))
+
+
 (defn require-block-device! [path]
   (when-not (block-device? path)
     (throw  (ex-info (str path " is not a block device")
@@ -41,3 +49,4 @@
      :start-sector start
      :end-sector   (+ start size -1)
      :size-bytes   (* 512 size)}))
+         

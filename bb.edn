@@ -6,5 +6,5 @@
             :task (apply e2e/-main *command-line-args*)}
   
   tools {:doc "Tools CLI"
-         :requires ([ujima.tools.cli :as cli])
+         :requires ([tools.cli :as cli])
          :task (apply cli/-main *command-line-args*)}}}

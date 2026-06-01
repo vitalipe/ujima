@@ -187,5 +187,5 @@
 (defn require-root! []
   (when-not (root?)
     (throw
-      (ex-info "This operation requires root or passwordless sudo"
+      (ex-info "This operation requires root"
                {:type :ujima/root-required}))))

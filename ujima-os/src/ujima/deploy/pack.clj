@@ -5,11 +5,17 @@
 
             [ujima.fs :refer [require-file!]]
             
-            [ujima.linux.shell :refer [sh! sh sudo!]]
-            [ujima.linux.disk  :refer [require-block-device!]]))
+            [ujima.linux.shell     :refer [$ sudo$ $! sudo$! sh! sh sudo! result-or-fail!]]
+            [ujima.linux.disk      :refer [require-block-device! device->partitions]]
+            [ujima.linux.disk.loop :refer [with-loopback-device]]))
+
 
 (def pack-version 1)
-
+(def base-meta    {:pack-version   pack-version
+                   :ujima-version  "0.0.0"
+                   :target         :mock
+                   :arch           :test})
+ 
 
 (defn metadata [ujima-pack-path]
   (let [{:keys [ok? out]} (sh :tar "--zstd" "-xOf" ujima-pack-path "metadata.edn")]
@@ -21,7 +27,7 @@
 
 (defn entries [ujima-pack-path]
   (->> ujima-pack-path
-       (sh! :tar "--zstd" "-tf")
+       (sh :tar "--zstd" "-tf")
        (:out)
        (str/split-lines)
        (into #{})))
@@ -43,79 +49,79 @@
         (ex-info "Invalid Ujima pack: unreadable metadata.edn"
                  {:path ujima-pack-path})))
 
-    (when-not (pos? (:pack meta))
+
+    (when-not (int? (:pack-version meta))
       (throw
         (ex-info "Invalid Ujima pack: unreadable :pack version number"
                  {:path ujima-pack-path
                   :pack meta})))
 
-    (when-not (>= pack-version (:pack meta))
+
+    (when-not (>= pack-version (:pack-version meta))
       (throw
         (ex-info "Invalid Ujima pack: unsupported newer version"
                  {:path ujima-pack-path
-                  :pack meta}))))
-
-
-  true)
+                  :pack meta})))
+    true))
 
 
 (defn valid? [ujima-pack-path]
   (try
     (validate! ujima-pack-path)
-    true
-    (catch Throwable _
-      false)))
+    true (catch Throwable _ false)))
 
 
-;; FIXME: might the the wrong signature, we probably want to start with a disk image
-;;        not 2 partition images
+(defn- pack-to-file! [src dst]
+  (sudo! :dd (str "if=" src) 
+             (str "of=" dst)
+             "bs=4M"
+             "conv=fsync"))
+
+
+(defn- unpack-to-partition! [pack-path member partition-path]
+  (-> ($ tar --zstd -xOf [pack-path] [member])
+      (sudo$ dd [(str "of="  partition-path)] "bs=4M" "conv=fsync")
+      (result-or-fail!)))
+
+
 (defn pack!
-   ([boot-img root-img ujima-pack-path]
-    (pack! boot-img root-img ujima-pack-path {}))
+   ([src-device ujima-pack-path]
+    (pack! src-device ujima-pack-path {}))
    
-   ([boot-img root-img ujima-pack-path pack-metadata]
+   ([src-device ujima-pack-path pack-metadata]
    
-    (require-file! boot-img)
-    (require-file! root-img)
+    (require-block-device! src-device)
 
-    (fs/with-temp-dir [work-dir {:prefix "ujima-pack-"}]
-      (spit (fs/path work-dir "metadata.edn") (pr-str (assoc pack-metadata :pack pack-version)))
+    (let [[boot-src root-src] (device->partitions src-device)]           
+      (fs/with-temp-dir [work-dir {:prefix "ujima-pack-"}]
+        
+        ;; meta
+        (spit (str (fs/path work-dir "metadata.edn")) 
+              (pr-str (merge base-meta 
+                             pack-metadata 
+                             {:pack-version pack-version})))
 
-      ;;FIXME: copy to rename, we might be able to tell tar to rename 
-      (sh! :cp (str boot-img) (str (fs/path work-dir "boot.img")))
-      (sh! :cp (str root-img) (str (fs/path work-dir "root.img")))
+        (pack-to-file! boot-src (fs/path work-dir "boot.img"))
+        (pack-to-file! root-src (fs/path work-dir "root.img"))
 
-      (sh! :tar "--zstd"
-                "-cf" ujima-pack-path
-                "-C" (str work-dir)
-                "metadata.edn"
-                "boot.img"
-                "root.img")
+        ($! tar --zstd
+                -cf [ujima-pack-path]
+                -C  [work-dir] "metadata.edn" "boot.img" "root.img")))
 
-      (validate! ujima-pack-path))))
+    (validate! ujima-pack-path)))
       
 
 (defn unpack! [ujima-pack-path boot-partition-path root-partition-path]
-  (let [shell-quote         (fn [x] (pr-str (str x)))
-        write-to-partition! (fn [member partition-path]
-                              (sh! :bash "-lc" (str "tar --zstd -xOf "
-                                                 (shell-quote ujima-pack-path)
-                                                 " "
-                                                 (shell-quote member)
-                                                 " | sudo -n dd of="
-                                                 (shell-quote partition-path)
-                                                 " bs=4M conv=fsync status=progress")))]
+  (validate! ujima-pack-path)
 
-    (validate! ujima-pack-path)
+  (require-block-device! boot-partition-path)
+  (require-block-device! root-partition-path)
+    
+  (unpack-to-partition! ujima-pack-path "boot.img" boot-partition-path)
+  (unpack-to-partition! ujima-pack-path "root.img" root-partition-path)
 
-    (require-block-device! boot-partition-path)
-    (require-block-device! root-partition-path)
+  (sudo$! e2fsck -fy [root-partition-path])
+  (sudo$! resize2fs  [root-partition-path])
+  (sudo$! sync)
 
-    (write-to-partition! "boot.img" boot-partition-path)
-    (write-to-partition! "root.img" root-partition-path)
-
-    (sudo! :e2fsck "-fy" (str root-partition-path))
-    (sudo! :resize2fs    (str root-partition-path))
-    (sudo! :sync)
-
-    nil))
+  nil)

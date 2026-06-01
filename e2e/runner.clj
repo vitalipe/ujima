@@ -3,7 +3,7 @@
             [clojure.string :as str]))
 
 
-(def e2e-root "test/e2e/tests")
+(def e2e-root "e2e/tests")
 
 
 (defn- usage! []
@@ -13,8 +13,8 @@
     (println "  bb e2e all [args...]")
     (println)
     (println "Examples:")
-    (println "  bb e2e mount-loopback")
-    (println "  bb e2e mount-loopback --keep")
+    (println "  bb e2e http")
+    (println "  bb e2e http --keep")
     (println "  bb e2e all"))
   (System/exit 2))
 
@@ -40,7 +40,7 @@
        (filter #(str/ends-with? (fs/file-name %) ".clj"))
        (map file->test-name)
        sort
-       vec))
+       (into [])))
 
 
 (defn- require-test-ns! [test-name]
@@ -64,17 +64,19 @@
                   :expected-var (symbol (str test-ns) "test!")}))))
 
 
-(defn- ctx [test-name args]
+(defn- ctx [test-name tmp-dir args]
   {:test-name test-name
    :test-root e2e-root
-   :tmp-dir   (str (fs/path "tmp" "e2e" test-name))
+   :tmp       tmp-dir
    :args      args})
 
 
 (defn- run-one! [test-name args]
   (let [test-ns (require-test-ns! test-name)
         test!   (resolve-test-fn! test-ns)]
-    (test! (ctx test-name args))))
+
+    (fs/with-temp-dir [tmp-dir {:prefix (str "e2e-" test-name)}]
+      (test! (ctx test-name tmp-dir args)))))
     
 
 (defn- run-one-result [test-name args]

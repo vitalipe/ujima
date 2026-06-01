@@ -22,13 +22,9 @@
   {:doc "Run unit tests"
    :task (shell "bb" "-cp" "src:test/unit" "-m" "runner")}
 
-  test-e2e
-  {:doc "Run an e2e test from test/e2e/tests"
-   :requires ([e2e.runner :as e2e])
-   :task (apply e2e/-main *command-line-args*)}
 
   test
   {:doc "Run all tests"
-   :depends [test-unit test-e2e]}}}
+   :depends [test-unit]}}}
 
 

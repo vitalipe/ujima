@@ -1,7 +1,10 @@
-{:paths ["ujima-os/src" "tools/src"]
+{:paths ["ujima-os/src" "tools/src" "."]
 
  :tasks
- {tools
-  {:doc "Tools CLI"
-   :requires ([ujima.tools.cli :as cli])
-   :task (apply cli/-main *command-line-args*)}}}
+ {test-e2e {:doc "Run an e2e test from e2e/tests"
+            :requires ([e2e.runner :as e2e])
+            :task (apply e2e/-main *command-line-args*)}
+  
+  tools {:doc "Tools CLI"
+         :requires ([ujima.tools.cli :as cli])
+         :task (apply cli/-main *command-line-args*)}}}

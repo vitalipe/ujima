@@ -1,15 +1,64 @@
-(ns ujima.tools.cli)
+(ns ujima.tools.cli
+  (:require
+    [ujima.cli.dispatch :as cli]
+    [ujima.tools.cli.loopback :as loopback]
+    [ujima.tools.cli.pack     :as pack]))
 
-(defn usage []
-  (println "Usage: bb tools <stage|update-ujima|jack-in|run>"))
 
 
-(defn -main [& args]
-  (case (first args)
-    "stage"        (println "TODO stage "  (rest args))
-    "update-ujima" (println "TODO ujima "  (rest args))
-    "jack-in"      (println "TODO jack-in" (rest args))
-    "run"          (println "TODO run"     (rest args))
-    (do
-      (usage)
-      (System/exit 1))))
+(def command-tree
+  {"loopback"
+   {"attach"
+    {:usage "Usage: tools loopback attach <img-file-path> [--readonly]"
+     :target loopback/attach-loopback!
+     :args [:img-file-path]
+     :spec {:img-file-path {:desc "Image file path"
+                            :require true}
+            :readonly {:coerce :boolean
+                       :desc "Attach image read-only"}}}
+
+    "detach"
+    {:usage "Usage: tools loopback detach <img-file-or-loop-device>"
+     :target loopback/detach-loopback!
+     :args [:img-file-or-loop-device]
+     :spec {:img-file-or-loop-device {:desc "Image path or loop device path"
+                                      :require true}}}
+
+    "list"
+    {:usage "Usage: tools loopback list"
+     :target loopback/list-loopbacks!
+     :args []
+     :spec {}}}
+
+   "pack"
+   {"create"
+    {:usage "Usage: tools pack create <block-device-path> <ujima-pack-out-path> [--target <target-name>] [--arch <arch-name>]"
+     :target pack/create-pack!
+     :args [:block-device-path :ujima-pack-out-path]
+     :spec {:block-device-path {:desc "Source block device path"
+                                :require true}
+            :ujima-pack-out-path {:desc "Output Ujima pack path"
+                                  :require true}
+            :target {:desc "Target name, e.g. rpi"}
+            :arch {:desc "Architecture name, e.g. arm64"}}}
+
+    "validate"
+    {:usage "Usage: tools pack validate <ujima-pack-path>"
+     :target pack/validate-pack!
+     :args [:ujima-pack-path]
+     :spec {:ujima-pack-path {:desc "Ujima pack path"
+                              :require true}}}
+
+    "meta"
+    {:usage "Usage: tools pack meta <ujima-pack-path> [--format edn|json]"
+     :target pack/print-pack-meta!
+     :args [:ujima-pack-path]
+     :spec {:ujima-pack-path {:desc "Ujima pack path"
+                              :require true}
+            :format {:desc "Output format: edn or json"
+                     :default "edn"
+                     :validate #{"edn" "json"}}}}}})
+
+(defn -main
+  [& args]
+  (cli/dispatch! command-tree args))

@@ -3,8 +3,8 @@
 
 
 (defn env->env-file-path [env]
-  (get-in env [:args 0] "config/ujima.edn"))
-
+  (get-in env [:args 0] "assets/e2e/ujima.edn"))
+ 
 
 (defn run-cmd! [env-path & args]
   (apply p/shell

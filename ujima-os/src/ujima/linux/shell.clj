@@ -177,3 +177,20 @@
      :out  target"
   [prev target]
   `(p/process {:prev ~prev :out  (clojure.java.io/file ~target)} "cat"))
+
+
+(defn root? []
+  (= "0" (str/trim (:out (sh :id "-u")))))
+
+
+(defn can-sudo-without-password? []
+  (:ok? (sh :sudo "-n" "true")))
+
+
+(defn require-root-or-passwordless-sudo!
+  []
+  (when-not (or (root?)
+                (can-sudo-without-password?))
+    (throw
+      (ex-info "This operation requires root or passwordless sudo"
+               {:type :ujima/root-required}))))

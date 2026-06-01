@@ -1,69 +1,117 @@
 (ns ujima.cli
-  (:require [ujima.runtime.protocol  :as runtime]
-            [ujima.target            :refer [->runtime]] 
-            [ujima.runtime.settings  :as settings]
+  (:require
+    [ujima.cli.dispatch :as cli]
+    [ujima.runtime.protocol :as runtime]
+    [ujima.runtime.settings :as settings]
+    [ujima.target :refer [->runtime]]
+    [ujima.log :as log]
+    [ujima.fs :refer [slurp-edn]]))
 
-            [ujima.log               :as log] 
-            [ujima.fs                :refer [slurp-edn]]))
+;; ----------------------------------------------------------------------------
+;; Runtime command dispatch
+;; ----------------------------------------------------------------------------
 
+(defn dispatch-cli
+  [runtime* cmd & args]
+  (case cmd
+    "hostname"
+    (let [[hostname] args]
+      (if hostname
+        (println (settings/hostname+settings! runtime* hostname))
+        (println (runtime/hostname runtime*))))
 
-(defn usage []
-  (println "Usage:")
-  (println "  ujima hostname")
-  (println "  ujima hostname <hostname>")
-  (println "  ujima timezone")
-  (println "  ujima timezone <timezone>")
-  (println "  ujima keyboard-layouts")
-  (println "  ujima keyboard-layouts <layout>...")
-  (println "  ujima volume")
-  (println "  ujima volume <0-100>")
-  (println "  ujima control-token")
-  (println "  ujima reboot")
-  (println "  ujima shutdown"))
+    "timezone"
+    (let [[timezone] args]
+      (if timezone
+        (println (settings/timezone+settings! runtime* timezone))
+        (println (runtime/timezone runtime*))))
 
+    "keyboard-layouts"
+    (if (seq args)
+      (println (settings/keyboard-layouts+settings! runtime* args))
+      (println (runtime/keyboard-layouts runtime*)))
 
-(defn parse-int [s]
-  (Integer/parseInt s))
+    "volume"
+    (let [[volume] args]
+      (if (some? volume)
+        (println (runtime/volume! runtime* (int volume)))
+        (println (runtime/volume runtime*))))
 
+    "control-token"
+    (println (runtime/probe-control-token runtime*))
 
-(defn run! [runtime* args]
-  (let [[cmd & rest] args]
-    (case cmd
-      "hostname"
-      (if (seq rest)
-        (println (settings/hostname+settings! runtime* (first rest)))
-        (println (runtime/hostname runtime*)))
+    "reboot"
+    (println (runtime/reboot! runtime*))
 
-      "timezone"
-      (if (seq rest)
-        (println (settings/timezone+settings! runtime* (first rest)))
-        (println (runtime/timezone runtime*)))
+    "shutdown"
+    (println (runtime/shutdown! runtime*))
 
-      "keyboard-layouts"
-      (if (seq rest)
-        (println (settings/keyboard-layouts+settings! runtime* rest))
-        (println (runtime/keyboard-layouts runtime*)))
+    (throw
+      (ex-info "Unknown runtime command"
+               {:cmd cmd
+                :args args}))))
 
-      "volume"
-      (if (seq rest)
-        (println (runtime/volume! runtime* (parse-int (first rest))))
-        (println (runtime/volume runtime*)))
+;; ----------------------------------------------------------------------------
+;; Main
+;; ----------------------------------------------------------------------------
 
-      "control-token"
-      (println (runtime/probe-control-token runtime*))
-
-      "reboot"
-      (println (runtime/reboot! runtime*))
-
-      "shutdown"
-      (println (runtime/shutdown! runtime*))
-
-      (usage))))
-
-                                 
-(defn -main [& args]
+(defn -main
+  [& args]
   (let [[env-path & rest-args] args
-        env                   (slurp-edn env-path {})]
+        env (slurp-edn env-path {})
+        runtime* (->runtime env)
+
+        command-tree
+        {"runtime"
+         {"hostname"
+          {:usage "Usage: ujima <env-path> runtime hostname [hostname]"
+           :target #(dispatch-cli runtime* "hostname" (:hostname %))
+           :args [:hostname]
+           :spec {:hostname {:desc "Hostname to set"}}}
+
+          "timezone"
+          {:usage "Usage: ujima <env-path> runtime timezone [timezone]"
+           :target #(dispatch-cli runtime* "timezone" (:timezone %))
+           :args [:timezone]
+           :spec {:timezone {:desc "Timezone to set, e.g. Asia/Jerusalem"}}}
+
+          "keyboard-layouts"
+          {:usage "Usage: ujima <env-path> runtime keyboard-layouts [layout ...]"
+           :target #(apply dispatch-cli
+                           runtime*
+                           "keyboard-layouts"
+                           (remove nil?
+                                   (cons (:layout %)
+                                         (:extra-args %))))
+           :args [:layout]
+           :allow-extra-args? true
+           :spec {:layout {:desc "Keyboard layout to set. Additional layouts may be passed as extra positional args."}}}
+
+          "volume"
+          {:usage "Usage: ujima <env-path> runtime volume [volume]"
+           :target #(dispatch-cli runtime* "volume" (:volume %))
+           :args [:volume]
+           :spec {:volume {:desc "Volume from 0 to 100"
+                           :coerce :long
+                           :validate #(<= 0 % 100)}}}
+
+          "control-token"
+          {:usage "Usage: ujima <env-path> runtime control-token"
+           :target #(dispatch-cli runtime* "control-token")
+           :args []
+           :spec {}}
+
+          "reboot"
+          {:usage "Usage: ujima <env-path> runtime reboot"
+           :target #(dispatch-cli runtime* "reboot")
+           :args []
+           :spec {}}
+
+          "shutdown"
+          {:usage "Usage: ujima <env-path> runtime shutdown"
+           :target #(dispatch-cli runtime* "shutdown")
+           :args []
+           :spec {}}}}]
 
     (log/set-log-level! :report)
-    (run! (->runtime env) rest-args)))
+    (cli/dispatch! command-tree rest-args)))

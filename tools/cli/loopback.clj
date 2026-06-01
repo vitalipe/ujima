@@ -1,4 +1,4 @@
-(ns ujima.tools.cli.loopback
+(ns tools.cli.loopback
   (:require
     [ujima.linux.disk      :refer [block-device?]]
     [ujima.linux.shell     :refer [require-root!]]

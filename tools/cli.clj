@@ -1,8 +1,8 @@
-(ns ujima.tools.cli
+(ns tools.cli
   (:require
     [ujima.cli.dispatch :as cli]
-    [ujima.tools.cli.loopback :as loopback]
-    [ujima.tools.cli.pack     :as pack]))
+    [tools.cli.loopback :as loopback]
+    [tools.cli.pack     :as pack]))
 
 
 

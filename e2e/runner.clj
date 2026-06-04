@@ -71,17 +71,22 @@
    :args      args})
 
 
-(defn- run-one! [test-name args]
+(defn run-test! [test-name tmp-dir args]
   (let [test-ns (require-test-ns! test-name)
         test!   (resolve-test-fn! test-ns)]
+      
+      (fs/create-dirs tmp-dir)
+      (test! (ctx test-name tmp-dir args))))
+    
 
-    (fs/with-temp-dir [tmp-dir {:prefix (str "e2e-" test-name)}]
-      (test! (ctx test-name tmp-dir args)))))
+(defn- run-test-with-tmp! [test-name args]
+  (fs/with-temp-dir [tmp-dir {:prefix (str "e2e-" test-name)}]
+    (run-test! test-name tmp-dir args)))
     
 
 (defn- run-one-result [test-name args]
   (try
-    (if (run-one! test-name args)
+    (if (run-test-with-tmp! test-name args)
       (do
         (println) 
         (println "E2E passed:" test-name) 

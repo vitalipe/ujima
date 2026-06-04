@@ -7,7 +7,7 @@
 
 (def ujima-mbr-disk-id  0x00C0FFEE)
 (def ujima-root-a-uuid  (format "%08x-%02x" ujima-mbr-disk-id 5))
-(def ujima-root-b-uuid  (format "%08x-%02x" ujima-mbr-disk-id 5))
+(def ujima-root-b-uuid  (format "%08x-%02x" ujima-mbr-disk-id 6))
 
 
 (defn- MiB [v] 

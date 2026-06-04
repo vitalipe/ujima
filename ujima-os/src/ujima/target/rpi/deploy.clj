@@ -65,14 +65,14 @@
     (pack/validate! ujima-pack-path)
 
     (let [{:keys [boot root]} (-> device 
-                                (device->partitions-by-name device)
+                                (device->partitions-by-name)
                                 (get slot))]
           
       (pack/unpack! ujima-pack-path boot root)
 
       (with-mounted-vfat [boot-mnt boot]
-        (autoboot/cmdline! (case slot :a ujima-root-a-uuid 
-                                      :b ujima-root-b-uuid)))))
+        (autoboot/cmdline! boot-mnt (str "PARTUUID=" (case slot :a ujima-root-a-uuid 
+                                                                :b ujima-root-b-uuid))))))
 
 
   (set-boot-slot! [_ slot]

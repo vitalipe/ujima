@@ -1,6 +1,7 @@
 (ns ujima.linux.shell
   (:require [clojure.string  :as str]
-            [babashka.process :refer [shell] :as p]))            
+            [babashka.process :refer [shell] :as p]
+            [ujima.env        :refer [get-in-env]]))
 
 
 (defn- only-one-expr! [form]
@@ -13,7 +14,7 @@
     (throw
       (ex-info "Shell macro [] must contain exactly one expression"
                {:form form})))
-   
+
   (first form))
 
 
@@ -40,6 +41,24 @@
     :otherwise (str form)))
 
 
+(defn re-map->cmd [cmd]
+  (let [remap (get-in-env [:shell :commands] {})]
+    (cond
+      (keyword? cmd)          (get remap cmd (name cmd))
+      (symbol? cmd)           (get remap (keyword (name cmd)) (name cmd))
+      (not (string? cmd))     (str cmd)
+      (str/includes? cmd "/") cmd ;; don't remap concrete paths
+      :otherwise              (get remap (keyword cmd) cmd))))
+
+
+(defn- remap-proc [cmd & args]
+  (apply p/process (re-map->cmd cmd) args))
+
+
+(defn- remap-proc-with-prv [prv cmd & args]
+  (apply p/process prv (re-map->cmd cmd) args))
+
+
 (defn- process-call-form [forms prefix-forms]
   (let [[maybe-prv & rest-forms] forms
         [prv forms]              (if (seq? maybe-prv) ;; threaded?
@@ -53,15 +72,15 @@
                    (mapv form->shell-token)
                    (concat prefix-forms))]
       (if prv
-        `(p/process {:prev ~prv} ~@tokens)
-        `(p/process ~@tokens)))))
+        `(remap-proc-with-prv {:prev ~prv} ~@tokens)
+        `(remap-proc ~@tokens)))))
 
 
 (defn sh
   "Runs a command. Returns a result map. Does not throw."
   [cmd & args]
   (let [result (apply shell {:out :string :err :string :continue true}
-                            (name cmd)
+                            (re-map->cmd cmd)
                             args)]
 
     {:ok?   (zero? (:exit result))
@@ -72,7 +91,7 @@
 
 (defn sudo
   [cmd & args]
-  (apply sh :sudo "-n" (name cmd) args))
+  (apply sh :sudo "-n" (re-map->cmd cmd) args))
 
 
 (defn sh!
@@ -81,15 +100,15 @@
   (let [{:keys [ok? out] :as result} (apply sh cmd args)]
     (when-not ok?
       (throw
-        (ex-info (str "Command failed: " (name cmd) " " (str/join " " args)) result)))
-    
+        (ex-info (str "Command failed: " (re-map->cmd cmd) " " (str/join " " args)) result)))
+
     out))
 
 
 (defn sudo!
   "Runs sudo command. Throws on non-zero exit."
   [cmd & args]
-  (apply sh! :sudo "-n" (name cmd) args))
+  (apply sh! :sudo "-n" (re-map->cmd cmd) args))
 
 
 (defmacro $
@@ -176,12 +195,12 @@
      :prev previous-process
      :out  target"
   [prev target]
-  `(p/process {:prev ~prev :out  (clojure.java.io/file ~target)} "cat"))
+  `(p/process {:prev ~prev :out  (clojure.java.io/file ~target)} (re-map->cmd :cat)))
 
 
 (defn root? []
-  (or (= "0" (str/trim (:out (sh :id "-u")))))
-      (:ok? (sh :sudo "-n" "true")))
+  (or (= "0" (str/trim (:out (sh :id "-u"))))
+      (:ok? (sh :sudo "-n" "true"))))
 
 
 (defn require-root! []

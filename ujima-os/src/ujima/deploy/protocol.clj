@@ -1,55 +1,48 @@
 (ns ujima.deploy.protocol)
 
 
-(defprotocol UjimaDeployTarget
+(defprotocol UjimaSystemDisk
 
-  (ujima-boot-info [this target-device]
-    "Return Ujima A/B boot information for target-device.
 
-     This inspects target-device and returns the discovered slot layout,
-     installed Ujima OS versions, the normal boot slot, and any pending
-     try-boot slot.
-
-     Returns `nil` when target-device does not contain a valid Ujima A/B
-     partition layout.
+  (ujima-disk-info [this]
+    "Return Ujima system disk information, or nil if this is not a valid Ujima system disk.
 
      Returns a map like:
 
-     {:slots {:a {:boot \"/dev/sda2\"
-                  :root \"/dev/sda3\"
-                  :ujima-os \"1.0\"}
-                  
-              :b {:boot \"/dev/sda4\"
+     {:device  \"/dev/sda\"
+      :storage \"/dev/sda8\"
+      :config  \"/dev/sda7\"
+      :slots {:a {:boot \"/dev/sda2\"
                   :root \"/dev/sda5\"
+                  :ujima-os \"0.1.0\"}
+              :b {:boot \"/dev/sda3\"
+                  :root \"/dev/sda6\"
                   :ujima-os nil}}
-      :boot :a
-      :try-boot :b}
 
-     :try-boot is nil when no trial boot is pending.")
+      :boot-slot :a
+      :try-boot-slot :b}
 
-
-  (install-ujima! [this ujima-pack-path target-device]
-    "Install Ujima OS onto target-device from ujima-pack-path.
-
-     This is destructive.
-
-     It creates the A/B partition layout, writes the initial Ujima OS pack into
-     the first install slot, and prepares the device to boot Ujima OS.
-
-     This should only be used for fresh installs, image creation, or explicit
-     full-device reinstall.
-
-     Returns Ujima.Task")
+     :try-boot-slot is nil when no trial boot is pending.")
 
 
-  (upgrade-ujima! [this ujima-pack-path target-device]
-    "Upgrade an existing Ujima OS installation on target-device from
-     ujima-pack-path.
+  (write-ujima-layout! [this]
+    "Destructively write the Ujima A/B partition layout.
 
-     This requires target-device to already have a valid Ujima A/B partition
-     layout.
+     Returns Ujima.Task.")
 
-     It writes the Ujima OS pack into the inactive slot and destroys whatever
-     content currently exists in that slot.
 
-     Returns Ujima.Task"))
+  (install-into-slot! [this ujima-pack-path slot]
+    "Write ujima-pack-path into slot :a or :b.
+
+     This destroys the existing content of that slot.
+
+     Returns Ujima.Task.")
+
+
+  (set-boot-slot! [this slot]
+    "Set the normal boot slot.")
+
+
+  (set-try-boot-slot! [this slot]
+    "Set a pending trial boot slot. or `nil` to clear try-boot"))
+

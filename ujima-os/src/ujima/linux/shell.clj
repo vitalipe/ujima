@@ -81,7 +81,7 @@
   (let [{:keys [ok? out] :as result} (apply sh cmd args)]
     (when-not ok?
       (throw
-        (ex-info (str "Command failed: " cmd args) result)))
+        (ex-info (str "Command failed: " (name cmd) " " (str/join " " args)) result)))
     
     out))
 

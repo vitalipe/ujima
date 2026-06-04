@@ -1,5 +1,6 @@
 (ns tools.cli
   (:require
+    [ujima.env          :as env]
     [ujima.cli.dispatch :as cli]
     [tools.cli.loopback :as loopback]
     [tools.cli.pack     :as pack]))
@@ -61,4 +62,7 @@
 
 (defn -main
   [& args]
+
+  (env/init! ["ujima-os/config/ujima.edn"
+              "ujima-os/config/config.local.edn"])
   (cli/dispatch! command-tree args))

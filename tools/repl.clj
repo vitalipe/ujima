@@ -4,6 +4,7 @@
     [clojure.pprint :refer [pprint]]
     [babashka.fs :as fs]
 
+    [ujima.env  :as env]
     [e2e.runner :as e2e]
 
     [ujima.linux.shell :refer [$! sudo$! sh! sudo!]]
@@ -89,6 +90,8 @@
 
 
 (defn start! []
+  (env/init! ["ujima-os/config/ujima.edn"
+              "ujima-os/config/config.local.edn"])
   (ensure-tmp!)
 
   (println)

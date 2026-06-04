@@ -1,6 +1,7 @@
 (ns e2e.runner
   (:require [babashka.fs :as fs]
-            [clojure.string :as str]))
+            [clojure.string :as str]
+            [ujima.env :as env]))
 
 
 (def e2e-root "e2e/tests")
@@ -144,6 +145,9 @@
 
 
 (defn -main [& args]
+  (env/init! ["ujima-os/config/ujima.edn"
+              "ujima-os/config/config.local.edn"])
+
   (let [[cmd & test-args] args]
     (when-not cmd
       (usage!))

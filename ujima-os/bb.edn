@@ -8,15 +8,11 @@
  :tasks
  {http
   {:doc "Run Ujima HTTP server"
-   :task (apply shell "bb" "-m" "ujima.http"
-                (or (seq *command-line-args*)
-                    ["config/ujima.edn"]))}
+   :task (apply shell "bb" "-m" "ujima.http" (seq *command-line-args*))}
 
   cli
   {:doc "Run Ujima CLI"
-   :task (apply shell "bb" "-m" "ujima.cli"
-                (or (seq *command-line-args*)
-                    ["config/ujima.edn"]))}
+   :task (apply shell "bb" "-m" "ujima.cli"(seq *command-line-args*))}
 
   test-unit
   {:doc "Run unit tests"

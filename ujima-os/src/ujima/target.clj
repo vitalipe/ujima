@@ -5,7 +5,6 @@
 
 
 (defn ->runtime [env]
-  (let [target (get-in env [:runtime :target])]
-    (case target
-      :mock (mock-runtime/->runtime (get-in env [:runtime :mock]))
-      :rpi  (rpi-runtime/->runtime (get-in env [:runtime :rpi])))))
+  (case (:target env)
+    :mock (mock-runtime/->runtime (:mock env))
+    :rpi  (rpi-runtime/->runtime  (:rpi env))))

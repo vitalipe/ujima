@@ -2,16 +2,12 @@
   (:require [babashka.process :as p]))
 
 
-(defn env->env-file-path [env]
-  (get-in env [:args 0] "assets/e2e/ujima.edn"))
- 
-
-(defn run-cmd! [env-path & args]
+(defn run-cmd! [& args]
   (apply p/shell
     {:out :string
      :err :string
      :continue true}
-    "bb" "-m" "ujima.cli" env-path args))
+    "bb" "-m" "ujima.cli" "runtime" args))
 
 
 (defn test! [name f]
@@ -37,24 +33,13 @@
       false)))
 
 
-(defn run! [env]
-  (let [env-path (env->env-file-path env)]
+(defn run! [_ctx]
+  (every? true?
+    [(test! "hostname" #(run-cmd! "hostname"))
+     (test! "timezone" #(run-cmd! "timezone"))
 
-    (every? true?
-      [(test! "hostname"
-         #(run-cmd! env-path "hostname"))
+     (test! "keyboard layouts" #(run-cmd! "keyboard-layouts"))
 
-       (test! "timezone"
-         #(run-cmd! env-path "timezone"))
-
-       (test! "keyboard layouts"
-         #(run-cmd! env-path "keyboard-layouts"))
-
-       (test! "volume get"
-         #(run-cmd! env-path "volume"))
-
-       (test! "volume set"
-         #(run-cmd! env-path "volume" "60"))
-
-       (test! "control token"
-         #(run-cmd! env-path "control-token"))])))
+     (test! "volume get"    #(run-cmd! "volume"))
+     (test! "volume set"    #(run-cmd! "volume" "60"))
+     (test! "control token" #(run-cmd! "control-token"))]))

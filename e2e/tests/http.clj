@@ -1,12 +1,11 @@
 (ns e2e.tests.http
   (:require [babashka.http-client :as http]
-            [cheshire.core :as json]))
+            [cheshire.core :as json]
+            [ujima.env :as env]))
 
 
-(defn ->base-url [env]
-  (let [host (get-in env [:http :host] "localhost")
-        port (get-in env [:http :port] 1337)
-        host (if (= host "0.0.0.0") "localhost" host)]
+(defn ->base-url [{:keys [host port] {:or {host "localhost" port 1337}}}]
+  (let [host (if (= host "0.0.0.0") "localhost" host)]
     (str "http://" host ":" port)))
 
 
@@ -60,8 +59,8 @@
       false)))
 
 
-(defn run! [env]
-  (let [base-url (->base-url env)]
+(defn run! [_ctx]
+  (let [base-url (->base-url (env/get-in-env [:http]))]
     
     (if-not (server-up? base-url)
       (do

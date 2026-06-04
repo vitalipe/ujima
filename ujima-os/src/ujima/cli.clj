@@ -1,5 +1,6 @@
 (ns ujima.cli
   (:require
+    [ujima.env :as env]
     [ujima.cli.dispatch :as cli]
     [ujima.runtime.protocol :as runtime]
     [ujima.runtime.settings :as settings]
@@ -57,61 +58,62 @@
 
 (defn -main
   [& args]
-  (let [[env-path & rest-args] args
-        env (slurp-edn env-path {})
-        runtime* (->runtime env)
 
-        command-tree
-        {"runtime"
-         {"hostname"
-          {:usage "Usage: ujima <env-path> runtime hostname [hostname]"
-           :target #(dispatch-cli runtime* "hostname" (:hostname %))
-           :args [:hostname]
-           :spec {:hostname {:desc "Hostname to set"}}}
+  (env/init! ["config/ujima.edn"
+              "config/config.local.edn"])
 
-          "timezone"
-          {:usage "Usage: ujima <env-path> runtime timezone [timezone]"
-           :target #(dispatch-cli runtime* "timezone" (:timezone %))
-           :args [:timezone]
-           :spec {:timezone {:desc "Timezone to set, e.g. Asia/Jerusalem"}}}
+  (let [runtime* (->runtime (env/get-in-env [:runtime]))
+        command-tree {"runtime"
+                       {"hostname"
+                        {:usage "Usage: ujima runtime hostname [hostname]"
+                         :target #(dispatch-cli runtime* "hostname" (:hostname %))
+                         :args [:hostname]
+                         :spec {:hostname {:desc "Hostname to set"}}}
 
-          "keyboard-layouts"
-          {:usage "Usage: ujima <env-path> runtime keyboard-layouts [layout ...]"
-           :target #(apply dispatch-cli
-                           runtime*
-                           "keyboard-layouts"
-                           (remove nil?
-                                   (cons (:layout %)
-                                         (:extra-args %))))
-           :args [:layout]
-           :allow-extra-args? true
-           :spec {:layout {:desc "Keyboard layout to set. Additional layouts may be passed as extra positional args."}}}
+                        "timezone"
+                        {:usage "Usage: ujima runtime timezone [timezone]"
+                         :target #(dispatch-cli runtime* "timezone" (:timezone %))
+                         :args [:timezone]
+                         :spec {:timezone {:desc "Timezone to set, e.g. Asia/Jerusalem"}}}
 
-          "volume"
-          {:usage "Usage: ujima <env-path> runtime volume [volume]"
-           :target #(dispatch-cli runtime* "volume" (:volume %))
-           :args [:volume]
-           :spec {:volume {:desc "Volume from 0 to 100"
-                           :coerce :long
-                           :validate #(<= 0 % 100)}}}
+                        "keyboard-layouts"
+                        {:usage "Usage: ujima runtime keyboard-layouts [layout ...]"
+                         :target #(apply dispatch-cli
+                                         runtime*
+                                         "keyboard-layouts"
+                                         (remove nil?
+                                                 (cons (:layout %)
+                                                       (:extra-args %))))
+                         :args [:layout]
+                         :allow-extra-args? true
+                         :spec {:layout {:desc "Keyboard layout to set. Additional layouts may be passed as extra positional args."}}}
 
-          "control-token"
-          {:usage "Usage: ujima <env-path> runtime control-token"
-           :target #(dispatch-cli runtime* "control-token")
-           :args []
-           :spec {}}
+                        "volume"
+                        {:usage "Usage: ujima runtime volume [volume]"
+                         :target #(dispatch-cli runtime* "volume" (:volume %))
+                         :args [:volume]
+                         :spec {:volume {:desc "Volume from 0 to 100"
+                                         :coerce :long
+                                         :validate #(<= 0 % 100)}}}
 
-          "reboot"
-          {:usage "Usage: ujima <env-path> runtime reboot"
-           :target #(dispatch-cli runtime* "reboot")
-           :args []
-           :spec {}}
+                        "control-token"
+                        {:usage "Usage: ujima runtime control-token"
+                         :target #(dispatch-cli runtime* "control-token")
+                         :args []
+                         :spec {}}
 
-          "shutdown"
-          {:usage "Usage: ujima <env-path> runtime shutdown"
-           :target #(dispatch-cli runtime* "shutdown")
-           :args []
-           :spec {}}}}]
+                        "reboot"
+                        {:usage "Usage: ujima runtime reboot"
+                         :target #(dispatch-cli runtime* "reboot")
+                         :args []
+                         :spec {}}
+
+                        "shutdown"
+                        {:usage "Usage: ujima runtime shutdown"
+                         :target #(dispatch-cli runtime* "shutdown")
+                         :args []
+                         :spec {}}}}]
+
 
     (log/set-log-level! :report)
-    (cli/dispatch! command-tree rest-args)))
+    (cli/dispatch! command-tree args)))

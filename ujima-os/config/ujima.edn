@@ -1,5 +1,6 @@
 {:http    {:host "0.0.0.0" :port 1337}
- :log     {:level :debug}
+ :log     {:level :info}
+ :shell   {:commands {}}
  :runtime {:target :mock
            :mock    {:control-token-toggle-ms 5000
                      :state {:hostname "ujima-mock"

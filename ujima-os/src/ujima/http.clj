@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             
             [org.httpkit.server :as http]
-            
+            [ujima.env :as env]
             [ujima.log :as log]
 
             [ujima.target           :refer [->runtime]]
@@ -140,28 +140,23 @@
       (server-error e))))
 
 
-(defn start! [env runtime*]
-  (let [host (get-in env [:http :host] "0.0.0.0")
-        port (get-in env [:http :port] 1337)]
-
-    (log/info "Starting HTTP server" {:host host :port port})
-    
-    (http/run-server
-      (partial handler runtime*)
-      {:ip host
-       :port port})))
+(defn start! [{:keys [host port] :or {host "0.0.0.0" port 1337}} runtime*]
+  (log/info "Starting HTTP server" {:host host :port port})
+  (http/run-server (partial handler runtime*) {:ip host :port port}))
 
 
 (defn -main [& args]
-  (let [[env-path] args
-        env      (slurp-edn env-path {})]
-        
-    ;; first set log level
-    (log/set-log-level! (get-in env [:log :level] :info))    
-    
-    (let [runtime* (->runtime env)]
-      (ujima-agent/init! (get env :agent {}) runtime*)
-      (start! env runtime*))
 
-    ;; block
-    @(promise)))
+  (env/init! ["config/ujima.edn"
+              "config/config.local.edn"])
+
+  ;; first set log level
+  (log/set-log-level! (env/get-in-env [:log :level] :info))
+
+
+  (let [runtime* (->runtime (env/get-in-env [:runtime] {}))]
+    (ujima-agent/init! (env/get-in-env [:agent] {}) runtime*)
+    (start! (env/get-in-env [:http] {}) runtime*))
+
+  ;; block
+  @(promise))

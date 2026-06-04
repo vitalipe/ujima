@@ -5,6 +5,11 @@
                                        partition->info]]))
 
 
+(def ujima-mbr-disk-id  0x00C0FFEE)
+(def ujima-root-a-uuid  (format "%08x-%02x" ujima-mbr-disk-id 5))
+(def ujima-root-b-uuid  (format "%08x-%02x" ujima-mbr-disk-id 5))
+
+
 (defn- MiB [v] 
   (* 1024 1024 v))
 
@@ -76,35 +81,38 @@
        :storage storage
        :a       {:boot boot-a :root root-a} 
        :b       {:boot boot-b :root root-b}})))
-  
 
+  
 (defn write-ab-partition-layout! [device]
   (let [[control-start control-end] [4            (+ 4 64)]
         [boot-a-start boot-a-end]   [control-end  (+ control-end 512)]
         [boot-b-start boot-b-end]   [boot-a-end   (+ boot-a-end  512)]
         
-        [ext-start    ext-end]      [boot-b-end   (+ boot-b-end  1)]
+        ext-start                    boot-b-end
         
-        [root-a-start root-a-end]   [ext-end      (+ ext-end     10240)]
-        [root-b-start root-b-end]   [root-a-end   (+ root-a-end  10240)]
-        [config-start config-end]   [root-b-end   (+ root-b-end  1024)]]
+        ;; +1 for EBR
+        [root-a-start root-a-end]   [(+ ext-start  1)  (+ ext-start  10240 1)]
+        [root-b-start root-b-end]   [(+ root-a-end 1)  (+ root-a-end 10240 1)]
+        [config-start config-end]   [(+ root-b-end 1)  (+ root-b-end 1024  1)]
+        [storage-start]             [(+ config-end 1)]]
 
     (require-block-device! device) 
 
     (sudo! :wipefs "-a" device)
-    (sudo! :parted "-s" device "mklabel" "msdos")
+    (sudo! :parted "-s"        device "mklabel" "msdos")
+    (sudo! :sfdisk "--disk-id" device ujima-mbr-disk-id) ;; <-- we need this for cmdline.txt
 
     (sudo! :parted "-s" device "mkpart" "primary" "fat32" (str control-start "MiB") (str control-end "MiB"))
 
-    (sudo! :parted "-s" device "mkpart" "primary" "fat32" (str boot-a-start "MiB")     (str boot-a-end "MiB"))
-    (sudo! :parted "-s" device "mkpart" "primary" "fat32" (str boot-b-start "MiB")     (str boot-b-end "MiB"))
+    (sudo! :parted "-s" device "mkpart" "primary" "fat32" (str boot-a-start "MiB")  (str boot-a-end "MiB"))
+    (sudo! :parted "-s" device "mkpart" "primary" "fat32" (str boot-b-start "MiB")  (str boot-b-end "MiB"))
 
     (sudo! :parted "-s" device "mkpart" "extended" (str  ext-start "MiB") "100%")
 
-    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str root-a-start "MiB") (str root-a-end "MiB"))
-    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str root-b-start "MiB") (str root-b-end "MiB"))
-    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str config-start "MiB") (str config-end "MiB"))
-    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str config-end   "MiB") "100%")
+    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str root-a-start  "MiB") (str root-a-end "MiB"))
+    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str root-b-start  "MiB") (str root-b-end "MiB"))
+    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str config-start  "MiB") (str config-end "MiB"))
+    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str storage-start "MiB") "100%")
 
     (sudo! :partprobe device)
     (sh!   :udevadm "settle")

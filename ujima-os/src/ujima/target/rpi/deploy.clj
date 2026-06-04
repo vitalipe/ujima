@@ -1,122 +1,104 @@
 (ns ujima.target.rpi.deploy
-  (:require 
+  (:require
 
-            [ujima.linux.disk      :as disk
-                                   :refer [device->partitions
-                                           with-mounted-vfat]]
-            [ujima.deploy.protocol :refer [UjimaDeployTarget]]
-            [ujima.deploy.pack     :as pack]
+            [ujima.linux.disk       :refer [device->partitions]]
+            [ujima.linux.disk.mount :refer [with-mounted-vfat]]
+            [ujima.deploy.protocol :refer [UjimaSystemDisk]]
+
+            [ujima.deploy.pack :as pack]
 
             [ujima.target.rpi.autoboot   :as autoboot]
-            [ujima.target.rpi.partitions :as partitions]))
-
-(comment
-
-   tasks will be the main abstaction unit of the cli+tui+gui
-   they are a structed log with a state 
-
-   ;; constactor
-   (->ujima-task "task-name" f*)
-
-   ;; f* gets UjimaTask record
-
-   
-   (task/log! task* type payload) ;; write a message
-
-   (task/progress! task* 10 "message") ;; (task/log! :progress {:progress 10 :message "message"})
-
-   (task/fail! task* "error")      ;; (do
-                                   ;;   (task/log! :error {:message "error"}))
-                                   ;;   close intarnal ch
+            [ujima.target.rpi.partitions :refer [ujima-root-a-uuid 
+                                                 ujima-root-b-uuid 
+                                                 device->partitions-by-name
+                                                 write-ab-partition-layout!
+                                                 require-ab-partition-layout!  
+                                                 ujima-ab-partition-layout?]]))
 
 
-   (task/done!     task value)     ;; (do
-                                   ;;   (task/log! :done {:value value :message "done!"}))
-                                   ;;   close intarnal ch with value
-
-   (task/join! task* another-task*)
-
-   (task/log task) ;; a lazy seq of task "events"    
+(defn- require-ab-slot! [?slot]
+  (when-not (#{:a :b} ?slot)
+    (throw
+      (ex-info "Boot slot must be :a or :b" {:expected #{:a :b} :actual ?slot}))))
 
 
+(def slot->idx {:a 2 :b 3})
+(def idx->slot {2 :a  3 :b})
 
 
+(defrecord RpiAutobootDisk [device]
 
-   (with-progress [progress!]
+  UjimaSystemDisk
 
-     (progress! 10 "wow!")
-     (let [child* (fn-that-has-its-own-progress)])
-     (join! progress! child* 10)) ;; this tells park until child* is closed (error or done) 
-                                   ;; 2nd arg (50) tells that it will take 50% of the parent process
-                                   
-     ;; once we reach the end of this block put (progress! 100)
+  (ujima-disk-info [{device :device}]
+    (when (ujima-ab-partition-layout? device)
+      (let [{:keys [a b config storage control]} (device->partitions-by-name device)]
+        (with-mounted-vfat [ctl-mnt control]
+          (let [meta-a (pack/installed-metadata (:root a))
+                meta-b (pack/installed-metadata (:root b))]
 
-  
-  (defrecord ProgressTask [ch state*]))
-
-
-
-
-
-(defrecord RpiDeploy [env]
-
-  UjimaDeployTarget
-
-  (ujima-boot-info [this target-device])
+            (when-let [{boot-idx :boot try-boot-idx :try-boot} (autoboot/autoboot ctl-mnt)]
+              {:device  device
+               :storage storage
+               :config  config
+               :slots   {:a (assoc a :ujima-os meta-a) 
+                         :b (assoc b :ujima-os meta-b)}
+             
+               :boot-slot     (idx->slot boot-idx) 
+               :try-boot-slot (idx->slot try-boot-idx)}))))))
 
 
-  (install-ujima! [this ujima-pack-path target-device]
-    "Install Ujima OS onto target-device from ujima-pack-path.
+  (write-ujima-layout! [_]
+    (println device)
+    (when-not (empty? (device->partitions device))
+      (throw
+        (ex-info "Refusing to write Ujima layout: device already has partitions"
+                 {:device     device})))
 
-     This is destructive.
-
-     It creates the A/B partition layout, writes the initial Ujima OS pack into
-     the first install slot, and prepares the device to boot Ujima OS.
-
-     This should only be used for fresh installs, image creation, or explicit
-     full-device reinstall.
-
-     Returns a core.async channel of progress events."
-
-    (partitions/write-ab-partition-layout! target-device)
-
-    (with-mounted-vfat [ctl (first (device->partitions target-device))]
-      (autoboot/autoboot! ctl {:boot 2})))
+    (write-ab-partition-layout! device))
 
 
-  (upgrade-ujima! [this ujima-pack-path target-device]
-  
-   ;; (require-ab-partition-layout! target-device)
-   
-   ;; detect inactive slot
-     ;; if target_device is boot device:
-       ;; look for root partition device
-       ;; get device index 
-       ;; get active device slot 
-       ;; 
-     ;; else:
-       ;; (autoboot/autoboot target-device)
-       ;; (cond (= boot 2) slot-b
-       ;;       (= boot 3) slot-a 
+  (install-into-slot! [_ ujima-pack-path slot]
+
+    (require-ab-slot! slot)   
+    (require-ab-partition-layout! device)
+    (pack/validate! ujima-pack-path)
+
+    (let [{:keys [boot root]} (-> device 
+                                (device->partitions-by-name device)
+                                (get slot))]
+          
+      (pack/unpack! ujima-pack-path boot root)
+
+      (with-mounted-vfat [boot-mnt boot]
+        (autoboot/cmdline! (case slot :a ujima-root-a-uuid 
+                                      :b ujima-root-b-uuid)))))
 
 
-       (write-)
-       {:boot  ""
-        :slots {:a {:boot "/dev/sda" :root "/dev/sda"}}}
+  (set-boot-slot! [_ slot]
+    (require-ab-partition-layout! device)
+    (require-ab-slot! slot) 
+
+    (let [{ctl :control} (device->partitions-by-name device)]
+      (with-mounted-vfat [ctl-mnt ctl]
+        (autoboot/autoboot! ctl-mnt {:boot (slot->idx slot) :try-boot nil})))
+    
+    nil)
+ 
+
+  (set-try-boot-slot! [_ slot]
+    (require-ab-partition-layout! device)
+    
+    (when-not (nil? slot)
+      (require-ab-slot! slot)) 
+
+    (let [{ctl :control} (device->partitions-by-name device)]
+      (with-mounted-vfat [ctl-mnt ctl]
+        (let [{boot-idx :boot} (autoboot/autoboot ctl-mnt)]
+          (autoboot/autoboot! ctl-mnt {:boot boot-idx :try-boot (slot->idx slot)}))))
+
+    nil)) 
 
 
-   (let [{boot-idx :boot try-boot-idx :try-boot}])
-
-   (pack/validate! ujima-pack-path)
-
-   (let [{:keys [root-device boot-device]} (disk/inactive-slot-info target-device)]
-      
-      (pack/unpack! ujima-pack-path boot-device root-device)
-      
-      (with-mounted! [boot-fs boot-device]
-        (autoboot/cmdline! boot-fs root-device)))))
-
-
-
-(defn ->deploy [env]
-  (->RpiDeploy env))
+(defn ->disk [{:keys [device]}]
+  (->RpiAutobootDisk device))

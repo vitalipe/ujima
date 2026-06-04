@@ -24,10 +24,12 @@
 (defn cmdline
   "Read `cmdline.txt` from `path` and return the configured root block
    device from the `root=` kernel argument, or nil if no `root=` argument exists.
+   
+   Note: use PARTUUID
 
    Example return value:
 
-     \"/dev/mmcblk0p5\""
+     \"PARTUUID=13371337-05\""
   [path]
   
   (let [content (slurp-text (fs/path path "cmdline.txt"))]
@@ -37,8 +39,8 @@
 
 
 (defn cmdline!
-  "Write a Raspberry Pi `cmdline.txt` file at `path` so it boots from
-   `target-block-device`.
+  "Write a Raspberry Pi `cmdline.txt` file at `path` so it boots from `target-block-device`.
+   Prefer PARTUUID over block device paths, device paths might fail with offline installs! 
 
    Returns the written commandline state (cmdline) "
   [path target-block-device]
@@ -53,10 +55,12 @@
 
 (defn autoboot
   "Read Raspberry Pi `autoboot.txt` from `path`.
+   
+   Note: autoboot.txt is not zero is not zero-based, values range (1-4) 
 
    Returns a map like:
 
-     {:boot 0 :try-boot nil}
+     {:boot 1 :try-boot 2}
 
    `:try-boot` may be nil"
   [path]
@@ -75,7 +79,7 @@
     
     (cond
        tryboot_a_b {:boot boot_partition :try-boot tryboot_partition}
-       :no-tryboot {:boot boot_partition})))
+       :no-tryboot {:boot boot_partition :try-boot nil})))
 
 
 (defn autoboot!
@@ -90,7 +94,7 @@
   
   [path {:keys [boot try-boot] :or {boot 2}}]
   
-  ;; autoboot.txt is an ini file that looks like this
+  ;; autoboot.txt is an ini file that looks like this:
   ;; [all]
   ;; tryboot_a_b=1
   ;; boot_partition=2

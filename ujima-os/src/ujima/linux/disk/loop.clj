@@ -24,7 +24,9 @@
 
 
 (defn attach-loopback-device! 
-  ([image-path readonly?] (attach-loopback-device! image-path false))
+  ([image-path] 
+   (attach-loopback-device! image-path false))
+  
   ([image-path readonly?]
    (when-not (fs/exists? image-path)
      (throw (ex-info "Image file does not exist"

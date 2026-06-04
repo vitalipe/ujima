@@ -6,7 +6,7 @@
             [babashka.process :as p]            
 
             [ujima.log :as log]
-            [ujima.fs  :refer [spit-file-atomic! 
+            [ujima.fs  :refer [spit-file-atomic 
                                slurp-edn
                                probe-file!]]
 
@@ -88,7 +88,7 @@
 
   (settings! [_ settings]
     (let [path         (get-in env [:paths :settings] "/var/lib/ujima/runtime.edn")
-          write-result (spit-file-atomic! path (pr-str settings))]
+          write-result (spit-file-atomic path (pr-str settings))]
      
      (when-not (:ok? write-result)
        (log/error "Failed to write settings" write-result))

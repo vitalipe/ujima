@@ -33,8 +33,13 @@
        default))))
      
      
+(defn spit-edn! [path content]
+  (spit (str path)
+        (pr-str content)))
+
+
 (defn spit-file-atomic!
-  "Writes text atomically. Returns a result map. Does not throw."
+  "Writes text atomically. Returns the written content. Throws on error"
   [path text]
   (try
     (let [file (fs/path path)
@@ -42,13 +47,20 @@
           tmp  (fs/path dir (str "." (fs/file-name file) ".tmp"))]
 
       (fs/create-dirs dir)
-
       (spit (str tmp) text)
-
       (fs/move tmp file {:replace-existing true :atomic-move true})
 
-      {:ok? true
-       :path path})
+      (slurp-text path))))
+
+
+(defn spit-file-atomic
+  "Writes text atomically. Returns a result map. Does not throw."
+  [path text]
+  (try
+      
+      {:ok?     true
+       :path    path
+       :content (spit-file-atomic! path text)}
 
     (catch Throwable e
       {:ok? false

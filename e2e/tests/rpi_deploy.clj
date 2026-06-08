@@ -29,8 +29,11 @@
 
     (catch Throwable e
       (println "FAIL")
-      (println " " (ex-message e))
-      (println " " (ex-data e))
+      (println " type:" (str (class e)))
+      (println " message:" (or (ex-message e) "<none>"))
+      (when-let [data (ex-data e)]
+        (println " data:" data))
+      (.printStackTrace e)
       false)))
 
 

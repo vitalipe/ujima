@@ -26,7 +26,7 @@
 (def idx->slot {2 :a  3 :b})
 
 
-(defrecord RpiAutobootDisk [device]
+(defrecord AutobootDisk [device]
 
   UjimaSystemDisk
 
@@ -49,7 +49,6 @@
 
 
   (write-ujima-layout! [_]
-    (println device)
     (when-not (empty? (device->partitions device))
       (throw
         (ex-info "Refusing to write Ujima layout: device already has partitions"
@@ -89,16 +88,19 @@
   (set-try-boot-slot! [_ slot]
     (require-ab-partition-layout! device)
     
-    (when-not (nil? slot)
+    (when-not (nil? slot) ;; nil is valid to reset try-boot
       (require-ab-slot! slot)) 
 
-    (let [{ctl :control} (device->partitions-by-name device)]
+    (let [{ctl :control} (device->partitions-by-name device)
+          try-boot-idx   (slot->idx slot)]
+
       (with-mounted-vfat [ctl-mnt ctl]
         (let [{boot-idx :boot} (autoboot/autoboot ctl-mnt)]
-          (autoboot/autoboot! ctl-mnt {:boot boot-idx :try-boot (slot->idx slot)}))))
+          (autoboot/autoboot! ctl-mnt {:boot (or boot-idx try-boot-idx) 
+                                       :try-boot try-boot-idx}))))
 
     nil)) 
 
 
 (defn ->disk [{:keys [device]}]
-  (->RpiAutobootDisk device))
+  (->AutobootDisk device))

@@ -21,6 +21,20 @@
 (defn- parse-int [s] (when s (parse-long s)))
 
 
+(defn- slurp-ini! [path]
+  (loop [[line & more] (str/split-lines (slurp-text path))
+         section       nil
+         result        {}]
+    (if-not line
+      result
+      (let [[_ next-section] (re-matches #"^\s*\[([^\]\s]+)\]\s*(?:#.*)?$" line)
+            [_ k v]          (re-matches #"^\s*([^#=\s]+)\s*=\s*([^#\s]+).*$" line)]
+        (cond
+          next-section (recur more next-section result)
+          k            (recur more section (assoc-in result [section k] v))
+          :otherwise   (recur more section result))))))
+
+
 (defn cmdline
   "Read `cmdline.txt` from `path` and return the configured root block
    device from the `root=` kernel argument, or nil if no `root=` argument exists.
@@ -33,9 +47,8 @@
   [path]
   
   (let [content (slurp-text (fs/path path "cmdline.txt"))]
-    (some->> content
-             (re-find #"(^|\s)root=(\S+)")
-             (nth 2 nil))))
+    (when-let [match (re-find #"(^|\s)root=(\S+)" content)]
+      (nth match 2 nil))))
 
 
 (defn cmdline!
@@ -62,24 +75,16 @@
 
      {:boot 1 :try-boot 2}
 
-   `:try-boot` may be nil"
+  `:try-boot` may be nil"
   [path]
-  (let [kv-line (fn [line]
-                 (let [[_ k v] (re-matches #"^\s*([^#=\s]+)\s*=\s*([^#\s]+).*$" line)]
-                   (when k [(keyword k) (parse-int v)])))
-
-        {:keys [boot_partition 
-                tryboot_partition 
-                tryboot_a_b]} (->> "autoboot.txt"  
-                                (fs/path path)
-                                (slurp-text)
-                                (str/split-lines)
-                                (keep kv-line)
-                                (into {}))]
+  (let [ini          (slurp-ini! (fs/path path "autoboot.txt"))
+        all-boot     (get-in ini ["all" "boot_partition"])
+        tryboot-boot (get-in ini ["tryboot" "boot_partition"])
+        tryboot-a-b  (get-in ini ["all" "tryboot_a_b"])]
     
     (cond
-       tryboot_a_b {:boot boot_partition :try-boot tryboot_partition}
-       :no-tryboot {:boot boot_partition :try-boot nil})))
+       tryboot-a-b {:boot (parse-int all-boot) :try-boot (parse-int tryboot-boot)}
+       :no-tryboot {:boot (parse-int all-boot) :try-boot nil})))
 
 
 (defn autoboot!

@@ -13,9 +13,10 @@
   ([path default]
    (try
      (cond 
-       (fs/exists? path) (slurp (str (java-io/file path)))
-       :otherwise        default))))
-     
+       (fs/exists? path) (slurp (str path))
+       :otherwise        default)
+     (catch Exception _ default))))
+
 
 (defn slurp-edn
   "Reads EDN. Returns default on error, Does not throw."
@@ -27,12 +28,12 @@
      (if-let [txt (slurp-text path nil)]            
        (try 
         (edn/read-string txt) 
-        (catch Throwable _ default))
+        (catch Exception _ default))
 
        ;; else 
        default))))
      
-     
+
 (defn spit-edn! [path content]
   (spit (str path)
         (pr-str content)))

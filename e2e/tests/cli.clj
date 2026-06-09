@@ -6,8 +6,10 @@
   (apply p/shell
     {:out :string
      :err :string
-     :continue true}
-    "bb" "-m" "ujima.cli" "runtime" args))
+     :continue true
+     :dir "ujima-os"}
+    
+    "bb" "cli" "runtime" args))
 
 
 (defn test! [name f]

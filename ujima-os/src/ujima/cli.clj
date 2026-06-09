@@ -59,8 +59,8 @@
 (defn -main
   [& args]
 
-  (env/init! ["config/ujima.edn"
-              "config/config.local.edn"])
+  (env/init! ["config/ujima.edn" "config/config.local.edn"])
+  (log/set-log-level! :report)
 
   (let [runtime* (->runtime (env/get-in-env [:runtime]))
         command-tree {"runtime"
@@ -98,22 +98,21 @@
 
                         "control-token"
                         {:usage "Usage: ujima runtime control-token"
-                         :target #(dispatch-cli runtime* "control-token")
+                         :target (fn [_] (dispatch-cli runtime* "control-token"))
                          :args []
                          :spec {}}
 
                         "reboot"
                         {:usage "Usage: ujima runtime reboot"
-                         :target #(dispatch-cli runtime* "reboot")
+                         :target (fn [_] (dispatch-cli runtime* "reboot"))
                          :args []
                          :spec {}}
 
                         "shutdown"
                         {:usage "Usage: ujima runtime shutdown"
-                         :target #(dispatch-cli runtime* "shutdown")
+                         :target (fn [_] (dispatch-cli runtime* "shutdown"))
                          :args []
                          :spec {}}}}]
 
 
-    (log/set-log-level! :report)
     (cli/dispatch! command-tree args)))

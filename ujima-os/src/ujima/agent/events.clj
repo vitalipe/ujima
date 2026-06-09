@@ -1,6 +1,5 @@
 (ns ujima.agent.events
-  (:require [ujima.log               :as log]
-            [ujima.runtime.protocols :as runtime]))
+  (:require [ujima.log :as log]))
 
 
 (defn on-control-token-change! [runtime* token]

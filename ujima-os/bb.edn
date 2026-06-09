@@ -1,4 +1,4 @@
-{:paths ["src"]
+{:paths ["src" "test"]
 
  :deps {http-kit/http-kit {:mvn/version "2.8.0"}
         cheshire/cheshire {:mvn/version "5.13.0"}
@@ -6,22 +6,21 @@
         com.taoensso/timbre {:mvn/version "6.6.1"}}
 
  :tasks
- {http {:doc "Run Ujima HTTP server"
-        :task (apply shell "bb" "-m" "ujima.http"
-                     (or (seq *command-line-args*)
-                         ["config/ujima.edn"]))}
+ {http
+  {:doc "Run Ujima HTTP server"
+   :task (apply shell "bb" "-m" "ujima.http" (seq *command-line-args*))}
 
-  cli {:doc "Run Ujima CLI"
-       :task (apply shell "bb" "-m" "ujima.cli"
-                    (or (seq *command-line-args*)
-                        ["config/ujima.edn"]))}
+  cli
+  {:doc "Run Ujima CLI"
+   :task (apply shell "bb" "-m" "ujima.cli"(seq *command-line-args*))}
 
-  test-http {:doc "Run HTTP smoke tests"
-             :task (apply shell "bb" "-m" "ujima.test.http"
-                          (or (seq *command-line-args*)
-                              ["config/ujima.edn"]))}
+  test-unit
+  {:doc "Run unit tests"
+   :task (shell "bb" "-cp" "src:test/unit" "-m" "runner")}
 
-  test-cli {:doc "Run CLI smoke tests"
-            :task (apply shell "bb" "-m" "ujima.test.cli"
-                         (or (seq *command-line-args*)
-                             ["config/ujima.edn"]))}}}
+
+  test
+  {:doc "Run all tests"
+   :depends [test-unit]}}}
+
+

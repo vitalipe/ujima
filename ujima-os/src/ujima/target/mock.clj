@@ -1,8 +1,8 @@
-(ns ujima.runtime.target.mock
+(ns ujima.target.mock
   (:require [clojure.core.async :as a]
 
-            [ujima.log               :as log]
-            [ujima.runtime.protocols :refer [UjimaSystem UjimaDesktop UjimaDiscovery UjimaRuntime]]))
+            [ujima.log              :as log]
+            [ujima.runtime.protocol :refer [UjimaSystem UjimaDesktop UjimaDiscovery UjimaRuntime]]))
             
 
 

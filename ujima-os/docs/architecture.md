@@ -20,6 +20,7 @@ The repo is organized around:
 
 - `ujima-agent`
 - `ujima-runtime`
+- `ujima-deploy`
 - HTTP server round `ujima-agent` and `ujima-runtime`
 - CLI wrapper round `ujima-runtime`
 
@@ -36,10 +37,11 @@ A target runtime implements the following protocols:
 - `UjimaDesktop`
 - `UjimaDiscovery`
 - `UjimaRuntime`
+- `UjimaTryBoot`
 
-Each protocol is detailed in `ujima.runtime.protocols`.
+Each protocol is detailed in `ujima.runtime.protocol`.
 
-Target runtimes are low-level implementations and should stay stateless.
+Target runtimes are low-level implementations and should stay as stateless as possible.
 
 `ujima-agent` is the stateful runtime layer. It holds state, applies config, monitors the control token, and discovers peers/content.
 
@@ -53,22 +55,26 @@ Target runtimes are low-level implementations and should stay stateless.
 
 config/ujima.edn ; deployment/runtime environment config 
 
-ujima.runtime.protocols     ; UjimaSystem UjimaDesktop UjimaDiscovery UjimaRuntime protocols
-ujima.runtime.target.rpi    ; rpi runtime impl
-ujima.runtime.target.mock   ; mock runtime impl
-ujima.runtime               ; (->runtime) factory
+ujima.runtime.protocol     ; UjimaSystem UjimaDesktop UjimaDiscovery UjimaRuntime  protocols
+ujima.runtime.settings     ; user/admin commands that update settings + settings reconcile logic
+
+ujima.deploy.protocol     ; UjimaDeployTarget
+ujima.deploy.pack         ; Ujima pack format, cross target operations
+
 
 ujima.agent                 ; holds state/cache and syncs the system with settings
 ujima.agent.events          ; callback logic from system events 
-ujima.agent.reconcile       ; settings reconciliation
-ujima.agent.commands        ; user/admin commands that update settings + reconcile/apply
 
 
-ujima.http ; HTTP server around the runtime and agent
+ujima.target.rpi    ; rpi runtime+deploy impl
+ujima.target.mock   ; mock runtime+deploy impl
+
+
+ujima.http ; HTTP server around the runtime
 ujima.cli  ; simple CLI client
 
 ujima.edn ; edn parsing helpers
-ujima.io  ; cross platform shell and fs operations
+ujima.io  ; cross target shell and fs operations
 ujima.log ; logger 
 
 ```

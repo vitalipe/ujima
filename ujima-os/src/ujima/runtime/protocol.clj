@@ -104,24 +104,6 @@
   The runtime is the full target object that may also implement UjimaSystem,
   UjimaDesktop, and UjimaDiscovery."
 
-  (check-runtime! [runtime]
-    "Performs a runtime preflight check.
-
-    This should check the external environment required by the runtime:
-    commands, files, directories, permissions, wrappers, desktop/session access,
-    and other target-specific assumptions.
-
-    Expected setup problems should be returned explicitly, not thrown.
-
-    Suggested return shape:
-
-      {:ok? true :errors []}
-
-    or:
-
-      {:ok? false
-       :errors [{:code :missing-command
-                 :message \"timedatectl was not found\"}]}")
 
   (settings [runtime]
     "Reads persistent EDN desired Ujima settings.

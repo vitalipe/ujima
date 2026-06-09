@@ -4,7 +4,7 @@
             [ujima.env :as env]))
 
 
-(defn ->base-url [{:keys [host port] {:or {host "localhost" port 1337}}}]
+(defn ->base-url [{:keys [host port] :or {host "localhost" port 1337}}]
   (let [host (if (= host "0.0.0.0") "localhost" host)]
     (str "http://" host ":" port)))
 
@@ -30,10 +30,9 @@
 (defn server-up? [url]
   (try
     (let [res (http/head url {:throw false
-                              :timeout 2000})]
+                              :timeout 1000})]
       (<= 200 (:status res) 399))
-    (catch Exception _
-      false)))
+    (catch Exception _ false)))
 
 
 (defn test! [name f]

@@ -147,6 +147,9 @@
 (defn -main [& args]
   (env/init! ["ujima-os/config/ujima.edn"
               "ujima-os/config/config.local.edn"])
+  (println "E2E env:")
+  (prn (env/env))
+  (println)
 
   (let [[cmd & test-args] args]
     (when-not cmd

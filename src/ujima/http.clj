@@ -9,7 +9,7 @@
 
 
             [ujima.fs  :refer [slurp-edn]]
-            [ujima.edn :refer [edn->json json->edn]]))
+            [lib.edn :refer [edn->json json->edn]]))
 
 
 (defn response

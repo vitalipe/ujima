@@ -1,6 +1,6 @@
-(ns ujima.edn-test
+(ns lib.edn-test
   (:require [clojure.test :refer [deftest is]]
-            [ujima.edn :as edn]))
+            [lib.edn :as edn]))
 
 
 (deftest edn->json-serializes-ordinary-throwables

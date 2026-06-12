@@ -1,6 +1,6 @@
 (ns tools.cli.pack
   (:require
-    [ujima.edn             :as edn]
+    [lib.edn               :as edn]
     [ujima.linux.disk      :refer [require-block-device!]]
     [ujima.linux.shell     :refer [require-root!]]
     [ujima.pack            :as pack]))

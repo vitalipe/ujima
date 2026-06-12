@@ -1,4 +1,4 @@
-(ns ujima.edn
+(ns lib.edn
   (:require [cheshire.core :as json]
             [clojure.string :as str])
 

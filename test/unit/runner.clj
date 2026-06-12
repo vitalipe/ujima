@@ -7,7 +7,7 @@
 
             [ujima.shell-macro-test]
 
-            [ujima.edn-test]
+            [lib.edn-test]
             [ujima.env-test]))
 
 
@@ -18,7 +18,7 @@
 
     ujima.shell-macro-test
 
-    ujima.edn-test
+    lib.edn-test
     ujima.env-test])
 
 

@@ -4,7 +4,7 @@
             [ujima.env :as env]))
 
 
-(def e2e-root "e2e/tests")
+(def e2e-root "test/e2e/tests")
 
 
 (defn- usage! []
@@ -145,8 +145,8 @@
 
 
 (defn -main [& args]
-  (env/init! ["ujima-os/config/ujima.edn"
-              "ujima-os/config/config.local.edn"])
+  (env/init! ["config/ujima.edn"
+              "config/config.local.edn"])
   (println "E2E env:")
   (prn (env/env))
   (println)

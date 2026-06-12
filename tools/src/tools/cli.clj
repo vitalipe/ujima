@@ -63,6 +63,6 @@
 (defn -main
   [& args]
 
-  (env/init! ["ujima-os/config/ujima.edn"
-              "ujima-os/config/config.local.edn"])
+  (env/init! ["config/ujima.edn"
+              "config/config.local.edn"])
   (cli/dispatch! command-tree args))

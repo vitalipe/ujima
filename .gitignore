@@ -1,3 +1,4 @@
 pad/
 /tmp/
 /stage/
+config/config.local.edn

@@ -7,7 +7,7 @@
     {:out :string
      :err :string
      :continue true
-     :dir "ujima-os"}
+     :dir "."}
     
     "bb" "cli" "runtime" args))
 

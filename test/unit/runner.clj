@@ -1,9 +1,9 @@
 (ns runner
   (:require [clojure.test :as test]
             [ujima.env :as env]
-            [ujima.task.timeline-test]
-            [ujima.task.flow-test]
-            [ujima.task.task-test]
+            [lib.task.timeline-test]
+            [lib.task.flow-test]
+            [lib.task.task-test]
 
             [ujima.shell-macro-test]
 
@@ -12,9 +12,9 @@
 
 
 (def test-namespaces
-  '[ujima.task.task-test
-    ujima.task.timeline-test
-    ujima.task.flow-test
+  '[lib.task.task-test
+    lib.task.timeline-test
+    lib.task.flow-test
 
     ujima.shell-macro-test
 

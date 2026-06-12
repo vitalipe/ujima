@@ -1,4 +1,4 @@
-(ns ujima.cli.dispatch
+(ns lib.cli
   "Small command-tree wrapper around babashka.cli.
 
    Defines a simple nested command map format and turns it into a
@@ -7,7 +7,7 @@
    Example:
 
      (ns my.tools
-       (:require [ujima.cli.dispatch :as cli]))
+       (:require [lib.cli :as cli]))
 
      (defn hello!
        [{:keys [name loud]}]
@@ -51,7 +51,7 @@
   [message data]
   (throw
     (ex-info message
-             (assoc data :type :ujima.cli.dispatch/user-error))))
+             (assoc data :type :lib.cli/user-error))))
 
 (defn babashka-cli-error?
   [e]
@@ -164,7 +164,7 @@
     (when-not (:help opts)
       (throw
         (ex-info msg
-                 (assoc data :type :ujima.cli.dispatch/user-error))))))
+                 (assoc data :type :lib.cli/user-error))))))
 
 
 (defn command-entry [cmds {:keys [usage target args spec coerce allow-extra-args?]}]
@@ -266,7 +266,7 @@
            (do
              (println (.getMessage e))
              (when-let [data (ex-data e)]
-               (when-not (= :ujima.cli.dispatch/user-error (:type data))
+               (when-not (= :lib.cli/user-error (:type data))
                  (println data))))))
        (System/exit 1))
 

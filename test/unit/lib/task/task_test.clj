@@ -1,7 +1,7 @@
-(ns ujima.task.task-test
+(ns lib.task.task-test
   (:require [clojure.test :refer [deftest is testing]]
-            [ujima.task :as task]
-            [ujima.task.timeline :as timeline]))
+            [lib.task :as task]
+            [lib.task.timeline :as timeline]))
 
 
 (defn events-for-id [t id]

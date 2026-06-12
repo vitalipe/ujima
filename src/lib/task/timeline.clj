@@ -1,4 +1,4 @@
-(ns ujima.task.timeline
+(ns lib.task.timeline
    "helpers for working with Ujima task timelines.
 
    A timeline is an append-only vector of TimelineEvent records. These helpers

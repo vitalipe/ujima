@@ -1,4 +1,4 @@
-(ns ujima.target.rpi.partitions
+(ns ujima.device.disk.autoboot.partitions
   (:require [ujima.linux.shell :refer [sh! sudo!]]
             [ujima.linux.disk :refer [require-block-device!
                                        device->partitions

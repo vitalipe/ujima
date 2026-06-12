@@ -1,4 +1,4 @@
-(ns ujima.deploy.pack
+(ns ujima.pack
   (:require [clojure.edn :as edn]
             [clojure.string :as str]
             [babashka.fs :as fs]

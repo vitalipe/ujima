@@ -1,4 +1,4 @@
-(ns ujima.deploy.protocol)
+(ns ujima.device.disk)
 
 
 (defprotocol UjimaSystemDisk

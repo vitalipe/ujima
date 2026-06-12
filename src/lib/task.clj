@@ -1,4 +1,4 @@
-(ns ujima.task
+(ns lib.task
   "Observable, single-start tasks for process-like operations.
 
    A task is created cold with its code function and is started once by `run!`
@@ -8,7 +8,7 @@
    events with `join!!`."
 
   (:require [clojure.core.async :as async]
-            [ujima.task.timeline :refer [->TimelineEvent 
+            [lib.task.timeline :refer [->TimelineEvent 
                                          terminal-event? 
                                          timeline->last-of 
                                          timeline->last-of-type

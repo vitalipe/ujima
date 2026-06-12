@@ -1,3 +1,4 @@
+;; death row: removed in phase 3 (control module)
 (ns ujima.target.mock
   (:require [clojure.core.async :as a]
 

@@ -1,9 +1,9 @@
-(ns ujima.task.flow
+(ns lib.task.flow
   "Macros for constructing task programs and joining nested steps.
 
    `flow` creates a cold task, while `flow!` constructs and synchronously runs
    a root task. Nested steps remain cold until joined by their parent."
-  (:require [ujima.task :as task]))
+  (:require [lib.task :as task]))
 
 
 (defn flow-error-ex

@@ -8,7 +8,7 @@
  :tasks
  {http
   {:doc "Run Ujima HTTP server"
-   :task (apply shell "bb" "-m" "ujima.http" (seq *command-line-args*))}
+   :task (apply shell "bb" "-m" "ujima.agent" (seq *command-line-args*))}
 
   cli
   {:doc "Run Ujima CLI"

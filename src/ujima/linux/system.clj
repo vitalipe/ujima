@@ -35,15 +35,4 @@
 
 
 (defn shutdown! []
-  (sudo :systemctl "poweroff")) 
-
-
-(defn volume []
-  (let [out (:out (sh :pactl "get-sink-volume" "@DEFAULT_SINK@"))]
-    (Integer/parseInt (second (re-find #"(\d+)%" out)))))
-
-
-(defn volume! [value]
-    (let [value (-> value int (max 0) (min 100))]
-      (sh :pactl "set-sink-volume" "@DEFAULT_SINK@" (str value "%"))
-      (volume)))
+  (sudo :systemctl "poweroff"))

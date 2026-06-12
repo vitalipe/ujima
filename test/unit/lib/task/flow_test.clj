@@ -1,7 +1,7 @@
-(ns ujima.task.flow-test
+(ns lib.task.flow-test
   (:require [clojure.test :refer [deftest is]]
-            [ujima.task :as task]
-            [ujima.task.flow :refer [flow flow! <join! <step!]]))
+            [lib.task :as task]
+            [lib.task.flow :refer [flow flow! <join! <step!]]))
 
 
 (defn task-stub [name code]

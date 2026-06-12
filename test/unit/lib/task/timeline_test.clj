@@ -1,6 +1,6 @@
-(ns ujima.task.timeline-test
+(ns lib.task.timeline-test
   (:require [clojure.test :refer [deftest is testing]]
-            [ujima.task.timeline :as timeline]))
+            [lib.task.timeline :as timeline]))
 
 
 (deftest terminal-event?-detects-terminal-events

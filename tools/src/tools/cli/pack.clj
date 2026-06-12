@@ -3,7 +3,7 @@
     [ujima.edn             :as edn]
     [ujima.linux.disk      :refer [require-block-device!]]
     [ujima.linux.shell     :refer [require-root!]]
-    [ujima.deploy.pack     :as pack]))
+    [ujima.pack            :as pack]))
 
 
 (defn create-pack! [{:keys [block-device-path ujima-pack-out-path target arch] :or {target "mock" arch "test"}}]

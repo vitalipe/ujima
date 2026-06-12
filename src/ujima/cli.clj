@@ -1,10 +1,10 @@
 (ns ujima.cli
   (:require
     [ujima.env :as env]
-    [ujima.cli.dispatch :as cli]
+    [lib.cli :as cli]
     [ujima.runtime.protocol :as runtime]
     [ujima.runtime.settings :as settings]
-    [ujima.target :refer [->runtime]]
+    [ujima.device :refer [->runtime]]
     [ujima.log :as log]
     [ujima.fs :refer [slurp-edn]]))
 

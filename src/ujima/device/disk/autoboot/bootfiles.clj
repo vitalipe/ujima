@@ -1,4 +1,4 @@
-(ns ujima.target.rpi.autoboot
+(ns ujima.device.disk.autoboot.bootfiles
   "Helpers for reading and writing Raspberry Pi boot-slot files.
 
    This namespace does not mount partitions. Callers pass concrete mounted directory paths,

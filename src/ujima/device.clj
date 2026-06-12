@@ -1,4 +1,4 @@
-(ns ujima.target
+(ns ujima.device
   (:require
    [ujima.target.mock :as mock-runtime]
    [ujima.target.rpi.runtime :as rpi-runtime]))

@@ -9,8 +9,8 @@
 
     [ujima.linux.shell :refer [$! sudo$! sh! sudo!]]
     [ujima.linux.disk  :as disk]
-    [ujima.deploy.pack :as pack]
-    [ujima.task.flow   :as task]
+    [ujima.pack        :as pack]
+    [lib.task.flow     :as task]
 
     [tools.cli.loopback :as +loop]
     [tools.cli.pack     :as +pack]))
@@ -51,8 +51,8 @@
   (println "Loaded aliases:")
   (println "  e2e    => e2e.runner")
   (println "  disk   => ujima.linux.disk")
-  (println "  pack   => ujima.deploy.pack")
-  (println "  task   => ujima.task.flow")
+  (println "  pack   => ujima.pack")
+  (println "  task   => lib.task.flow")
   (println "  +loop  => tools.cli.loopback")
   (println "  +pack  => tools.cli.pack")
   (println)

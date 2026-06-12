@@ -1,15 +1,15 @@
 (ns e2e.tests.rpi-deploy
   (:require [babashka.fs :as fs]
 
-            [ujima.deploy.pack :as pack]
-            [ujima.deploy.protocol :as disk]
+            [ujima.pack :as pack]
+            [ujima.device.disk :as disk]
             [ujima.linux.disk :as linux-disk]
             [ujima.linux.disk.loop :as loopback]
             [ujima.linux.disk.mount :refer [with-mounted-vfat]]
             [ujima.linux.shell :refer [$! require-root!]]
-            [ujima.target.rpi.autoboot :as autoboot]
-            [ujima.target.rpi.deploy :refer [->disk]]
-            [ujima.target.rpi.partitions :as rpi-partitions]))
+            [ujima.device.disk.autoboot.bootfiles :as autoboot]
+            [ujima.device.disk.autoboot :refer [->disk]]
+            [ujima.device.disk.autoboot.partitions :as rpi-partitions]))
 
 (defn test! [name f]
   (try

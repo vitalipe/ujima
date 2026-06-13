@@ -1,4 +1,4 @@
-(ns ujima.http
+(ns ujima.agent.http
   (:require [clojure.string :as str]
 
             [org.httpkit.server :as http]

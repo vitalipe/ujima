@@ -4,12 +4,12 @@
             [ujima.log               :as log]
 
             [ujima.device            :refer [->runtime]]
-            [ujima.http              :as http]
 
             [ujima.runtime.protocol  :as runtime]
             [ujima.runtime.settings  :refer [reconcile-settings!]]
 
-            [ujima.agent.events      :as    events]))
+            [ujima.agent.events      :as events]
+            [ujima.agent.http        :as http]))
 
 
 (defn init! [env runtime*]

@@ -1,4 +1,4 @@
-(ns ujima.device.disk)
+(ns ujima.device.ab)
 
 
 (defprotocol UjimaSystemDisk
@@ -46,3 +46,15 @@
   (set-try-boot-slot! [this slot]
     "Set a pending trial boot slot. or `nil` to clear try-boot"))
 
+
+
+
+(defprotocol UjimaBootRuntime
+
+
+  (try-boot! [this]
+    "Reboot into currently set try-boot slot.")
+
+
+  (in-try-boot? [this]
+    "Returns true if booted in try-boot mode"))

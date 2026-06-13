@@ -1,14 +1,14 @@
-(ns ujima.device.disk.autoboot
+(ns ujima.device.ab.autoboot
   (:require
 
             [ujima.linux.disk       :refer [device->partitions]]
             [ujima.linux.disk.mount :refer [with-mounted-vfat]]
-            [ujima.device.disk :refer [UjimaSystemDisk]]
+            [ujima.device.ab :refer [UjimaSystemDisk]]
 
             [ujima.pack :as pack]
 
-            [ujima.device.disk.autoboot.bootfiles  :as autoboot]
-            [ujima.device.disk.autoboot.partitions :refer [ujima-root-a-uuid 
+            [ujima.device.ab.autoboot.bootfiles  :as autoboot]
+            [ujima.device.ab.autoboot.partitions :refer [ujima-root-a-uuid
                                                  ujima-root-b-uuid 
                                                  device->partitions-by-name
                                                  write-ab-partition-layout!

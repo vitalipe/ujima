@@ -2,14 +2,14 @@
   (:require [babashka.fs :as fs]
 
             [ujima.pack :as pack]
-            [ujima.device.disk :as disk]
+            [ujima.device.ab :as ab]
             [ujima.linux.disk :as linux-disk]
             [ujima.linux.disk.loop :as loopback]
             [ujima.linux.disk.mount :refer [with-mounted-vfat]]
             [ujima.linux.shell :refer [$! require-root!]]
-            [ujima.device.disk.autoboot.bootfiles :as autoboot]
-            [ujima.device.disk.autoboot :refer [->disk]]
-            [ujima.device.disk.autoboot.partitions :as rpi-partitions]))
+            [ujima.device.ab.autoboot.bootfiles :as autoboot]
+            [ujima.device.ab.autoboot :refer [->disk]]
+            [ujima.device.ab.autoboot.partitions :as rpi-partitions]))
 
 (defn test! [name f]
   (try
@@ -102,7 +102,7 @@
 
 
 (defn require-disk-info! [disk*]
-  (or (disk/ujima-disk-info disk*)
+  (or (ab/ujima-disk-info disk*)
       (fail! "Expected Ujima disk info" {})))
 
 
@@ -123,11 +123,11 @@
 
 (defn test-initial-state! [disk*]
   (assert-nil! "Fresh disk image should not have a Ujima layout"
-               (disk/ujima-disk-info disk*)))
+               (ab/ujima-disk-info disk*)))
 
 
 (defn test-write-layout! [disk* device]
-  (disk/write-ujima-layout! disk*)
+  (ab/write-ujima-layout! disk*)
   (let [info (require-disk-info! disk*)]
     (assert-layout! info device)
     (assert-empty-slot! info :a)
@@ -140,7 +140,7 @@
 
 (defn test-install! [disk* pack-file slot expected-installed-slots]
   (let [expected-metadata (pack/metadata pack-file)]
-    (disk/install-into-slot! disk* pack-file slot)
+    (ab/install-into-slot! disk* pack-file slot)
     (let [info (require-disk-info! disk*)]
       (doseq [installed-slot expected-installed-slots]
         (assert-installed-slot! info installed-slot expected-metadata)
@@ -151,7 +151,7 @@
 
 
 (defn test-boot-slot! [disk* slot]
-  (disk/set-boot-slot! disk* slot)
+  (ab/set-boot-slot! disk* slot)
   (let [info (require-disk-info! disk*)]
     (assert= "Boot slot should match the requested slot"
              slot
@@ -161,7 +161,7 @@
 
 
 (defn test-try-boot-slot! [disk* boot-slot try-boot-slot]
-  (disk/set-try-boot-slot! disk* try-boot-slot)
+  (ab/set-try-boot-slot! disk* try-boot-slot)
   (let [info (require-disk-info! disk*)]
     (assert= "Normal boot slot should be preserved"
              boot-slot
@@ -172,7 +172,7 @@
 
 
 (defn test-clear-try-boot-slot! [disk* boot-slot]
-  (disk/set-try-boot-slot! disk* nil)
+  (ab/set-try-boot-slot! disk* nil)
   (let [info (require-disk-info! disk*)]
     (assert= "Normal boot slot should be preserved"
              boot-slot

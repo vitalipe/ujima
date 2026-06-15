@@ -10,7 +10,8 @@
             [lib.edn-test]
             [ujima.env-test]
 
-            [ujima.control.registry-test]))
+            [ujima.control.registry-test]
+            [ujima.control.reconcile-test]))
 
 
 (def test-namespaces
@@ -23,7 +24,8 @@
     lib.edn-test
     ujima.env-test
 
-    ujima.control.registry-test])
+    ujima.control.registry-test
+    ujima.control.reconcile-test])
 
 
 (defn -main [& _]

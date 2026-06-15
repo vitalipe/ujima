@@ -2,7 +2,7 @@
   (:require [cheshire.core :as json]
             [clojure.string :as str])
 
-  (:import '[java.io InputStream]))
+  (:import  [java.io InputStream]))
 
 
 (defn- snake->camel [k]

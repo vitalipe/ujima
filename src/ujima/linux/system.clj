@@ -9,7 +9,7 @@
 
 (defn hostname! [hostname]
   (sudo :hostnamectl "set-hostname" hostname)
-  (hostname))
+  (:out (sh :hostnamectl "--static")))
 
 
 (defn timezone []
@@ -18,7 +18,7 @@
 
 (defn timezone! [timezone]
   (sudo :timedatectl "set-timezone" timezone)
-  (timezone))
+  (:out (sh :timedatectl "show" "-p" "Timezone" "--value")))
 
 
 (defn keyboard-layouts []

@@ -3,23 +3,32 @@
 
             [ujima.linux.disk       :refer [device->partitions]]
             [ujima.linux.disk.mount :refer [with-mounted-vfat]]
-            [ujima.device.ab :refer [UjimaSystemDisk]]
+            [ujima.linux.shell      :refer [sudo$!]]
+
 
             [ujima.pack :as pack]
 
+            [ujima.device.ab                     :refer [UjimaSystemDisk UjimaBootRuntime]]
             [ujima.device.ab.autoboot.bootfiles  :as autoboot]
-            [ujima.device.ab.autoboot.partitions :refer [ujima-root-a-uuid
+            [ujima.device.ab.autoboot.partitions :refer [ujima-root-a-uuid]
                                                  ujima-root-b-uuid 
                                                  device->partitions-by-name
                                                  write-ab-partition-layout!
                                                  require-ab-partition-layout!  
-                                                 ujima-ab-partition-layout?]]))
+                                                 ujima-ab-partition-layout?]))
 
 
 (defn- require-ab-slot! [?slot]
   (when-not (#{:a :b} ?slot)
     (throw
       (ex-info "Boot slot must be :a or :b" {:expected #{:a :b} :actual ?slot}))))
+
+
+(defn file->u32-or-0 [path]
+  (if-not (fs/exists? path)
+    0
+    (->> (fs/read-all-bytes path)
+         (reduce (fn [a b] (+ (* a 256) (bit-and b 0xff))) 0))))
 
 
 (def slot->idx {:a 2 :b 3})
@@ -102,5 +111,21 @@
     nil)) 
 
 
+(defrecord AutobootRuntime [] 
+  
+  UjimaBootRuntime
+  
+  (try-boot! [_]
+    (sudo$! reboot "0 tryboot"))
+
+  (in-try-boot? [_]
+    (not (zero? (file->u32-or-0 "/proc/device-tree/chosen/bootloader/tryboot")))))
+
+
+
 (defn ->disk [{:keys [device]}]
   (->AutobootDisk device))
+
+
+(defn ->boot []
+  (-> AutobootRuntime))

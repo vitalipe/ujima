@@ -15,7 +15,7 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
 
-            [ujima.fs :refer [spit-file-atomic! file->number slurp-text]]))
+            [ujima.fs :refer [spit-file-atomic! slurp-text]]))
 
 
 (defn- parse-int [s] (when s (parse-long s)))
@@ -118,7 +118,4 @@
                                             "[tryboot]\n"
                                             "boot_partition=" try-boot "\n")))
   (autoboot path))
-
-
-(defn running-in-tryboot? []
-  (= 1 (file->number "/proc/device-tree/chosen/bootloader/tryboot")))
+  

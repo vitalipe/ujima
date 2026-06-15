@@ -2,7 +2,7 @@
   (:require [ujima.log :as log]))
 
 
-(defn on-control-token-change! [runtime* token]
+(defn on-control-token-change! [token]
 
   (when (:present? token)
     (log/info "control token present, open admin app!"))

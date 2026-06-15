@@ -6,15 +6,7 @@
         com.taoensso/timbre {:mvn/version "6.6.1"}}
 
  :tasks
- {http
-  {:doc "Run Ujima HTTP server"
-   :task (apply shell "bb" "-m" "ujima.agent" (seq *command-line-args*))}
-
-  cli
-  {:doc "Run Ujima CLI"
-   :task (apply shell "bb" "-m" "ujima.cli"(seq *command-line-args*))}
-
-  e2e
+ {e2e
   {:doc "Run an e2e test from e2e/tests"
    :task (apply shell "bb" "-cp" "src:test" "-m" "e2e.runner" (seq *command-line-args*))}
 
@@ -27,10 +19,7 @@
   {:doc "Start Ujima dev REPL"
    :task (shell "bb" "-cp" "src:tools/src:test" "-e" "(require 'tools.repl) (tools.repl/start!)")}
 
-  test-unit
+  test:unit
   {:doc "Run unit tests"
-   :task (shell "bb" "-cp" "src:test/unit" "-m" "runner")}
+   :task (shell "bb" "-cp" "src:test/unit" "-m" "runner")}}}
 
-  test
-  {:doc "Run all tests"
-   :depends [test-unit]}}}

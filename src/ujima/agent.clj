@@ -8,20 +8,20 @@
             [ujima.agent.events   :as events]))
 
 
-(defn init! [env]
+(defn init! [_]
   (let [control-token-ch* (token/watch-control-token!)]
     
     (log/info "Starting Agent loop")
 
     ;; reconcile persistent settings
-    (control/reconcile!!)
+    (control/reconcile!)
 
     ;; watch for events
     (async/thread
       (loop [prv-token nil]
         (when-let [token (async/<!! control-token-ch*)] ;; chan still open?
           (when (not= prv-token token)
-            (events/on-control-token-change! runtime* token))
+            (events/on-control-token-change! token))
           (recur token))))
 
     ;; block

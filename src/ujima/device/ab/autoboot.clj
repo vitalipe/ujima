@@ -1,21 +1,21 @@
 (ns ujima.device.ab.autoboot
   (:require
+    [babashka.fs :as fs]        
+    [ujima.linux.disk       :refer [device->partitions]]
+    [ujima.linux.disk.mount :refer [with-mounted-vfat]]
+    [ujima.linux.shell      :refer [sudo$!]]
 
-            [ujima.linux.disk       :refer [device->partitions]]
-            [ujima.linux.disk.mount :refer [with-mounted-vfat]]
-            [ujima.linux.shell      :refer [sudo$!]]
 
+    [ujima.pack :as pack]
 
-            [ujima.pack :as pack]
-
-            [ujima.device.ab                     :refer [UjimaSystemDisk UjimaBootRuntime]]
-            [ujima.device.ab.autoboot.bootfiles  :as autoboot]
-            [ujima.device.ab.autoboot.partitions :refer [ujima-root-a-uuid]
+    [ujima.device.ab                     :refer [UjimaSystemDisk UjimaBootRuntime]]
+    [ujima.device.ab.autoboot.bootfiles  :as autoboot]
+    [ujima.device.ab.autoboot.partitions :refer [ujima-root-a-uuid
                                                  ujima-root-b-uuid 
                                                  device->partitions-by-name
                                                  write-ab-partition-layout!
                                                  require-ab-partition-layout!  
-                                                 ujima-ab-partition-layout?]))
+                                                 ujima-ab-partition-layout?]]))
 
 
 (defn- require-ab-slot! [?slot]
@@ -116,7 +116,7 @@
   UjimaBootRuntime
   
   (try-boot! [_]
-    (sudo$! reboot "0 tryboot"))
+    (sudo$! reboot 0 tryboot))
 
   (in-try-boot? [_]
     (not (zero? (file->u32-or-0 "/proc/device-tree/chosen/bootloader/tryboot")))))
@@ -128,4 +128,4 @@
 
 
 (defn ->boot []
-  (-> AutobootRuntime))
+  (->AutobootRuntime))

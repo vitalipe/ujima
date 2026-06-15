@@ -1,11 +1,11 @@
-(ns ujima.agent
+(ns ujima.core
   (:require [ujima.env               :as env]
             [ujima.log               :as log]
 
             [ujima.device  :as device]
             [ujima.control :as control]
 
-            [ujima.agent      :as agent]
+            [ujima.agent   :as agent]))
 
 
 

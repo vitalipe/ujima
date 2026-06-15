@@ -8,7 +8,7 @@
             [ujima.fs  :refer [probe-file!]]))
 
 
-(defn do-probe-control-token! [_]
+(defn do-probe-control-token! []
   (let [control-file (probe-file! "/media" "*/*/.ujima-control-token")]
     (cond
       (nil? control-file) {:present? false}
@@ -17,26 +17,26 @@
                            :file control-file})))
 
 
-(defn watch-control-token! [env]
+(defn watch-control-token! []
   (let [ch* (a/chan (a/sliding-buffer 1))
         proc (p/process ["udevadm" "monitor" "--udev" "--subsystem-match=block"]
                         {:out :stream
                          :err :stream})]
 
     ;; Emit initial state immediately.
-    (a/>!! ch* (do-probe-control-token! env))
+    (a/>!! ch* (do-probe-control-token!))
 
     (a/thread
       (try
         (with-open [reader (java-io/reader (:out proc))]
-          (loop [last-token (do-probe-control-token! env)]
+          (loop [last-token (do-probe-control-token!)]
             (when-let [_line (.readLine reader)]
 
               ;; USB mount may not be ready at exact udev event time.
               ;; Small delay lets udisks/systemd/desktop automount finish.
               (Thread/sleep 800)
 
-              (let [token (do-probe-control-token! env)]
+              (let [token (do-probe-control-token!)]
                 (if (= token last-token) ;; ignore dup token states
                   (recur last-token)
                   (when (a/>!! ch* token) ;; recur when ch* still open

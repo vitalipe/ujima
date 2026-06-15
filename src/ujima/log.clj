@@ -30,7 +30,7 @@
    `(timbre/debug ~message ~data)))
 
 
-(defn init! [{level :level}]
+(defn init! [{level :level :or {level :info}}]
 
   (timbre/merge-config!
     {:output-fn

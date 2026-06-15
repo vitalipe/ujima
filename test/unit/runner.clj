@@ -8,7 +8,9 @@
             [ujima.shell-macro-test]
 
             [lib.edn-test]
-            [ujima.env-test]))
+            [ujima.env-test]
+
+            [ujima.control.registry-test]))
 
 
 (def test-namespaces
@@ -19,7 +21,9 @@
     ujima.shell-macro-test
 
     lib.edn-test
-    ujima.env-test])
+    ujima.env-test
+
+    ujima.control.registry-test])
 
 
 (defn -main [& _]

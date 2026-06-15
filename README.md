@@ -13,7 +13,7 @@ Core ideas:
 - **Local-first operation** — devices should keep working even without internet access.
 - **Peer-to-peer coordination** — machines discover and communicate with each other on the local network.
 - **Zero-config networking** — nearby Ujima machines should be discoverable without manual IP setup.
-- **Remote admin without a central server** — an authorized local admin can control machines through the local web interface.
+- **Remote admin without a central server** — an authorized local admin can control machines through a local web interface *(planned)*.
 - **Shared-computer management** — designed for public or semi-public computers used by many people.
 - **A/B system updates** — support safer system updates with rollback-friendly image/version switching.
 - **Low-maintenance deployment** — reduce the need for manual Linux administration on each machine.

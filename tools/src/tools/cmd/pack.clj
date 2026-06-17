@@ -1,4 +1,4 @@
-(ns tools.cli.pack
+(ns tools.cmd.pack
   (:require
     [lib.edn               :as edn]
     [ujima.linux.disk      :refer [require-block-device!]]

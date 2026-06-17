@@ -2,9 +2,9 @@
   (:require
     [ujima.env          :as env]
     [lib.cli            :as cli]
-    [tools.cli.loopback :as loopback]
-    [tools.cli.pack     :as pack]
-    [tools.image        :as image]))
+    [tools.cmd.loopback :as loopback]
+    [tools.cmd.pack     :as pack]
+    [tools.cmd.image    :as image]))
 
 
 

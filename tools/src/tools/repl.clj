@@ -14,8 +14,8 @@
     [lib.task.flow     :as task]
     [lib.util          :refer :all]
 
-    [tools.cli.loopback :as +loop]
-    [tools.cli.pack     :as +pack]))
+    [tools.cmd.loopback :as +loop]
+    [tools.cmd.pack     :as +pack]))
 
 
 (def tmp$ (fs/path "tmp" "ujima" "repl"))
@@ -55,8 +55,8 @@
   (println "  disk   => ujima.linux.disk")
   (println "  pack   => ujima.pack")
   (println "  task   => lib.task.flow")
-  (println "  +loop  => tools.cli.loopback")
-  (println "  +pack  => tools.cli.pack")
+  (println "  +loop  => tools.cmd.loopback")
+  (println "  +pack  => tools.cmd.pack")
   (println)
   (println "Referred shell helpers:")
   (println "  $! sudo$! sh! sudo!")

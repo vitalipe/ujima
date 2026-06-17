@@ -1,4 +1,4 @@
-(ns tools.image
+(ns tools.cmd.image
   "Host-only image build pipeline: fetch -> customize -> pack -> from-pack.
 
    Skeleton scope: pipeline mechanics only. No image content (packages/copy/fstab/bb) and no

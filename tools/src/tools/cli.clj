@@ -3,7 +3,8 @@
     [ujima.env          :as env]
     [lib.cli            :as cli]
     [tools.cli.loopback :as loopback]
-    [tools.cli.pack     :as pack]))
+    [tools.cli.pack     :as pack]
+    [tools.cli.image    :as image]))
 
 
 
@@ -58,7 +59,9 @@
                               :require true}
             :format {:desc "Output format: edn or json"
                      :default "edn"
-                     :validate #{"edn" "json"}}}}}})
+                     :validate #{"edn" "json"}}}}}
+
+   "image" image/command-tree})
 
 (defn -main
   [& args]

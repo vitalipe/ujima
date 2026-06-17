@@ -3,15 +3,19 @@
     [lib.edn               :as edn]
     [ujima.linux.disk      :refer [require-block-device!]]
     [ujima.linux.shell     :refer [require-root!]]
+    [ujima.linux.disk.loop :as loopback]
     [ujima.pack            :as pack]))
 
 
-(defn create-pack! [{:keys [block-device-path ujima-pack-out-path target arch] :or {target "mock" arch "test"}}]
+(defn pack-device! [{:keys [device out target arch] :or {target "mock" arch "test"}}]
   (require-root!)
-  
-  (pack/pack! block-device-path 
-              ujima-pack-out-path 
-              {:target target :arch arch}))
+  (pack/pack! device out {:target target :arch arch}))
+
+
+(defn pack-image! [{:keys [img out target arch] :or {target "mock" arch "test"}}]
+  (require-root!)
+  (loopback/with-loopback-device [dev img]
+    (pack/pack! dev out {:target target :arch arch})))
 
 
 (defn validate-pack! [{:keys [ujima-pack-path]}]

@@ -33,16 +33,27 @@
      :spec {}}}
 
    "pack"
-   {"create"
-    {:usage "Usage: tools pack create <block-device-path> <ujima-pack-out-path> [--target <target-name>] [--arch <arch-name>]"
-     :target pack/create-pack!
-     :args [:block-device-path :ujima-pack-out-path]
-     :spec {:block-device-path {:desc "Source block device path"
-                                :require true}
-            :ujima-pack-out-path {:desc "Output Ujima pack path"
-                                  :require true}
+   {"device"
+    {:usage "Usage: tools pack device <block-device> <out-pack> [--target <target-name>] [--arch <arch-name>]"
+     :target pack/pack-device!
+     :args [:device :out]
+     :spec {:device {:desc "Source block device path"
+                     :require true}
+            :out    {:desc "Output Ujima pack path"
+                     :require true}
             :target {:desc "Target name, e.g. rpi"}
-            :arch {:desc "Architecture name, e.g. arm64"}}}
+            :arch   {:desc "Architecture name, e.g. arm64"}}}
+
+    "image"
+    {:usage "Usage: tools pack image <img> <out-pack> [--target <target-name>] [--arch <arch-name>]"
+     :target pack/pack-image!
+     :args [:img :out]
+     :spec {:img    {:desc "Source image file (loopback-attached, then packed)"
+                     :require true}
+            :out    {:desc "Output Ujima pack path"
+                     :require true}
+            :target {:desc "Target name, e.g. rpi"}
+            :arch   {:desc "Architecture name, e.g. arm64"}}}
 
     "validate"
     {:usage "Usage: tools pack validate <ujima-pack-path>"
@@ -73,12 +84,6 @@
     {:usage "Usage: tools image customize <img>"
      :target image/customize! :args [:img]
      :spec {:img {:desc "Image to open a (no-op) chroot into" :require true}}}
-
-    "pack"
-    {:usage "Usage: tools image pack <img> <out-pack>"
-     :target image/pack! :args [:img :out]
-     :spec {:img {:desc "Customized source image" :require true}
-            :out {:desc "Output .pack path" :require true}}}
 
     "chroot"
     {:usage "Usage: tools image chroot <img>"

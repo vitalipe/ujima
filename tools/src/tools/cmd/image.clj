@@ -116,15 +116,6 @@
         (p/shell {:inherit true} "sudo" "chroot" (str mnt) "/bin/bash")))))
 
 
-(defn pack!
-  "Capture boot+root from a (customized) image into a .pack."
-  [{:keys [img out]}]
-  (require-root!)
-  (loopback/with-loopback-device [dev img]
-    (pack/pack! dev out))
-  (println "packed ->" (str out)))
-
-
 (defn from-pack!
   "Write a flashable A/B-layout image from a .pack: vanilla rootfs into slot :a, boot slot :a."
   [{pack-path :pack :keys [out layout]}]

@@ -125,19 +125,27 @@
 
 
 (defn from-pack!
-  "Write a flashable A/B-layout image from a .pack: vanilla rootfs into slot :a, boot slot :a."
+  "Returns a task that writes a flashable A/B-layout image from a .pack:
+   vanilla rootfs into slot :a, boot slot :a."
   [{pack-path :pack :keys [out layout]}]
-  (require-root!)
-  (let [{:keys [->disk image-bytes]} (resolve-layout layout)]
-    (pack/validate! pack-path)
-    (fs/delete-if-exists out)                       ; layout refuses a device that already has partitions
-    ($! truncate -s [(str image-bytes)] [(str out)]) ; sparse
-    (loopback/with-loopback-device [dev out]
-      (let [disk (->disk {:device dev})]
-        (ab/write-ujima-layout! disk)
-        (ab/install-into-slot!  disk pack-path :a)
-        (ab/set-boot-slot!      disk :a)))
-    (println "wrote A/B image ->" (str out))))
+  (flow :image/from-pack
+    (require-root!)
+    (let [{:keys [->disk image-bytes]} (resolve-layout layout)]
+      (progress! 5 "validating pack")
+      (pack/validate! pack-path)
+      (progress! 15 "preparing image")
+      (fs/delete-if-exists out)                        ; layout refuses a device that already has partitions
+      ($! truncate -s [(str image-bytes)] [(str out)]) ; sparse
+      (loopback/with-loopback-device [dev out]
+        (let [disk (->disk {:device dev})]
+          (progress! 25 "writing A/B layout")
+          (ab/write-ujima-layout! disk)
+          (progress! 50 "installing slot :a")
+          (ab/install-into-slot!  disk pack-path :a)
+          (progress! 90 "setting boot slot")
+          (ab/set-boot-slot!      disk :a)))
+      (progress! 100 "done")
+      {:out (str out)})))
 
 
 (defn run!

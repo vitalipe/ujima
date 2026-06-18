@@ -1,7 +1,10 @@
 (ns tools.cli
   (:require
+    [clojure.walk       :as walk]
     [ujima.env          :as env]
     [lib.cli            :as cli]
+    [lib.task           :as task]
+    [lib.task.timeline  :as timeline]
     [tools.cmd.loopback :as loopback]
     [tools.cmd.pack     :as pack]
     [tools.cmd.image    :as image]))
@@ -103,9 +106,56 @@
      :spec {:img  {:desc "Image to boot in qemu (experimental)" :require true}
             :arch {:desc "Guest arch" :default "arm64"}}}}})
 
+;; ----------------------------------------------------------------------------
+;; Task rendering
+;;
+;; A command target that returns a lib.task flow is run here and its progress is
+;; rendered to the terminal; any other return value passes straight through.
+;; ----------------------------------------------------------------------------
+
+(defn run-and-display!
+  "Runs a cold task and renders its progress on a single updating terminal line.
+   Returns the task's :done value, or re-throws its :error."
+  [t]
+  (task/run! t)
+  (loop []
+    (when-let [{:keys [type payload]} (task/take!! t)]
+      (when (= :progress type)
+        (print (format "\r%-16s %3d%%  %-24s"
+                       (str (:name t))
+                       (int (:progress payload))
+                       (or (:message payload) "")))
+        (flush))
+      (recur)))
+  (println)
+  (let [tl (task/task->timeline t)]
+    (if (= :error (timeline/timeline->state tl))
+      (throw (:error (:payload (timeline/timeline->last-of-type tl (:id t) :error))))
+      (:payload (timeline/timeline->last-of-type tl (:id t) :done)))))
+
+
+(defn- wrap-target [target]
+  (fn [opts]
+    (let [result (target opts)]
+      (if (task/task? result)
+        (run-and-display! result)
+        result))))
+
+
+(defn- wrap-targets
+  "Wrap every command target so a returned task is run + rendered."
+  [tree]
+  (walk/postwalk
+    (fn [node]
+      (if (and (map? node) (:target node))
+        (update node :target wrap-target)
+        node))
+    tree))
+
+
 (defn -main
   [& args]
 
   (env/init! ["config/ujima.edn"
               "config/config.local.edn"])
-  (cli/dispatch! command-tree args))
+  (cli/dispatch! (wrap-targets command-tree) args))

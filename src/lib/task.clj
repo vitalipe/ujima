@@ -74,7 +74,13 @@
                       code])
 
 
-(defn task->timeline 
+(defn task?
+  "Returns true when `x` is a task (a UjimaTask record)."
+  [x]
+  (instance? UjimaTask x))
+
+
+(defn task->timeline
   "Returns a snapshot of the task's append-only event timeline.
 
    This is the source of truth for polling clients and derived task state. A

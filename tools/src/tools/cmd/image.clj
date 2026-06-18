@@ -9,6 +9,7 @@
     [clojure.string  :as str]
     [babashka.fs      :as fs]
     [babashka.process :as p]
+    [lib.task.flow    :refer [flow]]
     [ujima.linux.shell      :refer [$! sudo$! sh! require-root!]]
     [ujima.linux.disk       :as linux-disk]
     [ujima.linux.disk.loop  :as loopback]
@@ -83,17 +84,24 @@
 
 
 (defn fetch!
-  "Download `url` -> verify optional `sha256` (of the compressed file) -> decompress -> `out`."
+  "Returns a task that downloads `url` -> verifies optional `sha256` (of the compressed
+   file) -> decompresses -> `out`."
   [{:keys [url out sha256]}]
-  (fs/with-temp-dir [dir {:prefix "ujima-fetch-"}]
-    (let [dl (str (fs/path dir (fs/file-name url)))]
-      ($! curl -fsSL --output [dl] [(str url)])
-      (when sha256
-        (let [actual (sha256-of dl)]
-          (when-not (= sha256 actual)
-            (throw (ex-info "sha256 mismatch" {:expected sha256 :actual actual :url url})))))
-      (decompress! dl out)
-      (println "fetched ->" (str out)))))
+  (flow :image/fetch
+    (fs/with-temp-dir [dir {:prefix "ujima-fetch-"}]
+      (let [dl (str (fs/path dir (fs/file-name url)))]
+        (progress! 5 "downloading")
+        ($! curl -fsSL --output [dl] [(str url)])
+        (progress! 60 "downloaded")
+        (when sha256
+          (progress! 65 "verifying checksum")
+          (let [actual (sha256-of dl)]
+            (when-not (= sha256 actual)
+              (error! :error/sha256-mismatch (str "sha256 mismatch: expected " sha256 " got " actual)))))
+        (progress! 70 "decompressing")
+        (decompress! dl out)
+        (progress! 100 "done")
+        {:out (str out)}))))
 
 
 (defn customize!

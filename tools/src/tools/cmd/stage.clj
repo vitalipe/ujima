@@ -32,7 +32,7 @@
 (defn- stage-img-name []
   (let [branch (sanitize (git "rev-parse" "--abbrev-ref" "HEAD"))
         commit (git "rev-parse" "--short" "HEAD")
-        dirty  (when-not (str/blank? (git "status" "--porcelain")) "-dev")]
+        dirty  (when-not (str/blank? (git "status" "--porcelain" "--untracked-files=no")) "-dev")]
     (str "ujima-" branch "-" commit dirty ".img")))
 
 

@@ -41,7 +41,9 @@
      your-script greet hello world --loud"
   (:require
     [babashka.cli :as cli]
-    [clojure.string :as str]))
+    [clojure.string :as str]
+    [lib.task :as task]
+    [lib.task.timeline :as timeline]))
 
 ;; ----------------------------------------------------------------------------
 ;; Errors
@@ -231,6 +233,33 @@
         (println "Available subcommands:")
         (doseq [cmd all-commands]
           (println " " (name cmd)))))))
+
+;; ----------------------------------------------------------------------------
+;; Task rendering
+;;
+;; A target that returns a lib.task flow can be run here and its progress rendered
+;; to the terminal on a single updating line.
+;; ----------------------------------------------------------------------------
+
+(defn run-and-display!
+  "Runs a cold task and renders its progress on a single updating terminal line.
+   Returns the task's :done value, or re-throws its :error."
+  [t]
+  (task/run! t)
+  (loop []
+    (when-let [{:keys [type payload]} (task/take!! t)]
+      (when (= :progress type)
+        (print (format "\r%-16s %3d%%  %-24s"
+                       (str (:name t))
+                       (int (:progress payload))
+                       (or (:message payload) "")))
+        (flush))
+      (recur)))
+  (println)
+  (let [tl (task/task->timeline t)]
+    (if (= :error (timeline/timeline->state tl))
+      (throw (:error (:payload (timeline/timeline->last-of-type tl (:id t) :error))))
+      (:payload (timeline/timeline->last-of-type tl (:id t) :done)))))
 
 ;; ----------------------------------------------------------------------------
 ;; Public API

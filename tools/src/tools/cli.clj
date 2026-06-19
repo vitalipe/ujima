@@ -4,15 +4,23 @@
     [ujima.env          :as env]
     [lib.cli            :as cli]
     [lib.task           :as task]
-    [lib.task.timeline  :as timeline]
     [tools.cmd.loopback :as loopback]
     [tools.cmd.pack     :as pack]
-    [tools.cmd.image    :as image]))
+    [tools.cmd.image    :as image]
+    [tools.cmd.stage    :as stage]))
 
 
 
 (def command-tree
-  {"loopback"
+  {"stage"
+   {"rpi-os"
+    {:usage "Usage: tools stage rpi-os [--no-install]"
+     :target stage/rpi-os!
+     :args []
+     :spec {:no-install {:coerce :boolean
+                         :desc "Stage without the chroot install step (no sudo)"}}}}
+
+   "loopback"
    {"attach"
     {:usage "Usage: tools loopback attach <img-file-path> [--readonly]"
      :target loopback/attach-loopback!
@@ -103,38 +111,15 @@
 
 
 ;; ----------------------------------------------------------------------------
-;; Task rendering
-;;
-;; A command target that returns a lib.task flow is run here and its progress is
-;; rendered to the terminal; any other return value passes straight through.
+;; Task rendering — a target that returns a lib.task flow is run + rendered via
+;; lib.cli/run-and-display!; any other return value passes straight through.
 ;; ----------------------------------------------------------------------------
-
-(defn run-and-display!
-  "Runs a cold task and renders its progress on a single updating terminal line.
-   Returns the task's :done value, or re-throws its :error."
-  [t]
-  (task/run! t)
-  (loop []
-    (when-let [{:keys [type payload]} (task/take!! t)]
-      (when (= :progress type)
-        (print (format "\r%-16s %3d%%  %-24s"
-                       (str (:name t))
-                       (int (:progress payload))
-                       (or (:message payload) "")))
-        (flush))
-      (recur)))
-  (println)
-  (let [tl (task/task->timeline t)]
-    (if (= :error (timeline/timeline->state tl))
-      (throw (:error (:payload (timeline/timeline->last-of-type tl (:id t) :error))))
-      (:payload (timeline/timeline->last-of-type tl (:id t) :done)))))
-
 
 (defn- wrap-target [target]
   (fn [opts]
     (let [result (target opts)]
       (if (task/task? result)
-        (run-and-display! result)
+        (cli/run-and-display! result)
         result))))
 
 

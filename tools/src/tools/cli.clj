@@ -83,17 +83,10 @@
             :out    {:desc "Output .img path" :require true}
             :sha256 {:desc "Expected sha256 of the downloaded (compressed) file"}}}
 
-    "customize"
-    {:usage "Usage: tools image customize <img> [--only <script>] [--from <script>]"
-     :target image/customize! :args [:img]
-     :spec {:img  {:desc "Image to customize (runs tools.scripts.* in the chroot)" :require true}
-            :only {:desc "Run only this script (install|configure|cleanup)"}
-            :from {:desc "Run from this script onward"}}}
-
-    "apply"
-    {:usage "Usage: tools image apply <script> <img>"
-     :target image/apply! :args [:target :img]
-     :spec {:target {:desc "Script to run (install|configure|cleanup)" :require true}
+    "script"
+    {:usage "Usage: tools image script <img> <script>"
+     :target image/script! :args [:img :script]
+     :spec {:script {:desc "Script to run inside chroot" :require true}
             :img    {:desc "Image to customize" :require true}}}
 
     "chroot"
@@ -106,13 +99,8 @@
      :target image/from-pack! :args [:pack :out]
      :spec {:pack   {:desc "Source .pack" :require true}
             :out    {:desc "Output .img" :require true}
-            :layout {:desc "Disk layout" :default "autoboot" :validate #{"autoboot"}}}}
+            :layout {:desc "Disk layout" :default "autoboot" :validate #{"autoboot"}}}}}})
 
-    "run"
-    {:usage "Usage: tools image run <img> [--arch arm64]   (EXPERIMENTAL)"
-     :target image/run! :args [:img]
-     :spec {:img  {:desc "Image to boot in qemu (experimental)" :require true}
-            :arch {:desc "Guest arch" :default "arm64"}}}}})
 
 ;; ----------------------------------------------------------------------------
 ;; Task rendering

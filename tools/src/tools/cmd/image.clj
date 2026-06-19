@@ -1,9 +1,10 @@
 (ns tools.cmd.image
-  "Host-only image build pipeline: fetch -> customize -> pack -> from-pack.
+  "Host-only image build pipeline: fetch -> script -> pack -> from-pack.
 
-   Skeleton scope: pipeline mechanics only. No image content (packages/copy/fstab/bb) and no
-   config reads — `customize` is a no-op chroot. Reuses the e2e-tested ujima.device/pack/loopback
-   fns; this namespace is wiring + the chroot/fetch mechanics only."
+   `script` runs a tools.scripts.<name>/run! namespace inside the target chroot (aarch64 bb
+   under qemu) against a read-only project bind, so the script's file ops / shell-outs land in
+   the image. Reuses the e2e-tested ujima.device/pack/loopback fns; this namespace is wiring +
+   the chroot/fetch mechanics."
   (:require
     [clojure.java.io :as io]
     [clojure.string  :as str]
@@ -37,7 +38,7 @@
 
 
 ;; ---------------------------------------------------------------------------
-;; Chroot lifecycle (used by customize! and chroot-shell!)
+;; Chroot lifecycle (used by script! and chroot-shell!)
 ;; ---------------------------------------------------------------------------
 
 ;; Vendored host-side binaries (repo-relative). The aarch64 bb runs in place from the
@@ -121,22 +122,18 @@
 ;; ---------------------------------------------------------------------------
 ;; Image-content scripts
 ;;
-;; Each step is tools.scripts.<name>/run!, executed *inside* the chroot by the
-;; vendored aarch64 bb (run in place from the read-only project bind). Edit the
-;; `scripts` vector to add/remove steps.
+;; A script is tools.scripts.<name>/run!, executed *inside* the chroot by the
+;; vendored aarch64 bb (run in place from the read-only project bind). Add a
+;; script by dropping tools/src/tools/scripts/<name>.clj.
 ;; ---------------------------------------------------------------------------
 
-(def scripts
-  "Ordered image-content scripts: the default customize pipeline and the registry
-   that backs --only/--from and the 'unknown script' error."
-  [:install :configure :cleanup])
+
+(def ^:private chroot-bb   (str project-mnt "/assets/tools/bb-aarch64"))
+(def ^:private chroot-cp   (str project-mnt "/src:" project-mnt "/tools/src"))
+(def ^:private scripts-dir "tools/src/tools/scripts")  ;; host-side, repo-relative
 
 
-(def ^:private chroot-bb (str project-mnt "/assets/tools/bb-aarch64"))
-(def ^:private chroot-cp (str project-mnt "/src:" project-mnt "/tools/src"))
-
-
-(defn- run-script! [mnt target]
+(defn- do-chroot-run-script! [mnt target]
   (p/shell {:inherit true}
            "sudo" "chroot" (str mnt)
            chroot-bb "--classpath" chroot-cp
@@ -144,38 +141,25 @@
            "--project" project-mnt))
 
 
-(defn- select-targets [{:keys [only from]}]
-  (let [->known (fn [s]
-                  (let [t (keyword s)]
-                    (when-not (some #{t} scripts)
-                      (throw (ex-info "Unknown script"
-                                      {:script s :available (mapv name scripts)})))
-                    t))]
-    (cond
-      only [(->known only)]
-      from (subvec scripts (.indexOf scripts (->known from)))
-      :else scripts)))
+(defn- require-script!
+  "Fail fast (before any chroot/loopback work) if tools.scripts.<script> doesn't exist."
+  [script]
+  (when-not (fs/exists? (fs/path scripts-dir (str script ".clj")))
+    (let [available (->> (fs/glob scripts-dir "*.clj")
+                         (mapv #(str/replace (str (fs/file-name %)) #"\.clj$" ""))
+                         sort vec)]
+      (throw (ex-info (str "Unknown script: " script)
+                      {:script script :available available})))))
 
 
-(defn customize!
-  "Run the image-content scripts inside the chroot in one session.
-   --only <name> runs a single script; --from <name> runs that script onward."
-  [{:keys [img] :as opts}]
+(defn script!
+  "Run a single image-content script (tools.scripts.<script>/run!) inside the chroot."
+  [{:keys [img script]}]
+  (require-script! script)
   (require-root!)
-  (let [targets (select-targets opts)]
-    (loopback/with-loopback-device [dev img]
-      (with-chrooted-rootfs* dev
-        (fn [mnt]
-          (doseq [t targets]
-            (println (str "\n== customize: " (name t) " =="))
-            (run-script! mnt t)))))
-    (println "customize done ->" (str img))))
-
-
-(defn apply!
-  "Run a single image-content script inside the chroot (ad-hoc entry point)."
-  [{:keys [target img]}]
-  (customize! {:img img :only target}))
+  (loopback/with-loopback-device [dev img]
+    (with-chrooted-rootfs* dev
+      (fn [mnt] (do-chroot-run-script! mnt script)))))
 
 
 (defn chroot-shell!
@@ -210,9 +194,3 @@
           (ab/set-boot-slot!      disk :a)))
       (progress! 100 "done")
       {:out (str out)})))
-
-
-(defn run!
-  "EXPERIMENTAL stub — qemu boot of the arm64 image is its own project."
-  [_]
-  (println "image run is experimental — use a separate x86 Debian VM for desktop work."))

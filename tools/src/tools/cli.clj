@@ -14,11 +14,10 @@
 (def command-tree
   {"stage"
    {"rpi-os"
-    {:usage "Usage: tools stage rpi-os [--no-install]"
+    {:usage "Usage: tools stage rpi-os"
      :target stage/rpi-os!
      :args []
-     :spec {:no-install {:coerce :boolean
-                         :desc "Stage without the chroot install step (no sudo)"}}}}
+     :spec {}}}
 
    "loopback"
    {"attach"

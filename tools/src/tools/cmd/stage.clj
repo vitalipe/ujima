@@ -1,7 +1,9 @@
 (ns tools.cmd.stage
-  "bb tools stage <target>: build a staged, install-scripted image from a pinned base OS.
+  "bb tools stage <target>: build a staged image from a pinned base OS.
 
-   fetch (vendor-cached) -> copy to ujima-<branch>-<commit>.img -> image script install."
+   Vendor base (fetch + `image script install`, cached under stage/vendor/) -> copy to
+   stage/ujima-<branch>-<commit>.img. The vendor is built once; rm it to rebuild
+   (e.g. after editing tools.scripts.install or bumping the vendored bb)."
   (:require
     [clojure.string :as str]
     [babashka.fs :as fs]
@@ -41,36 +43,41 @@
                 (str/replace (str (fs/file-name url)) #"\.(xz|gz|zip)$" ""))))
 
 
+(defn- build-vendor!
+  "Fetch the base image and bake `install` (packages + bb) into it, then publish it
+   to the cached vendor path. Built in a temp file and moved into place only on
+   success, so a failed install never leaves a poisoned cache."
+  [url sha256 vendor]
+  (require-root!)                       ; chroot install needs root — fail before the download
+  (fs/create-dirs vendor-dir)
+  (let [tmp (str vendor ".building")]
+    (fs/delete-if-exists tmp)
+    (cli/run-and-display! (image/fetch! {:url url :out tmp :sha256 sha256}))
+    (image/script! {:img tmp :script "install"})
+    (fs/move tmp vendor {:replace-existing true})))
+
+
 (defn stage!
-  "fetch (vendor-cached) -> copy to working image -> image script install."
-  [target {:keys [no-install]}]
+  "Build a cached vendor base (base OS + packages + bb) and copy it to a working
+   image. The vendor is built once; rm stage/vendor/<name>.img to rebuild it."
+  [target _opts]
   (let [{:keys [url sha256]} (or (get targets target)
                                  (throw (ex-info (str "Unknown stage target: " target)
                                                  {:target target :available (vec (keys targets))})))
         vendor (vendor-img url)
         out    (str (fs/path stage-dir (stage-img-name)))]
 
-    ;; the chroot install step needs root — fail fast, before the long download
-    (when-not no-install
-      (require-root!))
-
-    ;; 1. vendor base image (skip if already cached)
+    ;; 1. vendor base (base + install), built once and cached
     (if (fs/exists? vendor)
       (println "vendor cached ->" vendor)
-      (do
-        (fs/create-dirs vendor-dir)
-        (cli/run-and-display! (image/fetch! {:url url :out vendor :sha256 sha256}))))
+      (build-vendor! url sha256 vendor))
 
     ;; 2. copy to the working image (override)
     (fs/create-dirs stage-dir)
     (println "copy ->" out)
     (fs/copy vendor out {:replace-existing true})
 
-    ;; 3. install image content in the chroot
-    (when-not no-install
-      (image/script! {:img out :script "install"}))
-
-    (println "staged ->" out)
+    (println "staged ->" out "(rm" vendor "to rebuild the base)")
     {:out out}))
 
 

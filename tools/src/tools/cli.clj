@@ -84,9 +84,17 @@
             :sha256 {:desc "Expected sha256 of the downloaded (compressed) file"}}}
 
     "customize"
-    {:usage "Usage: tools image customize <img>"
+    {:usage "Usage: tools image customize <img> [--only <script>] [--from <script>]"
      :target image/customize! :args [:img]
-     :spec {:img {:desc "Image to open a (no-op) chroot into" :require true}}}
+     :spec {:img  {:desc "Image to customize (runs tools.scripts.* in the chroot)" :require true}
+            :only {:desc "Run only this script (install|configure|cleanup)"}
+            :from {:desc "Run from this script onward"}}}
+
+    "apply"
+    {:usage "Usage: tools image apply <script> <img>"
+     :target image/apply! :args [:target :img]
+     :spec {:target {:desc "Script to run (install|configure|cleanup)" :require true}
+            :img    {:desc "Image to customize" :require true}}}
 
     "chroot"
     {:usage "Usage: tools image chroot <img>"

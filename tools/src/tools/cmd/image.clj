@@ -40,26 +40,40 @@
 ;; Chroot lifecycle (used by customize! and chroot-shell!)
 ;; ---------------------------------------------------------------------------
 
-(def ^:private qemu-aarch64-static "/usr/bin/qemu-aarch64-static")
+;; Vendored host-side binaries (repo-relative). The aarch64 bb runs in place from the
+;; read-only project bind; only qemu must be copied, because binfmt resolves it at a fixed
+;; path *inside* the chroot.
+(def ^:private qemu-src    "assets/tools/qemu-aarch64-static")
+(def ^:private qemu-chroot "/usr/bin/qemu-aarch64-static")
+(def ^:private project-mnt "/ujima-src")  ;; repo bind-mount point inside the chroot
 
 
-;; Base image has 2 partitions [boot root]. Mount root, bind kernel fs, inject qemu-static +
-;; resolv.conf, run f, then (finally) unbind and remove the injected files so a no-op run leaves
-;; a clean/vanilla rootfs. The unbind MUST happen before with-mounted-ext4 unmounts root.
+;; Base image has 2 partitions [boot root]. Mount root, bind kernel fs, bind the repo
+;; read-only at project-mnt, inject qemu-static + resolv.conf, run f, then (finally) tear
+;; everything down so a no-op run leaves a clean/vanilla rootfs. All binds MUST be unmounted
+;; before with-mounted-ext4 unmounts root.
 (defn with-chrooted-rootfs* [device f]
   (let [[_boot root] (linux-disk/device->partitions device)
+        project      (str (fs/cwd))
         binds        ["/dev" "/proc" "/sys"]]
     (mount/with-mounted-ext4 [mnt root]
       (try
         (doseq [b binds]
           (sudo$! mount --bind [b] [(str mnt b)]))
-        (sudo$! cp "/etc/resolv.conf"    [(str mnt "/etc/resolv.conf")])
-        (sudo$! cp [qemu-aarch64-static] [(str mnt qemu-aarch64-static)])
+        ;; repo, read-only: scripts read their source/assets but cannot mutate the tree
+        (sudo$! mkdir -p [(str mnt project-mnt)])
+        (sudo$! mount --bind [project] [(str mnt project-mnt)])
+        (sudo$! mount -o "remount,bind,ro" [(str mnt project-mnt)])
+        ;; networking + aarch64 emulation (binfmt resolves qemu at qemu-chroot)
+        (sudo$! cp "/etc/resolv.conf"            [(str mnt "/etc/resolv.conf")])
+        (sudo$! cp [(str project "/" qemu-src)]  [(str mnt qemu-chroot)])
         (f mnt)
         (finally
+          (sudo$! umount [(str mnt project-mnt)])
+          (sudo$! rmdir  [(str mnt project-mnt)])
           (doseq [b (reverse binds)]
             (sudo$! umount [(str mnt b)]))
-          (sudo$! rm -f [(str mnt qemu-aarch64-static)])
+          (sudo$! rm -f [(str mnt qemu-chroot)])
           (sudo$! sh -c [(str ": > " mnt "/etc/resolv.conf")]))))))
 
 
@@ -104,14 +118,64 @@
         {:out (str out)}))))
 
 
+;; ---------------------------------------------------------------------------
+;; Image-content scripts
+;;
+;; Each step is tools.scripts.<name>/run!, executed *inside* the chroot by the
+;; vendored aarch64 bb (run in place from the read-only project bind). Edit the
+;; `scripts` vector to add/remove steps.
+;; ---------------------------------------------------------------------------
+
+(def scripts
+  "Ordered image-content scripts: the default customize pipeline and the registry
+   that backs --only/--from and the 'unknown script' error."
+  [:install :configure :cleanup])
+
+
+(def ^:private chroot-bb (str project-mnt "/assets/tools/bb-aarch64"))
+(def ^:private chroot-cp (str project-mnt "/src:" project-mnt "/tools/src"))
+
+
+(defn- run-script! [mnt target]
+  (p/shell {:inherit true}
+           "sudo" "chroot" (str mnt)
+           chroot-bb "--classpath" chroot-cp
+           "-x" (str "tools.scripts." (name target) "/run!")
+           "--project" project-mnt))
+
+
+(defn- select-targets [{:keys [only from]}]
+  (let [->known (fn [s]
+                  (let [t (keyword s)]
+                    (when-not (some #{t} scripts)
+                      (throw (ex-info "Unknown script"
+                                      {:script s :available (mapv name scripts)})))
+                    t))]
+    (cond
+      only [(->known only)]
+      from (subvec scripts (.indexOf scripts (->known from)))
+      :else scripts)))
+
+
 (defn customize!
-  "No-op chroot skeleton: set up the chroot and apply nothing (vanilla rootfs out).
-   Content (packages/copy/fstab/bb/hardening) is added by hand later."
-  [{:keys [img]}]
+  "Run the image-content scripts inside the chroot in one session.
+   --only <name> runs a single script; --from <name> runs that script onward."
+  [{:keys [img] :as opts}]
   (require-root!)
-  (loopback/with-loopback-device [dev img]
-    (with-chrooted-rootfs* dev (fn [_mnt] nil)))
-  (println "customize (no-op skeleton) ->" (str img)))
+  (let [targets (select-targets opts)]
+    (loopback/with-loopback-device [dev img]
+      (with-chrooted-rootfs* dev
+        (fn [mnt]
+          (doseq [t targets]
+            (println (str "\n== customize: " (name t) " =="))
+            (run-script! mnt t)))))
+    (println "customize done ->" (str img))))
+
+
+(defn apply!
+  "Run a single image-content script inside the chroot (ad-hoc entry point)."
+  [{:keys [target img]}]
+  (customize! {:img img :only target}))
 
 
 (defn chroot-shell!

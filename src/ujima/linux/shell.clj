@@ -1,11 +1,9 @@
 (ns ujima.linux.shell
-  "Project shell layer over `lib.shell`: env-driven command remap + sudo, plus the
-   function-style `sh`/`sudo` API.
-
-   Same DSL as `lib.shell` (`$`, `$!`, `$>`, `->` piping). On top it adds:
-   - command remap from `[:shell :commands]` — argv[0] only, concrete paths skipped;
-   - `sudo$`/`sudo$!`, which remap the wrapped command and then prepend a (remapped)
-     `sudo -n` (so both get remapped)."
+  "Project shell layer over `lib.shell`: the same DSL (`$`, `$!`, `$?`, `$>`, `->` piping)
+   with env command-remap applied to every command (argv[0] only, concrete paths skipped),
+   plus the sudo family (`sudo$`/`sudo$!`/`sudo$?`) which remaps the wrapped command and
+   prepends a (remapped) `sudo -n`. `$?`/`sudo$?` run eagerly and return
+   `{:ok? :exit :out :err}` without throwing; `root?`/`require-root!` are the only functions."
   (:require [clojure.string :as str]
             [ujima.env      :refer [get-in-env]]
             [lib.shell      :as shell]
@@ -84,6 +82,23 @@
   `(exec/out-or-fail! (sudo$ ~@forms)))
 
 
+(def capture-opts
+  "Process opts for string capture, used by `$?` / `sudo$?`."
+  {:out :string :err :string :continue true})
+
+
+(defmacro $?
+  "Run a command (remap) eagerly; return `{:ok? :exit :out :err}`. Does not throw."
+  [& forms]
+  `(exec/result! (remap-spawn capture-opts (:cmd (shell/$argv ~@forms)))))
+
+
+(defmacro sudo$?
+  "Run a command through sudo (remap) eagerly; return `{:ok? :exit :out :err}`. No throw."
+  [& forms]
+  `(exec/result! (sudo-spawn capture-opts (:cmd (shell/$argv ~@forms)))))
+
+
 (defmacro $>
   "Redirect the previous process's stdout into `target` (a file); the `cat` stage is
    remapped. Use inside a `->` pipe."
@@ -98,30 +113,12 @@
 
 
 ;; ---------------------------------------------------------------------------
-;; Function-style API — preserved signatures, heavily used by call-sites.
+;; Root helpers.
 ;; ---------------------------------------------------------------------------
 
-(def ^:private capture-opts {:out :string :err :string :continue true})
-
-(defn- ->tokens [cmd args]
-  (shell/value->tokens (cons cmd args)))
-
-
-(defn sh
-  "Run a command. Returns a result map `{:ok? :exit :out :err}`. Does not throw."
-  [cmd & args]
-  (exec/result! (remap-spawn capture-opts (->tokens cmd args))))
-
-
-(defn sudo
-  "Run a command through sudo. Returns a result map. Does not throw."
-  [cmd & args]
-  (exec/result! (sudo-spawn capture-opts (->tokens cmd args))))
-
-
 (defn root? []
-  (or (= "0" (str/trim (:out (sh :id "-u"))))
-      (:ok? (sh :sudo "-n" "true"))))
+  (or (= "0" (str/trim (:out ($? id -u))))
+      (:ok? ($? sudo -n "true"))))
 
 
 (defn require-root! []

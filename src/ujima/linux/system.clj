@@ -1,24 +1,24 @@
 (ns ujima.linux.system
   (:require [clojure.string :as str]
-            [ujima.linux.shell :refer [sh sudo]]))            
+            [ujima.linux.shell :refer [$? sudo$?]]))
 
 
 (defn hostname []
-  (:out (sh :hostnamectl "--static")))
+  (:out ($? hostnamectl --static)))
 
 
 (defn hostname! [hostname]
-  (sudo :hostnamectl "set-hostname" hostname)
-  (:out (sh :hostnamectl "--static")))
+  (sudo$? hostnamectl set-hostname [hostname])
+  (:out ($? hostnamectl --static)))
 
 
 (defn timezone []
-  (:out (sh :timedatectl "show" "-p" "Timezone" "--value")))
+  (:out ($? timedatectl show -p "Timezone" --value)))
 
 
 (defn timezone! [timezone]
-  (sudo :timedatectl "set-timezone" timezone)
-  (:out (sh :timedatectl "show" "-p" "Timezone" "--value")))
+  (sudo$? timedatectl set-timezone [timezone])
+  (:out ($? timedatectl show -p "Timezone" --value)))
 
 
 (defn keyboard-layouts []
@@ -26,13 +26,13 @@
 
 
 (defn keyboard-layouts! [layouts]
-  (sudo :localectl "set-x11-keymap" (str/join "," layouts))
+  (sudo$? localectl set-x11-keymap [(str/join "," layouts)])
   (keyboard-layouts))
 
 
 (defn reboot! []
-  (sudo :systemctl "reboot"))
+  (sudo$? systemctl reboot))
 
 
 (defn shutdown! []
-  (sudo :systemctl "poweroff"))
+  (sudo$? systemctl poweroff))

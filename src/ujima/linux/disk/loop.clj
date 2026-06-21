@@ -3,13 +3,13 @@
             [babashka.fs :as fs]
             [cheshire.core :as json]
 
-            [ujima.linux.shell      :refer [sh sudo$!]]
+            [ujima.linux.shell      :refer [$? sudo$!]]
             [ujima.linux.disk       :refer [device->partitions]]
             [ujima.linux.disk.mount :refer [device->mount-points]]))
 
 
 (defn path->loopback-devices [image-path]
-  (let [{:keys [out]} (sh :losetup "-j" (str image-path))]
+  (let [{:keys [out]} ($? losetup -j [image-path])]
     (->> (str/split-lines out)
          (map #(first (str/split % #":" 2)))
          (remove str/blank?)
@@ -17,7 +17,7 @@
 
 
 (defn loopback-devices []
-  (let [out (:out (sh :losetup "--list" "--json"))]
+  (let [out (:out ($? losetup --list --json))]
     (-> out
         (json/parse-string true)
         (:loopdevices))))

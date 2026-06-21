@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
             [ujima.fs :refer [file->number]]
-            [ujima.linux.shell :refer [sh]]))
+            [ujima.linux.shell :refer [$?]]))
 
 
 (defn- sys-file->path [partition file-name]
@@ -14,7 +14,7 @@
 
 
 (defn block-device? [path]
-  (:ok? (sh :test "-b" (str path))))
+  (:ok? ($? test -b [path])))
 
 
 (defn partition? [device-path]
@@ -33,8 +33,7 @@
 
 
 (defn device->partitions [device]
-  (->> device
-    (sh :lsblk "-nrpo" "NAME")
+  (->> ($? lsblk -nrpo "NAME" [device])
     (:out)
     (str/split-lines)
     (filter  #(fs/exists? (sys-file->path % "partition")))

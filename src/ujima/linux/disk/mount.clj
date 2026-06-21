@@ -1,18 +1,18 @@
 (ns ujima.linux.disk.mount
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
-            [ujima.linux.shell :refer [sh sudo$!]]))
+            [ujima.linux.shell :refer [$? sudo$!]]))
 
 
 (defn mount-point? [mnt]
-  (:ok? (sh :mountpoint "-q" (str mnt))))
+  (:ok? ($? mountpoint -q [mnt])))
 
 
 (defn device->mount-points [device-path]
-  (->> (sh :findmnt "--source" (str device-path)
-                    "--output" "TARGET"
-                    "--noheadings"
-                    "--raw")
+  (->> ($? findmnt --source [device-path]
+                   --output "TARGET"
+                   --noheadings
+                   --raw)
     (:out)
     (str/split-lines)
     (remove str/blank?)))

@@ -5,7 +5,7 @@
 
             [ujima.fs :refer [require-file! slurp-edn spit-edn!]]
             
-            [ujima.linux.shell      :refer  [$ sudo$ $! sudo$! sh result-or-fail!]]
+            [ujima.linux.shell      :refer  [$ sudo$ $! sudo$! $? result-or-fail!]]
             [ujima.linux.disk        :refer [require-block-device! device->partitions]]
             [ujima.linux.disk.mount  :refer [with-mounted-ext4]]))
 
@@ -28,7 +28,7 @@
 
 
 (defn metadata [ujima-pack-path]
-  (let [{:keys [ok? out]} (sh :tar "--zstd" "-xOf" ujima-pack-path "metadata.edn")]
+  (let [{:keys [ok? out]} ($? tar --zstd -xOf [ujima-pack-path] "metadata.edn")]
     (when ok?
       (try
         (edn/read-string out)
@@ -46,8 +46,7 @@
 
 
 (defn entries [ujima-pack-path]
-  (->> ujima-pack-path
-       (sh :tar "--zstd" "-tf")
+  (->> ($? tar --zstd -tf [ujima-pack-path])
        (:out)
        (str/split-lines)
        (into #{})))

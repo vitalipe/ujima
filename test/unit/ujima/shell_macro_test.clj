@@ -101,35 +101,35 @@
                    @calls*))))))))
 
 
-;; --- function API: sh / sudo ----------------------------------------------
+;; --- macro runners: $? / sudo$? -------------------------------------------
 
-(deftest sh-test
-  (testing "sh remaps, captures string output, returns a result map (no throw)"
+(deftest $?-test
+  (testing "$? remaps, captures string output, returns a result map (no throw)"
     (with-command-remap {:e2fsck ["echo" "e2fsck"]}
       (fn []
         (let [calls* (atom [])]
           (with-redefs [lib/spawn (recording-spawn calls* {:exit 0 :out "ok\n" :err ""})]
             (is (= {:ok? true :exit 0 :out "ok" :err ""}
-                   (shell/sh :e2fsck "-fn" "/dev/x")))
+                   (shell/$? e2fsck -fn "/dev/x")))
             (is (= [{:opts {:out :string :err :string :continue true}
                      :argv ["echo" "e2fsck" "-fn" "/dev/x"]}]
                    @calls*)))))))
 
-  (testing "sh returns ok? false on a non-zero exit, does not throw"
+  (testing "$? returns ok? false on a non-zero exit, does not throw"
     (with-command-remap {}
       (fn []
         (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 1 :out "" :err "boom\n"})]
           (is (= {:ok? false :exit 1 :out "" :err "boom"}
-                 (shell/sh :whatever))))))))
+                 (shell/$? whatever))))))))
 
 
-(deftest sudo-fn-test
-  (testing "sudo remaps both sudo and the command, returns a result map"
+(deftest sudo$?-test
+  (testing "sudo$? remaps both sudo and the command, returns a result map"
     (with-command-remap {:sudo ["echo" "sudo"] :e2fsck ["echo" "e2fsck"]}
       (fn []
         (let [calls* (atom [])]
           (with-redefs [lib/spawn (recording-spawn calls* {:exit 0 :out "" :err ""})]
-            (shell/sudo :e2fsck "-fn" "/dev/x")
+            (shell/sudo$? e2fsck -fn "/dev/x")
             (is (= ["echo" "sudo" "-n" "echo" "e2fsck" "-fn" "/dev/x"]
                    (:argv (first @calls*))))))))))
 
@@ -153,35 +153,38 @@
         (is (= "hi there" (shell/$! tool "hi there")))))))
 
 
-;; --- root? (ported unchanged) ----------------------------------------------
+;; --- root? (mocks lib.shell/spawn, since sh is gone) ------------------------
 
 (deftest root?-test
   (testing "root? returns true for uid 0 without checking sudo"
-    (let [calls* (atom [])]
-      (with-redefs [shell/sh (fn [cmd & args]
-                               (swap! calls* conj [cmd args])
-                               (case cmd
-                                 :id   {:ok? true :exit 0 :out "0\n" :err ""}
-                                 :sudo (throw (ex-info "sudo should not be called" {}))))]
-        (is (true? (shell/root?)))
-        (is (= [[:id ["-u"]]]
-               @calls*)))))
+    (with-command-remap {}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (fn [_opts argv]
+                                    (swap! calls* conj argv)
+                                    (atom (case (first argv)
+                                            "id"   {:exit 0 :out "0\n" :err ""}
+                                            "sudo" (throw (ex-info "sudo should not be called" {})))))]
+            (is (true? (shell/root?)))
+            (is (= [["id" "-u"]] @calls*)))))))
 
   (testing "root? falls back to passwordless sudo for non-root users"
-    (let [calls* (atom [])]
-      (with-redefs [shell/sh (fn [cmd & args]
-                               (swap! calls* conj [cmd args])
-                               (case cmd
-                                 :id   {:ok? true :exit 0 :out "1000\n" :err ""}
-                                 :sudo {:ok? true :exit 0 :out "" :err ""}))]
-        (is (true? (shell/root?)))
-        (is (= [[:id ["-u"]]
-                [:sudo ["-n" "true"]]]
-               @calls*)))))
+    (with-command-remap {}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (fn [_opts argv]
+                                    (swap! calls* conj argv)
+                                    (atom (case (first argv)
+                                            "id"   {:exit 0 :out "1000\n" :err ""}
+                                            "sudo" {:exit 0 :out "" :err ""})))]
+            (is (true? (shell/root?)))
+            (is (= [["id" "-u"] ["sudo" "-n" "true"]] @calls*)))))))
 
   (testing "root? returns false when neither root nor passwordless sudo is available"
-    (with-redefs [shell/sh (fn [cmd & _args]
-                             (case cmd
-                               :id   {:ok? true :exit 0 :out "1000\n" :err ""}
-                               :sudo {:ok? false :exit 1 :out "" :err ""}))]
-      (is (false? (shell/root?))))))
+    (with-command-remap {}
+      (fn []
+        (with-redefs [lib/spawn (fn [_opts argv]
+                                  (atom (case (first argv)
+                                          "id"   {:exit 0 :out "1000\n" :err ""}
+                                          "sudo" {:exit 1 :out "" :err ""})))]
+          (is (false? (shell/root?))))))))

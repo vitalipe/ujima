@@ -1,6 +1,6 @@
 (ns ujima.linux.shell
   "Project shell layer over `lib.shell`: env-driven command remap + sudo, plus the
-   function-style `sh`/`sh!`/`sudo`/`sudo!` API.
+   function-style `sh`/`sudo` API.
 
    Same DSL as `lib.shell` (`$`, `$!`, `$>`, `->` piping). On top it adds:
    - command remap from `[:shell :commands]` — argv[0] only, concrete paths skipped;
@@ -117,24 +117,6 @@
   "Run a command through sudo. Returns a result map. Does not throw."
   [cmd & args]
   (exec/result! (sudo-spawn capture-opts (->tokens cmd args))))
-
-
-(defn sh!
-  "Run a command. Returns stdout; throws on a non-zero exit."
-  [cmd & args]
-  (let [{:keys [ok? out] :as result} (apply sh cmd args)]
-    (when-not ok?
-      (throw (ex-info (str "Command failed: " (str/join " " (->tokens cmd args))) result)))
-    out))
-
-
-(defn sudo!
-  "Run a command through sudo. Returns stdout; throws on a non-zero exit."
-  [cmd & args]
-  (let [{:keys [ok? out] :as result} (apply sudo cmd args)]
-    (when-not ok?
-      (throw (ex-info (str "Command failed: sudo " (str/join " " (->tokens cmd args))) result)))
-    out))
 
 
 (defn root? []

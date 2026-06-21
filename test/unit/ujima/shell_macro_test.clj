@@ -1,6 +1,6 @@
 (ns ujima.shell-macro-test
   "Project-layer shell tests: command remap, sudo (remap-then-prepend), and the
-   function-style sh/sh!/sudo/sudo! API. The generic DSL/lowering behaviour lives in
+   function-style sh/sudo API. The generic DSL/lowering behaviour lives in
    lib.shell-test."
   (:require [clojure.java.io   :as io]
             [clojure.test      :refer [deftest is testing]]
@@ -101,7 +101,7 @@
                    @calls*))))))))
 
 
-;; --- function API: sh / sudo / sh! / sudo! ---------------------------------
+;; --- function API: sh / sudo ----------------------------------------------
 
 (deftest sh-test
   (testing "sh remaps, captures string output, returns a result map (no throw)"
@@ -132,30 +132,6 @@
             (shell/sudo :e2fsck "-fn" "/dev/x")
             (is (= ["echo" "sudo" "-n" "echo" "e2fsck" "-fn" "/dev/x"]
                    (:argv (first @calls*))))))))))
-
-
-(deftest sh!-test
-  (testing "sh! returns trimmed stdout"
-    (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 0 :out "hi\n" :err ""})]
-      (is (= "hi" (shell/sh! :echo "hi")))))
-
-  (testing "sh! throws on a non-zero exit"
-    (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 1 :out "" :err "nope"})]
-      (is (thrown? Exception (shell/sh! :false))))))
-
-
-(deftest sudo!-test
-  (testing "sudo! remaps both and returns trimmed stdout"
-    (with-command-remap {:sudo ["echo" "sudo"]}
-      (fn []
-        (let [calls* (atom [])]
-          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0 :out "done\n" :err ""})]
-            (is (= "done" (shell/sudo! :reboot "0")))
-            (is (= ["echo" "sudo" "-n" "reboot" "0"] (:argv (first @calls*)))))))))
-
-  (testing "sudo! throws on a non-zero exit"
-    (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 5 :out "" :err "x"})]
-      (is (thrown? Exception (shell/sudo! :reboot))))))
 
 
 ;; --- end-to-end: real processes through remap + sudo (the bug fix) ----------

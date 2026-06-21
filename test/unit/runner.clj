@@ -5,6 +5,8 @@
             [lib.task.flow-test]
             [lib.task.task-test]
 
+            [lib.shell-test]
+
             [ujima.shell-macro-test]
 
             [lib.edn-test]
@@ -18,6 +20,8 @@
   '[lib.task.task-test
     lib.task.timeline-test
     lib.task.flow-test
+
+    lib.shell-test
 
     ujima.shell-macro-test
 

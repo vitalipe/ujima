@@ -5,22 +5,14 @@
 
             [ujima.fs :refer [require-file! slurp-edn spit-edn!]]
             
-            [ujima.linux.shell      :refer  [$ sudo$ $! sudo$! sh! sh sudo! result-or-fail!]]
+            [ujima.linux.shell      :refer  [$ sudo$ $! sudo$! sh result-or-fail!]]
             [ujima.linux.disk        :refer [require-block-device! device->partitions]]
             [ujima.linux.disk.mount  :refer [with-mounted-ext4]]))
 
 
-
-(defn- pack-to-file! [src dst]
-  (sudo! :dd (str "if=" src) 
-             (str "of=" dst)
-             "bs=4M"
-             "conv=fsync"))
-
-
 (defn- unpack-to-partition! [pack-path member partition-path]
   (-> ($ tar --zstd -xOf [pack-path] [member])
-      (sudo$ dd [(str "of="  partition-path)] "bs=4M" "conv=fsync")
+      (sudo$ dd {:of partition-path :bs "4M" :conv "fsync"})
       (result-or-fail!)))
 
 
@@ -117,8 +109,9 @@
                           pack-metadata 
                           {:pack-version pack-version}))
 
-        (pack-to-file! boot-src (fs/path work-dir "boot.img"))
-        (pack-to-file! root-src (fs/path work-dir "root.img"))
+        (sudo$! dd {:if boot-src :of (fs/path work-dir "boot.img") :bs "4M" :conv "fsync"}) 
+        (sudo$! dd {:if root-src :of (fs/path work-dir "root.img") :bs "4M" :conv "fsync"}) 
+        
 
         ($! tar --zstd
                 -cf [ujima-pack-path]
@@ -153,7 +146,7 @@
          (spit-edn! (fs/path tmp-dir "meta.edn")    pack-meta)
          (spit-edn! (fs/path tmp-dir "install.edn") install-meta)
 
-         (sudo$! install -D  -m "0644" [(fs/path tmp-dir "meta.edn")]    [(fs/path mnt-root system-metadata-path)])
-         (sudo$! install -D  -m "0644" [(fs/path tmp-dir "install.edn")] [(fs/path mnt-root system-install-path)]))))
+         (sudo$! install -D  -m "0644" (fs/path tmp-dir "meta.edn")    (fs/path mnt-root system-metadata-path))
+         (sudo$! install -D  -m "0644" (fs/path tmp-dir "install.edn") (fs/path mnt-root system-install-path)))))
           
    nil))

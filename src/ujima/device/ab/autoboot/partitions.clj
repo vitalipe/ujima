@@ -1,5 +1,5 @@
 (ns ujima.device.ab.autoboot.partitions
-  (:require [ujima.linux.shell :refer [sh! sudo!]]
+  (:require [ujima.linux.shell :refer [$! sudo$!]]
             [ujima.linux.disk :refer [require-block-device!
                                        device->partitions
                                        partition->info]]))
@@ -84,7 +84,8 @@
 
   
 (defn write-ab-partition-layout! [device]
-  (let [[control-start control-end] [4            (+ 4 64)]
+  (let [MiB #(str % "MiB")
+        [control-start control-end] [4            (+ 4 64)]
         [boot-a-start boot-a-end]   [control-end  (+ control-end 512)]
         [boot-b-start boot-b-end]   [boot-a-end   (+ boot-a-end  512)]
         
@@ -98,30 +99,30 @@
 
     (require-block-device! device) 
 
-    (sudo! :wipefs "-a" device)
-    (sudo! :parted "-s"        device "mklabel" "msdos")
-    (sudo! :sfdisk "--disk-id" device ujima-mbr-disk-id) ;; <-- we need this for cmdline.txt
+    (sudo$! wipefs -a [device])
+    (sudo$! parted -s        [device] "mklabel" "msdos")
+    (sudo$! sfdisk --disk-id [device ujima-mbr-disk-id]) ;; <-- we need this for cmdline.txt
 
-    (sudo! :parted "-s" device "mkpart" "primary" "fat32" (str control-start "MiB") (str control-end "MiB"))
+    (sudo$! parted -s [device] mkpart primary fat32 (MiB control-start) (MiB control-end))
 
-    (sudo! :parted "-s" device "mkpart" "primary" "fat32" (str boot-a-start "MiB")  (str boot-a-end "MiB"))
-    (sudo! :parted "-s" device "mkpart" "primary" "fat32" (str boot-b-start "MiB")  (str boot-b-end "MiB"))
+    (sudo$! parted -s [device] mkpart primary fat32 (MiB boot-a-start)  (MiB boot-a-end))
+    (sudo$! parted -s [device] mkpart primary fat32 (MiB boot-b-start)  (MiB boot-b-end))
 
-    (sudo! :parted "-s" device "mkpart" "extended" (str  ext-start "MiB") "100%")
+    (sudo$! parted -s [device] mkpart extended (MiB  ext-start) "100%")
 
-    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str root-a-start  "MiB") (str root-a-end "MiB"))
-    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str root-b-start  "MiB") (str root-b-end "MiB"))
-    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str config-start  "MiB") (str config-end "MiB"))
-    (sudo! :parted "-s" device "mkpart" "logical" "ext4" (str storage-start "MiB") "100%")
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB root-a-start) (MiB root-a-end))
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB root-b-start) (MiB root-b-end))
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB config-start) (MiB config-end))
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB storage-start) "100%")
 
-    (sudo! :partprobe device)
-    (sh!   :udevadm "settle")
+    (sudo$! partprobe [device])
+    ($!     udevadm settle)
   
     ;; Format only persistent/control partitions here.
     ;; Boot/root partitions are written later from images.
     (let [{:keys [control config storage]} (device->partitions-by-name device)]
   
-      (sudo! :mkfs.vfat "-F" "32" "-n" "UJCTL" control)
+      (sudo$! :mkfs.vfat -F 32 -n "UJCTL" [control])
 
-      (sudo! :mkfs.ext4 "-F" "-L" "UJCFG"   config)
-      (sudo! :mkfs.ext4 "-F" "-L" "UJSTORE" storage))))
+      (sudo$! :mkfs.ext4 -F -L "UJCFG"   [config])
+      (sudo$! :mkfs.ext4 -F -L "UJSTORE" [storage]))))

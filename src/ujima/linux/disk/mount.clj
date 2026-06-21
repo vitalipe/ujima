@@ -1,7 +1,7 @@
 (ns ujima.linux.disk.mount
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
-            [ujima.linux.shell :refer [sh sudo!]]))
+            [ujima.linux.shell :refer [sh sudo$!]]))
 
 
 (defn mount-point? [mnt]
@@ -28,11 +28,11 @@
 
 
 (defn umount! [mnt]
-  (sudo! :umount (str mnt)))
+  (sudo$! umount [mnt]))
 
 
 (defn mount! [fs-type device mnt]
-  (sudo! :mount "-t" fs-type (str device) (str mnt)))
+  (sudo$! mount -t [fs-type] [device] [mnt]))
 
 
 (defn wait-until-unmounted-or-fail! [mnt]

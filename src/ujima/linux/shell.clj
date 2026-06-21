@@ -1,201 +1,140 @@
 (ns ujima.linux.shell
-  (:require [clojure.string  :as str]
-            [babashka.process :refer [shell] :as p]
-            [ujima.env        :refer [get-in-env]]))
+  "Project shell layer over `lib.shell`: env-driven command remap + sudo, plus the
+   function-style `sh`/`sh!`/`sudo`/`sudo!` API.
+
+   Same DSL as `lib.shell` (`$`, `$!`, `$>`, `->` piping). On top it adds:
+   - command remap from `[:shell :commands]` — argv[0] only, concrete paths skipped;
+   - `sudo$`/`sudo$!`, which remap the wrapped command and then prepend a (remapped)
+     `sudo -n` (so both get remapped)."
+  (:require [clojure.string :as str]
+            [ujima.env      :refer [get-in-env]]
+            [lib.shell      :as shell]
+            [lib.shell.exec :as exec]))
 
 
-(defn- only-one-expr! [form]
-  (when (empty? form)
-    (throw
-      (ex-info "Shell macro [] cannot be empty"
-               {:form form})))
+;; ---------------------------------------------------------------------------
+;; Command remap — argv[0] only, from [:shell :commands].
+;; ---------------------------------------------------------------------------
 
-  (when (> (count form) 1)
-    (throw
-      (ex-info "Shell macro [] must contain exactly one expression"
-               {:form form})))
-
-  (first form))
-
-
-(defn- form->shell-token [form]
-  (cond
-    ;; Shell-like literal token:
-    ;;   ($ curl --fail --location ...)
-    ;; => "curl" "--fail" "--location"
-    (symbol? form)  (name form)
-    (keyword? form) (name form)
-
-    ;; Explicit Clojure evaluation:
-    ;;   ($ cat [path])
-    ;; => (str path)
-    (vector? form) `(str ~(only-one-expr! form))
-
-    ;; Avoid accidental evaluation.
-    ;; Use [(...)] when evaluation is intended.
-    (seq? form) (throw
-                  (ex-info "Use [...] for evaluated shell macro expressions"
-                           {:form form}))
-
-    ;; Strings, numbers, paths, etc.
-    :otherwise (str form)))
+(defn remap-cmd
+  "Resolve a command token to a token vector via the `[:shell :commands]` table. The
+   looked-up value is a v3 fragment lowered by `lib.shell/value->tokens` (a scalar is one
+   token, a vector splices). Concrete paths (containing '/') and unmapped tokens pass
+   through unchanged."
+  [tok]
+  (let [remap     (get-in-env [:shell :commands] {})
+        concrete? (and (string? tok) (str/includes? tok "/"))
+        k         (cond
+                    (keyword? tok) tok
+                    (symbol? tok)  (keyword (name tok))
+                    (string? tok)  (keyword tok))]
+    (if (and k (not concrete?) (contains? remap k))
+      (shell/value->tokens (get remap k))
+      (shell/value->tokens tok))))
 
 
-(defn re-map->cmd [cmd]
-  (let [remap (get-in-env [:shell :commands] {})]
-    (cond
-      (keyword? cmd)          (get remap cmd (name cmd))
-      (symbol? cmd)           (get remap (keyword (name cmd)) (name cmd))
-      (not (string? cmd))     (str cmd)
-      (str/includes? cmd "/") cmd ;; don't remap concrete paths
-      :otherwise              (get remap (keyword cmd) cmd))))
+(defn remap-argv
+  "Remap argv[0] only; arguments are left untouched."
+  [argv]
+  (into (remap-cmd (first argv)) (rest argv)))
 
 
-(defn- remap-proc [cmd & args]
-  (apply p/process (re-map->cmd cmd) args))
+;; ---------------------------------------------------------------------------
+;; Spawns — plain (remap) and sudo (remap THEN prepend a remapped `sudo -n`).
+;; ---------------------------------------------------------------------------
+
+(defn remap-spawn [opts argv]
+  (shell/spawn opts (remap-argv argv)))
 
 
-(defn- remap-proc-with-prv [prv cmd & args]
-  (apply p/process prv (re-map->cmd cmd) args))
+(defn sudo-spawn
+  "Remap the user argv, then prepend a (remapped) `sudo -n`. Both the wrapped command and
+   sudo are remapped."
+  [opts argv]
+  (shell/spawn opts (-> (remap-cmd "sudo")
+                        (conj "-n")
+                        (into (remap-argv argv)))))
 
 
-(defn- process-call-form [forms prefix-forms]
-  (let [[maybe-prv & rest-forms] forms
-        [prv forms]              (if (seq? maybe-prv) ;; threaded?
-                                    [maybe-prv rest-forms]
-                                    [nil forms])]
-    (when-not (seq forms)
-      (throw
-        (ex-info "Shell macro requires a command" {:form forms})))
+;; ---------------------------------------------------------------------------
+;; Macros — the remap/sudo DSL over lib.shell.
+;; ---------------------------------------------------------------------------
 
-    (let [tokens (->> forms
-                   (mapv form->shell-token)
-                   (concat prefix-forms))]
-      (if prv
-        `(remap-proc-with-prv {:prev ~prv} ~@tokens)
-        `(remap-proc ~@tokens)))))
+(defmacro $
+  "Like `lib.shell/$`, with env command-remap applied. Supports `->` piping."
+  [& forms]
+  `(shell/$* remap-spawn ~@forms))
+
+
+(defmacro sudo$
+  "Like `$`, but through a (remapped) `sudo -n`; the wrapped command is remapped too."
+  [& forms]
+  `(shell/$* sudo-spawn ~@forms))
+
+
+(defmacro $!
+  "Run a command (remap) and return its trimmed stdout, throwing on a non-zero exit."
+  [& forms]
+  `(exec/out-or-fail! ($ ~@forms)))
+
+
+(defmacro sudo$!
+  "Run a command through sudo (remap) and return its trimmed stdout, throwing on non-zero."
+  [& forms]
+  `(exec/out-or-fail! (sudo$ ~@forms)))
+
+
+(defmacro $>
+  "Redirect the previous process's stdout into `target` (a file); the `cat` stage is
+   remapped. Use inside a `->` pipe."
+  [prev target]
+  `(shell/$>* remap-spawn ~prev ~target))
+
+
+;; Finishers re-exported so call-sites can keep referring them from this ns.
+(def pipeline-or-fail! exec/pipeline-or-fail!)
+(def result-or-fail!   exec/result-or-fail!)
+(def out-or-fail!      exec/out-or-fail!)
+
+
+;; ---------------------------------------------------------------------------
+;; Function-style API — preserved signatures, heavily used by call-sites.
+;; ---------------------------------------------------------------------------
+
+(def ^:private capture-opts {:out :string :err :string :continue true})
+
+(defn- ->tokens [cmd args]
+  (shell/value->tokens (cons cmd args)))
 
 
 (defn sh
-  "Runs a command. Returns a result map. Does not throw."
+  "Run a command. Returns a result map `{:ok? :exit :out :err}`. Does not throw."
   [cmd & args]
-  (let [result (apply shell {:out :string :err :string :continue true}
-                            (re-map->cmd cmd)
-                            args)]
-
-    {:ok?   (zero? (:exit result))
-     :exit  (:exit result)
-     :out   (str/trim (:out result))
-     :err   (str/trim (:err result))}))
+  (exec/result! (remap-spawn capture-opts (->tokens cmd args))))
 
 
 (defn sudo
+  "Run a command through sudo. Returns a result map. Does not throw."
   [cmd & args]
-  (apply sh :sudo "-n" (re-map->cmd cmd) args))
+  (exec/result! (sudo-spawn capture-opts (->tokens cmd args))))
 
 
 (defn sh!
-  "Runs a command. returns stdout, Throws on non-zero exit."
+  "Run a command. Returns stdout; throws on a non-zero exit."
   [cmd & args]
   (let [{:keys [ok? out] :as result} (apply sh cmd args)]
     (when-not ok?
-      (throw
-        (ex-info (str "Command failed: " (re-map->cmd cmd) " " (str/join " " args)) result)))
-
+      (throw (ex-info (str "Command failed: " (str/join " " (->tokens cmd args))) result)))
     out))
 
 
 (defn sudo!
-  "Runs sudo command. Throws on non-zero exit."
+  "Run a command through sudo. Returns stdout; throws on a non-zero exit."
   [cmd & args]
-  (apply sh! :sudo "-n" (re-map->cmd cmd) args))
-
-
-(defmacro $
-  "Starts a process.
-
-   Symbols become literal shell tokens.
-   [expr] evaluates expr and stringifies it.
-
-   Examples:
-     ($ echo hello)
-     ($ cat [path])
-
-   Supports thread-first piping:
-     (-> ($ echo hello)
-         ($ grep hell)
-         (out-or-fail!))"
-  [& forms]
-  (process-call-form forms []))
-
-
-(defmacro sudo$
-  "Starts a process through sudo.
-
-   Examples:
-     (sudo$ mount -t ext4 [device] [mnt])
-
-   Supports thread-first piping:
-     (-> (sudo$ cat /root/file)
-         ($ grep ujima)
-         (out-or-fail!))"
-  [& forms]
-  (process-call-form forms ["sudo" "-n"]))
-
-
-(defn pipeline-or-fail!
-  "Checks every process in a process pipeline.
-
-   Returns a vector of checked process results."
-  [proc]
-  (mapv p/check (p/pipeline proc)))
-
-
-(defn result-or-fail!
-  "Checks every process in a process pipeline.
-
-   Returns the final checked process result."
-  [proc]
-  (last (pipeline-or-fail! proc)))
-
-
-(defn out-or-fail!
-  "Reads stdout from the final process, then checks every process in the pipeline.
-
-   Returns stdout as a string."
-  [proc]
-  (let [out (slurp (:out proc))]
-    (pipeline-or-fail! proc)
-    (str/trim out)))
-
-
-(defmacro $!
-  "Shell syntax sugar over sh!. Not pipeable. Returns trimmed stdout."
-  [& forms]
-  `(sh! ~@(mapv form->shell-token forms)))
-
-
-(defmacro sudo$!
-  "Shell syntax sugar over sudo!. Not pipeable. Returns trimmed stdout."
-  [& forms]
-  `(sudo! ~@(mapv form->shell-token forms)))
-
-
-(defmacro $>
-  "Redirects stdout from the previous process into target.
-
-   Intended for use inside thread-first process pipelines:
-
-     (-> ($ curl --fail --location [url])
-         ($ xz -dc)
-         ($> (fs/file image-path))
-         (result-or-fail!))
-
-   This starts a final `cat` process with:
-     :prev previous-process
-     :out  target"
-  [prev target]
-  `(p/process {:prev ~prev :out  (clojure.java.io/file ~target)} (re-map->cmd :cat)))
+  (let [{:keys [ok? out] :as result} (apply sudo cmd args)]
+    (when-not ok?
+      (throw (ex-info (str "Command failed: sudo " (str/join " " (->tokens cmd args))) result)))
+    out))
 
 
 (defn root? []
@@ -205,6 +144,5 @@
 
 (defn require-root! []
   (when-not (root?)
-    (throw
-      (ex-info "This operation requires root"
-               {:type :ujima/root-required}))))
+    (throw (ex-info "This operation requires root"
+                    {:type :ujima/root-required}))))

@@ -1,8 +1,11 @@
 (ns ujima.shell-macro-test
-  (:require [clojure.java.io  :as io]
-            [clojure.test     :refer [deftest is testing]]
-            [babashka.process :as process]
-            [ujima.env        :as env]
+  "Project-layer shell tests: command remap, sudo (remap-then-prepend), and the
+   function-style sh/sh!/sudo/sudo! API. The generic DSL/lowering behaviour lives in
+   lib.shell-test."
+  (:require [clojure.java.io   :as io]
+            [clojure.test      :refer [deftest is testing]]
+            [ujima.env         :as env]
+            [lib.shell         :as lib]
             [ujima.linux.shell :as shell]))
 
 
@@ -14,319 +17,167 @@
       (env/init! [] {}))))
 
 
-(deftest dollar-macro-test
-  (testing "$ converts symbols to argv tokens and calls babashka.process/process"
-    (let [calls* (atom [])]
-      (with-redefs [process/process (fn [& args]
-                                      (swap! calls* conj args)
-                                      {:proc true})]
-        (is (= {:proc true}
-               (shell/$ echo hello)))
-
-        (is (= [["echo" "hello"]]
-               @calls*)))))
-
-  (testing "$ stringifies literal non-symbol args"
-    (let [calls* (atom [])]
-      (with-redefs [process/process (fn [& args]
-                                      (swap! calls* conj args)
-                                      {:proc true})]
-        (shell/$ printf "%s" 42 :ok)
-
-        (is (= [["printf" "%s" "42" "ok"]]
-               @calls*)))))
-
-  (testing "$ evaluates [expr] args and stringifies the result"
-    (let [calls* (atom [])]
-      (with-redefs [process/process (fn [& args]
-                                      (swap! calls* conj args)
-                                      {:proc true})]
-        (let [path "/tmp/some path"]
-          (shell/$ cat [path]))
-
-        (is (= [["cat" "/tmp/some path"]]
-               @calls*)))))
-
-  (testing "$ supports thread-first process piping using :prev"
-    (let [calls* (atom [])
-          n*     (atom 0)]
-      (with-redefs [process/process (fn [& args]
-                                      (let [proc {:id   (swap! n* inc)
-                                                  :args args}]
-                                        (swap! calls* conj args)
-                                        proc))]
-        (let [result (-> (shell/$ curl --fail ["/tmp/file"])
-                         (shell/$ grep ujima))]
-          (is (= {:id   2
-                  :args [{:prev {:id   1
-                                 :args ["curl" "--fail" "/tmp/file"]}}
-                         "grep"
-                         "ujima"]}
-                 result))
-
-          (is (= [["curl" "--fail" "/tmp/file"]
-                  [{:prev {:id   1
-                           :args ["curl" "--fail" "/tmp/file"]}}
-                   "grep"
-                   "ujima"]]
-                 @calls*)))))))
+(defn recording-spawn
+  "A spawn that records each `{:opts :argv}` and returns a derefable fake so the function
+   API's `result!` finisher works."
+  [calls* deref-val]
+  (fn [opts argv]
+    (swap! calls* conj {:opts opts :argv argv})
+    (atom deref-val)))
 
 
-(deftest sudo-dollar-macro-test
-  (testing "sudo$ prefixes command with sudo -n"
-    (let [calls* (atom [])]
-      (with-redefs [process/process (fn [& args]
-                                      (swap! calls* conj args)
-                                      {:proc true})]
-        (let [device "/dev/sdz"]
-          (shell/sudo$ wipefs -a [device]))
+;; --- remap-cmd / remap-argv (pure) -----------------------------------------
 
-        (is (= [["sudo" "-n" "wipefs" "-a" "/dev/sdz"]]
-               @calls*)))))
+(deftest remap-cmd-test
+  (with-command-remap {:cat ["echo" "cat"] :ls "/custom/ls"}
+    (fn []
+      (testing "keyword / symbol / string all resolve through the table"
+        (is (= ["echo" "cat"] (shell/remap-cmd :cat)))
+        (is (= ["echo" "cat"] (shell/remap-cmd 'cat)))
+        (is (= ["echo" "cat"] (shell/remap-cmd "cat"))))
 
-  (testing "sudo$ supports thread-first process piping using :prev"
-    (let [calls* (atom [])
-          n*     (atom 0)]
-      (with-redefs [process/process (fn [& args]
-                                      (let [proc {:id   (swap! n* inc)
-                                                  :args args}]
-                                        (swap! calls* conj args)
-                                        proc))]
-        (-> (shell/$ echo hello)
-            (shell/sudo$ tee ["/root/file"]))
+      (testing "a scalar fragment is one token; a vector fragment splices"
+        (is (= ["/custom/ls"] (shell/remap-cmd :ls)))
+        (is (= ["echo" "cat"] (shell/remap-cmd :cat))))
 
-        (is (= [["echo" "hello"]
-                [{:prev {:id   1
-                         :args ["echo" "hello"]}}
-                 "sudo"
-                 "-n"
-                 "tee"
-                 "/root/file"]]
-               @calls*))))))
+      (testing "unmapped token passes through"
+        (is (= ["git"] (shell/remap-cmd :git))))
+
+      (testing "a concrete path (contains '/') is never remapped"
+        (is (= ["/bin/cat"] (shell/remap-cmd "/bin/cat")))))))
 
 
-(deftest redirect-dollar-macro-test
-  (testing "$> redirects previous process stdout to a file path using cat"
-    (let [calls* (atom [])
-          prev   {:id 1}
-          target "/tmp/ujima/image.img"]
-      (with-redefs [process/process (fn [& args]
-                                      (swap! calls* conj args)
-                                      {:proc true})]
-        (is (= {:proc true}
-               (shell/$> prev target)))
+(deftest remap-argv-test
+  (with-command-remap {:dd ["echo" "dd"]}
+    (fn []
+      (testing "remaps argv[0] only; the fragment splices, args are untouched"
+        (is (= ["echo" "dd" "if=/x" "of=/y"]
+               (shell/remap-argv ["dd" "if=/x" "of=/y"]))))
 
-        (is (= [[{:prev prev
-                  :out  (io/file target)}
-                 "cat"]]
-               @calls*)))))
-
-  (testing "$> works in thread-first pipelines"
-    (let [calls* (atom [])
-          n*     (atom 0)
-          target "/tmp/ujima/image.img"]
-      (with-redefs [process/process (fn [& args]
-                                      (let [proc {:id   (swap! n* inc)
-                                                  :args args}]
-                                        (swap! calls* conj args)
-                                        proc))]
-        (let [result (-> (shell/$ curl --fail --location ["https://example.test/os.img.xz"])
-                         (shell/$ xz -dc)
-                         (shell/$> target))]
-          (is (= {:id   3
-                  :args [{:prev {:id   2
-                                 :args [{:prev {:id   1
-                                                :args ["curl"
-                                                       "--fail"
-                                                       "--location"
-                                                       "https://example.test/os.img.xz"]}}
-                                        "xz"
-                                        "-dc"]}
-                         :out  (io/file target)}
-                         "cat"]}
-                 result))
-
-          (is (= [["curl" "--fail" "--location" "https://example.test/os.img.xz"]
-                  [{:prev {:id   1
-                           :args ["curl"
-                                  "--fail"
-                                  "--location"
-                                  "https://example.test/os.img.xz"]}}
-                   "xz"
-                   "-dc"]
-                  [{:prev {:id   2
-                           :args [{:prev {:id   1
-                                          :args ["curl"
-                                                 "--fail"
-                                                 "--location"
-                                                 "https://example.test/os.img.xz"]}}
-                                  "xz"
-                                  "-dc"]}
-                   :out  (io/file target)}
-                   "cat"]]
-                 @calls*))))))
-
-  (testing "$> accepts evaluated target expressions through normal Clojure syntax"
-    (let [calls*    (atom [])
-          prev      {:id 1}
-          stage-dir "/tmp/ujima-stage"
-          filename  "image.img"]
-      (with-redefs [process/process (fn [& args]
-                                      (swap! calls* conj args)
-                                      {:proc true})]
-        (shell/$> prev (str stage-dir "/" filename))
-
-        (is (= [[{:prev prev
-                  :out  (io/file "/tmp/ujima-stage/image.img")}
-                 "cat"]]
-               @calls*))))))
+      (testing "an argument that matches a remap key is NOT remapped"
+        (is (= ["cp" "dd"] (shell/remap-argv ["cp" "dd"])))))))
 
 
-(deftest dollar-bang-macro-test
-  (testing "$! converts tokens and delegates to sh!"
-    (with-redefs [shell/sh! (fn [& args] (vec args))]
-      (is (= ["echo" "hello"]
-             (shell/$! echo hello)))))
+;; --- $ / sudo$ / $> remap (argv shape via recording spawn) -----------------
 
-  (testing "$! evaluates [expr] args and stringifies the result"
-    (with-redefs [shell/sh! (fn [& args] (vec args))]
-      (let [path "/tmp/some path"]
-        (is (= ["cat" "/tmp/some path"]
-               (shell/$! cat [path]))))))
-
-  (testing "$! stringifies literal non-symbol args"
-    (with-redefs [shell/sh! (fn [& args] (vec args))]
-      (is (= ["printf" "%s" "42" "ok"]
-             (shell/$! printf "%s" 42 :ok))))))
-
-
-(deftest sudo-dollar-bang-macro-test
-  (testing "sudo$! converts tokens and delegates to sudo!"
-    (with-redefs [shell/sudo! (fn [& args] (vec args))]
-      (let [device "/dev/sdz"]
-        (is (= ["wipefs" "-a" "/dev/sdz"]
-               (shell/sudo$! wipefs -a [device]))))))
-
-  (testing "sudo$! stringifies literal non-symbol args"
-    (with-redefs [shell/sudo! (fn [& args] (vec args))]
-      (is (= ["install" "-m" "644" "src" "dst"]
-             (shell/sudo$! install -m 644 "src" "dst"))))))
-
-
-(deftest command-remap-test
-  (testing "re-map->cmd maps keywords, symbols, and strings"
-    (with-command-remap
-      {:cat "/custom/cat"}
-      (fn []
-        (is (= "/custom/cat"
-               (shell/re-map->cmd :cat)))
-        (is (= "/custom/cat"
-               (shell/re-map->cmd 'cat)))
-        (is (= "/custom/cat"
-               (shell/re-map->cmd "cat"))))))
-
-  (testing "re-map->cmd does not remap concrete paths"
-    (with-command-remap
-      {:cat "/custom/cat"}
-      (fn []
-        (is (= "/bin/cat"
-               (shell/re-map->cmd "/bin/cat"))))))
-
-  (testing "sh remaps the executed command"
-    (with-command-remap
-      {:e2fsck "/custom/e2fsck"}
+(deftest dollar-remap-test
+  (testing "$ remaps argv[0]"
+    (with-command-remap {:e2fsck ["echo" "e2fsck"]}
       (fn []
         (let [calls* (atom [])]
-          (with-redefs [process/shell (fn [& args]
-                                        (swap! calls* conj args)
-                                        {:exit 0 :out "" :err ""})]
-            (shell/sh :e2fsck "-fn" "/dev/x")
-            (is (= [[{:out :string
-                      :err :string
-                      :continue true}
-                     "/custom/e2fsck"
-                     "-fn"
-                     "/dev/x"]]
-                   @calls*)))))))
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0})]
+            (shell/$ e2fsck -fn "/dev/x")
+            (is (= [{:opts {} :argv ["echo" "e2fsck" "-fn" "/dev/x"]}] @calls*))))))))
 
-  (testing "sudo remaps both sudo and the delegated command"
-    (with-command-remap
-      {:sudo "/custom/sudo"
-       :e2fsck "/custom/e2fsck"}
+
+(deftest sudo-dollar-remap-test
+  (testing "sudo$ remaps the wrapped command AND sudo, then prepends sudo -n"
+    (with-command-remap {:git ["/opt/git"] :sudo ["/opt/sudo"]}
       (fn []
         (let [calls* (atom [])]
-          (with-redefs [process/shell (fn [& args]
-                                        (swap! calls* conj args)
-                                        {:exit 0 :out "" :err ""})]
-            (shell/sudo :e2fsck "-fn" "/dev/x")
-            (is (= [[{:out :string
-                      :err :string
-                      :continue true}
-                     "/custom/sudo"
-                     "-n"
-                     "/custom/e2fsck"
-                     "-fn"
-                     "/dev/x"]]
-                   @calls*)))))))
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0})]
+            (shell/sudo$ git status)
+            (is (= [{:opts {} :argv ["/opt/sudo" "-n" "/opt/git" "status"]}] @calls*)))))))
 
-  (testing "sudo! remaps both sudo and the delegated command"
-    (with-command-remap
-      {:sudo "/custom/sudo"
-       :e2fsck "/custom/e2fsck"}
+  (testing "sudo$ splices multiword echo stubs for both sudo and the wrapped command"
+    (with-command-remap {:dd ["echo" "dd"] :sudo ["echo" "sudo"]}
       (fn []
         (let [calls* (atom [])]
-          (with-redefs [process/shell (fn [& args]
-                                        (swap! calls* conj args)
-                                        {:exit 0 :out "ok\n" :err ""})]
-            (is (= "ok"
-                   (shell/sudo! :e2fsck "-fn" "/dev/x")))
-            (is (= [[{:out :string
-                      :err :string
-                      :continue true}
-                     "/custom/sudo"
-                     "-n"
-                     "/custom/e2fsck"
-                     "-fn"
-                     "/dev/x"]]
-                   @calls*)))))))
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0})]
+            (shell/sudo$ dd "if=/x")
+            (is (= [{:opts {} :argv ["echo" "sudo" "-n" "echo" "dd" "if=/x"]}] @calls*))))))))
 
-  (testing "$ remaps process commands and preserves :prev pipelines"
-    (with-command-remap
-      {:curl "/custom/curl"
-       :grep "/custom/grep"}
-      (fn []
-        (let [calls* (atom [])
-              n*     (atom 0)]
-          (with-redefs [process/process (fn [& args]
-                                          (let [proc {:id   (swap! n* inc)
-                                                      :args args}]
-                                            (swap! calls* conj args)
-                                            proc))]
-            (-> (shell/$ curl --fail ["/tmp/file"])
-                (shell/$ grep ujima))
-            (is (= [["/custom/curl" "--fail" "/tmp/file"]
-                    [{:prev {:id   1
-                             :args ["/custom/curl" "--fail" "/tmp/file"]}}
-                     "/custom/grep"
-                     "ujima"]]
-                   @calls*)))))))
 
-  (testing "$> remaps the redirect cat command"
-    (with-command-remap
-      {:cat "/custom/cat"}
+(deftest redirect-remap-test
+  (testing "$> remaps the cat stage and carries :prev / :out"
+    (with-command-remap {:cat ["echo" "cat"]}
       (fn []
         (let [calls* (atom [])
               prev   {:id 1}
               target "/tmp/ujima/image.img"]
-          (with-redefs [process/process (fn [& args]
-                                          (swap! calls* conj args)
-                                          {:proc true})]
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0})]
             (shell/$> prev target)
-            (is (= [[{:prev prev
-                      :out  (io/file target)}
-                     "/custom/cat"]]
+            (is (= [{:opts {:prev prev :out (io/file target)} :argv ["echo" "cat"]}]
                    @calls*))))))))
 
+
+;; --- function API: sh / sudo / sh! / sudo! ---------------------------------
+
+(deftest sh-test
+  (testing "sh remaps, captures string output, returns a result map (no throw)"
+    (with-command-remap {:e2fsck ["echo" "e2fsck"]}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0 :out "ok\n" :err ""})]
+            (is (= {:ok? true :exit 0 :out "ok" :err ""}
+                   (shell/sh :e2fsck "-fn" "/dev/x")))
+            (is (= [{:opts {:out :string :err :string :continue true}
+                     :argv ["echo" "e2fsck" "-fn" "/dev/x"]}]
+                   @calls*)))))))
+
+  (testing "sh returns ok? false on a non-zero exit, does not throw"
+    (with-command-remap {}
+      (fn []
+        (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 1 :out "" :err "boom\n"})]
+          (is (= {:ok? false :exit 1 :out "" :err "boom"}
+                 (shell/sh :whatever))))))))
+
+
+(deftest sudo-fn-test
+  (testing "sudo remaps both sudo and the command, returns a result map"
+    (with-command-remap {:sudo ["echo" "sudo"] :e2fsck ["echo" "e2fsck"]}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0 :out "" :err ""})]
+            (shell/sudo :e2fsck "-fn" "/dev/x")
+            (is (= ["echo" "sudo" "-n" "echo" "e2fsck" "-fn" "/dev/x"]
+                   (:argv (first @calls*))))))))))
+
+
+(deftest sh!-test
+  (testing "sh! returns trimmed stdout"
+    (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 0 :out "hi\n" :err ""})]
+      (is (= "hi" (shell/sh! :echo "hi")))))
+
+  (testing "sh! throws on a non-zero exit"
+    (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 1 :out "" :err "nope"})]
+      (is (thrown? Exception (shell/sh! :false))))))
+
+
+(deftest sudo!-test
+  (testing "sudo! remaps both and returns trimmed stdout"
+    (with-command-remap {:sudo ["echo" "sudo"]}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0 :out "done\n" :err ""})]
+            (is (= "done" (shell/sudo! :reboot "0")))
+            (is (= ["echo" "sudo" "-n" "reboot" "0"] (:argv (first @calls*)))))))))
+
+  (testing "sudo! throws on a non-zero exit"
+    (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 5 :out "" :err "x"})]
+      (is (thrown? Exception (shell/sudo! :reboot))))))
+
+
+;; --- end-to-end: real processes through remap + sudo (the bug fix) ----------
+
+(deftest sudo-bang-echo-config-test
+  (testing "sudo$! under echo stubs runs for real: wrapped command remapped + spliced"
+    ;; With the dev echo-stub config, the launched argv is
+    ;;   ["echo" "sudo" "-n" "echo" "dd" "if=/x"]
+    ;; i.e. /bin/echo printing operands -> "sudo -n echo dd if=/x". This proves BOTH the
+    ;; wrapped command remaps (dd -> echo dd) and the multiword values splice.
+    (with-command-remap {:sudo ["echo" "sudo"] :dd ["echo" "dd"]}
+      (fn []
+        (is (= "sudo -n echo dd if=/x"
+               (shell/sudo$! dd "if=/x"))))))
+
+  (testing "$! under an echo stub runs for real and returns stdout"
+    (with-command-remap {:tool ["echo"]}
+      (fn []
+        (is (= "hi there" (shell/$! tool "hi there")))))))
+
+
+;; --- root? (ported unchanged) ----------------------------------------------
 
 (deftest root?-test
   (testing "root? returns true for uid 0 without checking sudo"
@@ -334,7 +185,7 @@
       (with-redefs [shell/sh (fn [cmd & args]
                                (swap! calls* conj [cmd args])
                                (case cmd
-                                 :id {:ok? true :exit 0 :out "0\n" :err ""}
+                                 :id   {:ok? true :exit 0 :out "0\n" :err ""}
                                  :sudo (throw (ex-info "sudo should not be called" {}))))]
         (is (true? (shell/root?)))
         (is (= [[:id ["-u"]]]
@@ -345,7 +196,7 @@
       (with-redefs [shell/sh (fn [cmd & args]
                                (swap! calls* conj [cmd args])
                                (case cmd
-                                 :id {:ok? true :exit 0 :out "1000\n" :err ""}
+                                 :id   {:ok? true :exit 0 :out "1000\n" :err ""}
                                  :sudo {:ok? true :exit 0 :out "" :err ""}))]
         (is (true? (shell/root?)))
         (is (= [[:id ["-u"]]
@@ -355,36 +206,6 @@
   (testing "root? returns false when neither root nor passwordless sudo is available"
     (with-redefs [shell/sh (fn [cmd & _args]
                              (case cmd
-                               :id {:ok? true :exit 0 :out "1000\n" :err ""}
+                               :id   {:ok? true :exit 0 :out "1000\n" :err ""}
                                :sudo {:ok? false :exit 1 :out "" :err ""}))]
       (is (false? (shell/root?))))))
-
-
-(deftest macro-validation-test
-  (testing "empty [expr] is rejected"
-    (is (thrown-with-msg?
-          clojure.lang.ExceptionInfo
-          #"cannot be empty"
-          (macroexpand-1
-            '(ujima.linux.shell/$ echo [])))))
-
-  (testing "multi-expression [expr] is rejected"
-    (is (thrown-with-msg?
-          clojure.lang.ExceptionInfo
-          #"exactly one expression"
-          (macroexpand-1
-            '(ujima.linux.shell/$ echo [a b])))))
-
-  (testing "raw Clojure forms are rejected as command args"
-    (is (thrown-with-msg?
-          clojure.lang.ExceptionInfo
-          #"Use \[\.\.\.\]"
-          (macroexpand-1
-            '(ujima.linux.shell/$ echo (+ 1 2))))))
-
-  (testing "missing command is rejected"
-    (is (thrown-with-msg?
-          clojure.lang.ExceptionInfo
-          #"requires a command"
-          (macroexpand-1
-            '(ujima.linux.shell/$))))))

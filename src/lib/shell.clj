@@ -15,18 +15,18 @@
 ;; ---------------------------------------------------------------------------
 
 (defn- map-entry->tokens
-  "One map entry -> tokens: false/nil drops, true -> bare key, scalar -> `k=v`."
+  "One map entry -> tokens: false/nil drops, true -> bare key, a collection value is an
+   error; anything else glues as `k=v` (keyword via subs, else via str — so Path/File/UUID
+   work, mirroring `value->tokens`)."
   [k v]
   (let [key-tok (if (keyword? k) (subs (str k) 1) (str k))]
     (cond
-      (or (false? v) (nil? v)) []
-      (true? v)                [key-tok]
-      (string? v)              [(str key-tok "=" v)]
-      (keyword? v)             [(str key-tok "=" (subs (str v) 1))]
-      (symbol? v)              [(str key-tok "=" v)]
-      (number? v)              [(str key-tok "=" v)]
-      :else (throw (ex-info "shell: map value must be a scalar, true, false, or nil"
-                            {:key k :value v})))))
+      (or (false? v) (nil? v))               []
+      (true? v)                              [key-tok]
+      (keyword? v)                           [(str key-tok "=" (subs (str v) 1))]
+      (or (sequential? v) (set? v) (map? v)) (throw (ex-info "shell: a map value can't be a collection (it must glue to one token)"
+                                                             {:key k :value v}))
+      :else                                  [(str key-tok "=" v)])))
 
 
 (defn value->tokens

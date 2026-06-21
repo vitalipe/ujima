@@ -52,6 +52,13 @@
     (is (thrown-with-msg? Exception #"map value" (sh/value->tokens {:k [1 2]})))))
 
 
+(deftest map-value-path-test
+  (testing "a Path/File map value glues like its string form, not just scalars"
+    (is (= ["of=/a/b"] (sh/value->tokens {:of (fs/path "/a" "b")})))
+    (is (= (sh/value->tokens {:of "/a/b"})
+           (sh/value->tokens {:of (fs/path "/a" "b")})))))
+
+
 ;; --- $* argv lowering (recording spawn) ------------------------------------
 
 (deftest dollar-lowering-test

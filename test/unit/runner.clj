@@ -6,8 +6,9 @@
             [lib.task.task-test]
 
             [lib.shell-test]
+            [lib.shell.command-test]
 
-            [ujima.shell-macro-test]
+            [ujima.sudo-test]
 
             [lib.edn-test]
             [ujima.env-test]
@@ -22,8 +23,9 @@
     lib.task.flow-test
 
     lib.shell-test
+    lib.shell.command-test
 
-    ujima.shell-macro-test
+    ujima.sudo-test
 
     lib.edn-test
     ujima.env-test

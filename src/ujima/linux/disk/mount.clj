@@ -1,7 +1,8 @@
 (ns ujima.linux.disk.mount
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
-            [ujima.linux.shell :refer [$? sudo$!]]))
+            [lib.shell :refer [$?]]
+            [ujima.linux.sudo :refer [sudo$!]]))
 
 
 (defn mount-point? [mnt]

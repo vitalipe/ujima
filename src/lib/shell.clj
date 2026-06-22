@@ -1,175 +1,176 @@
 (ns lib.shell
-  "Shell DSL: build and run shell commands from Clojure forms.
+  "Shell DSL convenience layer over `lib.shell.command`: the same DSL, but commands run
+   through a dynamic spawn `*spawn*`, so command-remap / sudo / logging layer on transparently.
 
-   `$` starts a command (returns a process); `$!` runs it and returns its stdout,
-   throwing on failure. Bare words are literal tokens; anything in `[…]`, `{…}` or `(…)` is
-   evaluated as Clojure. Pipe with `->`. The comment at the bottom shows the syntax."
-  (:require [babashka.process :as p]
-            [clojure.string   :as str]
-            [clojure.java.io  :as io]
-            [lib.shell.exec   :as exec]))
+   `$`/`$!`/`$?` (+ `sh`/`sh!`/`sh?` fn forms for data args) read `*spawn*`. Set the baseline
+   once with `alter-var-root` (e.g. a project installs its remap at startup); compose per-op
+   with `with-spawn`/`with-remap`. `lib.shell.command/$*`/`sh*` are the explicit-spawn escape
+   hatch when you don't want the ambient `*spawn*` (concurrent code, lazy seqs).
 
-
-;; ---------------------------------------------------------------------------
-;; Value rules — lower a runtime value to argv tokens.
-;; ---------------------------------------------------------------------------
-
-(defn- map-entry->tokens
-  "One map entry -> tokens: false/nil drops, true -> bare key, a collection value is an
-   error; anything else glues as `k=v` (keyword via subs, else via str — so Path/File/UUID
-   work, mirroring `value->tokens`)."
-  [k v]
-  (let [key-tok (if (keyword? k) (subs (str k) 1) (str k))]
-    (cond
-      (or (false? v) (nil? v))               []
-      (true? v)                              [key-tok]
-      (keyword? v)                           [(str key-tok "=" (subs (str v) 1))]
-      (or (sequential? v) (set? v) (map? v)) (throw (ex-info "shell: a map value can't be a collection (it must glue to one token)"
-                                                             {:key k :value v}))
-      :else                                  [(str key-tok "=" v)])))
-
-
-(defn value->tokens
-  "Lower a value to argv tokens: nil drops; string/number/keyword/symbol -> one token
-   (keyword via `(subs (str v) 1)`, so :a/b -> \"a/b\"); vector/seq splices; map -> `k=v`
-   pairs; set/boolean throw; anything else -> `(str v)` (Path, File, UUID, …)."
-  [v]
-  (cond
-    (nil? v)        []
-    (string? v)     [v]
-    (keyword? v)    [(subs (str v) 1)]
-    (symbol? v)     [(str v)]
-    (number? v)     [(str v)]
-    (boolean? v)    (throw (ex-info "shell: a boolean isn't a shell token outside a map"
-                                    {:value v}))
-    (set? v)        (throw (ex-info "shell: a set isn't a shell token; use a vector"
-                                    {:value v}))
-    ;; `sequential?`, not `seqable?`: a Path is seqable into its components but must stay
-    ;; one token — it falls to the `(str v)` branch below.
-    (sequential? v) (into [] (mapcat value->tokens) v)
-    (map? v)        (into [] (mapcat #(map-entry->tokens (key %) (val %))) v)
-    :else           [(str v)]))
-
-
-(defn ->argv
-  "Lower already-evaluated values to argv tokens (each via `value->tokens`, splicing).
-   The runtime core shared by `sh*` and `$argv`."
-  [& vals]
-  (into [] (mapcat value->tokens) vals))
+   Standalone: this lib has no project deps — a remap table is supplied by the caller, never
+   read from any global env."
+  (:require [clojure.string    :as str]
+            [lib.shell.command :as cmd]
+            [lib.shell.exec    :as exec]))
 
 
 ;; ---------------------------------------------------------------------------
-;; Process detection + default spawn.
+;; The dynamic spawn — what the convenience API runs through.
 ;; ---------------------------------------------------------------------------
 
-(defn process?
-  "True if `x` is a process (what a spawn returns)."
-  [x]
-  ;; by class name: babashka's SCI can't resolve the Process class symbol for `instance?`.
-  (= "babashka.process.Process" (some-> x class .getName)))
-
-
-(defn spawn
-  "Default spawn `(fn [opts argv]) -> process`."
-  [opts argv]
-  ;; varargs, not `(p/process opts argv)`: babashka mis-parses a vector cmd when opts is set.
-  (apply p/process opts argv))
-
-
-(defn sh*
-  "Run a command from already-evaluated Clojure data through `spawn`. `cmd` is argv[0] (or a
-   previous process, which becomes a `:prev` pipe stage); `args` splice via `value->tokens`.
-   Returns the spawn's process. Opts ride on `spawn`."
-  [spawn cmd & args]
-  (let [prev? (process? cmd)
-        argv  (if prev? (apply ->argv args) (apply ->argv cmd args))]
-    (when (or (empty? argv) (str/blank? (str (first argv))))
-      (throw (ex-info "shell: empty command / blank argv[0]" {:argv argv})))
-    (spawn (if prev? {:prev cmd} {}) argv)))
+(def ^:dynamic *spawn*
+  "The spawn `$`/`$!`/`$?` run through. Defaults to the plain terminal spawn (no remap, no
+   sudo). Install a remap baseline with `alter-var-root` (root binding -> global, thread-safe);
+   compose per-op with `with-spawn`/`with-remap` (a nested `binding`)."
+  cmd/spawn)
 
 
 ;; ---------------------------------------------------------------------------
-;; Macro-time form lowering.
+;; Capture — an OPTS decorator (composes freely; doesn't touch argv). For the `?` runners.
 ;; ---------------------------------------------------------------------------
 
-(defn- lower-form
-  "Lower one DSL form to a value expression for `sh*`/`->argv`. A bare symbol is a literal
-   token (its name); set/boolean literals throw at macroexpand; everything else (keyword,
-   string, number, nil, `[..]`/`{..}`/`(..)`, a threaded process) passes through and is
-   `value->tokens`'d at runtime."
-  [form]
-  (cond
-    (symbol? form)  (str form)
-    (set? form)     (throw (ex-info "shell: a set isn't a shell token; use a vector"
-                                    {:form form}))
-    (boolean? form) (throw (ex-info "shell: a boolean isn't a shell token outside a map"
-                                    {:form form}))
-    :else           form))
+(def capture-opts
+  "Process opts for string capture, used by the `?` runners (`$?`/`sh?`)."
+  {:out :string :err :string :continue true})
+
+
+(defn capturing
+  "Wrap `spawn` so the process captures stdout/stderr as strings and never throws — the shape
+   `result!` needs."
+  [spawn]
+  (fn [opts argv] (spawn (merge capture-opts opts) argv)))
 
 
 ;; ---------------------------------------------------------------------------
-;; Macros.
+;; Command remap — sudo-aware, table-driven, an ARGV transform (so it composes in order).
 ;; ---------------------------------------------------------------------------
 
-(defmacro $*
-  "Like `$`, but with an explicit spawn `(fn [opts argv]) -> process` as the first
-   argument — the seam a project uses to add command remap or sudo."
-  [spawn & forms]
-  (when (empty? forms)
-    (throw (ex-info "shell: $* requires a command" {:forms forms})))
-  ;; `mapv`, not `map`: force the lowering eagerly so set/boolean forms throw at macroexpand
-  ;; (a lazy `~@(map …)` defers the error to compile time and slips past `macroexpand-1`).
-  `(sh* ~spawn ~@(mapv lower-form forms)))
+(defn- remap-token
+  "Rewrite one command token (string) via `table` (keyword -> v3 fragment). Concrete paths
+   (containing '/') and unmapped tokens pass through. Returns a token vector (the fragment is
+   lowered by `value->tokens`, so a scalar is one token and a vector splices)."
+  [table tok]
+  (if (and (not (str/includes? tok "/")) (contains? table (keyword tok)))
+    (cmd/value->tokens (get table (keyword tok)))
+    [tok]))
 
+
+(defn remap-argv
+  "Remap the command token in `argv` via `table`. argv[0]-only, EXCEPT a leading `sudo` plus
+   its `-flags` are skipped, so the *real* command (not `sudo`) is the one rewritten — that's
+   what lets a `sudo -n` prefix compose with remap. Concrete '/'-paths pass through. The
+   sudo-skip is deliberately narrow: it handles `sudo -n <cmd>`, not `sudo -u user <cmd>`."
+  [table argv]
+  (let [argv    (vec argv)
+        cmd-idx (if (= "sudo" (first argv))
+                  (loop [i 1]
+                    (if (and (< i (count argv)) (str/starts-with? (str (nth argv i)) "-"))
+                      (recur (inc i))
+                      i))
+                  0)]
+    (if (< cmd-idx (count argv))
+      (-> (subvec argv 0 cmd-idx)
+          (into (remap-token table (str (nth argv cmd-idx))))
+          (into (subvec argv (inc cmd-idx))))
+      argv)))
+
+
+(defn remapping
+  "Spawn decorator: wrap `spawn` so argv is remapped via `table` before spawning. Build a
+   baseline with e.g. `((remapping table) lib.shell.command/spawn)`."
+  [table]
+  (fn [spawn] (fn [opts argv] (spawn opts (remap-argv table argv)))))
+
+
+;; ---------------------------------------------------------------------------
+;; Context macros — rebind *spawn* for a dynamic extent.
+;; ---------------------------------------------------------------------------
+
+(defmacro with-spawn
+  "Run `body` with `*spawn*` bound to `spawn`."
+  [spawn & body]
+  `(binding [*spawn* ~spawn] ~@body))
+
+
+(defmacro with-remap
+  "Run `body` with command-remap (via `table`) composed onto the current `*spawn*`."
+  [table & body]
+  `(binding [*spawn* ((remapping ~table) *spawn*)] ~@body))
+
+
+;; ---------------------------------------------------------------------------
+;; The convenience API — runs through *spawn*.
+;; ---------------------------------------------------------------------------
 
 (defmacro $
-  "Build a command from shell-DSL forms and start it (returns a process). Pipe with `->`:
-   `(-> ($ echo hi) ($ cat))`."
+  "Build a command from shell-DSL forms and start it through `*spawn*` (returns a process).
+   Pipe with `->`: `(-> ($ echo hi) ($ cat))`."
   [& forms]
-  `($* spawn ~@forms))
+  `(cmd/$* *spawn* ~@forms))
 
 
 (defmacro $!
-  "Run a command and return its trimmed stdout, throwing on a non-zero exit."
+  "Run a command through `*spawn*`; return trimmed stdout, throwing on a non-zero exit."
   [& forms]
-  `(exec/out-or-fail! ($ ~@forms)))
+  `(exec/out-or-fail! (cmd/$* *spawn* ~@forms)))
+
+
+(defmacro $?
+  "Run a command through `*spawn*` eagerly; return `{:ok? :exit :out :err}`. Does not throw."
+  [& forms]
+  `(exec/result! (cmd/$* (capturing *spawn*) ~@forms)))
 
 
 (defmacro $argv
   "Lower forms to `{:cmd argv :opts {}}` without running — a dry run / explain."
   [& forms]
-  (when (empty? forms)
-    (throw (ex-info "shell: $argv requires a command" {:forms forms})))
-  `{:cmd (->argv ~@(mapv lower-form forms)) :opts {}})
+  `(cmd/$argv ~@forms))
 
 
 (defmacro $>
-  "Redirect the previous process's stdout into `target` (a file) via a trivial `cat` stage.
-   Use inside a `->` pipe."
+  "Redirect the previous process's stdout into `target` (a file). Use inside a `->` pipe.
+   Runs through the terminal spawn, never remapped (`cat` is internal plumbing)."
   [prev target]
-  `(spawn {:prev ~prev :out (io/file ~target)} ["cat"]))
+  `(cmd/$> ~prev ~target))
+
+
+(defn sh
+  "Run a command (from data) through `*spawn*`; return the process. Fn form of `$`."
+  [& args]
+  (apply cmd/sh* *spawn* args))
+
+
+(defn sh!
+  "Run a command (from data) through `*spawn*`; return trimmed stdout, throwing. Fn form of `$!`."
+  [& args]
+  (exec/out-or-fail! (apply cmd/sh* *spawn* args)))
+
+
+(defn sh?
+  "Run a command (from data) through `*spawn*` eagerly; return a result map, no throw. Fn form of `$?`."
+  [& args]
+  (exec/result! (apply cmd/sh* (capturing *spawn*) args)))
+
+
+;; Finishers re-exported so the convenience layer is one-stop.
+(def out-or-fail!      exec/out-or-fail!)
+(def result-or-fail!   exec/result-or-fail!)
+(def pipeline-or-fail! exec/pipeline-or-fail!)
+(def result!           exec/result!)
 
 
 (comment
 
-  ($ git --no-pager log)       ;; => git --no-pager log
-  ($ tail -n 100 [file])       ;; => tail -n 100 <file>      
-  ($ dd {:if src :of dst})      ;; => dd if=<src> of=<dst>    
-  ($ rm -rf (fs/path dir))      ;; => rm -rf <dir>            
+  ($ git --no-pager log)            ;; => git --no-pager log
+  ($! echo "hello")                 ;; => "hello"  (throws if it fails)
+  ($? test -b "/dev/sda")           ;; => {:ok? … :exit … :out … :err …}
 
+  ;; baseline remap (project installs this once at startup):
+  (alter-var-root #'*spawn* (constantly ((remapping {:dd ["echo" "dd"]}) cmd/spawn)))
 
-  ($! ls (when list? :-l) "/home") ;; => if list?
-                                   ;;      ls -l /home
-                                   ;;      ls /home
+  ;; one-off composition:
+  (with-remap {:ls "/custom/ls"} ($! ls "-l"))
 
-
-  (require '[lib.shell :refer [$ $! $argv]]
-           '[lib.shell.exec :refer [out-or-fail!]])
-
-  ($argv git --oneline log)   ; => {:cmd ["git" "--oneline" "log"] :opts {}}
-  ($! echo "hello")           ; => "hello"  (throws if the command fails)
-
-
-  (-> ($ echo "ujima rocks") 
-      ($ grep ujima) 
-      (out-or-fail!))) ; => "ujima rocks"
+  (-> ($ echo "lib.shell rocks")
+      ($ grep shell)
+      (out-or-fail!)))             ;; => "lib.shell rocks"

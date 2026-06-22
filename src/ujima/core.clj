@@ -4,6 +4,7 @@
 
             [ujima.device  :as device]
             [ujima.control :as control]
+            [ujima.linux.sudo :as sudo]
 
             [ujima.agent   :as agent]))
 
@@ -13,6 +14,8 @@
 
   (env/init! ["config/ujima.edn"
               "config/config.local.edn"])
+
+  (sudo/install-remap! (env/get-in-env [:shell :commands] {}))
 
   (log/init!          (env/get-in-env [:log] {:level :info}))
   (control/init!      (env/get-in-env [:control] {}))

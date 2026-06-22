@@ -1,6 +1,7 @@
 (ns ujima.linux.system
   (:require [clojure.string :as str]
-            [ujima.linux.shell :refer [$? sudo$?]]))
+            [lib.shell :refer [$?]]
+            [ujima.linux.sudo :refer [sudo$?]]))
 
 
 (defn hostname []

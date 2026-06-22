@@ -1,224 +1,134 @@
 (ns lib.shell-test
+  "Context-layer tests: the dynamic `*spawn*`, command remap (sudo-aware), `with-spawn`/
+   `with-remap`, and the `*spawn*`-backed `$`/`$!`/`$?` + `sh`/`sh!`/`sh?`. Engine/lowering
+   behaviour lives in lib.shell.command-test."
   (:require [clojure.test     :refer [deftest is testing]]
-            [clojure.java.io  :as io]
-            [babashka.fs      :as fs]
             [babashka.process :as p]
-            [lib.shell        :as sh]
-            [lib.shell.exec   :as exec]))
+            [lib.shell        :as sh]))
 
 
-(defn recorder
-  "A recording spawn: records each `{:opts :argv}` and returns the shared real `proc` so
-   the head-dispatch's `process?` check fires on threaded stages."
-  [calls* proc]
+(defn recording-spawn
+  "A spawn that records each `{:opts :argv}` and returns a derefable fake (so `result!`-style
+   finishers work without launching a real process)."
+  [calls* deref-val]
   (fn [opts argv]
     (swap! calls* conj {:opts opts :argv argv})
-    proc))
+    (atom deref-val)))
 
 
-;; --- value->tokens (value rules) -------------------------------------------
+;; --- command remap (sudo-aware, table-driven) ------------------------------
 
-(deftest value->tokens-test
-  (testing "scalars"
-    (is (= []     (sh/value->tokens nil)))
-    (is (= ["hi"] (sh/value->tokens "hi")))
-    (is (= ["42"] (sh/value->tokens 42)))
-    (is (= ["x"]  (sh/value->tokens 'x)))
-    (is (= ["-n"] (sh/value->tokens :-n))))
+(deftest remap-argv-test
+  (testing "remaps argv[0] only; the fragment splices, args are untouched"
+    (is (= ["echo" "dd" "if=/x" "of=/y"]
+           (sh/remap-argv {:dd ["echo" "dd"]} ["dd" "if=/x" "of=/y"])))
+    (is (= ["cp" "dd"] (sh/remap-argv {:dd ["echo" "dd"]} ["cp" "dd"]))))
 
-  (testing "keyword keeps a single slash via subs, not name"
-    (is (= ["a/b"] (sh/value->tokens :a/b))))
+  (testing "a scalar fragment is one token"
+    (is (= ["/custom/ls" "-l"] (sh/remap-argv {:ls "/custom/ls"} ["ls" "-l"]))))
 
-  (testing "sequential? splices recursively, drops nils"
-    (is (= ["-o" "rw"]   (sh/value->tokens [:-o "rw"])))
-    (is (= ["a" "b" "c"] (sh/value->tokens ["a" ["b" ["c"]]])))
-    (is (= ["x"]         (sh/value->tokens [nil "x" nil])))
-    (is (= []            (sh/value->tokens [nil nil]))))
+  (testing "a concrete path (contains '/') is never remapped"
+    (is (= ["/bin/cat"] (sh/remap-argv {:cat ["echo" "cat"]} ["/bin/cat"]))))
 
-  (testing "a Path stays ONE token via the (str v) catch-all (the sequential? trap)"
-    (is (= ["/a/b"] (sh/value->tokens (fs/path "/a" "b"))))
-    (is (= ["/a/b"] (sh/value->tokens [(fs/path "/a" "b")]))))
+  (testing "unmapped token passes through"
+    (is (= ["git" "status"] (sh/remap-argv {:dd ["echo" "dd"]} ["git" "status"]))))
 
-  (testing "map -> k=v pairs"
-    (is (= ["if=/dev/sda"]    (sh/value->tokens {:if "/dev/sda"})))
-    (is (= ["--verbose"]      (sh/value->tokens {:--verbose true})))
-    (is (= []                 (sh/value->tokens {:--quiet false :--x nil})))
-    (is (= ["--color=always"] (sh/value->tokens {:--color "always"})))
-    (is (= ["bs=4M"]          (sh/value->tokens {:bs "4M"}))))
-
-  (testing "errors"
-    (is (thrown-with-msg? Exception #"set"       (sh/value->tokens #{1 2})))
-    (is (thrown-with-msg? Exception #"boolean"   (sh/value->tokens true)))
-    (is (thrown-with-msg? Exception #"map value" (sh/value->tokens {:k [1 2]})))))
+  (testing "sudo-aware: skip a leading `sudo` + its -flags, remap the REAL command (not sudo)"
+    (is (= ["sudo" "-n" "echo" "dd" "if=/x"]
+           (sh/remap-argv {:dd ["echo" "dd"] :sudo ["echo" "sudo"]}
+                          ["sudo" "-n" "dd" "if=/x"])))))
 
 
-(deftest map-value-path-test
-  (testing "a Path/File map value glues like its string form, not just scalars"
-    (is (= ["of=/a/b"] (sh/value->tokens {:of (fs/path "/a" "b")})))
-    (is (= (sh/value->tokens {:of "/a/b"})
-           (sh/value->tokens {:of (fs/path "/a" "b")})))))
+(deftest remapping+with-remap-test
+  (testing "remapping decorates a spawn to remap argv before spawning"
+    (let [calls* (atom [])]
+      (((sh/remapping {:dd ["echo" "dd"]}) (recording-spawn calls* {:exit 0})) {} ["dd" "x"])
+      (is (= ["echo" "dd" "x"] (:argv (first @calls*))))))
+
+  (testing "with-remap composes remap onto the current *spawn*"
+    (let [calls* (atom [])]
+      (binding [sh/*spawn* (recording-spawn calls* {:exit 0})]
+        (sh/with-remap {:dd ["echo" "dd"]} (sh/$ dd "x")))
+      (is (= ["echo" "dd" "x"] (:argv (first @calls*)))))))
 
 
-;; --- ->argv / sh* (the data+fn runtime core) -------------------------------
+;; --- the *spawn*-backed convenience API ------------------------------------
 
-(deftest ->argv-test
-  (testing "splices already-evaluated values via value->tokens, drops nils"
-    (is (= ["git" "status"]         (sh/->argv :git "status")))
-    (is (= ["git" "status"]         (sh/->argv "git" :status)))
-    (is (= ["dd" "if=/x" "of=/y"]   (sh/->argv :dd {:if "/x" :of "/y"})))
-    (is (= ["git" "status"]         (sh/->argv :git ["status"] nil nil nil)))
-    (is (= ["tail" "-n" "100" "/x"] (sh/->argv :tail :-n 100 ["/x"]))))
+(deftest dynamic-spawn-test
+  (testing "$ runs through *spawn* (rebindable); opts {}"
+    (let [calls* (atom [])]
+      (binding [sh/*spawn* (recording-spawn calls* {:exit 0})]
+        (sh/$ echo hi))
+      (is (= [{:opts {} :argv ["echo" "hi"]}] @calls*))))
 
-  (testing "a Path stays ONE token (the sequential? trap)"
-    (is (= ["rm" "-rf" "/tmp/x"] (sh/->argv :rm :-rf (fs/path "/tmp" "x"))))))
+  (testing "$? wraps *spawn* with capture-opts and returns a result map (no throw)"
+    (let [calls* (atom [])]
+      (binding [sh/*spawn* (recording-spawn calls* {:exit 0 :out "ok\n" :err ""})]
+        (is (= {:ok? true :exit 0 :out "ok" :err ""} (sh/$? echo "x"))))
+      (is (= {:out :string :err :string :continue true} (:opts (first @calls*))))))
 
-
-(deftest sh*-test
-  (let [calls* (atom [])
-        proc   (p/process "true")
-        rec    (recorder calls* proc)]
-
-    (testing "builds argv from data args and spawns with opts {}"
-      (reset! calls* [])
-      (sh/sh* rec :git "status")
-      (is (= [{:opts {} :argv ["git" "status"]}] @calls*)))
-
-    (testing "a process cmd becomes a :prev pipe stage; the args are the command"
-      (reset! calls* [])
-      (sh/sh* rec proc :grep "ujima")
-      (let [{:keys [opts argv]} (first @calls*)]
-        (is (= ["grep" "ujima"] argv))
-        (is (sh/process? (:prev opts)))))
-
-    (testing "blank / empty argv[0] is rejected"
-      (is (thrown-with-msg? Exception #"empty command" (sh/sh* rec nil)))
-      (is (thrown-with-msg? Exception #"empty command" (sh/sh* rec ""))))))
+  (testing "$? returns ok? false on a non-zero exit, does not throw"
+    (binding [sh/*spawn* (recording-spawn (atom []) {:exit 1 :out "" :err "boom\n"})]
+      (is (= {:ok? false :exit 1 :out "" :err "boom"} (sh/$? whatever))))))
 
 
-;; --- $* argv lowering (recording spawn) ------------------------------------
-
-(deftest dollar-lowering-test
-  (let [calls* (atom [])
-        proc   (p/process "true")
-        rec    (recorder calls* proc)]
-
-    (testing "bare symbols -> literal tokens, opts {}"
-      (reset! calls* [])
-      (sh/$* rec echo hello)
-      (is (= [{:opts {} :argv ["echo" "hello"]}] @calls*)))
-
-    (testing "mixed literals: string / number / keyword"
-      (reset! calls* [])
-      (sh/$* rec printf "%s" 42 :ok)
-      (is (= [{:opts {} :argv ["printf" "%s" "42" "ok"]}] @calls*)))
-
-    (testing "[expr] arg splices the evaluated value"
-      (reset! calls* [])
-      (let [path "/tmp/some path"]
-        (sh/$* rec cat [path]))
-      (is (= [{:opts {} :argv ["cat" "/tmp/some path"]}] @calls*)))
-
-    (testing "vector splice + ordered single-entry maps"
-      (reset! calls* [])
-      (sh/$* rec dd {:if "/dev/sda"} {:of "/dev/sdb"} :bs=4M)
-      (is (= [{:opts {} :argv ["dd" "if=/dev/sda" "of=/dev/sdb" "bs=4M"]}] @calls*)))
-
-    (testing "bare -flag symbol and bare (expr) need no keyword or [] wrapping"
-      (reset! calls* [])
-      (sh/$* rec rm -rf (fs/path "/tmp/x"))
-      (is (= [{:opts {} :argv ["rm" "-rf" "/tmp/x"]}] @calls*)))
-
-    (testing "runtime empty/blank argv[0] is rejected"
-      (is (thrown-with-msg? Exception #"empty command"
-            (sh/$* rec [nil]))))))
+(deftest with-spawn-test
+  (testing "with-spawn rebinds *spawn* for its body"
+    (let [calls* (atom [])]
+      (sh/with-spawn (recording-spawn calls* {:exit 0})
+        (sh/$ echo hi))
+      (is (= [{:opts {} :argv ["echo" "hi"]}] @calls*)))))
 
 
-;; --- piping head-dispatch (needs a real Process) ---------------------------
+(deftest fn-forms-test
+  (testing "sh runs through *spawn* with data args"
+    (let [calls* (atom [])]
+      (binding [sh/*spawn* (recording-spawn calls* {:exit 0})]
+        (sh/sh :echo "hi"))
+      (is (= [{:opts {} :argv ["echo" "hi"]}] @calls*))))
 
-(deftest piping-test
-  (testing "a threaded Process head becomes :prev; the next form is the command"
-    ;; $* can't be threaded with -> (its first arg is the spawn), so nest explicitly:
-    ;; the inner call's Process is placed in the outer head position.
-    (let [calls* (atom [])
-          proc   (p/process "true")
-          rec    (recorder calls* proc)]
-      (sh/$* rec (sh/$* rec curl --fail ["/tmp/file"]) grep ujima)
-      (is (= 2 (count @calls*)))
-      (is (= {:opts {} :argv ["curl" "--fail" "/tmp/file"]} (first @calls*)))
-      (let [{:keys [opts argv]} (second @calls*)]
-        (is (= ["grep" "ujima"] argv))
-        (is (sh/process? (:prev opts))))))
+  (testing "sh? returns a result map with capture-opts"
+    (let [calls* (atom [])]
+      (binding [sh/*spawn* (recording-spawn calls* {:exit 0 :out "ok\n" :err ""})]
+        (is (= {:ok? true :exit 0 :out "ok" :err ""} (sh/sh? :echo "x"))))
+      (is (= {:out :string :err :string :continue true} (:opts (first @calls*)))))))
 
-  (testing "default $ pipes for real via -> through out-or-fail!"
-    (is (= "hi" (-> (sh/$ echo "hi")
-                    (sh/$ cat)
-                    (exec/out-or-fail!))))))
-
-
-;; --- compile-time errors ---------------------------------------------------
-
-(deftest compile-error-test
-  (testing "literal set arg is rejected at macroexpand"
-    (is (thrown-with-msg? Exception #"set"
-          (macroexpand-1 '(lib.shell/$* rec echo #{1 2})))))
-
-  (testing "literal boolean arg is rejected at macroexpand"
-    (is (thrown-with-msg? Exception #"boolean"
-          (macroexpand-1 '(lib.shell/$* rec echo true)))))
-
-  (testing "empty $* is rejected"
-    (is (thrown-with-msg? Exception #"requires a command"
-          (macroexpand-1 '(lib.shell/$* rec))))))
-
-
-;; --- $argv (dry-run) -------------------------------------------------------
 
 (deftest dollar-argv-test
-  (testing "returns {:cmd :opts}, no spawn"
-    (is (= {:cmd ["git" "--oneline" "log"] :opts {}}
-           (sh/$argv git :--oneline log))))
-
-  (testing "splices [expr] and lowers literals"
-    (let [f "/x"]
-      (is (= {:cmd ["tail" "-n" "100" "/x"] :opts {}}
-             (sh/$argv tail :-n 100 [f]))))))
+  (testing "$argv (re-exported) dry-runs without spawning"
+    (is (= {:cmd ["git" "--oneline" "log"] :opts {}} (sh/$argv git :--oneline log)))))
 
 
-;; --- $! (run + check) ------------------------------------------------------
+;; --- real runs through the default *spawn* (no remap installed in tests) ----
 
-(deftest dollar-bang-test
+(deftest real-run-test
   (testing "$! runs and returns trimmed stdout"
     (is (= "hi" (sh/$! echo "hi"))))
 
   (testing "$! throws on a non-zero exit"
-    (is (thrown? Exception (sh/$! "false")))))
+    (is (thrown? Exception (sh/$! "false"))))
+
+  (testing "sh! (fn form) runs for real"
+    (is (= "hi" (sh/sh! :echo "hi"))))
+
+  (testing "$ pipes for real via -> through out-or-fail!"
+    (is (= "hi" (-> (sh/$ echo "hi")
+                    (sh/$ cat)
+                    (sh/out-or-fail!))))))
 
 
-;; --- $> redirect -----------------------------------------------------------
-
-(deftest redirect-test
-  (testing "$> emits a `cat` stage carrying :prev and :out, through the default spawn"
-    (let [calls* (atom [])
-          proc   (p/process "true")
-          prev   {:id 1}
-          target "/tmp/ujima/image.img"]
-      (with-redefs [sh/spawn (recorder calls* proc)]
-        (sh/$> prev target))
-      (is (= [{:opts {:prev prev :out (io/file target)} :argv ["cat"]}] @calls*)))))
-
-
-;; --- exec finishers --------------------------------------------------------
+;; --- finishers (re-exported from lib.shell.exec) ----------------------------
 
 (deftest finishers-test
   (testing "result! returns ok? false on non-zero, no throw"
-    (let [r (exec/result! (p/process {:out :string :err :string} "false"))]
+    (let [r (sh/result! (p/process {:out :string :err :string} "false"))]
       (is (false? (:ok? r)))
       (is (pos? (:exit r)))))
 
   (testing "result! captures trimmed stdout"
-    (let [r (exec/result! (p/process {:out :string :err :string} "echo" "hi"))]
+    (let [r (sh/result! (p/process {:out :string :err :string} "echo" "hi"))]
       (is (true? (:ok? r)))
       (is (= "hi" (:out r)))))
 
   (testing "out-or-fail! throws on non-zero exit"
-    (is (thrown? Exception (exec/out-or-fail! (sh/$ "false"))))))
+    (is (thrown? Exception (sh/out-or-fail! (sh/$ "false"))))))

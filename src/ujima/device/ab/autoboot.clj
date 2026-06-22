@@ -3,7 +3,7 @@
     [babashka.fs :as fs]        
     [ujima.linux.disk       :refer [device->partitions]]
     [ujima.linux.disk.mount :refer [with-mounted-vfat]]
-    [ujima.linux.shell      :refer [sudo$!]]
+    [ujima.linux.sudo       :refer [sudo$!]]
 
 
     [ujima.pack :as pack]

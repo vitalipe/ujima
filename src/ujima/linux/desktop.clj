@@ -1,5 +1,5 @@
 (ns ujima.linux.desktop
-  (:require [ujima.linux.shell :refer [$?]]))
+  (:require [lib.shell :refer [$?]]))
 
 
 (defn volume []

@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
             [ujima.fs :refer [file->number]]
-            [ujima.linux.shell :refer [$?]]))
+            [lib.shell :refer [$?]]))
 
 
 (defn- sys-file->path [partition file-name]

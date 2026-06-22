@@ -5,7 +5,8 @@
 
             [ujima.fs :refer [require-file! slurp-edn spit-edn!]]
             
-            [ujima.linux.shell      :refer  [$ sudo$ $! sudo$! $? result-or-fail!]]
+            [lib.shell              :refer [$ $! $? result-or-fail!]]
+            [ujima.linux.sudo       :refer [sudo$ sudo$!]]
             [ujima.linux.disk        :refer [require-block-device! device->partitions]]
             [ujima.linux.disk.mount  :refer [with-mounted-ext4]]))
 

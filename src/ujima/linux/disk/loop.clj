@@ -3,7 +3,8 @@
             [babashka.fs :as fs]
             [cheshire.core :as json]
 
-            [ujima.linux.shell      :refer [$? sudo$!]]
+            [lib.shell              :refer [$?]]
+            [ujima.linux.sudo       :refer [sudo$!]]
             [ujima.linux.disk       :refer [device->partitions]]
             [ujima.linux.disk.mount :refer [device->mount-points]]))
 

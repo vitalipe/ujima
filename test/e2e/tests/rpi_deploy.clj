@@ -6,7 +6,8 @@
             [ujima.linux.disk :as linux-disk]
             [ujima.linux.disk.loop :as loopback]
             [ujima.linux.disk.mount :refer [with-mounted-vfat]]
-            [ujima.linux.shell :refer [$! require-root!]]
+            [lib.shell :refer [$!]]
+            [ujima.linux.sudo :refer [require-root!]]
             [ujima.device.ab.autoboot.bootfiles :as autoboot]
             [ujima.device.ab.autoboot :refer [->disk]]
             [ujima.device.ab.autoboot.partitions :as rpi-partitions]))

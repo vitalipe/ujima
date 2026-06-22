@@ -1,5 +1,6 @@
 (ns ujima.device.ab.autoboot.partitions
-  (:require [ujima.linux.shell :refer [$! sudo$!]]
+  (:require [lib.shell :refer [$!]]
+            [ujima.linux.sudo :refer [sudo$!]]
             [ujima.linux.disk :refer [require-block-device!
                                        device->partitions
                                        partition->info]]))

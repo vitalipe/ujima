@@ -8,7 +8,7 @@
     [clojure.string :as str]
     [babashka.fs :as fs]
     [lib.cli :as cli]
-    [ujima.linux.shell :refer [sh! require-root!]]
+    [lib.shell :refer [sh! require-root!]]
     [tools.cmd.image :as image]))
 
 

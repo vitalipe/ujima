@@ -2,7 +2,7 @@
   (:require
     [lib.edn               :as edn]
     [ujima.linux.disk      :refer [require-block-device!]]
-    [ujima.linux.shell     :refer [require-root!]]
+    [lib.shell             :refer [require-root!]]
     [ujima.linux.disk.loop :as loopback]
     [ujima.pack            :as pack]))
 

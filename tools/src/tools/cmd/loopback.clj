@@ -1,7 +1,7 @@
 (ns tools.cmd.loopback
   (:require
     [ujima.linux.disk      :refer [block-device?]]
-    [ujima.linux.shell     :refer [require-root!]]
+    [lib.shell             :refer [require-root!]]
     [ujima.linux.disk.loop :as loopback]))
 
 

@@ -2,6 +2,7 @@
   (:require
     [clojure.walk       :as walk]
     [ujima.env          :as env]
+    [lib.shell          :as shell]
     [lib.cli            :as cli]
     [lib.task           :as task]
     [tools.cmd.loopback :as loopback]
@@ -138,4 +139,5 @@
 
   (env/init! ["config/ujima.edn"
               "config/config.local.edn"])
+  (shell/install-remap! (env/get-in-env [:shell :commands] {}))
   (cli/dispatch! (wrap-targets command-tree) args))

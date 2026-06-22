@@ -132,3 +132,47 @@
 
   (testing "out-or-fail! throws on non-zero exit"
     (is (thrown? Exception (sh/out-or-fail! (sh/$ "false"))))))
+
+
+;; --- root? / install-remap! (mock *spawn*) ----------------------------------
+
+(deftest root?-test
+  (testing "uid 0 -> root, without probing sudo"
+    (let [calls* (atom [])]
+      (binding [sh/*spawn*
+                (fn [_opts argv]
+                  (swap! calls* conj argv)
+                  (atom (case (first argv)
+                          "id"   {:exit 0 :out "0\n" :err ""}
+                          "sudo" (throw (ex-info "sudo should not be called" {})))))]
+        (is (true? (sh/root?)))
+        (is (= [["id" "-u"]] @calls*)))))
+
+  (testing "non-root uid falls back to the passwordless sudo probe"
+    (let [calls* (atom [])]
+      (binding [sh/*spawn*
+                (fn [_opts argv]
+                  (swap! calls* conj argv)
+                  (atom (case (first argv)
+                          "id"   {:exit 0 :out "1000\n" :err ""}
+                          "sudo" {:exit 0 :out "" :err ""})))]
+        (is (true? (sh/root?)))
+        (is (= [["id" "-u"] ["sudo" "-n" "true"]] @calls*)))))
+
+  (testing "false when neither root nor passwordless sudo is available"
+    (binding [sh/*spawn*
+              (fn [_opts argv]
+                (atom (case (first argv)
+                        "id"   {:exit 0 :out "1000\n" :err ""}
+                        "sudo" {:exit 1 :out "" :err ""})))]
+      (is (false? (sh/root?))))))
+
+
+(deftest install-remap!-test
+  (testing "install-remap! makes the baseline *spawn* remap (verified via a real echo stub)"
+    (let [orig lib.shell/*spawn*]
+      (try
+        (sh/install-remap! {:tool ["echo"]})
+        (is (= "hi there" (sh/$! tool "hi there")))
+        (finally
+          (alter-var-root #'lib.shell/*spawn* (constantly orig)))))))

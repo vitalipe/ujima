@@ -1,11 +1,11 @@
 (ns ujima.sudo-test
-  "Sudo/root layer: `with-sudo` composition, the sudo-aware remap baseline (sudo prefix
-   skipped, wrapped command rewritten), the `sudo`/`sudo?` fns, `root?`, and `install-remap!`.
-   Tests mock at the spawn level (bind `*spawn*`) — no real `sudo` is ever launched."
-  (:require [clojure.test      :refer [deftest is testing]]
-            [lib.shell         :as shell]
-            [lib.shell.command :as cmd]
-            [ujima.linux.sudo  :as sudo]))
+  "Sudo layer: `with-sudo` composition, the sudo-aware remap baseline (sudo prefix skipped,
+   wrapped command rewritten), and the `sudo`/`sudo?` fn + `sudo$*` macro sugar. Tests mock at
+   the spawn level (bind `*spawn*`) — no real `sudo` is ever launched. (root?/require-root!/
+   install-remap! moved to lib.shell — tested in lib.shell-test.)"
+  (:require [clojure.test     :refer [deftest is testing]]
+            [lib.shell        :as shell]
+            [ujima.linux.sudo :as sudo]))
 
 
 (defn recording-spawn
@@ -55,49 +55,3 @@
       (binding [shell/*spawn* (recording-spawn calls* {:exit 0 :out "" :err ""})]
         (sudo/sudo$? e2fsck -fn "/dev/x"))
       (is (= ["sudo" "-n" "e2fsck" "-fn" "/dev/x"] (:argv (first @calls*)))))))
-
-
-;; --- root? (mocks *spawn*) --------------------------------------------------
-
-(deftest root?-test
-  (testing "uid 0 -> root, without probing sudo"
-    (let [calls* (atom [])]
-      (binding [shell/*spawn*
-                (fn [_opts argv]
-                  (swap! calls* conj argv)
-                  (atom (case (first argv)
-                          "id"   {:exit 0 :out "0\n" :err ""}
-                          "sudo" (throw (ex-info "sudo should not be called" {})))))]
-        (is (true? (sudo/root?)))
-        (is (= [["id" "-u"]] @calls*)))))
-
-  (testing "non-root uid falls back to the passwordless sudo probe"
-    (let [calls* (atom [])]
-      (binding [shell/*spawn*
-                (fn [_opts argv]
-                  (swap! calls* conj argv)
-                  (atom (case (first argv)
-                          "id"   {:exit 0 :out "1000\n" :err ""}
-                          "sudo" {:exit 0 :out "" :err ""})))]
-        (is (true? (sudo/root?)))
-        (is (= [["id" "-u"] ["sudo" "-n" "true"]] @calls*)))))
-
-  (testing "false when neither root nor passwordless sudo is available"
-    (binding [shell/*spawn*
-              (fn [_opts argv]
-                (atom (case (first argv)
-                        "id"   {:exit 0 :out "1000\n" :err ""}
-                        "sudo" {:exit 1 :out "" :err ""})))]
-      (is (false? (sudo/root?))))))
-
-
-;; --- install-remap! (alter-var-root the baseline; restore after) ------------
-
-(deftest install-remap!-test
-  (testing "install-remap! makes the baseline *spawn* remap (verified via a real echo stub)"
-    (let [orig lib.shell/*spawn*]
-      (try
-        (sudo/install-remap! {:tool ["echo"]})
-        (is (= "hi there" (shell/$! tool "hi there")))
-        (finally
-          (alter-var-root #'lib.shell/*spawn* (constantly orig)))))))

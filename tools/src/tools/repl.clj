@@ -7,7 +7,7 @@
     [ujima.env  :as env]
     [e2e.runner :as e2e]
 
-    [ujima.linux.shell :refer [$! sudo$! sh! sudo!]]
+    [lib.shell :refer [$! sh! install-remap!]]
     [ujima.linux.disk  :as disk]
     [ujima.pack        :as pack]
 
@@ -59,7 +59,7 @@
   (println "  +pack  => tools.cmd.pack")
   (println)
   (println "Referred shell helpers:")
-  (println "  $! sudo$! sh! sudo!")
+  (println "  $! sh!")
   (println)
   (println "Shared REPL tmp dir:")
   (println "  tmp$         =>" (str tmp$))
@@ -94,6 +94,7 @@
 (defn start! []
   (env/init! ["config/ujima.edn"
               "config/config.local.edn"])
+  (install-remap! (env/get-in-env [:shell :commands] {}))
   (ensure-tmp!)
 
   (println)

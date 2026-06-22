@@ -11,7 +11,7 @@
     [babashka.fs      :as fs]
     [babashka.process :as p]
     [lib.task.flow    :refer [flow]]
-    [ujima.linux.shell      :refer [$! sudo$! sh! require-root!]]
+    [lib.shell              :refer [$! sh! require-root!]]
     [ujima.linux.disk       :as linux-disk]
     [ujima.linux.disk.loop  :as loopback]
     [ujima.linux.disk.mount :as mount]
@@ -60,22 +60,22 @@
     (mount/with-mounted-ext4 [mnt root]
       (try
         (doseq [b binds]
-          (sudo$! mount --bind [b] [(str mnt b)]))
+          ($! mount --bind [b] [(str mnt b)]))
         ;; repo, read-only: scripts read their source/assets but cannot mutate the tree
-        (sudo$! mkdir -p [(str mnt project-mnt)])
-        (sudo$! mount --bind [project] [(str mnt project-mnt)])
-        (sudo$! mount -o "remount,bind,ro" [(str mnt project-mnt)])
+        ($! mkdir -p [(str mnt project-mnt)])
+        ($! mount --bind [project] [(str mnt project-mnt)])
+        ($! mount -o "remount,bind,ro" [(str mnt project-mnt)])
         ;; networking + aarch64 emulation (binfmt resolves qemu at qemu-chroot)
-        (sudo$! cp "/etc/resolv.conf"            [(str mnt "/etc/resolv.conf")])
-        (sudo$! cp [(str project "/" qemu-src)]  [(str mnt qemu-chroot)])
+        ($! cp "/etc/resolv.conf"            [(str mnt "/etc/resolv.conf")])
+        ($! cp [(str project "/" qemu-src)]  [(str mnt qemu-chroot)])
         (f mnt)
         (finally
-          (sudo$! umount [(str mnt project-mnt)])
-          (sudo$! rmdir  [(str mnt project-mnt)])
+          ($! umount [(str mnt project-mnt)])
+          ($! rmdir  [(str mnt project-mnt)])
           (doseq [b (reverse binds)]
-            (sudo$! umount [(str mnt b)]))
-          (sudo$! rm -f [(str mnt qemu-chroot)])
-          (sudo$! sh -c [(str ": > " mnt "/etc/resolv.conf")]))))))
+            ($! umount [(str mnt b)]))
+          ($! rm -f [(str mnt qemu-chroot)])
+          ($! sh -c [(str ": > " mnt "/etc/resolv.conf")]))))))
 
 
 ;; ---------------------------------------------------------------------------

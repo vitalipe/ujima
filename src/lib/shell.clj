@@ -159,6 +159,32 @@
 (def result!           exec/result!)
 
 
+;; ---------------------------------------------------------------------------
+;; Baseline install + root checks.
+;; ---------------------------------------------------------------------------
+
+(defn install-remap!
+  "Install `table` (a command-remap map) as the baseline `*spawn*` via `alter-var-root` — a
+   root binding, global and thread-safe. Call once from an entry point after reading config."
+  [table]
+  (alter-var-root #'*spawn* (constantly ((remapping table) cmd/spawn))))
+
+
+(defn root?
+  "True if the current process is root (uid 0), or can become root via passwordless sudo."
+  []
+  (or (= "0" (str/trim (:out ($? id -u))))
+      (:ok? ($? sudo -n "true"))))
+
+
+(defn require-root!
+  "Throw unless `root?` — for entry points (e.g. a tool run under `sudo bb`) that must be root."
+  []
+  (when-not (root?)
+    (throw (ex-info "This operation requires root"
+                    {:type :lib.shell/root-required}))))
+
+
 (comment
 
   ($ git --no-pager log)            ;; => git --no-pager log

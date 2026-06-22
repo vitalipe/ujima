@@ -88,8 +88,8 @@
             (is (= [{:opts {} :argv ["echo" "sudo" "-n" "echo" "dd" "if=/x"]}] @calls*))))))))
 
 
-(deftest redirect-remap-test
-  (testing "$> remaps the cat stage and carries :prev / :out"
+(deftest redirect-no-remap-test
+  (testing "$> does NOT remap the internal cat stage, even when :cat is mapped"
     (with-command-remap {:cat ["echo" "cat"]}
       (fn []
         (let [calls* (atom [])
@@ -97,7 +97,7 @@
               target "/tmp/ujima/image.img"]
           (with-redefs [lib/spawn (recording-spawn calls* {:exit 0})]
             (shell/$> prev target)
-            (is (= [{:opts {:prev prev :out (io/file target)} :argv ["echo" "cat"]}]
+            (is (= [{:opts {:prev prev :out (io/file target)} :argv ["cat"]}]
                    @calls*))))))))
 
 
@@ -132,6 +132,70 @@
             (shell/sudo$? e2fsck -fn "/dev/x")
             (is (= ["echo" "sudo" "-n" "echo" "e2fsck" "-fn" "/dev/x"]
                    (:argv (first @calls*))))))))))
+
+
+;; --- function-style API: sh / sh! / sh? + sudo variants --------------------
+
+(deftest sh-fn-test
+  (testing "sh remaps argv[0] and spawns (data args, opts {})"
+    (with-command-remap {:e2fsck ["echo" "e2fsck"]}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0})]
+            (shell/sh :e2fsck :-fn "/dev/x")
+            (is (= [{:opts {} :argv ["echo" "e2fsck" "-fn" "/dev/x"]}] @calls*)))))))
+
+  (testing "sh? captures strings and returns a result map (no throw)"
+    (with-command-remap {:e2fsck ["echo" "e2fsck"]}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0 :out "ok\n" :err ""})]
+            (is (= {:ok? true :exit 0 :out "ok" :err ""}
+                   (shell/sh? :e2fsck :-fn "/dev/x")))
+            (is (= [{:opts {:out :string :err :string :continue true}
+                     :argv ["echo" "e2fsck" "-fn" "/dev/x"]}]
+                   @calls*)))))))
+
+  (testing "sh? returns ok? false on a non-zero exit, does not throw"
+    (with-command-remap {}
+      (fn []
+        (with-redefs [lib/spawn (recording-spawn (atom []) {:exit 1 :out "" :err "boom\n"})]
+          (is (= {:ok? false :exit 1 :out "" :err "boom"}
+                 (shell/sh? :whatever))))))))
+
+
+(deftest sudo-fn-test
+  (testing "sudo remaps the wrapped command AND sudo, then prepends sudo -n"
+    (with-command-remap {:git ["/opt/git"] :sudo ["/opt/sudo"]}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0})]
+            (shell/sudo :git :status)
+            (is (= [{:opts {} :argv ["/opt/sudo" "-n" "/opt/git" "status"]}] @calls*)))))))
+
+  (testing "sudo? captures + remaps both sudo and the command, returns a result map"
+    (with-command-remap {:sudo ["echo" "sudo"] :e2fsck ["echo" "e2fsck"]}
+      (fn []
+        (let [calls* (atom [])]
+          (with-redefs [lib/spawn (recording-spawn calls* {:exit 0 :out "" :err ""})]
+            (shell/sudo? :e2fsck :-fn "/dev/x")
+            (is (= ["echo" "sudo" "-n" "echo" "e2fsck" "-fn" "/dev/x"]
+                   (:argv (first @calls*))))
+            (is (= {:out :string :err :string :continue true}
+                   (:opts (first @calls*))))))))))
+
+
+(deftest sh-fn-echo-config-test
+  (testing "sh! runs for real under an echo stub and returns trimmed stdout"
+    (with-command-remap {:tool ["echo"]}
+      (fn []
+        (is (= "hi there" (shell/sh! :tool "hi there"))))))
+
+  (testing "sudo! runs for real: wrapped command remapped + a map arg splices to k=v"
+    (with-command-remap {:sudo ["echo" "sudo"] :dd ["echo" "dd"]}
+      (fn []
+        (is (= "sudo -n echo dd if=/x"
+               (shell/sudo! :dd {:if "/x"})))))))
 
 
 ;; --- end-to-end: real processes through remap + sudo (the bug fix) ----------

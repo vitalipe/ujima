@@ -51,6 +51,13 @@
     :else           [(str v)]))
 
 
+(defn ->argv
+  "Lower already-evaluated values to argv tokens (each via `value->tokens`, splicing).
+   The runtime core shared by `sh*` and `$argv`."
+  [& vals]
+  (into [] (mapcat value->tokens) vals))
+
+
 ;; ---------------------------------------------------------------------------
 ;; Process detection + default spawn.
 ;; ---------------------------------------------------------------------------
@@ -69,33 +76,30 @@
   (apply p/process opts argv))
 
 
+(defn sh*
+  "Run a command from already-evaluated Clojure data through `spawn`. `cmd` is argv[0] (or a
+   previous process, which becomes a `:prev` pipe stage); `args` splice via `value->tokens`.
+   Returns the spawn's process. Opts ride on `spawn`."
+  [spawn cmd & args]
+  (let [prev? (process? cmd)
+        argv  (if prev? (apply ->argv args) (apply ->argv cmd args))]
+    (when (or (empty? argv) (str/blank? (str (first argv))))
+      (throw (ex-info "shell: empty command / blank argv[0]" {:argv argv})))
+    (spawn (if prev? {:prev cmd} {}) argv)))
+
+
 ;; ---------------------------------------------------------------------------
 ;; Macro-time form lowering.
 ;; ---------------------------------------------------------------------------
 
-(defn- lower-arg
-  "Lower one non-head form to a token-vector expression."
-  [form]
-  (cond
-    (nil? form)     []
-    (symbol? form)  [(str form)]
-    (keyword? form) [(subs (str form) 1)]
-    (string? form)  [form]
-    (number? form)  [(str form)]
-    (set? form)     (throw (ex-info "shell: a set isn't a shell token; use a vector"
-                                    {:form form}))
-    (boolean? form) (throw (ex-info "shell: a boolean isn't a shell token outside a map"
-                                    {:form form}))
-    :else           `(value->tokens ~form)))
-
-
-(defn- lower-head
-  "Lower the head form to its value expression. Bare symbol/keyword become literal strings;
-   everything else evaluates at runtime (so a `->`-threaded process flows through)."
+(defn- lower-form
+  "Lower one DSL form to a value expression for `sh*`/`->argv`. A bare symbol is a literal
+   token (its name); set/boolean literals throw at macroexpand; everything else (keyword,
+   string, number, nil, `[..]`/`{..}`/`(..)`, a threaded process) passes through and is
+   `value->tokens`'d at runtime."
   [form]
   (cond
     (symbol? form)  (str form)
-    (keyword? form) (subs (str form) 1)
     (set? form)     (throw (ex-info "shell: a set isn't a shell token; use a vector"
                                     {:form form}))
     (boolean? form) (throw (ex-info "shell: a boolean isn't a shell token outside a map"
@@ -113,13 +117,9 @@
   [spawn & forms]
   (when (empty? forms)
     (throw (ex-info "shell: $* requires a command" {:forms forms})))
-  `(let [head#  ~(lower-head (first forms))
-         args#  (into [] cat [~@(map lower-arg (rest forms))])
-         prev?# (process? head#)
-         argv#  (if prev?# args# (into (value->tokens head#) args#))]
-     (when (or (empty? argv#) (str/blank? (str (first argv#))))
-       (throw (ex-info "shell: empty command / blank argv[0]" {:argv argv#})))
-     (~spawn (if prev?# {:prev head#} {}) argv#)))
+  ;; `mapv`, not `map`: force the lowering eagerly so set/boolean forms throw at macroexpand
+  ;; (a lazy `~@(map …)` defers the error to compile time and slips past `macroexpand-1`).
+  `(sh* ~spawn ~@(mapv lower-form forms)))
 
 
 (defmacro $
@@ -140,21 +140,14 @@
   [& forms]
   (when (empty? forms)
     (throw (ex-info "shell: $argv requires a command" {:forms forms})))
-  `{:cmd  (into (value->tokens ~(lower-head (first forms)))
-                (into [] cat [~@(map lower-arg (rest forms))]))
-    :opts {}})
-
-
-(defmacro $>*
-  "Redirect a previous process's stdout into a file via a `cat` stage through `spawn`."
-  [spawn prev target]
-  `(~spawn {:prev ~prev :out (io/file ~target)} ["cat"]))
+  `{:cmd (->argv ~@(mapv lower-form forms)) :opts {}})
 
 
 (defmacro $>
-  "Redirect the previous process's stdout into `target` (a file). Use inside a `->` pipe."
+  "Redirect the previous process's stdout into `target` (a file) via a trivial `cat` stage.
+   Use inside a `->` pipe."
   [prev target]
-  `($>* spawn ~prev ~target))
+  `(spawn {:prev ~prev :out (io/file ~target)} ["cat"]))
 
 
 (comment

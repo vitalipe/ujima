@@ -59,6 +59,42 @@
            (sh/value->tokens {:of (fs/path "/a" "b")})))))
 
 
+;; --- ->argv / sh* (the data+fn runtime core) -------------------------------
+
+(deftest ->argv-test
+  (testing "splices already-evaluated values via value->tokens, drops nils"
+    (is (= ["git" "status"]         (sh/->argv :git "status")))
+    (is (= ["git" "status"]         (sh/->argv "git" :status)))
+    (is (= ["dd" "if=/x" "of=/y"]   (sh/->argv :dd {:if "/x" :of "/y"})))
+    (is (= ["git" "status"]         (sh/->argv :git ["status"] nil nil nil)))
+    (is (= ["tail" "-n" "100" "/x"] (sh/->argv :tail :-n 100 ["/x"]))))
+
+  (testing "a Path stays ONE token (the sequential? trap)"
+    (is (= ["rm" "-rf" "/tmp/x"] (sh/->argv :rm :-rf (fs/path "/tmp" "x"))))))
+
+
+(deftest sh*-test
+  (let [calls* (atom [])
+        proc   (p/process "true")
+        rec    (recorder calls* proc)]
+
+    (testing "builds argv from data args and spawns with opts {}"
+      (reset! calls* [])
+      (sh/sh* rec :git "status")
+      (is (= [{:opts {} :argv ["git" "status"]}] @calls*)))
+
+    (testing "a process cmd becomes a :prev pipe stage; the args are the command"
+      (reset! calls* [])
+      (sh/sh* rec proc :grep "ujima")
+      (let [{:keys [opts argv]} (first @calls*)]
+        (is (= ["grep" "ujima"] argv))
+        (is (sh/process? (:prev opts)))))
+
+    (testing "blank / empty argv[0] is rejected"
+      (is (thrown-with-msg? Exception #"empty command" (sh/sh* rec nil)))
+      (is (thrown-with-msg? Exception #"empty command" (sh/sh* rec ""))))))
+
+
 ;; --- $* argv lowering (recording spawn) ------------------------------------
 
 (deftest dollar-lowering-test
@@ -161,13 +197,13 @@
 ;; --- $> redirect -----------------------------------------------------------
 
 (deftest redirect-test
-  (testing "$>* emits a `cat` stage carrying :prev and :out"
+  (testing "$> emits a `cat` stage carrying :prev and :out, through the default spawn"
     (let [calls* (atom [])
           proc   (p/process "true")
-          rec    (recorder calls* proc)
           prev   {:id 1}
           target "/tmp/ujima/image.img"]
-      (sh/$>* rec prev target)
+      (with-redefs [sh/spawn (recorder calls* proc)]
+        (sh/$> prev target))
       (is (= [{:opts {:prev prev :out (io/file target)} :argv ["cat"]}] @calls*)))))
 
 

@@ -186,17 +186,57 @@
 
 
 (comment
+  ;; -------------------------------------------------------------------------
+  ;; lib.shell — Clojure forms in, processes out.
+  ;;   a bare word is a literal token; [..] {..} (..) evaluate as Clojure.
+  ;;   every command runs through the dynamic *spawn* (remap/sudo/logging
+  ;;   layer onto it); `$argv` shows the lowering without running anything.
+  ;; -------------------------------------------------------------------------
 
-  ($ git --no-pager log)            ;; => git --no-pager log
-  ($! echo "hello")                 ;; => "hello"  (throws if it fails)
-  ($? test -b "/dev/sda")           ;; => {:ok? … :exit … :out … :err …}
+  ;; three runners — same forms, you pick the finisher:
+  ($  git status)               ;; => a process — pipe it, or hand it to a finisher
+  ($! git rev-parse HEAD)       ;; => "9e12586…"  trimmed stdout, THROWS on non-zero
+  ($? systemctl is-active ufw)  ;; => {:ok? true :exit 0 :out "active" :err ""}  (never throws)
 
-  ;; baseline remap (project installs this once at startup):
-  (alter-var-root #'*spawn* (constantly ((remapping {:dd ["echo" "dd"]}) cmd/spawn)))
+  ;; a value becomes argv tokens — inspect it with $argv (the dry run):
+  (let [file "/etc/hosts"  n 20  follow? true]
+    ($argv tail (when follow? :-f) :-n [n] [file]))
+  ;;   tail        bare word  -> literal "tail"
+  ;;   (when …)    false/nil DROPS; here it yields :-f
+  ;;   :-f :-n     a keyword is just a token  -> "-f" "-n"
+  ;;   [n] [file]  [..] uses the VALUE        -> "20" "/etc/hosts"
+  ;; => {:cmd ["tail" "-f" "-n" "20" "/etc/hosts"] :opts {}}
 
-  ;; one-off composition:
-  (with-remap {:ls "/custom/ls"} ($! ls "-l"))
+  ($argv dd {:if "/dev/sda" :of "/dev/sdb" :bs "4M"})    ;; {map} -> k=v tokens
+  ;; => {:cmd ["dd" "if=/dev/sda" "of=/dev/sdb" "bs=4M"] :opts {}}
 
-  (-> ($ echo "lib.shell rocks")
-      ($ grep shell)
-      (out-or-fail!)))             ;; => "lib.shell rocks"
+  ($argv cp -r ["a" "b"] (fs/path "/tmp" id))            ;; vectors splice; a Path stays ONE token
+  ;; => {:cmd ["cp" "-r" "a" "b" "/tmp/<id>"] :opts {}}
+
+  ;; pipe with -> ; send the final stdout to a file with $> :
+  (-> ($ cat "/var/log/syslog") 
+      ($ grep -i error) 
+      ($ tail -n 3) 
+      (out-or-fail!))
+  
+  (-> ($ tar --zstd -cf - "src") 
+      ($> "/tmp/src.tzst"))
+
+  ;; fn forms (sh / sh! / sh?): same value rules, DATA args — so you can build a
+  ;; command programmatically (apply / map / reduce):
+  (sh! :git "rev-parse" "HEAD")              ;; => "9e12586…"
+  (apply sh! :git "log" "--oneline" flags)
+
+  ;; *spawn* is the seam. Install a remap baseline once (dev echo-stubs, path pins):
+  (install-remap! {:dd ["echo" "dd"]  :mkfs.ext4 "/opt/sbin/mkfs.ext4"})
+  (with-remap {:ls "/usr/local/bin/ls"} ($! ls -la))     ;; … or compose it per-op
+
+  ;; and since *spawn* is just a (fn [opts argv]), you can DECORATE it —
+  ;; e.g. log every command right before it runs:
+  (let [run *spawn*]
+    (with-spawn (fn [opts argv] (println "$" (str/join " " argv)) (run opts argv))
+      ($! uname -a)))                        ;; prints `$ uname -a`, then runs it
+
+  ;; explicit escape hatch — pass the spawn, skip the ambient *spawn*
+  ;; (raw threads / lazy seqs that escape a binding, or precise control):
+  (out-or-fail! (lib.shell.command/$* cmd/spawn git status)))

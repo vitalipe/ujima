@@ -60,22 +60,22 @@
     (mount/with-mounted-ext4 [mnt root]
       (try
         (doseq [b binds]
-          ($! mount --bind [b] [(str mnt b)]))
+          ($! mount --bind [b] (str mnt b)))
         ;; repo, read-only: scripts read their source/assets but cannot mutate the tree
-        ($! mkdir -p [(str mnt project-mnt)])
-        ($! mount --bind [project] [(str mnt project-mnt)])
-        ($! mount -o "remount,bind,ro" [(str mnt project-mnt)])
+        ($! mkdir -p (str mnt project-mnt))
+        ($! mount --bind [project] (str mnt project-mnt))
+        ($! mount -o "remount,bind,ro" (str mnt project-mnt))
         ;; networking + aarch64 emulation (binfmt resolves qemu at qemu-chroot)
-        ($! cp "/etc/resolv.conf"            [(str mnt "/etc/resolv.conf")])
-        ($! cp [(str project "/" qemu-src)]  [(str mnt qemu-chroot)])
+        ($! cp "/etc/resolv.conf"            (str mnt "/etc/resolv.conf"))
+        ($! cp (str project "/" qemu-src)  (str mnt qemu-chroot))
         (f mnt)
         (finally
-          ($! umount [(str mnt project-mnt)])
-          ($! rmdir  [(str mnt project-mnt)])
+          ($! umount (str mnt project-mnt))
+          ($! rmdir  (str mnt project-mnt))
           (doseq [b (reverse binds)]
-            ($! umount [(str mnt b)]))
-          ($! rm -f [(str mnt qemu-chroot)])
-          ($! sh -c [(str ": > " mnt "/etc/resolv.conf")]))))))
+            ($! umount (str mnt b)))
+          ($! rm -f (str mnt qemu-chroot))
+          ($! sh -c (str ": > " mnt "/etc/resolv.conf")))))))
 
 
 ;; ---------------------------------------------------------------------------
@@ -106,7 +106,7 @@
     (fs/with-temp-dir [dir {:prefix "ujima-fetch-"}]
       (let [dl (str (fs/path dir (fs/file-name url)))]
         (progress! 5 "downloading")
-        ($! curl -fsSL --output [dl] [(str url)])
+        ($! curl -fsSL --output [dl] (str url))
         (progress! 60 "downloaded")
         (when sha256
           (progress! 65 "verifying checksum")
@@ -183,7 +183,7 @@
       (pack/validate! pack-path)
       (progress! 15 "preparing image")
       (fs/delete-if-exists out)                        ; layout refuses a device that already has partitions
-      ($! truncate -s [(str image-bytes)] [(str out)]) ; sparse
+      ($! truncate -s (str image-bytes) (str out)) ; sparse
       (loopback/with-loopback-device [dev out]
         (let [disk (->disk {:device dev})]
           (progress! 25 "writing A/B layout")

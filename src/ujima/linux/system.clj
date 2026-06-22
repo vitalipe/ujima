@@ -27,7 +27,7 @@
 
 
 (defn keyboard-layouts! [layouts]
-  (sudo$? localectl set-x11-keymap [(str/join "," layouts)])
+  (sudo$? localectl set-x11-keymap (str/join "," layouts))
   (keyboard-layouts))
 
 

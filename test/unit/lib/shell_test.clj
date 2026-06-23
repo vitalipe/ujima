@@ -148,24 +148,16 @@
         (is (true? (sh/root?)))
         (is (= [["id" "-u"]] @calls*)))))
 
-  (testing "non-root uid falls back to the passwordless sudo probe"
+  (testing "non-root uid -> not root, without probing sudo"
     (let [calls* (atom [])]
       (binding [sh/*spawn*
                 (fn [_opts argv]
                   (swap! calls* conj argv)
                   (atom (case (first argv)
                           "id"   {:exit 0 :out "1000\n" :err ""}
-                          "sudo" {:exit 0 :out "" :err ""})))]
-        (is (true? (sh/root?)))
-        (is (= [["id" "-u"] ["sudo" "-n" "true"]] @calls*)))))
-
-  (testing "false when neither root nor passwordless sudo is available"
-    (binding [sh/*spawn*
-              (fn [_opts argv]
-                (atom (case (first argv)
-                        "id"   {:exit 0 :out "1000\n" :err ""}
-                        "sudo" {:exit 1 :out "" :err ""})))]
-      (is (false? (sh/root?))))))
+                          "sudo" (throw (ex-info "sudo should not be called" {})))))]
+        (is (false? (sh/root?)))
+        (is (= [["id" "-u"]] @calls*))))))
 
 
 (deftest install-remap!-test

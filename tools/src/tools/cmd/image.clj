@@ -71,12 +71,18 @@
         ($! cp (str project "/" qemu-src)  (str mnt qemu-chroot))
         (f mnt)
         (finally
-          ($! umount (str mnt project-mnt))
-          ($! rmdir  (str mnt project-mnt))
+          ;; best-effort teardown: only undo what was actually set up, so a mid-setup
+          ;; failure surfaces its own exception instead of being masked by an `umount`
+          ;; of something that was never mounted.
+          (when (mount/mount-point? (str mnt project-mnt))
+            ($! umount (str mnt project-mnt)))
+          (when (fs/exists? (str mnt project-mnt))
+            ($! rmdir (str mnt project-mnt)))
           (doseq [b (reverse binds)]
-            ($! umount (str mnt b)))
-          ($! rm -f (str mnt qemu-chroot))
-          ($! sh -c (str ": > " mnt "/etc/resolv.conf")))))))
+            (when (mount/mount-point? (str mnt b))
+              ($! umount (str mnt b))))
+          ($! rm -f (str mnt qemu-chroot))                ; -f already no-throws on missing
+          ($! sh -c (str ": > " mnt "/etc/resolv.conf"))))))) ; mnt/etc always exists
 
 
 ;; ---------------------------------------------------------------------------

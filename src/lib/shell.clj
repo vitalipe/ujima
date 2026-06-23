@@ -218,17 +218,18 @@
 
 
 (defn root?
-  "True if the current process is root (uid 0), or can become root via passwordless sudo."
+  "True iff the current process is literally root (uid 0). Having passwordless sudo is
+   NOT root: tools that shell out with bare `$!` need a real root process (`sudo bb`)."
   []
-  (or (= "0" (str/trim (:out ($? id -u))))
-      (:ok? ($? sudo -n "true"))))
+  (= "0" (str/trim (:out ($? id -u)))))
 
 
 (defn require-root!
-  "Throw unless `root?` — for entry points (e.g. a tool run under `sudo bb`) that must be root."
+  "Throw unless the process is root (uid 0). Build tools run as `sudo bb`; a plain `bb`
+   invocation fails here, before any heavy work (download / loopback / chroot)."
   []
   (when-not (root?)
-    (throw (ex-info "This operation requires root"
+    (throw (ex-info "This operation requires root — run it as `sudo bb …`"
                     {:type :lib.shell/root-required}))))
 
 

@@ -11,31 +11,33 @@
      - the actual desktop: packages, session, autologin
      - systemd unit to launch ujima.core/-main on boot
      - real user/credentials from config instead of the default ujima/ujima below"
-  (:require [babashka.process :refer [shell]]
+  (:require [lib.shell :refer [$ $! $? with-console-out]]
             [babashka.fs :as fs]))
 
 
 (defn- create-login-user!
   "stripdown disables cloud-init (which would have created the login user from
-   /boot/firmware/user-data), so create one here.
-   DEFAULT CREDENTIAL — change it / drive it from config before shipping."
+   /boot/firmware/user-data), so create one here. The default ujima/ujima credential is
+   intentional: ujima is a public-access machine where physical access already implies root,
+   so the login password isn't a secret (drive it from config if that ever changes)."
   []
-  (when-not (zero? (:exit (shell {:continue true :out :string :err :string} "id" "ujima")))
-    (shell "useradd" "-m" "-s" "/bin/bash" "-G" "sudo" "ujima"))
-  (shell {:in "ujima:ujima\n"} "chpasswd"))
+  (when-not (:ok? ($? id "ujima"))
+    ($! useradd -m -s "/bin/bash" -G "sudo" "ujima"))
+  (-> ($ echo "ujima:ujima") ($! chpasswd)))
 
 
 (defn run! [{:keys [project]}]
-  (let [dst "/opt/ujima"]
-    (fs/create-dirs (str dst "/config"))
+  (with-console-out
+    (let [dst "/opt/ujima"]
+      (fs/create-dirs (str dst "/config"))
 
-    ;; agent source + deployment config
-    (shell "cp" "-a" (str project "/src")             (str dst "/"))
-    (shell "cp" "-a" (str project "/config/ujima.edn") (str dst "/config/"))
+      ;; agent source + deployment config
+      ($! cp -a (str project "/src")             (str dst "/"))
+      ($! cp -a (str project "/config/ujima.edn") (str dst "/config/"))
 
-    ;; login user (stripdown turned cloud-init off, so nothing else makes one)
-    (create-login-user!)
+      ;; login user (stripdown turned cloud-init off, so nothing else makes one)
+      (create-login-user!)
 
-    ;; release marker
-    (spit "/etc/ujima-release"
-          (str "built-at=" (java.time.Instant/now) "\n"))))
+      ;; release marker
+      (spit "/etc/ujima-release"
+            (str "built-at=" (java.time.Instant/now) "\n")))))

@@ -42,6 +42,46 @@
 
 
 ;; ---------------------------------------------------------------------------
+;; Console output — a spawn decorator that streams a command's output as it runs (build
+;; scripts). Composes freely; capturing (`$?`) calls stay silent.
+;; ---------------------------------------------------------------------------
+
+(defn- tee-stream
+  "An InputStream over `src` that also copies everything to `echo` as it flows. A pump thread
+   drains `src` -> `echo` (live console) + a pipe; the pipe is the returned stream, so a normal
+   reader (`out-or-fail!`'s slurp) gets the bytes unchanged and still prints. (A pump, not an
+   echo-on-read wrapper, because babashka's SCI can't `proxy` a stream class.)"
+  [^java.io.InputStream src ^java.io.OutputStream echo]
+  (let [sink (java.io.PipedOutputStream.)
+        out  (java.io.PipedInputStream. sink (* 64 1024))]
+    (future
+      (try
+        (let [buf ^bytes (byte-array 8192)]
+          (loop []
+            (let [n (.read src buf)]
+              (when (pos? n)
+                (.write echo buf 0 n) (.flush echo)
+                (.write sink buf 0 n)
+                (recur)))))
+        (catch Exception _ nil)
+        (finally (.close sink))))
+    out))
+
+
+(defn console-out
+  "Spawn decorator: stream each command's stdout + stderr to the console as it runs. Capturing
+   calls (`:out :string`, i.e. `$?`) pass through untouched, so query runners stay silent.
+   `out-or-fail!` / `$!` are unchanged — they slurp the wrapped `:out`, which prints as a side
+   effect of being read yet still yields the captured string."
+  [spawn]
+  (fn [opts argv]
+    (if (= :string (:out opts))
+      (spawn opts argv)
+      (let [proc (spawn (assoc opts :err :inherit) argv)]
+        (assoc proc :out (tee-stream (:out proc) System/out))))))
+
+
+;; ---------------------------------------------------------------------------
 ;; Command remap — sudo-aware, table-driven, an ARGV transform (so it composes in order).
 ;; ---------------------------------------------------------------------------
 
@@ -96,6 +136,13 @@
   "Run `body` with command-remap (via `table`) composed onto the current `*spawn*`."
   [table & body]
   `(binding [*spawn* ((remapping ~table) *spawn*)] ~@body))
+
+
+(defmacro with-console-out
+  "Run `body` with every `$`/`$!` command streaming its output to the console as it runs
+   (composes `console-out` onto the current `*spawn*`). `$?` stays silent."
+  [& body]
+  `(with-spawn (console-out *spawn*) ~@body))
 
 
 ;; ---------------------------------------------------------------------------

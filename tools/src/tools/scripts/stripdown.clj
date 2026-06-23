@@ -12,7 +12,7 @@
      - per-device identity: empty /etc/machine-id + remove ssh host keys (the firstboot
        wizard is masked below, so emptying machine-id is then safe)
      - emit the /boot/firmware (and root) fstab entries per A/B slot at install time"
-  (:require [babashka.process :refer [shell]]
+  (:require [lib.shell :refer [$! with-console-out]]
             [babashka.fs :as fs]))
 
 
@@ -35,24 +35,25 @@
   "systemd 'mask': symlink the unit to /dev/null so it can never start, even if something
    still 'wants' it."
   [unit]
-  (shell "ln" "-sf" "/dev/null" (str "/etc/systemd/system/" unit)))
+  ($! ln -sf "/dev/null" (str "/etc/systemd/system/" unit)))
 
 
 (defn run! [_opts]
-  ;; 1. fstab pointing at the ujima partitions (not the base image's dead PARTUUIDs)
-  (spit "/etc/fstab" fstab-contents)
+  (with-console-out
+    ;; 1. fstab pointing at the ujima partitions (not the base image's dead PARTUUIDs)
+    (spit "/etc/fstab" fstab-contents)
 
-  ;; 2. disable cloud-init: with no datasource it stalls on first boot and never finishes.
-  ;;    This marker file is cloud-init's documented kill-switch. (configure then creates the
-  ;;    login user that cloud-init would otherwise have provisioned.)
-  (when (fs/exists? "/etc/cloud")
-    (spit "/etc/cloud/cloud-init.disabled" ""))
+    ;; 2. disable cloud-init: with no datasource it stalls on first boot and never finishes.
+    ;;    This marker file is cloud-init's documented kill-switch. (configure then creates the
+    ;;    login user that cloud-init would otherwise have provisioned.)
+    (when (fs/exists? "/etc/cloud")
+      (spit "/etc/cloud/cloud-init.disabled" ""))
 
-  ;; 3. mask raspios first-boot units that assume the stock 2-partition layout:
-  ;;    - root-growers: would expand '/' to fill the card and can clobber the adjacent slot
-  ;;    - setup wizards: grab a tty and block the normal login prompt
-  (doseq [unit ["rpi-resize.service"           ;; "Grow and trim root filesystem on first boot"
-                "systemd-growfs-root.service"   ;; "Grow Root File System"
-                "userconfig.service"            ;; raspios "User configuration dialog"
-                "systemd-firstboot.service"]]   ;; systemd "First Boot Wizard"
-    (mask! unit)))
+    ;; 3. mask raspios first-boot units that assume the stock 2-partition layout:
+    ;;    - root-growers: would expand '/' to fill the card and can clobber the adjacent slot
+    ;;    - setup wizards: grab a tty and block the normal login prompt
+    (doseq [unit ["rpi-resize.service"           ;; "Grow and trim root filesystem on first boot"
+                  "systemd-growfs-root.service"   ;; "Grow Root File System"
+                  "userconfig.service"            ;; raspios "User configuration dialog"
+                  "systemd-firstboot.service"]]   ;; systemd "First Boot Wizard"
+      (mask! unit))))

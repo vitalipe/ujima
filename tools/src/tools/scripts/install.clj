@@ -3,17 +3,17 @@
    Installs runtime packages and the runtime babashka.
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
-  (:require [babashka.process :refer [shell]]
-            [babashka.fs :as fs]))
+  (:require [lib.shell :refer [$! with-console-out]]))
 
 
 (defn run! [{:keys [project]}]
-  ;; base packages the agent needs at runtime
-  (shell "apt-get" "update")
-  (shell "apt-get" "install" "-y" "--no-install-recommends"
-         "ca-certificates")
+  (with-console-out
+    ;; base packages the agent needs at runtime
+    ($! apt-get update)
+    ($! apt-get install -y --no-install-recommends "ca-certificates")
 
-  ;; runtime babashka: the same vendored aarch64 binary we are running under
-  (let [bb "/usr/local/bin/bb"]
-    (fs/copy (str project "/assets/tools/bb-aarch64") bb {:replace-existing true})
-    (shell "chmod" "+x" bb)))
+    ;; runtime babashka: the same vendored aarch64 binary we are running under,
+    ;; copied + made executable in one shot
+    ($! install -m "0755"
+                (str project "/assets/tools/bb-aarch64")
+                "/usr/local/bin/bb")))

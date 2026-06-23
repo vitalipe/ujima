@@ -17,7 +17,8 @@
     [ujima.linux.disk.mount :as mount]
     [ujima.pack             :as pack]
     [ujima.device.ab        :as ab]
-    [ujima.device.ab.autoboot :as ab-auto]))
+    [ujima.device.ab.autoboot :as ab-auto]
+    [tools.script-registry  :as registry]))
 
 
 ;; ---------------------------------------------------------------------------
@@ -130,7 +131,6 @@
 
 (def ^:private chroot-bb   (str project-mnt "/assets/tools/bb-aarch64"))
 (def ^:private chroot-cp   (str project-mnt "/src:" project-mnt "/tools/src"))
-(def ^:private scripts-dir "tools/src/tools/scripts")  ;; host-side, repo-relative
 
 
 (defn- do-chroot-run-script! [mnt target]
@@ -141,21 +141,10 @@
            "--project" project-mnt))
 
 
-(defn- require-script!
-  "Fail fast (before any chroot/loopback work) if tools.scripts.<script> doesn't exist."
-  [script]
-  (when-not (fs/exists? (fs/path scripts-dir (str script ".clj")))
-    (let [available (->> (fs/glob scripts-dir "*.clj")
-                         (mapv #(str/replace (str (fs/file-name %)) #"\.clj$" ""))
-                         sort vec)]
-      (throw (ex-info (str "Unknown script: " script)
-                      {:script script :available available})))))
-
-
 (defn script!
   "Run a single image-content script (tools.scripts.<script>/run!) inside the chroot."
   [{:keys [img script]}]
-  (require-script! script)
+  (registry/require-script! script)
   (require-root!)
   (loopback/with-loopback-device [dev img]
     (with-chrooted-rootfs* dev

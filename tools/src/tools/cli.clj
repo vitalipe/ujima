@@ -30,6 +30,16 @@
             :ip       {:desc "Target RPI host or IP" :require true}
             :user     {:desc "SSH user"     :default "ujima"}
             :password {:desc "SSH password" :default "ujima"}
+            :port     {:desc "SSH port"     :default "22"}}}
+
+    "script"
+    {:usage "Usage: tools dev script <name> <ip> [--user ujima] [--password ujima] [--port 22]"
+     :target dev/script!
+     :args [:script :ip]
+     :spec {:script   {:desc "Script to run live (tools.scripts.<name>)" :require true}
+            :ip       {:desc "Target RPI host or IP" :require true}
+            :user     {:desc "SSH user"     :default "ujima"}
+            :password {:desc "SSH password" :default "ujima"}
             :port     {:desc "SSH port"     :default "22"}}}}
 
    "loopback"

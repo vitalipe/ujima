@@ -14,7 +14,7 @@
   (with-console-out
     ;; SSH server for headless dev access (raspios ships it present-but-disabled)
     ($! apt-get update)
-    ($! apt-get install -y --no-install-recommends "openssh-server")
+    ($! apt-get install -y --no-install-recommends "openssh-server" "rsync")
     ($! systemctl enable "ssh")
 
     ;; dev/customization helper scripts (wifi, …): copy assets/dev -> /ujima/dev,

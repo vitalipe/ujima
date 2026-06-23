@@ -8,7 +8,8 @@
     [tools.cmd.loopback :as loopback]
     [tools.cmd.pack     :as pack]
     [tools.cmd.image    :as image]
-    [tools.cmd.stage    :as stage]))
+    [tools.cmd.stage    :as stage]
+    [tools.cmd.dev      :as dev]))
 
 
 
@@ -19,6 +20,17 @@
      :target stage/rpi-os!
      :args []
      :spec {}}}
+
+   "dev"
+   {"push"
+    {:usage "Usage: tools dev push agent <ip> [--user ujima] [--password ujima] [--port 22]"
+     :target dev/push!
+     :args [:target :ip]
+     :spec {:target   {:desc "What to push (agent)" :require true}
+            :ip       {:desc "Target RPI host or IP" :require true}
+            :user     {:desc "SSH user"     :default "ujima"}
+            :password {:desc "SSH password" :default "ujima"}
+            :port     {:desc "SSH port"     :default "22"}}}}
 
    "loopback"
    {"attach"

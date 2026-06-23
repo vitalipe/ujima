@@ -2,3 +2,6 @@ pad/
 /tmp/
 /stage/
 config/config.local.edn
+
+# personal per-network wifi wrappers (e.g. wifi.home); the `wifi` tool itself stays tracked
+assets/dev/wifi.*

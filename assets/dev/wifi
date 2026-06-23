@@ -1,0 +1,30 @@
+#!/bin/sh
+# wifi — join a WiFi network non-interactively.
+#
+#   wifi <ssid> <password> [country]    # country defaults to IL
+#
+# raspios (trixie) uses NetworkManager, so this drives nmcli: it (re)creates a single
+# persistent, autoconnecting profile named after the SSID. Used to get a dev device online
+# and shipped as a release tool. The password is passed on argv (visible in `ps`/history) —
+# acceptable per the ujima public-access threat model.
+set -eu
+
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+    echo "usage: wifi <ssid> <password> [country]   (country defaults to IL)" >&2
+    exit 2
+fi
+
+ssid=$1
+password=$2
+country=${3:-IL}
+
+# raspios keeps the WiFi radio rfkill-blocked until a regulatory country is set. raspi-config
+# sets *and persists* it (and unblocks the radio) — same path as the GUI's "WLAN Country"; fall
+# back to a runtime-only `iw reg set` if raspi-config isn't around.
+raspi-config nonint do_wifi_country "$country" 2>/dev/null || iw reg set "$country" 2>/dev/null || true
+rfkill unblock wifi 2>/dev/null || true
+nmcli radio wifi on 2>/dev/null || true
+
+# Idempotent: drop any existing profile for this SSID, then create + activate a fresh one.
+nmcli connection delete "$ssid" >/dev/null 2>&1 || true
+nmcli device wifi connect "$ssid" password "$password"

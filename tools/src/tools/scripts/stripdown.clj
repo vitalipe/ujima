@@ -52,7 +52,7 @@
     ;; 3. mask raspios first-boot units that assume the stock 2-partition layout:
     ;;    - root-growers: would expand '/' to fill the card and can clobber the adjacent slot
     ;;    - setup wizards: grab a tty and block the normal login prompt
-    (doseq [unit ["rpi-resize.service"           ;; "Grow and trim root filesystem on first boot"
+    (doseq [unit ["rpi-resize.service"            ;; "Grow and trim root filesystem on first boot"
                   "systemd-growfs-root.service"   ;; "Grow Root File System"
                   "userconfig.service"            ;; raspios "User configuration dialog"
                   "systemd-firstboot.service"]]   ;; systemd "First Boot Wizard"

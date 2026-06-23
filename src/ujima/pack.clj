@@ -133,8 +133,8 @@
    (unpack-to-partition! ujima-pack-path "boot.img" boot-partition-path)
    (unpack-to-partition! ujima-pack-path "root.img" root-partition-path)
 
-   (sudo$! e2fsck -fn [root-partition-path]) ;; fail on fs errors, don't attempt to fix
-   (sudo$! resize2fs  [root-partition-path])
+   (sudo$! e2fsck    -fn [root-partition-path]) ;; fail on fs errors, don't attempt to fix
+   (sudo$! resize2fs -f  [root-partition-path]) ;; -f: we checked it read-only above; skip resize2fs's own "run e2fsck -f first" gate (s_lastcheck<s_mtime after staging)
    (sudo$! sync)
 
    ;;install metadata

@@ -61,7 +61,10 @@
   (spit-file-atomic! (fs/path path "cmdline.txt") 
                      (str "console=serial0,115200 console=tty1"
                           " root=" target-block-device
-                          " rootfstype=ext4 fsck.repair=yes rootwait quiet splash"))
+                          ;; rw: the kernel mounts root read-only by default, and we keep no
+                          ;; fstab '/' entry to remount it (see tools.scripts.configure) — so
+                          ;; without rw root stays ro and first-boot writes (debconf, …) fail.
+                          " rootfstype=ext4 fsck.repair=yes rootwait rw quiet splash"))
 
   (cmdline path))
 

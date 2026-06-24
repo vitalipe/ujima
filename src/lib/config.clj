@@ -1,4 +1,4 @@
-(ns ujima.env
+(ns lib.config
   (:require [lib.io :refer [slurp-edn]]))
 
 
@@ -34,7 +34,7 @@
   (or @env*
       (throw
         (ex-info "Ujima env was not initialized"
-                 {:hint "Call ujima.env/init! from the entry point"}))))
+                 {:hint "Call lib.config/init! from the entry point"}))))
 
 
 (defn get-in-env [& ks]

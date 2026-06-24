@@ -1,6 +1,6 @@
 (ns runner
   (:require [clojure.test :as test]
-            [ujima.env :as env]
+            [lib.config :as config]
             [lib.task.timeline-test]
             [lib.task.flow-test]
             [lib.task.task-test]
@@ -11,7 +11,7 @@
             [ujima.sudo-test]
 
             [lib.edn-test]
-            [ujima.env-test]
+            [lib.config-test]
 
             [ujima.control.registry-test]
             [ujima.control.reconcile-test]))
@@ -28,7 +28,7 @@
     ujima.sudo-test
 
     lib.edn-test
-    ujima.env-test
+    lib.config-test
 
     ujima.control.registry-test
     ujima.control.reconcile-test])
@@ -36,7 +36,7 @@
 
 (defn -main [& _]
 
-  (env/init! ["config/ujima.edn"
+  (config/init! ["config/ujima.edn"
               "config/config.local.edn"])
 
   (let [{:keys [fail error]} (apply test/run-tests test-namespaces)]

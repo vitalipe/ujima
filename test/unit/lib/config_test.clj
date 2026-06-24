@@ -1,7 +1,7 @@
-(ns ujima.env-test
+(ns lib.config-test
   (:require [babashka.fs :as fs]
             [clojure.test :refer [deftest is]]
-            [ujima.env :as env]))
+            [lib.config :as config]))
 
 
 (deftest init-loads-paths-left-to-right-and-applies-overrides-last
@@ -18,7 +18,7 @@
                        :nested {:x     2
                                 :local true}}))
 
-        (env/init! [(str base-path)
+        (config/init! [(str base-path)
                     (str local-path)]
                    {:nested {:x        3
                              :override true}})
@@ -28,6 +28,6 @@
                          :keep     true
                          :local    true
                          :override true}}
-               (env/env)))))
+               (config/env)))))
     (finally
-      (env/init! [] {}))))
+      (config/init! [] {}))))

@@ -47,8 +47,8 @@ defined in `ujima.device.ab`.
 - `ujima.linux.token` — USB control-token detection.
 
 ### 5. Support
-`ujima.pack` (Ujima pack format / install), `ujima.env` (config), `ujima.fs` (file ops),
-`ujima.log` (logging). Generic libraries live under `lib.*`: `lib.util` (utilities),
+`ujima.pack` (Ujima pack format / install), `ujima.log` (logging). Generic libraries live
+under `lib.*`: `lib.config` (config), `lib.io` (file ops), `lib.util` (utilities),
 `lib.task[.flow/.timeline]` (async task machinery), `lib.edn`, `lib.cli`.
 
 ## Module map
@@ -76,8 +76,9 @@ ujima.linux.disk(.loop/.mount)  ; block device / loopback / mount
 ujima.linux.token           ; USB control-token watch
 
 ujima.pack                  ; Ujima pack format / install
-ujima.env  ujima.fs  ujima.log   ; config / fs / logging
+ujima.log                   ; logging
 
+lib.config  lib.io          ; config loader / file-io helpers
 lib.util                    ; generic utilities
 lib.task(.flow/.timeline)   ; async task machinery
 lib.edn  lib.cli            ; edn / cli helpers

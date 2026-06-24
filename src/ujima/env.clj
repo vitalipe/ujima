@@ -1,5 +1,5 @@
 (ns ujima.env
-  (:require [ujima.fs :refer [slurp-edn]]))
+  (:require [lib.io :refer [slurp-edn]]))
 
 
 (defonce env* (atom nil))

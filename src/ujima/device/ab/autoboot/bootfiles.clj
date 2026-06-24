@@ -15,7 +15,7 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
 
-            [ujima.fs :refer [spit-file-atomic! slurp-text]]))
+            [lib.io :refer [spit-file-atomic! slurp-text]]))
 
 
 (defn- parse-int [s] (when s (parse-long s)))

@@ -1,7 +1,7 @@
 (ns ujima.linux.disk
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
-            [ujima.fs :refer [file->number]]
+            [lib.io :refer [file->number]]
             [lib.shell :refer [$?]]))
 
 

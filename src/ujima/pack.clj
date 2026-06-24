@@ -3,7 +3,7 @@
             [clojure.string :as str]
             [babashka.fs :as fs]
 
-            [ujima.fs :refer [slurp-edn spit-edn!]]
+            [lib.io :refer [slurp-edn spit-edn!]]
             
             [lib.shell              :refer [$ $! $? result-or-fail!]]
             [ujima.linux.sudo       :refer [sudo$ sudo$!]]

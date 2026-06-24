@@ -1,7 +1,7 @@
 (ns ujima.device.ab.autoboot
   (:require
     [babashka.fs :as fs]
-    [ujima.fs               :refer [file->uint-be]]
+    [lib.io                 :refer [file->uint-be]]
     [ujima.linux.disk       :refer [device->partitions]]
     [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
     [ujima.linux.sudo       :refer [sudo$!]]

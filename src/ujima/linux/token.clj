@@ -5,7 +5,7 @@
 
             [babashka.process :as p]
 
-            [ujima.fs  :refer [probe-file!]]))
+            [lib.io  :refer [probe-file!]]))
 
 
 (defn do-probe-control-token! []

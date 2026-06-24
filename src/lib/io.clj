@@ -1,6 +1,5 @@
-(ns ujima.fs
+(ns lib.io
   (:require [clojure.string  :as str]
-            [clojure.java.io :as java-io]
             [clojure.edn     :as edn]
             [babashka.fs      :as fs]))
 

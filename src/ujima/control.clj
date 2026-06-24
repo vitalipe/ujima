@@ -5,7 +5,7 @@
   (:require [lib.util    :refer [index-by map-vals map-kv-vals]]
             [babashka.fs :refer [path]]
 
-            [ujima.fs :as fs]
+            [lib.io :as io]
             [ujima.control.defs      :as defs]
             [ujima.control.reconcile :as reconcile]
             [ujima.control.registry  :refer [->registry
@@ -26,11 +26,11 @@
 
 
 (defn- slurp-scope [scope]
-  (fs/slurp-edn (get @storage* scope) {}))
+  (io/slurp-edn (get @storage* scope) {}))
   
 
 (defn- spit-scope! [scope scope-edn]
-  (fs/spit-file-atomic! (get @storage* scope) scope-edn))
+  (io/spit-file-atomic! (get @storage* scope) scope-edn))
 
 
 ;; ---------------------------------------------------------------------------

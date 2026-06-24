@@ -61,9 +61,10 @@
   (spit-file-atomic! (fs/path path "cmdline.txt") 
                      (str "console=serial0,115200 console=tty1"
                           " root=" target-block-device
-                          ;; rw: the kernel mounts root read-only by default, and we keep no
-                          ;; fstab '/' entry to remount it — so without rw root stays ro and first-boot writes (debconf, …) fail.
-                          " rootfstype=ext4 fsck.repair=yes rootwait rw quiet splash"))
+                          ;; no rw here: the kernel mounts root read-only, fsck.repair=yes fscks it, then systemd
+                          ;; remounts it rw per the fstab '/' entry (written per-slot by autoboot/slot->fstab).
+                          ;; quiet/splash dropped for now: verbose boots during bring-up (re-add to quieten)
+                          " rootfstype=ext4 fsck.repair=yes rootwait"))
 
   (cmdline path))
 

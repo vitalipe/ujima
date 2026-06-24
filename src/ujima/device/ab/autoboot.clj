@@ -48,12 +48,13 @@
 
 
 (defn- slot->fstab
-  "Per-slot /etc/fstab for an installed slot: the slot's own /boot/firmware + the shared
-   config/storage partitions, all by PARTUUID. No '/' entry — the kernel mounts root from the
-   cmdline (root=PARTUUID per slot, see bootfiles/cmdline!); `nofail` keeps a missing/unformatted
-   partition out of emergency mode."
+  "Per-slot /etc/fstab for an installed slot: the slot's own root + /boot/firmware, plus the
+   shared config/storage partitions, all by PARTUUID. Root is passno 1 so it's fsck'd first —
+   the cmdline mounts it read-only, fsck runs, then systemd remounts it rw per this '/' entry.
+   `nofail` on the rest keeps a missing/unformatted partition out of emergency mode."
   [slot]
-  (str "proc                  /proc           proc  defaults         0  0\n"
+  (str "PARTUUID=" (slot->root-uuid slot) "  /               ext4  defaults,noatime  0  1\n"
+       "proc                  /proc           proc  defaults         0  0\n"
        "PARTUUID=" (slot->boot-uuid slot) "  /boot/firmware  vfat  defaults,nofail  0  2\n"
        "PARTUUID=" ujima-config-uuid      "  /mnt/config     ext4  defaults,nofail  0  2\n"
        "PARTUUID=" ujima-storage-uuid     "  /mnt/storage    ext4  defaults,nofail  0  2\n"))

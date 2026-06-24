@@ -2,7 +2,8 @@
   "Host-side dev-loop commands against a RUNNING ujima dev device over ssh. Distinct from
    tools.scripts.dev (the in-chroot build script).
 
-     push agent      rsync the working-tree src/ -> /opt/ujima/src on the device.
+     push agent      deploy the agent live: run tools.scripts.agent (= `script agent` — stages
+                     src/ + config into /opt/ujima), then restart ujima.service.
      script <name>   run tools.scripts.<name>/run! live on the device — the running-system
                      analog of `tools image script` (which runs the same fn in the build chroot).
 
@@ -55,29 +56,6 @@
 ;; Commands
 ;; ---------------------------------------------------------------------------
 
-(defn- push-agent!
-  "rsync the local agent source (src/) onto a running dev device at /opt/ujima/src.
-   Mirror (--delete), owned root:root (dirs 0755 / files 0644), remote rsync under sudo."
-  [{:keys [ip] :as opts}]
-  (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
-  (require-host-cmd! "rsync"   "install it (e.g. apt install rsync)")
-  (let [{:keys [ssh-e host] :as transport} (ssh-transport opts)
-        dest (str host ":/opt/ujima/src/")]
-    ;; device preflight (loud): rsync must be present, since the dev image may predate it
-    (when-not (:ok? (remote-sh? transport "command -v rsync >/dev/null"))
-      (throw (ex-info (str "rsync missing on " ip
-                           " — `sudo apt install rsync` on the device, or reflash a dev image that ships it")
-                      {:ip ip})))
-    ;; mirror src/ -> /opt/ujima/src/, root-owned, remote rsync elevated via passwordless sudo
-    (sh! :rsync "-a" "--delete"
-         "--chown=root:root" "--chmod=D755,F644"
-         "--rsync-path=sudo rsync"
-         "-e" ssh-e
-         "src/" dest)
-    (println "pushed src/ ->" dest)
-    (println "run on device:  cd /opt/ujima && bb -cp src -m ujima.core")
-    {:pushed dest}))
-
 
 ;; The staging dir on the device. NOT /opt/ujima: agent.clj copies <project>/src into
 ;; /opt/ujima/, so if project were /opt/ujima it would copy src into itself. Mirrors the chroot,
@@ -128,10 +106,23 @@
     {:script script :ip ip :stage device-stage}))
 
 
+;; What `push <target>` knows how to deploy: the image script that stages it (the copy) and the
+;; systemd unit to restart so the new code takes effect. A new deployable target is one entry.
+(def ^:private push-targets
+  {"agent" {:script "agent" :service "ujima"}})
+
+
 (defn push!
-  "Entry for `dev push <target> <ip>`. Only target \"agent\" today (rsync src/ -> /opt/ujima/src);
-   leaves room for `dev push config`/`assets` siblings later."
-  [{:keys [target] :as opts}]
-  (case target
-    "agent" (push-agent! opts)
-    (throw (ex-info (str "unknown push target: " target " — supported: agent") {:target target}))))
+  "Entry for `dev push <target> <ip>`: stage + run the target's image script (the copy, via
+   script!), then restart its systemd unit so the new code is live. Today only \"agent\"
+   (tools.scripts.agent -> ujima.service); a new target is one entry in push-targets."
+  [{:keys [target ip] :as opts}]
+  (if-let [{:keys [script service]} (get push-targets target)]
+    (let [result (script! (assoc opts :script script))]
+      (println (str "restarting " service " on " ip))
+      (remote-exec! (ssh-transport opts) (str "sudo systemctl restart " service))
+      (println (str "tail logs:  journalctl -u " service " -f"))
+      (assoc result :restarted service))
+    (throw (ex-info (str "unknown push target: " target
+                         " — supported: " (str/join ", " (keys push-targets)))
+                    {:target target}))))

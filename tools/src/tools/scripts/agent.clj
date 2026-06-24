@@ -16,6 +16,9 @@
     (let [dst "/opt/ujima"]
       (fs/create-dirs (str dst "/config"))
 
-      ;; agent source + deployment config
+      ;; agent source + deployment config. Clean-mirror src (rm before cp) so a file deleted in
+      ;; the working tree doesn't linger on a re-run — matches the desktop script. Build-safe:
+      ;; a fresh slot has no /opt/ujima/src, so the rm is a no-op there.
+      ($! rm -rf (str dst "/src"))
       ($! cp -a (str project "/src")              (str dst "/"))
       ($! cp -a (str project "/config/ujima.edn") (str dst "/config/")))))

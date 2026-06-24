@@ -48,7 +48,7 @@ defined in `ujima.device.ab`.
 
 ### 5. Support
 `ujima.pack` (Ujima pack format / install), `ujima.log` (logging). Generic libraries live
-under `lib.*`: `lib.config` (config), `lib.io` (file ops), `lib.util` (utilities),
+under `lib.*`: `lib.io` (file ops + config loading), `lib.util` (utilities),
 `lib.task[.flow/.timeline]` (async task machinery), `lib.edn`, `lib.cli`.
 
 ## Module map
@@ -78,7 +78,7 @@ ujima.linux.token           ; USB control-token watch
 ujima.pack                  ; Ujima pack format / install
 ujima.log                   ; logging
 
-lib.config  lib.io          ; config loader / file-io helpers
+lib.io                      ; file-io helpers + config loader
 lib.util                    ; generic utilities
 lib.task(.flow/.timeline)   ; async task machinery
 lib.edn  lib.cli            ; edn / cli helpers

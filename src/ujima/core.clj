@@ -1,5 +1,5 @@
 (ns ujima.core
-  (:require [lib.config              :as config]
+  (:require [lib.io                  :as io]
             [ujima.log               :as log]
 
             [ujima.device  :as device]
@@ -12,13 +12,11 @@
 
 (defn -main [& args]
 
-  (config/init! ["config/ujima.edn"
-              "config/config.local.edn"])
+  (let [env (io/slurp-config "config" "ujima")]
 
-  (shell/install-remap! (config/get-in-env [:shell :commands] {}))
+    (shell/install-remap! (get-in env [:shell :commands] {}))
 
-  (log/init!          (config/get-in-env [:log] {:level :info}))
-  (control/init!      (config/get-in-env [:control] {}))
-
-  (agent/init! (config/get-in-env [:agent] {})))
+    (log/init!     (get-in env [:log]     {:level :info}))
+    (control/init! (get-in env [:control] {}))
+    (agent/init!   (get-in env [:agent]   {}))))
 

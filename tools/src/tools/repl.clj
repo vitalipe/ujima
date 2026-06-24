@@ -4,7 +4,7 @@
     [clojure.pprint :refer [pprint]]
     [babashka.fs :as fs]
 
-    [lib.config :as config]
+    [lib.io :as io]
     [e2e.runner :as e2e]
 
     [lib.shell :refer [$! sh! install-remap!]]
@@ -92,9 +92,11 @@
 
 
 (defn start! []
-  (config/init! ["config/ujima.edn"
-              "config/config.local.edn"])
-  (install-remap! (config/get-in-env [:shell :commands] {}))
+  
+  (-> (io/slurp-config "config" "ujima")
+      (get-in  [:shell :commands] {})
+      (install-remap!))
+
   (ensure-tmp!)
 
   (println)

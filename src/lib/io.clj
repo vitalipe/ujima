@@ -1,7 +1,8 @@
 (ns lib.io
   (:require [clojure.string  :as str]
             [clojure.edn     :as edn]
-            [babashka.fs      :as fs]))
+            [babashka.fs      :as fs]
+            [lib.util         :refer [deep-merge]]))
 
 
 (defn slurp-text
@@ -71,3 +72,14 @@
     0
     (->> (fs/read-all-bytes path)
          (reduce (fn [a b] (+ (* a 256) (bit-and b 0xff))) 0))))
+
+
+(defn slurp-config
+  "Read config `name` from `config-dir`, deep-merging
+   <name>.edn < <name>.local.edn < <name>.dev.edn (later wins;
+   missing optional files are skipped)."
+  [config-dir name]
+  (deep-merge
+    (slurp-edn (fs/path config-dir (str name ".edn")))
+    (slurp-edn (fs/path config-dir (str name ".local.edn")))
+    (slurp-edn (fs/path config-dir (str name ".dev.edn")))))

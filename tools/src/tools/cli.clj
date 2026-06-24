@@ -1,7 +1,7 @@
 (ns tools.cli
   (:require
     [clojure.walk       :as walk]
-    [lib.config         :as config]
+    [lib.io             :as io]
     [lib.shell          :as shell]
     [lib.cli            :as cli]
     [lib.task           :as task]
@@ -159,7 +159,8 @@
 (defn -main
   [& args]
 
-  (config/init! ["config/ujima.edn"
-              "config/config.local.edn"])
-  (shell/install-remap! (config/get-in-env [:shell :commands] {}))
+  (-> (io/slurp-config "config" "ujima")
+      (get-in  [:shell :commands] {})
+      (shell/install-remap!))
+
   (cli/dispatch! (wrap-targets command-tree) args))

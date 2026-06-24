@@ -4,31 +4,32 @@
             [lib.io :as io]))
 
 
-(deftest env-deep-merges-base-local-dev-left-to-right
+(deftest slurp-config-merges-base-dev-local
   (fs/with-temp-dir [dir {}]
     (spit (str (fs/path dir "app.edn"))
           (pr-str {:a      1
                    :nested {:x    1
                             :keep true}}))
+    (spit (str (fs/path dir "app.dev.edn"))
+          (pr-str {:nested {:x        3
+                            :override true}}))
     (spit (str (fs/path dir "app.local.edn"))
           (pr-str {:a      2
                    :nested {:x     2
                             :local true}}))
-    (spit (str (fs/path dir "app.dev.edn"))
-          (pr-str {:nested {:x        3
-                            :override true}}))
 
+    ;; precedence: base < dev < local — local's :x wins (2, not dev's 3)
     (is (= {:a      2
-            :nested {:x        3
+            :nested {:x        2
                      :keep     true
-                     :local    true
-                     :override true}}
+                     :override true
+                     :local    true}}
            (io/slurp-config (str dir) "app")))))
 
 
-(deftest env-tolerates-missing-optional-files
+(deftest slurp-config-tolerates-missing-optional-files
   (fs/with-temp-dir [dir {}]
     (spit (str (fs/path dir "app.edn"))
           (pr-str {:a 1}))
-    ;; no app.local.edn / app.dev.edn present
+    ;; no app.dev.edn / app.local.edn present
     (is (= {:a 1} (io/slurp-config (str dir) "app")))))

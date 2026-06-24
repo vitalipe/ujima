@@ -75,11 +75,9 @@
 
 
 (defn slurp-config
-  "Read config `name` from `config-dir`, deep-merging
-   <name>.edn < <name>.local.edn < <name>.dev.edn (later wins;
-   missing optional files are skipped)."
+  "Merge `name[.|.dev|.local].edn` from `config-dir` — later wins; missing files skipped."
   [config-dir name]
   (deep-merge
     (slurp-edn (fs/path config-dir (str name ".edn")))
-    (slurp-edn (fs/path config-dir (str name ".local.edn")))
-    (slurp-edn (fs/path config-dir (str name ".dev.edn")))))
+    (slurp-edn (fs/path config-dir (str name ".dev.edn")))
+    (slurp-edn (fs/path config-dir (str name ".local.edn")))))

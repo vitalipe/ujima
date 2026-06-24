@@ -146,7 +146,7 @@
 
 (defn -main [& args]
   (println "E2E env:")
-  (prn (io/slurp-config "config" "ujima"))
+  (prn (io/slurp-config "config" "ujimad"))
   (println)
 
   (let [[cmd & test-args] args]

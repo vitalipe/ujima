@@ -93,7 +93,7 @@
 
 (defn start! []
   
-  (-> (io/slurp-config "config" "ujima")
+  (-> (io/slurp-config "config" "tools")
       (get-in  [:shell :commands] {})
       (install-remap!))
 

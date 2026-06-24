@@ -12,7 +12,7 @@
 
 (defn -main [& args]
 
-  (let [env (io/slurp-config "config" "ujima")]
+  (let [env (io/slurp-config "config" "ujimad")]
 
     (shell/install-remap! (get-in env [:shell :commands] {}))
 

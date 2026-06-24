@@ -159,7 +159,7 @@
 (defn -main
   [& args]
 
-  (-> (io/slurp-config "config" "ujima")
+  (-> (io/slurp-config "config" "tools")
       (get-in  [:shell :commands] {})
       (shell/install-remap!))
 

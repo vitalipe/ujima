@@ -21,4 +21,4 @@
       ;; a fresh slot has no /opt/ujima/src, so the rm is a no-op there.
       ($! rm -rf (str dst "/src"))
       ($! cp -a (str project "/src")              (str dst "/"))
-      ($! cp -a (str project "/config/ujima.edn") (str dst "/config/")))))
+      ($! cp -a (str project "/config/ujimad.edn") (str dst "/config/")))))

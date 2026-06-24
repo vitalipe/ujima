@@ -1,6 +1,7 @@
 (ns ujima.device.ab.autoboot
   (:require
-    [babashka.fs :as fs]        
+    [babashka.fs :as fs]
+    [ujima.fs               :refer [file->uint-be]]
     [ujima.linux.disk       :refer [device->partitions]]
     [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
     [ujima.linux.sudo       :refer [sudo$!]]
@@ -21,13 +22,6 @@
   (when-not (#{:a :b} ?slot)
     (throw
       (ex-info "Boot slot must be :a or :b" {:expected #{:a :b} :actual ?slot}))))
-
-
-(defn file->u32-or-0 [path]
-  (if-not (fs/exists? path)
-    0
-    (->> (fs/read-all-bytes path)
-         (reduce (fn [a b] (+ (* a 256) (bit-and b 0xff))) 0))))
 
 
 ;; 1 control · 2 boot-a · 3 boot-b · 4 ext · 5 root-a · 6 root-b · 7 config · 8 storage
@@ -150,7 +144,7 @@
     (sudo$! reboot 0 tryboot))
 
   (in-try-boot? [_]
-    (not (zero? (file->u32-or-0 "/proc/device-tree/chosen/bootloader/tryboot")))))
+    (not (zero? (file->uint-be "/proc/device-tree/chosen/bootloader/tryboot")))))
 
 
 

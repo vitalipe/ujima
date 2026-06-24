@@ -54,22 +54,6 @@
       (slurp-text path))))
 
 
-(defn spit-file-atomic
-  "Writes text atomically. Returns a result map. Does not throw."
-  [path text]
-  (try
-      
-      {:ok?     true
-       :path    path
-       :content (spit-file-atomic! path text)}
-
-    (catch Throwable e
-      {:ok? false
-       :path path
-       :error (ex-message e)
-       :exception e})))
-
-
 (defn probe-file! [root file-pattern]
   (let [[first-matching] (fs/glob root file-pattern)]
     (when first-matching
@@ -78,12 +62,13 @@
 
 (defn file->number [path]
   (when (fs/exists? path)
-    (-> path str slurp str/trim parse-long))) 
+    (-> path str slurp str/trim parse-long)))
 
 
-(defn require-file! [path]
-  (when-not (fs/regular-file? path)
-    (throw
-      (ex-info (str path " is not a regular file")
-               {:path (str path)})))
-  path)
+(defn file->uint-be
+  "Read `path`'s bytes as a big-endian unsigned integer. Missing file ⇒ 0."
+  [path]
+  (if-not (fs/exists? path)
+    0
+    (->> (fs/read-all-bytes path)
+         (reduce (fn [a b] (+ (* a 256) (bit-and b 0xff))) 0))))

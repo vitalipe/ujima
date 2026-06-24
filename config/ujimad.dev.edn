@@ -1,0 +1,3 @@
+{:log     {:level :debug}
+ :control {:storage "/tmp/ujima/settings/" 
+           :tmp     "/tmp/ujima/settings/session"}}

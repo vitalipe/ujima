@@ -62,8 +62,7 @@
                      (str "console=serial0,115200 console=tty1"
                           " root=" target-block-device
                           ;; rw: the kernel mounts root read-only by default, and we keep no
-                          ;; fstab '/' entry to remount it (see tools.scripts.configure) — so
-                          ;; without rw root stays ro and first-boot writes (debconf, …) fail.
+                          ;; fstab '/' entry to remount it — so without rw root stays ro and first-boot writes (debconf, …) fail.
                           " rootfstype=ext4 fsck.repair=yes rootwait rw quiet splash"))
 
   (cmdline path))

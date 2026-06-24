@@ -4,7 +4,7 @@
    at /ujima/dev, and a [ujima-dev] shell prompt. Not part of the release pipeline — run on dev
    images only.
 
-   Pipeline: stage -> stripdown -> configure -> [dev] -> pack -> from-pack.
+   Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [clojure.string :as str]
@@ -24,7 +24,7 @@
   "Idempotent: write the prompt to its own file (full overwrite, always current), and source it
    from the ujima user's ~/.bashrc exactly once (guarded). ~/.bashrc sources it last, so it wins
    over the skel PS1; the `[ -f ]` guard keeps login working even if the file is later removed.
-   (configure created the ujima user + home before this script runs.) `home` is overridable for
+   (base created the ujima user + home before this script runs.) `home` is overridable for
    tests."
   ([] (install-dev-prompt! "/home/ujima"))
   ([home]

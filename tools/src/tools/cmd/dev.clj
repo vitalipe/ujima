@@ -8,7 +8,7 @@
 
    Both talk to the device over sshpass+ssh with default ujima/ujima creds (dev boxes; see the
    public-access threat model). No live-safe gating: `script` runs whatever you name — note
-   cleanup/stripdown are destructive on a running box."
+   cleanup/base/ujimaify are destructive on a running box."
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
             [babashka.process :as p]
@@ -79,7 +79,7 @@
     {:pushed dest}))
 
 
-;; The staging dir on the device. NOT /opt/ujima: configure.clj copies <project>/src into
+;; The staging dir on the device. NOT /opt/ujima: agent.clj copies <project>/src into
 ;; /opt/ujima/, so if project were /opt/ujima it would copy src into itself. Mirrors the chroot,
 ;; where the read-only repo bind (/ujima-src) is deliberately separate from the install target.
 (def ^:private device-stage "/ujima-src")

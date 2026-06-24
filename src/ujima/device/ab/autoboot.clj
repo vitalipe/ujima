@@ -2,7 +2,7 @@
   (:require
     [babashka.fs :as fs]        
     [ujima.linux.disk       :refer [device->partitions]]
-    [ujima.linux.disk.mount :refer [with-mounted-vfat]]
+    [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
     [ujima.linux.sudo       :refer [sudo$!]]
 
 
@@ -10,8 +10,7 @@
 
     [ujima.device.ab                     :refer [UjimaSystemDisk UjimaBootRuntime]]
     [ujima.device.ab.autoboot.bootfiles  :as autoboot]
-    [ujima.device.ab.autoboot.partitions :refer [ujima-root-a-uuid
-                                                 ujima-root-b-uuid 
+    [ujima.device.ab.autoboot.partitions :refer [ujima-mbr-disk-id
                                                  device->partitions-by-name
                                                  write-ab-partition-layout!
                                                  require-ab-partition-layout!  
@@ -31,8 +30,33 @@
          (reduce (fn [a b] (+ (* a 256) (bit-and b 0xff))) 0))))
 
 
+;; 1 control · 2 boot-a · 3 boot-b · 4 ext · 5 root-a · 6 root-b · 7 config · 8 storage
 (def slot->idx {:a 2 :b 3})
 (def idx->slot {2 :a  3 :b})
+
+
+(def ujima-config-uuid  (format "%08x-%02x" ujima-mbr-disk-id 7))
+(def ujima-storage-uuid (format "%08x-%02x" ujima-mbr-disk-id 8))
+
+
+(def slot->boot-uuid {:a (format "%08x-%02x" ujima-mbr-disk-id 2)
+                      :b (format "%08x-%02x" ujima-mbr-disk-id 3)})
+
+
+(def slot->root-uuid {:a (format "%08x-%02x" ujima-mbr-disk-id 5)
+                      :b (format "%08x-%02x" ujima-mbr-disk-id 6)})
+
+
+(defn- slot->fstab
+  "Per-slot /etc/fstab for an installed slot: the slot's own /boot/firmware + the shared
+   config/storage partitions, all by PARTUUID. No '/' entry — the kernel mounts root from the
+   cmdline (root=PARTUUID per slot, see bootfiles/cmdline!); `nofail` keeps a missing/unformatted
+   partition out of emergency mode."
+  [slot]
+  (str "proc                  /proc           proc  defaults         0  0\n"
+       "PARTUUID=" (slot->boot-uuid slot) "  /boot/firmware  vfat  defaults,nofail  0  2\n"
+       "PARTUUID=" ujima-config-uuid      "  /mnt/config     ext4  defaults,nofail  0  2\n"
+       "PARTUUID=" ujima-storage-uuid     "  /mnt/storage    ext4  defaults,nofail  0  2\n"))
 
 
 (defrecord AutobootDisk [device]
@@ -79,8 +103,14 @@
       (pack/unpack! ujima-pack-path boot root)
 
       (with-mounted-vfat [boot-mnt boot]
-        (autoboot/cmdline! boot-mnt (str "PARTUUID=" (case slot :a ujima-root-a-uuid 
-                                                                :b ujima-root-b-uuid))))))
+        (autoboot/cmdline! boot-mnt (str "PARTUUID=" (slot->root-uuid slot))))
+
+      ;; per-slot fstab + the config/storage mount points (root via the from-pack/require-root! path)
+      (with-mounted-ext4 [root-mnt root]
+        (fs/create-dirs (fs/path root-mnt "etc"))   ; real rootfs has it; a minimal/test root may not
+        (spit (str (fs/path root-mnt "etc/fstab")) (slot->fstab slot))
+        (fs/create-dirs (fs/path root-mnt "mnt/config"))
+        (fs/create-dirs (fs/path root-mnt "mnt/storage")))))
 
 
   (set-boot-slot! [_ slot]

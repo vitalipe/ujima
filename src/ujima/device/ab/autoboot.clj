@@ -42,16 +42,29 @@
 
 
 (defn- slot->fstab
-  "Per-slot /etc/fstab for an installed slot: the slot's own root + /boot/firmware, plus the
-   shared config/storage partitions, all by PARTUUID. Root is passno 1 so it's fsck'd first —
-   the cmdline mounts it read-only, fsck runs, then systemd remounts it rw per this '/' entry.
-   `nofail` on the rest keeps a missing/unformatted partition out of emergency mode."
+  "Per-slot /etc/fstab for an installed slot: the slot's own root + /boot/firmware, the shared
+   settings partition and its per-slot bind onto /ujima/settings (the stable path the agent reads,
+   so the agent never knows its slot), plus the shared storage partition; all by PARTUUID. Root is
+   passno 1 so it's fsck'd first — the cmdline mounts it read-only, fsck runs, then systemd remounts
+   it rw per this '/' entry.
+
+   Settings is a REQUIRED mount (no `nofail`): the agent is meaningless without it, so a
+   missing/corrupt settings partition must halt boot (emergency) rather than silently fall back to
+   the empty rootfs mountpoint and run on defaults. Being required also means systemd's
+   local-fs.target guarantees it is mounted before the agent starts — no mount check in agent code.
+   fsck still runs first (passno 2, `fsck.repair=yes` in the cmdline) and auto-repairs the common
+   power-loss case. `nofail` stays on boot-firmware/storage — those missing shouldn't brick an
+   otherwise-correct boot."
   [slot]
   (str "PARTUUID=" (slot->root-uuid slot) "  /               ext4  defaults,noatime  0  1\n"
        "proc                  /proc           proc  defaults         0  0\n"
        "PARTUUID=" (slot->boot-uuid slot) "  /boot/firmware  vfat  defaults,nofail  0  2\n"
-       "PARTUUID=" ujima-config-uuid      "  /mnt/config     ext4  defaults,nofail  0  2\n"
-       "PARTUUID=" ujima-storage-uuid     "  /mnt/storage    ext4  defaults,nofail  0  2\n"))
+
+       "PARTUUID=" ujima-config-uuid      "  /mnt/settings   ext4  defaults         0  2\n"
+       "PARTUUID=" ujima-storage-uuid     "  /mnt/storage    ext4  defaults,nofail  0  2\n"
+
+       "/mnt/settings/" (name slot)       "  /ujima/settings none  bind             0  0\n"
+       "/mnt/storage/"                    "  /ujima/storage  none  bind             0  0\n"))
 
 
 (defrecord AutobootDisk [device]
@@ -91,21 +104,29 @@
     (require-ab-partition-layout! device)
     (pack/validate! ujima-pack-path)
 
-    (let [{:keys [boot root]} (-> device 
-                                (device->partitions-by-name)
-                                (get slot))]
-          
+    (let [{cfg-blk :config :as parts} (device->partitions-by-name device) 
+          {:keys [root boot]}         (get parts slot)]
+
       (pack/unpack! ujima-pack-path boot root)
 
       (with-mounted-vfat [boot-mnt boot]
         (autoboot/cmdline! boot-mnt (str "PARTUUID=" (slot->root-uuid slot))))
 
-      ;; per-slot fstab + the config/storage mount points (root via the from-pack/require-root! path)
+      ;; per-slot fstab + mount points. Settings is bind-mounted per-slot onto /ujima/settings, so
+      ;; the rootfs needs both the raw /mnt/settings mount point and the /ujima/settings bind target.
       (with-mounted-ext4 [root-mnt root]
         (fs/create-dirs (fs/path root-mnt "etc"))   ; real rootfs has it; a minimal/test root may not
         (spit (str (fs/path root-mnt "etc/fstab")) (slot->fstab slot))
-        (fs/create-dirs (fs/path root-mnt "mnt/config"))
-        (fs/create-dirs (fs/path root-mnt "mnt/storage")))))
+
+        (fs/create-dirs (fs/path root-mnt "mnt/settings"))
+        (fs/create-dirs (fs/path root-mnt "mnt/storage"))
+
+        (fs/create-dirs (fs/path root-mnt "ujima/settings"))
+        (fs/create-dirs (fs/path root-mnt "ujima/storage")))
+
+      ;; create this slot's settings subdir 
+      (with-mounted-ext4 [cfg-mnt cfg-blk]
+        (fs/create-dirs (fs/path cfg-mnt (name slot))))))
 
 
   (set-boot-slot! [_ slot]

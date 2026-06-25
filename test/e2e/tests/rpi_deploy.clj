@@ -1,11 +1,12 @@
 (ns e2e.tests.rpi-deploy
   (:require [babashka.fs :as fs]
+            [clojure.string :as str]
 
             [ujima.pack :as pack]
             [ujima.device.ab :as ab]
             [ujima.linux.disk :as linux-disk]
             [ujima.linux.disk.loop :as loopback]
-            [ujima.linux.disk.mount :refer [with-mounted-vfat]]
+            [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
             [lib.shell :refer [$! require-root!]]
             [ujima.device.ab.autoboot.bootfiles :as autoboot]
             [ujima.device.ab.autoboot :refer [->disk]]
@@ -138,6 +139,32 @@
                  (:try-boot-slot info))))
 
 
+(defn assert-slot-settings! [info slot]
+  ;; the per-slot settings subdir exists on the shared config partition (the bind source)
+  (with-mounted-ext4 [cfg-mnt (:config info)]
+    (assert= "Expected per-slot settings subdir on the config partition"
+             true (fs/exists? (fs/path cfg-mnt (name slot)))))
+  ;; the slot's fstab: settings partition mounted REQUIRED (no nofail) at /mnt/settings, then
+  ;; bind-mounted per-slot onto /ujima/settings; plus both rootfs mount points.
+  (with-mounted-ext4 [root-mnt (get-in info [:slots slot :root])]
+    (let [fstab         (slurp (str (fs/path root-mnt "etc/fstab")))
+          settings-line (->> (str/split-lines fstab)
+                             (filter #(re-find #"\s/mnt/settings\s" %))
+                             first)]
+      (assert-some! "fstab should mount the settings partition at /mnt/settings" settings-line)
+      (when (str/includes? settings-line "nofail")
+        (fail! "Settings mount must be REQUIRED (no nofail) so a bad partition halts boot rather than silently using defaults"
+               {:line settings-line}))
+      (assert-some! "fstab should bind /mnt/settings/<slot> onto /ujima/settings"
+                    (re-find (re-pattern (str "/mnt/settings/" (name slot)
+                                              "\\s+/ujima/settings\\s+none\\s+bind"))
+                             fstab))
+      (assert= "rootfs should have the /mnt/settings mount point"
+               true (fs/exists? (fs/path root-mnt "mnt/settings")))
+      (assert= "rootfs should have the /ujima/settings mount point"
+               true (fs/exists? (fs/path root-mnt "ujima/settings"))))))
+
+
 (defn test-install! [disk* pack-file slot expected-installed-slots]
   (let [expected-metadata (pack/metadata pack-file)]
     (ab/install-into-slot! disk* pack-file slot)
@@ -147,6 +174,7 @@
         (assert-slot-cmdline! info installed-slot))
       (doseq [empty-slot (remove expected-installed-slots [:a :b])]
         (assert-empty-slot! info empty-slot))
+      (assert-slot-settings! info slot)
       true)))
 
 

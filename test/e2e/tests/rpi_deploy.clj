@@ -165,6 +165,20 @@
                true (fs/exists? (fs/path root-mnt "ujima/settings"))))))
 
 
+(defn assert-slot-logs! [info slot]
+  ;; journald's logs dir exists on the shared storage partition (the bind source)
+  (with-mounted-ext4 [s-mnt (:storage info)]
+    (assert= "Expected /logs dir on the storage partition"
+             true (fs/exists? (fs/path s-mnt "logs"))))
+  ;; the slot's fstab binds /var/log/journal onto storage, and the mount point exists
+  (with-mounted-ext4 [root-mnt (get-in info [:slots slot :root])]
+    (let [fstab (slurp (str (fs/path root-mnt "etc/fstab")))]
+      (assert-some! "fstab should bind /var/log/journal onto /mnt/storage/logs"
+                    (re-find #"/mnt/storage/logs\s+/var/log/journal\s+none\s+bind" fstab))
+      (assert= "rootfs should have the /var/log/journal mount point"
+               true (fs/exists? (fs/path root-mnt "var/log/journal"))))))
+
+
 (defn test-install! [disk* pack-file slot expected-installed-slots]
   (let [expected-metadata (pack/metadata pack-file)]
     (ab/install-into-slot! disk* pack-file slot)
@@ -175,6 +189,7 @@
       (doseq [empty-slot (remove expected-installed-slots [:a :b])]
         (assert-empty-slot! info empty-slot))
       (assert-slot-settings! info slot)
+      (assert-slot-logs! info slot)
       true)))
 
 

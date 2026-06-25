@@ -6,7 +6,8 @@
    ujima.device.ab/install-into-slot! — not here.)
 
    Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup]."
-  (:require [lib.shell :refer [$! with-console-out]]))
+  (:require [lib.shell :refer [$! with-console-out]]
+            [babashka.fs :as fs]))
 
 
 ;; The agent's boot service. Root: the agent reconciles system settings (hostnamectl, localectl,
@@ -29,11 +30,23 @@
        "WantedBy=multi-user.target\n"))
 
 
+;; Persistent, capped journal — backed by the storage partition via slot->fstab's /var/log/journal
+;; bind. Storage=persistent is explicit: `auto` can stay volatile even with the dir present.
+(def ^:private journald-conf
+  (str "[Journal]\n"
+       "Storage=persistent\n"
+       "SystemMaxUse=256M\n"))
+
+
 (defn run! [_opts]
   (with-console-out
     ;; agent boot service (write + enable; restart-on-iterate is the CLI's job, not here)
     (spit "/etc/systemd/system/ujima.service" ujima-service)
     ($! systemctl enable "ujima")
+
+    ;; persistent capped journal on storage
+    (fs/create-dirs "/etc/systemd/journald.conf.d")
+    (spit "/etc/systemd/journald.conf.d/ujima.conf" journald-conf)
 
     ;; build marker
     (spit "/etc/ujima-release"

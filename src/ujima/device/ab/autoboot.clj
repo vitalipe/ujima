@@ -64,7 +64,8 @@
        "PARTUUID=" ujima-storage-uuid     "  /mnt/storage    ext4  defaults,nofail  0  2\n"
 
        "/mnt/settings/" (name slot)       "  /ujima/settings none  bind             0  0\n"
-       "/mnt/storage/"                    "  /ujima/storage  none  bind             0  0\n"))
+       "/mnt/storage/"                    "  /ujima/storage  none  bind             0  0\n"
+       "/mnt/storage/logs"                "  /var/log/journal none  bind,nofail     0  0\n"))
 
 
 (defrecord AutobootDisk [device]
@@ -104,7 +105,7 @@
     (require-ab-partition-layout! device)
     (pack/validate! ujima-pack-path)
 
-    (let [{cfg-blk :config :as parts} (device->partitions-by-name device) 
+    (let [{cfg-blk :config storage-blk :storage :as parts} (device->partitions-by-name device)
           {:keys [root boot]}         (get parts slot)]
 
       (pack/unpack! ujima-pack-path boot root)
@@ -122,11 +123,16 @@
         (fs/create-dirs (fs/path root-mnt "mnt/storage"))
 
         (fs/create-dirs (fs/path root-mnt "ujima/settings"))
-        (fs/create-dirs (fs/path root-mnt "ujima/storage")))
+        (fs/create-dirs (fs/path root-mnt "ujima/storage"))
+        (fs/create-dirs (fs/path root-mnt "var/log/journal")))
 
-      ;; create this slot's settings subdir 
+      ;; create this slot's settings subdir
       (with-mounted-ext4 [cfg-mnt cfg-blk]
-        (fs/create-dirs (fs/path cfg-mnt (name slot))))))
+        (fs/create-dirs (fs/path cfg-mnt (name slot))))
+
+      ;; journald logs dir on storage (the /var/log/journal bind source)
+      (with-mounted-ext4 [storage-mnt storage-blk]
+        (fs/create-dirs (fs/path storage-mnt "logs")))))
 
 
   (set-boot-slot! [_ slot]

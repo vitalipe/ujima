@@ -1,4 +1,4 @@
-{:log     {:level :info}
+{:log     {:level :warn}
  :shell   {:commands {}}
  :control {:storage "/ujima/settings/" 
            :tmp     "/ujima/run/session"}}

@@ -30,12 +30,17 @@
    `(timbre/debug ~message ~data)))
 
 
+;; <N> syslog-priority prefix: journald strips it and sets PRIORITY, so `journalctl -p` filters by level.
+(def ^:private level->syslog {:trace 7 :debug 7 :info 6 :warn 4 :error 3 :fatal 2 :report 5 :spy 7})
+
+
 (defn init! [{level :level :or {level :info}}]
 
   (timbre/merge-config!
     {:output-fn
      (fn [{:keys [level ?ns-str msg_]}]
-       (str "[" (name level) "] "
+       (str "<" (level->syslog level 6) ">"
+            "[" (name level) "] "
             "[" ?ns-str "] "
             (force msg_)))})
 

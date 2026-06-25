@@ -1,7 +1,8 @@
 (ns e2e.runner
   (:require [babashka.fs :as fs]
             [clojure.string :as str]
-            [lib.io :as io]))
+            [lib.io :as io]
+            [lib.shell :as shell]))
 
 
 (def e2e-root "test/e2e/tests")
@@ -148,6 +149,10 @@
   (println "E2E env:")
   (prn (io/slurp-config "config" "ujimad"))
   (println)
+
+  ;; host command remaps (e2fsck/resize2fs from tools[.local].edn): the disk ops run on the host,
+  ;; so they need the vendored e2fsprogs the build tools use, not the older system one.
+  (shell/install-remap! (get-in (io/slurp-config "config" "tools") [:shell :commands] {}))
 
   (let [[cmd & test-args] args]
     (when-not cmd

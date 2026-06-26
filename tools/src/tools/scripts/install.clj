@@ -12,10 +12,16 @@
     ($! apt-get update)
     ($! apt-get install -y --no-install-recommends "ca-certificates")
 
-    ;; overlayroot: the read-only-root tmpfs overlay mechanism. Its postinst wires the initramfs
-    ;; hook that builds lower=ro-root + upper=tmpfs at boot. Installed into every image (this is the
-    ;; cached vendor base); activated on every image via the `overlayroot=tmpfs` cmdline token
-    ;; (ujima.device.ab.autoboot.bootfiles/cmdline!), and toggled off on dev with assets/dev/lock-fs.
+    ;; suppress in-chroot initramfs generation: overlayroot's postinst trigger runs update-initramfs,
+    ;; which SEGFAULTS under qemu. We bake a prebuilt, kernel-matched initramfs instead
+    ;; (tools.cmd.image/initramfs!, from stage), so the chroot never generates one. `=no` also fits
+    ;; the immutable model (the initramfs is fixed; a kernel bump is a rebuild, not in-place regen).
+    (spit "/etc/initramfs-tools/update-initramfs.conf" "update_initramfs=no\nbackup_initramfs=no\n")
+
+    ;; overlayroot: the read-only-root tmpfs overlay mechanism (lower=ro-root + upper=tmpfs at boot,
+    ;; via the initramfs hook baked above). Installed into every image (the cached vendor base);
+    ;; activated via the `overlayroot=tmpfs:recurse=0` cmdline token (autoboot.bootfiles/cmdline!),
+    ;; and toggled off on dev with assets/dev/lock-fs.
     ($! apt-get install -y --no-install-recommends "overlayroot")
 
     ;; runtime babashka: the same vendored aarch64 binary we are running under,

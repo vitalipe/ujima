@@ -189,3 +189,55 @@
           (ab/set-boot-slot!      disk :a)))
       (progress! 100 "done")
       {:out (str out)})))
+
+
+;; ---------------------------------------------------------------------------
+;; Prebuilt initramfs (static-copy)
+;;
+;; The overlayroot initramfs hook can't be built under qemu (update-initramfs
+;; segfaults in the chroot), so we bake a prebuilt, kernel-matched initramfs from
+;; the repo onto the image's boot partition. Keyed by kernel version and hard-failing
+;; on a miss, so a base bump that outdates the stash stops the build loudly instead of
+;; shipping a stale (silently overlay-less) image. Regenerate the stash with the
+;; assets/dev producer on a Pi.
+;; ---------------------------------------------------------------------------
+
+(def ^:private initramfs-assets "assets/initramfs")
+(def ^:private initramfs-files  ["initramfs8" "initramfs_2712"])
+
+
+(defn- derive-kernel-version
+  "Kernel base version shared by the installed rpi kernels, e.g. \"6.12.75+rpt\" from
+   /lib/modules/{6.12.75+rpt-rpi-v8,6.12.75+rpt-rpi-2712}."
+  [root-mnt]
+  (let [bases (->> (fs/list-dir (fs/path root-mnt "lib" "modules"))
+                   (map (comp str fs/file-name))
+                   (filter #(str/includes? % "+rpt"))
+                   (map #(str/replace % #"-rpi-.*$" ""))
+                   distinct)]
+    (when-not (= 1 (count bases))
+      (throw (ex-info "could not derive a single rpi kernel base version from /lib/modules"
+                      {:found bases})))
+    (first bases)))
+
+
+(defn initramfs!
+  "Bake the prebuilt overlayroot initramfs into <img>'s boot partition, selected by the image's
+   own kernel version (assets/initramfs/<version>/). Fails loudly if that stash is missing."
+  [{:keys [img]}]
+  (require-root!)
+  (loopback/with-loopback-device [dev img]
+    (let [[boot root] (linux-disk/device->partitions dev)
+          version     (mount/with-mounted-ext4 [root-mnt root]
+                        (derive-kernel-version root-mnt))
+          src         (str initramfs-assets "/" version)]
+      (doseq [f initramfs-files]
+        (when-not (fs/exists? (str src "/" f))
+          (throw (ex-info (str "no prebuilt initramfs for kernel " version
+                               " — regenerate with the assets/dev producer on a Pi and copy into " src)
+                          {:version version :missing (str src "/" f)}))))
+      (mount/with-mounted-vfat [boot-mnt boot]
+        (doseq [f initramfs-files]
+          (fs/copy (str src "/" f) (str (fs/path boot-mnt f)) {:replace-existing true})))
+      (println "baked prebuilt initramfs (" version ") ->" img)
+      {:img (str img) :version version})))

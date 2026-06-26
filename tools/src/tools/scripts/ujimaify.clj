@@ -71,45 +71,6 @@
        "WantedBy=multi-user.target\n"))
 
 
-;; First-boot self-heal for the overlay. Our cross-build runs update-initramfs under qemu, where it
-;; segfaults — so the flashed initramfs lacks the overlayroot hook and the cmdline token does nothing
-;; (the Pi boots rw). On real hardware, regenerate it natively (once) and reboot so the overlay
-;; engages. Keys off the OUTCOME (cmdline wants the overlay, but / is not an overlay mount), so it also
-;; no-ops under `lock-fs disable` and would re-heal a future kernel update. Loop-safe via a marker on
-;; /boot/firmware (persistent, outside the overlay): regen at most once, else fail loudly to the
-;; journal rather than reboot-loop. Ordered after the machine-id pin so the one self-heal reboot also
-;; lands the stable machine-id.
-(def ^:private overlay-init-script
-  (str "#!/bin/sh\n"
-       "set -eu\n"
-       "marker=/boot/firmware/.ujima-initramfs-fixed\n"
-       "[ \"$(findmnt -no FSTYPE /)\" = overlay ] && { rm -f \"$marker\"; exit 0; }\n"
-       "grep -q 'overlayroot=tmpfs' /proc/cmdline || exit 0\n"
-       "if [ -e \"$marker\" ]; then\n"
-       "  echo 'ujima-overlay-init: overlay still inactive after a regen attempt; not rebooting' >&2\n"
-       "  exit 1\n"
-       "fi\n"
-       ;; mark only AFTER a successful regen — a FAILED regen (e.g. the first boot if / came up
-       ;; read-only) must NOT leave a marker, or every later boot gives up and never retries.
-       "update-initramfs -u -k all\n"
-       "touch \"$marker\"\n"
-       "systemctl reboot\n"))
-
-
-(def ^:private overlay-init-unit
-  (str "[Unit]\n"
-       "Description=Self-heal the overlayroot initramfs hook (cross-build/qemu gap), then reboot\n"
-       "After=ujima-machine-id.service\n"
-       "\n"
-       "[Service]\n"
-       "Type=oneshot\n"
-       "ExecStart=/usr/local/sbin/ujima-overlay-init\n"
-       "RemainAfterExit=yes\n"
-       "\n"
-       "[Install]\n"
-       "WantedBy=multi-user.target\n"))
-
-
 (defn run! [_opts]
   (with-console-out
     ;; agent boot service (write + enable; restart-on-iterate is the CLI's job, not here)
@@ -126,13 +87,6 @@
       ($! chmod "0755" [bin]))
     (spit "/etc/systemd/system/ujima-machine-id.service" machine-id-unit)
     ($! systemctl enable "ujima-machine-id")
-
-    ;; first-boot self-heal: natively regenerate the overlayroot initramfs hook (qemu can't), reboot
-    (let [bin "/usr/local/sbin/ujima-overlay-init"]
-      (spit bin overlay-init-script)
-      ($! chmod "0755" [bin]))
-    (spit "/etc/systemd/system/ujima-overlay-init.service" overlay-init-unit)
-    ($! systemctl enable "ujima-overlay-init")
 
     ;; overlayfs rejects `mount -o remount` via the modern mount API ("No changes allowed in
     ;; reconfigure"), so systemd-remount-fs — which remounts / rw early in boot — fails under the

@@ -77,6 +77,9 @@
     (println "copy ->" out)
     (fs/copy vendor out {:replace-existing true})
 
+    ;; 3. bake the prebuilt overlayroot initramfs (qemu segfaults building it in-chroot; static-copy)
+    (image/initramfs! {:img out})
+
     (println "staged ->" out "(rm" vendor "to rebuild the base)")
     {:out out}))
 

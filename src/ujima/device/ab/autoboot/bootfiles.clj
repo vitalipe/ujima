@@ -64,12 +64,11 @@
                           "overlayroot=tmpfs:recurse=0 "
                           "console=serial0,115200 console=tty1"
                           " root=" target-block-device
-                          ;; rw: the first boot has no overlay yet (its hook is regenerated on first boot by
-                          ;; ujima-overlay-init) and systemd-remount-fs is masked — so the kernel must mount
-                          ;; root rw or / stays read-only, breaking logind and the self-heal's update-initramfs.
-                          ;; (Caveat: rw also leaves the overlay lower mounted rw; a true-ro lower is a
-                          ;; deferred refinement.) No fsck.repair — pointless on a rw mount. quiet/splash off.
-                          " rw rootfstype=ext4 rootwait"))
+                          ;; no rw: the overlay is live from the first boot (its hook is baked into the
+                          ;; initramfs — tools.cmd.image/initramfs!), so / is writable via the tmpfs upper
+                          ;; while the kernel mounts the lower read-only — truly immutable. No fsck.repair:
+                          ;; the ro lower can't corrupt. quiet/splash off for bring-up.
+                          " rootfstype=ext4 rootwait"))
 
   (cmdline path))
 

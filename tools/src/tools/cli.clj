@@ -129,7 +129,12 @@
      :target image/from-pack! :args [:pack :out]
      :spec {:pack   {:desc "Source .pack" :require true}
             :out    {:desc "Output .img" :require true}
-            :layout {:desc "Disk layout" :default "autoboot" :validate #{"autoboot"}}}}}})
+            :layout {:desc "Disk layout" :default "autoboot" :validate #{"autoboot"}}}}
+
+    "initramfs"
+    {:usage "Usage: tools image initramfs <img>"
+     :target image/initramfs! :args [:img]
+     :spec {:img {:desc "Image to bake the prebuilt overlayroot initramfs into" :require true}}}}})
 
 
 ;; ----------------------------------------------------------------------------

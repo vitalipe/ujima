@@ -1,0 +1,42 @@
+#!/bin/sh
+# lock-fs — toggle the read-only tmpfs overlay on / for a DEV device. Run as root.
+#
+#   lock-fs enable     # / becomes read-only (tmpfs overlay) on next boot, then reboots
+#   lock-fs disable    # / becomes writable again on next boot, then reboots
+#   lock-fs status     # report the current state
+#
+# The image bakes `overlayroot=tmpfs:recurse=0` into the cmdline (see
+# ujima.device.ab.autoboot.bootfiles/cmdline!). recurse=0 makes it a non-bare token raspi-config
+# can't manage, so we flip the cmdline ourselves between that and `overlayroot=disabled` (which
+# overlayroot honours). The cmdline is the right lever: it lives on the rw boot partition, so it
+# still works once / is read-only. A reboot is required either way — the overlay is built by the
+# initramfs at boot.
+set -eu
+cmdline=/boot/firmware/cmdline.txt
+on="overlayroot=tmpfs:recurse=0"
+off="overlayroot=disabled"
+
+case "${1:-status}" in
+    enable)
+        sed -i "s/$off/$on/" "$cmdline"
+        grep -q "$on" "$cmdline" || echo "lock-fs: warning — '$on' not present in $cmdline" >&2
+        echo "overlay ENABLED (/ read-only) on next boot — rebooting"
+        reboot
+        ;;
+    disable)
+        sed -i "s/$on/$off/" "$cmdline"
+        echo "overlay DISABLED (/ writable) on next boot — rebooting"
+        reboot
+        ;;
+    status)
+        if [ "$(findmnt -no FSTYPE /)" = overlay ]; then
+            echo "overlay: ON (/ is read-only)"
+        else
+            echo "overlay: off (/ is writable)"
+        fi
+        ;;
+    *)
+        echo "usage: lock-fs {enable|disable|status}   (run as root)" >&2
+        exit 2
+        ;;
+esac

@@ -43,6 +43,12 @@
     ($! apt-get update)
     ($! apt-get install -y --no-install-recommends "openssh-server" "rsync")
     ($! systemctl enable "ssh")
+    ;; Bake host keys into the rootfs now so they stay stable when a dev box runs under the
+    ;; read-only overlay (assets/dev/lock-fs): sshd then reads them from the ro lower instead of
+    ;; regenerating into ephemeral tmpfs every boot (which trips "REMOTE HOST IDENTIFICATION HAS
+    ;; CHANGED"). `-A` only fills in missing key types (idempotent); raspios ships none. Release
+    ;; skips this script and tools.scripts.cleanup wipes any keys, so it's a dev-only concern.
+    ($! ssh-keygen -A)
 
     ;; dev/customization helper scripts (wifi, …): clean-mirror assets/dev -> /ujima/dev (rm
     ;; first so a re-run drops files removed from assets/dev), preserving the exec bit (cp -a).

@@ -58,13 +58,18 @@
    Returns the written commandline state (cmdline) "
   [path target-block-device]
 
-  (spit-file-atomic! (fs/path path "cmdline.txt") 
-                     (str "console=serial0,115200 console=tty1"
+  (spit-file-atomic! (fs/path path "cmdline.txt")
+                     (str ;; ro-root tmpfs overlay; recurse=0 so our fstab submounts (settings/storage/
+                          ;; journal) punch through as real persistent mounts instead of being overlaid too
+                          "overlayroot=tmpfs:recurse=0 "
+                          "console=serial0,115200 console=tty1"
                           " root=" target-block-device
-                          ;; no rw here: the kernel mounts root read-only, fsck.repair=yes fscks it, then systemd
-                          ;; remounts it rw per the fstab '/' entry (written per-slot by autoboot/slot->fstab).
-                          ;; quiet/splash dropped for now: verbose boots during bring-up (re-add to quieten)
-                          " rootfstype=ext4 fsck.repair=yes rootwait"))
+                          ;; rw: the first boot has no overlay yet (its hook is regenerated on first boot by
+                          ;; ujima-overlay-init) and systemd-remount-fs is masked — so the kernel must mount
+                          ;; root rw or / stays read-only, breaking logind and the self-heal's update-initramfs.
+                          ;; (Caveat: rw also leaves the overlay lower mounted rw; a true-ro lower is a
+                          ;; deferred refinement.) No fsck.repair — pointless on a rw mount. quiet/splash off.
+                          " rw rootfstype=ext4 rootwait"))
 
   (cmdline path))
 

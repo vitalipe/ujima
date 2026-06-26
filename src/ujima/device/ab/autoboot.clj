@@ -42,22 +42,20 @@
 
 
 (defn- slot->fstab
-  "Per-slot /etc/fstab for an installed slot: the slot's own root + /boot/firmware, the shared
-   settings partition and its per-slot bind onto /ujima/settings (the stable path the agent reads,
-   so the agent never knows its slot), plus the shared storage partition; all by PARTUUID. Root is
-   passno 1 so it's fsck'd first — the cmdline mounts it read-only, fsck runs, then systemd remounts
-   it rw per this '/' entry.
+  "Per-slot /etc/fstab for an installed slot: /boot/firmware, the shared settings partition and its
+   per-slot bind onto /ujima/settings (the stable path the agent reads, so it never knows its slot),
+   plus the shared storage partition; all by PARTUUID. Root is NOT listed — the kernel mounts it from
+   the cmdline and overlayroot overlays it (read-only lower + tmpfs upper) and rewrites this fstab
+   itself, so a '/' entry would be pointless (overlayroot just comments it out) and systemd-remount-fs,
+   which would act on it, is masked in tools.scripts.ujimaify (overlayfs rejects its remount).
 
    Settings is a REQUIRED mount (no `nofail`): the agent is meaningless without it, so a
    missing/corrupt settings partition must halt boot (emergency) rather than silently fall back to
    the empty rootfs mountpoint and run on defaults. Being required also means systemd's
    local-fs.target guarantees it is mounted before the agent starts — no mount check in agent code.
-   fsck still runs first (passno 2, `fsck.repair=yes` in the cmdline) and auto-repairs the common
-   power-loss case. `nofail` stays on boot-firmware/storage — those missing shouldn't brick an
-   otherwise-correct boot."
+   `nofail` stays on boot-firmware/storage — those missing shouldn't brick an otherwise-correct boot."
   [slot]
-  (str "PARTUUID=" (slot->root-uuid slot) "  /               ext4  defaults,noatime  0  1\n"
-       "proc                  /proc           proc  defaults         0  0\n"
+  (str "proc                  /proc           proc  defaults         0  0\n"
        "PARTUUID=" (slot->boot-uuid slot) "  /boot/firmware  vfat  defaults,nofail  0  2\n"
 
        "PARTUUID=" ujima-config-uuid      "  /mnt/settings   ext4  defaults         0  2\n"

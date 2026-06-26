@@ -8,8 +8,15 @@
 # copies the results into /ujima/dev/initramfs-out/<kernel-version>/. Copy that <version>/ folder
 # straight into the repo's assets/initramfs/ — the build selects it by kernel version.
 #
-# Run on a Pi that has overlayroot installed (our dev image), so the regen includes the hook.
+# Run on a dev Pi (overlayroot installed) with the overlay DISABLED: update-initramfs can't resolve
+# the root device when / is the overlay, so `lock-fs disable` + reboot first, then run this.
 set -eu
+
+# bail loudly if the overlay is still on (else update-initramfs dies: "failed to determine device for /")
+if [ "$(findmnt -no FSTYPE /)" = overlay ]; then
+    echo "build-initramfs: / is the overlay — run 'lock-fs disable', reboot, then re-run this." >&2
+    exit 1
+fi
 
 conf=/etc/initramfs-tools/update-initramfs.conf
 ver=$(ls /lib/modules | grep '+rpt' | sed 's/-rpi-.*//' | sort -u | head -1)

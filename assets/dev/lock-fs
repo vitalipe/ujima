@@ -19,12 +19,16 @@ off="overlayroot=disabled"
 case "${1:-status}" in
     enable)
         sed -i "s/$off/$on/" "$cmdline"
+        sed -i "s/ rw\b//g" "$cmdline"   # overlay back on: lower must mount ro (cmdline default)
         grep -q "$on" "$cmdline" || echo "lock-fs: warning — '$on' not present in $cmdline" >&2
         echo "overlay ENABLED (/ read-only) on next boot — rebooting"
         reboot
         ;;
     disable)
         sed -i "s/$on/$off/" "$cmdline"
+        # without the overlay, nothing else remounts / rw (systemd-remount-fs is masked), so / would
+        # mount read-only and break logind/console. Force rw explicitly.
+        grep -qw rw "$cmdline" || sed -i "s/\$/ rw/" "$cmdline"
         echo "overlay DISABLED (/ writable) on next boot — rebooting"
         reboot
         ;;

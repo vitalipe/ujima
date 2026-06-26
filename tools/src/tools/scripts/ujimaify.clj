@@ -38,37 +38,24 @@
        "SystemMaxUse=256M\n"))
 
 
-;; Overlay-safe machine-id. The overlay is on for every image (see cmdline!), and under it systemd
-;; can't persist /etc/machine-id — the write lands in the ephemeral tmpfs upper, so PID 1 mints a
-;; fresh random id every boot, which would churn journald's /var/log/journal/<machine-id>/ into one
-;; orphan dir per boot (defeating the persistent journal above). Fix: pin the id to a hash of the
-;; board serial by appending systemd.machine_id= to cmdline.txt (the boot partition lives OUTSIDE
-;; the overlay), so PID 1 reads the same id every boot -> one stable journal dir. Idempotent (the
-;; grep guard); also fine on a lock-fs-disabled (rw) dev box. Cost: the very first boot still uses a
-;; random id (one tiny orphan) until the next reboot picks up the param.
-(def ^:private machine-id-script
+;; Overlay-safe machine-id. Under the overlay (every image, see cmdline!) systemd can't persist
+;; /etc/machine-id — writes hit the ephemeral tmpfs upper, so PID 1 mints a random id each boot,
+;; churning journald's /var/log/journal/<machine-id>/ into one orphan dir per boot (defeating the
+;; persistent journal above). Fix: an initramfs hook derives the id from the board serial and writes
+;; /etc/machine-id before PID 1 reads it — re-derived identically each boot, so it's stable from the
+;; FIRST boot (no orphan, no reboot to settle). PREREQ=overlayroot → runs after the overlay mounts,
+;; so ${rootmnt} is the overlay and the write lands in its upper. The producer
+;; (assets/dev/build-initramfs) bakes it into the stash and image initramfs ships that, so this just
+;; needs to be present in the rootfs for the producer's update-initramfs to pick up.
+(def ^:private machine-id-hook
   (str "#!/bin/sh\n"
-       "set -eu\n"
-       "cmdline=/boot/firmware/cmdline.txt\n"
-       "grep -q 'systemd.machine_id=' \"$cmdline\" && exit 0\n"
-       "serial=$(tr -dc 'a-zA-Z0-9' < /proc/device-tree/serial-number)\n"
+       "PREREQ=\"overlayroot\"\n"
+       "prereqs() { echo \"$PREREQ\"; }\n"
+       "case \"$1\" in prereqs) prereqs; exit 0;; esac\n"
+       "serial=$(tr -dc 'a-zA-Z0-9' < /sys/firmware/devicetree/base/serial-number 2>/dev/null)\n"
+       "[ -n \"$serial\" ] || exit 0\n"
        "mid=$(printf '%s' \"$serial\" | sha256sum | cut -c1-32)\n"
-       "sed -i '1 s/$/ systemd.machine_id='\"$mid\"'/' \"$cmdline\"\n"))
-
-
-(def ^:private machine-id-unit
-  (str "[Unit]\n"
-       "Description=Pin machine-id to a hash of the board serial (overlay-safe)\n"
-       "ConditionPathExists=/proc/device-tree/serial-number\n"
-       "ConditionPathExists=/boot/firmware/cmdline.txt\n"
-       "\n"
-       "[Service]\n"
-       "Type=oneshot\n"
-       "ExecStart=/usr/local/sbin/ujima-machine-id\n"
-       "RemainAfterExit=yes\n"
-       "\n"
-       "[Install]\n"
-       "WantedBy=multi-user.target\n"))
+       "printf '%s\\n' \"$mid\" > \"${rootmnt}/etc/machine-id\"\n"))
 
 
 (defn run! [_opts]
@@ -81,12 +68,11 @@
     (fs/create-dirs "/etc/systemd/journald.conf.d")
     (spit "/etc/systemd/journald.conf.d/ujima.conf" journald-conf)
 
-    ;; overlay-safe machine-id: oneshot that pins systemd.machine_id from the board serial
-    (let [bin "/usr/local/sbin/ujima-machine-id"]
-      (spit bin machine-id-script)
-      ($! chmod "0755" [bin]))
-    (spit "/etc/systemd/system/ujima-machine-id.service" machine-id-unit)
-    ($! systemctl enable "ujima-machine-id")
+    ;; overlay-safe machine-id: initramfs hook (the producer bakes it; image initramfs ships it)
+    (let [hook "/etc/initramfs-tools/scripts/init-bottom/ujima-machine-id"]
+      (fs/create-dirs (fs/parent hook))
+      (spit hook machine-id-hook)
+      ($! chmod "0755" [hook]))
 
     ;; overlayfs rejects `mount -o remount` via the modern mount API ("No changes allowed in
     ;; reconfigure"), so systemd-remount-fs — which remounts / rw early in boot — fails under the

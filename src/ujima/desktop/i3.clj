@@ -52,3 +52,11 @@
 
 (defn focus-con! [con-id] (command! (format "[con_id=%d]" con-id) "focus"))
 (defn close-con! [con-id] (command! (format "[con_id=%d]" con-id) "kill"))
+
+
+(defn place!
+  "Move a container to its Ujima window's workspace and focus that workspace — the i3 side of a
+   new/attached window the projection just recorded."
+  [con-id workspace]
+  (command! (format "[con_id=%d]" con-id) "move" "to" "workspace" workspace)
+  (command! "workspace" workspace))

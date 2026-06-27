@@ -6,6 +6,7 @@
             [ujima.control :as control]
             [lib.shell :as shell]
 
+            [ujima.desktop :as desktop]
             [ujima.agent   :as agent]))
 
 
@@ -18,5 +19,6 @@
 
     (log/init!     (get-in env [:log]     {:level :info}))
     (control/init! (get-in env [:control] {}))
+    (desktop/init! (get-in env [:desktop] {}))
     (agent/init!   (get-in env [:agent]   {}))))
 

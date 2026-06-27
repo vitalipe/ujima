@@ -1,5 +1,9 @@
 {:log     {:level :warn}
  :shell   {:commands {}}
- :control {:storage "/ujima/settings/" 
-           :tmp     "/ujima/run/session"}}
+ :control {:storage "/ujima/settings/"
+           :tmp     "/ujima/run/session"}
+ :desktop {:catalog     "/opt/ujima/desktop/apps.edn"
+           :http        {:host "127.0.0.1" :port 1337}
+           :chromium    "chromium"
+           :profile-dir "/ujima/run/desktop/chrome"}}
    

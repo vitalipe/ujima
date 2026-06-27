@@ -120,3 +120,12 @@
                     :closable    (boolean (:closable? app))}))
    :current (:current state)
    :status  (:status state)})
+
+
+;; --- read accessors: the http layer reads the projection; only the i3 event thread writes it ---
+
+(defn window-for-con [state con-id] (get-in state [:wm->win con-id]))
+(defn window-for-app [state app-id] (win-for-app state app-id))
+(defn window         [state wid]    (get-in state [:windows wid]))
+(defn con-ids        [state wid]    (get-in state [:windows wid :wm-windows]))
+(defn current        [state]        (:current state))

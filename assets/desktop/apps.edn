@@ -1,0 +1,62 @@
+;; UjimaOS desktop app catalog — baked into the image at /opt/ujima/desktop/apps.edn.
+;; One declarative entry per app; the agent's per-:kind launch strategy applies the mechanics
+;; (--class stamping, ephemeral shared profile, workspace assignment). Adding an app = one entry.
+;;
+;;   :kind  :shell   the launcher (an eww window, not a spawned process)
+;;          :web     chromium --app=<:url>, stamped --class=ujima-<:id>, shared ephemeral profile
+;;          :desktop native app, :exec verbatim, tracked by its natural :wm-class
+{:apps
+ [{:id :launcher
+   :label "Ujima"
+   :kind :shell
+   :instance-policy :single
+   :show-topbar? false
+   :closable? false}
+
+  {:id :wikipedia
+   :label "Wikipedia"
+   :kind :web
+   :url "http://ujima-content.local/wiki"
+   :instance-policy :single
+   :show-topbar? true
+   :closable? true
+   :after-close :launcher}
+
+  {:id :books
+   :label "Books"
+   :kind :web
+   :url "http://ujima-content.local/books"
+   :instance-policy :single
+   :show-topbar? true
+   :closable? true
+   :after-close :launcher}
+
+  {:id :write
+   :label "Write"
+   :kind :desktop
+   :exec ["libreoffice" "--writer"]
+   :wm-class "libreoffice-writer"
+   :instance-policy :single
+   :show-topbar? true
+   :closable? true
+   :after-close :launcher}
+
+  {:id :draw
+   :label "Draw"
+   :kind :desktop
+   :exec ["tuxpaint"]
+   :wm-class "tuxpaint"
+   :instance-policy :single
+   :show-topbar? true
+   :closable? true
+   :after-close :launcher}
+
+  {:id :files
+   :label "Files"
+   :kind :desktop
+   :exec ["pcmanfm" "/home/ujima/Files"]
+   :wm-class "pcmanfm"
+   :instance-policy :single
+   :show-topbar? true
+   :closable? true
+   :after-close :launcher}]}

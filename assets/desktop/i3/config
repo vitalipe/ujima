@@ -1,0 +1,17 @@
+# UjimaOS — minimal i3 config. No i3bar; eww is the shell, the agent owns app/window lifecycle.
+font pango:Inter 10
+default_border none
+default_floating_border none
+hide_edge_borders both
+
+# dialogs/popups float; deliberately NO fullscreen keybind — the eww bars must stay visible
+for_window [window_type="dialog"]  floating enable
+for_window [window_type="utility"] floating enable
+for_window [window_role="pop-up"]  floating enable
+
+# the agent: window/app lifecycle + the loopback API eww talks to (adjust the launch per deploy)
+exec --no-startup-id ujima-agent
+
+# eww shell: daemon + the three surfaces (top / mid / bottom)
+exec_always --no-startup-id eww daemon
+exec_always --no-startup-id eww open-many topbar launcher dock

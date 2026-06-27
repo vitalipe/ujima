@@ -110,16 +110,19 @@
   "The wire shape the dock/topbar render from (pushed as NDJSON). Joins each window to its
    catalog entry for the chrome flags. Plain keys (no `?`) — lib.edn camelCases them for JSON."
   [state]
-  {:windows (vec (for [id  (:order state)
-                       :let [w   (get-in state [:windows id])
-                             app (catalog/app (:catalog state) (:app-id w))]]
-                   {:id          (:id w)
-                    :app-id      (:app-id w)
-                    :title       (:title w)
-                    :show-topbar (boolean (:show-topbar? app))
-                    :closable    (boolean (:closable? app))}))
-   :current (:current state)
-   :status  (:status state)})
+  (let [current (:current state)
+        windows (vec (for [id  (:order state)
+                           :let [w   (get-in state [:windows id])
+                                 app (catalog/app (:catalog state) (:app-id w))]]
+                       {:id          (:id w)
+                        :app-id      (:app-id w)
+                        :title       (:title w)
+                        :show-topbar (boolean (:show-topbar? app))
+                        :closable    (boolean (:closable? app))}))]
+    {:windows        windows
+     :current        current
+     :current-window (some #(when (= (:id %) current) %) windows)  ; resolved for the topbar; nil on launcher
+     :status         (:status state)}))
 
 
 ;; --- read accessors: the http layer reads the projection; only the i3 event thread writes it ---

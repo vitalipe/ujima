@@ -1,0 +1,63 @@
+;; UjimaOS desktop shell — minimal eww surfaces: top (title + close), mid (launcher), bottom (dock).
+;; Driven by the agent: one NDJSON snapshot per change in via deflisten; commands POST back.
+;; `eww` and `curl` assumed on PATH. Exact syntax may need a nudge for the installed eww version.
+
+(defvar api "http://127.0.0.1:1337/api/desktop")
+
+(deflisten desktop
+  :initial `{"windows":[],"current":"launcher","currentWindow":null,"status":"ok"}`
+  `curl -sN --retry 999 --retry-connrefused http://127.0.0.1:1337/api/desktop/stream`)
+
+(defpoll clock :interval "10s" "date +%H:%M")
+
+
+;; --- top: current window title + close -----------------------------------
+(defwidget topbar []
+  (centerbox :class "topbar"
+    (label :class "title" :halign "start"
+           :text {desktop.current == "launcher" ? "" : desktop.currentWindow.title})
+    (box)
+    (button :class "close" :halign "end"
+            :visible {desktop.current != "launcher"}
+            :onclick "curl -sX POST ${api}/windows/current/close"
+            "✕")))
+
+;; --- mid: launcher tiles -------------------------------------------------
+(defwidget launcher []
+  (box :class "launcher" :orientation "v" :halign "center" :valign "center" :space-evenly false
+    (label :class "brand" :text "Ujima")
+    (box :class "tiles" :orientation "h" :space-evenly true
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/wikipedia/open" "Wikipedia")
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/books/open"     "Books")
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/write/open"     "Write")
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/draw/open"      "Draw")
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/files/open"     "Files"))))
+
+;; --- bottom: launcher + open windows + clock -----------------------------
+(defwidget dock []
+  (centerbox :class "dock"
+    (box :halign "start" :space-evenly false
+      (button :class "ujima" :onclick "curl -sX POST ${api}/apps/launcher/open" "Ujima")
+      (for w in {desktop.windows}
+        (button :class {w.id == desktop.current ? "win active" : "win"}
+                :onclick "curl -sX POST ${api}/windows/${w.id}/focus"
+          {w.title})))
+    (box)
+    (label :class "clock" :halign "end" :text {clock})))
+
+
+;; --- surfaces ------------------------------------------------------------
+(defwindow topbar
+  :monitor 0 :geometry (geometry :anchor "top center" :width "100%" :height "36px")
+  :windowtype "dock" :exclusive true :stacking "fg"
+  (topbar))
+
+(defwindow launcher
+  :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
+  :stacking "bg"
+  (launcher))
+
+(defwindow dock
+  :monitor 0 :geometry (geometry :anchor "bottom center" :width "100%" :height "48px")
+  :windowtype "dock" :exclusive true :stacking "fg"
+  (dock))

@@ -87,3 +87,10 @@
   (let [s (play [{:type :window/new :con-id 1 :class "ujima-wikipedia"}
                  {:type :window/new :con-id 2 :class "libreoffice-writer"}])]
     (is (= [:wikipedia :write] (mapv :app-id (:windows (w/snapshot s)))))))
+
+
+(deftest snapshot-resolves-current-window-for-the-topbar
+  (let [snap (w/snapshot (play [{:type :window/new :con-id 1 :class "ujima-wikipedia" :title "Wikipedia"}]))]
+    (is (= "win-0001"  (get-in snap [:current-window :id])))
+    (is (= "Wikipedia" (get-in snap [:current-window :title]))))
+  (is (nil? (:current-window (w/snapshot s0))) "null on the launcher"))

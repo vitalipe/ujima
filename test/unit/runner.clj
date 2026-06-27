@@ -17,7 +17,8 @@
 
             [ujima.desktop.catalog-test]
             [ujima.desktop.launch-test]
-            [ujima.desktop.windows-test]))
+            [ujima.desktop.windows-test]
+            [ujima.desktop.i3-test]))
 
 
 (def test-namespaces
@@ -38,7 +39,8 @@
 
     ujima.desktop.catalog-test
     ujima.desktop.launch-test
-    ujima.desktop.windows-test])
+    ujima.desktop.windows-test
+    ujima.desktop.i3-test])
 
 
 (defn -main [& _]

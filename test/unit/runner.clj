@@ -16,7 +16,8 @@
             [ujima.control.reconcile-test]
 
             [ujima.desktop.catalog-test]
-            [ujima.desktop.launch-test]))
+            [ujima.desktop.launch-test]
+            [ujima.desktop.windows-test]))
 
 
 (def test-namespaces
@@ -36,7 +37,8 @@
     ujima.control.reconcile-test
 
     ujima.desktop.catalog-test
-    ujima.desktop.launch-test])
+    ujima.desktop.launch-test
+    ujima.desktop.windows-test])
 
 
 (defn -main [& _]

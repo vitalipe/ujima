@@ -22,4 +22,13 @@
           (fs/create-dirs "/opt/ujima")
           ($! rm -rf "/opt/ujima/desktop")
           ($! cp -a [src] "/opt/ujima/desktop"))
-        (println "desktop: no assets/desktop yet — scaffold no-op")))))
+        (println "desktop: no assets/desktop yet — scaffold no-op")))
+
+    ;; eww binary: built out-of-band on a Pi (assets/dev/build-eww) and vendored as
+    ;; assets/eww/eww-aarch64-latest. Staged here (not install) so a rebuilt eww ships via
+    ;; `dev push desktop` without rebuilding the cached vendor base. Warn-not-fail while eww is still
+    ;; in progress; tighten to a hard fail once it's a locked dependency.
+    (let [eww (str project "/assets/eww/eww-aarch64-latest")]
+      (if (fs/exists? eww)
+        ($! install -m "0755" [eww] "/usr/local/bin/eww")
+        (println "desktop: no assets/eww/eww-aarch64-latest yet — eww not staged")))))

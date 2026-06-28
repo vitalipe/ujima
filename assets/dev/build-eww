@@ -1,0 +1,57 @@
+#!/bin/sh
+# build-eww — build the eww binary natively on THIS Pi (aarch64) and stage it for copying into the
+# repo's assets/eww/. Run as root.
+#
+# eww isn't packaged for the ujima base (Debian trixie has no eww; upstream ships no binaries), and
+# the image build can't compile it (the pipeline's aarch64 chroot runs under qemu, where a Rust+GTK
+# build is unusably slow). So we build it here on real hardware once and vendor the binary — the same
+# shape as assets/dev/build-initramfs. The image consumes the result in tools.scripts.desktop, which
+# copies assets/eww/eww-aarch64-latest -> /usr/local/bin/eww.
+#
+# Run with the overlay DISABLED (lock-fs disable + reboot): the apt build-deps + Rust toolchain +
+# cargo target dir are multi-GB and would otherwise land in the ephemeral tmpfs upper (RAM).
+set -eu
+
+EWW_REF="${EWW_REF:-v0.6.0}"          # pinned eww release; bump deliberately
+out=/ujima/dev/eww-out
+src=/ujima/dev/eww-src
+
+# need a real writable root for the heavy build, not the RAM-backed overlay upper
+if [ "$(findmnt -no FSTYPE /)" = overlay ]; then
+    echo "build-eww: / is the overlay — run 'lock-fs disable', reboot, then re-run this." >&2
+    exit 1
+fi
+
+# build deps: GTK3 dev headers + a toolchain. Rust via rustup (eww wants a newer toolchain than apt
+# ships, and upstream recommends rustup); skip if cargo is already present.
+apt-get update
+apt-get install -y --no-install-recommends \
+    git curl ca-certificates build-essential pkg-config \
+    libgtk-3-dev libdbusmenu-gtk3-dev
+
+if ! command -v cargo >/dev/null 2>&1; then
+    curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
+fi
+. "$HOME/.cargo/env" 2>/dev/null || true
+
+# fetch + build at the pinned tag. X11-only (--no-default-features --features x11) drops the
+# wayland/gtk-layer-shell dep: smaller binary, fewer runtime libs on the image.
+rm -rf "$src"
+git clone --depth 1 --branch "$EWW_REF" https://github.com/elkowar/eww "$src"
+( cd "$src" && cargo build --release --no-default-features --features x11 )
+
+ver=$(printf '%s' "$EWW_REF" | tr -c 'A-Za-z0-9._-' '-')   # printf, not echo: no trailing-newline -> dash
+mkdir -p "$out"
+cp "$src/target/release/eww" "$out/eww-aarch64-$ver"
+ln -sf "eww-aarch64-$ver" "$out/eww-aarch64-latest"   # relative symlink: resolves in the chroot bind + any checkout
+
+echo
+echo "built eww $EWW_REF -> $out/eww-aarch64-latest"
+"$out/eww-aarch64-latest" --version || true
+echo
+echo "runtime libs (pin these in tools.scripts.install):"
+ldd "$out/eww-aarch64-latest" | awk '{print $1}' | sort -u
+echo
+echo "copy into the repo (versioned binary; recreate the symlink there):"
+echo "  scp ujima@<this-pi>:$out/eww-aarch64-$ver <repo>/assets/eww/"
+echo "  ln -sf eww-aarch64-$ver <repo>/assets/eww/eww-aarch64-latest"

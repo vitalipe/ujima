@@ -24,6 +24,14 @@
     ;; and toggled off on dev with assets/dev/lock-fs.
     ($! apt-get install -y --no-install-recommends "overlayroot")
 
+    ;; minimal desktop runtime (cached in the vendor base): i3 + core X. eww is NOT apt — built from
+    ;; source (assets/dev/build-eww), staged by tools.scripts.desktop; libgtk-3-0 is its runtime lib
+    ;; (apt pulls the rest of the GTK stack). Pin the exact eww lib set from build-eww's `ldd` dump;
+    ;; add librsvg2-common if the bar images are SVG.
+    ($! apt-get install -y --no-install-recommends
+        "i3" "xserver-xorg-core" "xserver-xorg-input-libinput" "xinit"
+        "libgtk-3-0")
+
     ;; runtime babashka: the same vendored aarch64 binary we are running under,
     ;; copied + made executable in one shot
     ($! install -m "0755"

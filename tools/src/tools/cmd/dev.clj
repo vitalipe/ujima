@@ -66,7 +66,8 @@
 ;; Explicit include-list, NEVER the whole worktree: it holds the 846MB assets/e2e/dummy.pack and
 ;; other large/private untracked files that must never go over the wire to a Pi. A new script
 ;; that reads a new asset dir adds one entry here.
-(def ^:private stage-paths ["src" "tools/src" "config" "assets/dev" "assets/tools"])
+(def ^:private stage-paths ["src" "tools/src" "config" "assets/dev" "assets/tools"
+                            "assets/desktop" "assets/eww"])   ; desktop.clj reads these
 
 
 (defn script!

@@ -7,7 +7,7 @@
 (def cat
   (catalog/->catalog
     {:apps [{:id :launcher  :kind :shell   :label "Ujima"     :show-topbar? false :closable? false}
-            {:id :wikipedia :kind :web     :label "Wikipedia" :url "http://x/wiki"
+            {:id :wikipedia :kind :web     :label "Wikipedia" :url "http://x/wiki" :icon "globe"
              :show-topbar? true :closable? true}
             {:id :write     :kind :desktop :label "Write"     :exec ["libreoffice"]
              :wm-class "libreoffice-writer" :show-topbar? true :closable? true}]}))
@@ -22,7 +22,7 @@
         snap (w/snapshot s)]
     (is (= "win-0001" (:current s)))
     (is (= 1 (count (:windows snap))))
-    (is (= {:id "win-0001" :app-id :wikipedia :title "Wikipedia" :show-topbar true :closable true}
+    (is (= {:id "win-0001" :app-id :wikipedia :title "Wikipedia" :icon "globe" :show-topbar true :closable true}
            (first (:windows snap))))))
 
 

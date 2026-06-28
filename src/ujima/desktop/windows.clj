@@ -119,6 +119,7 @@
                        {:id          (:id w)
                         :app-id      (:app-id w)
                         :title       (if (= :launcher (:app-id w)) (:label app) (:title w))
+                        :icon        (or (:icon app) (name (:app-id w)))
                         :show-topbar (boolean (:show-topbar? app))
                         :closable    (boolean (:closable? app))}))]
     {:windows        windows

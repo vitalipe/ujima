@@ -32,7 +32,8 @@
         "i3" "xserver-xorg-core" "xserver-xorg-input-libinput" "xinit"
         "xserver-xorg-legacy"
         "libgtk-3-0"
-        "librsvg2-common")   ; gdk-pixbuf SVG loader — lets eww render the SVG app icons (librsvg2-2 is just the lib)
+        "librsvg2-common"   ; gdk-pixbuf SVG loader — lets eww render the SVG app icons (librsvg2-2 is just the lib)
+        "picom")            ; xrender compositor — transparency for floating eww overlays (volume popover)
 
     ;; X-from-systemd: let a non-console user start X via the setuid wrapper. HW-verified — without it
     ;; Xorg dies "Cannot open virtual console (Permission denied)".

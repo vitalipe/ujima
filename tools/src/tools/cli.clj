@@ -40,6 +40,30 @@
             :ip       {:desc "Target RPI host or IP" :require true}
             :user     {:desc "SSH user"     :default "ujima"}
             :password {:desc "SSH password" :default "ujima"}
+            :port     {:desc "SSH port"     :default "22"}}}
+
+    "view"
+    {:usage "Usage: tools dev view <ip> [--rfbport 5900] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target dev/view!
+     :args [:ip]
+     :spec {:ip       {:desc "Target RPI host or IP" :require true}
+            :rfbport  {:desc "VNC/RFB port (tunneled over ssh)" :default "5900"}
+            :display  {:desc "X display to mirror" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima"}
+            :password {:desc "SSH password" :default "ujima"}
+            :port     {:desc "SSH port"     :default "22"}}}
+
+    "screenshot"
+    {:usage "Usage: tools dev screenshot <ip> [--out ujima-screen.png] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target dev/screenshot!
+     :args [:ip]
+     :spec {:ip       {:desc "Target RPI host or IP" :require true}
+            :out      {:desc "Host PNG output path" :default "ujima-screen.png"}
+            :display  {:desc "X display to grab" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima"}
+            :password {:desc "SSH password" :default "ujima"}
             :port     {:desc "SSH port"     :default "22"}}}}
 
    "loopback"

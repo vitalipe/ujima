@@ -32,6 +32,12 @@
         "i3" "xserver-xorg-core" "xserver-xorg-input-libinput" "xinit"
         "libgtk-3-0")
 
+    ;; classroom apps the launcher opens (assets/desktop/apps.edn): chromium for the web tiles
+    ;; (Wikipedia/Books, run as --app), libreoffice-writer for Write, tuxpaint for Draw. Writer-only
+    ;; (not the full suite) to match the catalog + keep the image lean — add -impress/-calc with tiles.
+    ($! apt-get install -y --no-install-recommends
+        "chromium" "libreoffice-writer" "tuxpaint")
+
     ;; runtime babashka: the same vendored aarch64 binary we are running under,
     ;; copied + made executable in one shot
     ($! install -m "0755"

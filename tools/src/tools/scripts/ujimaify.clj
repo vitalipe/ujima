@@ -17,7 +17,8 @@
 ;; on tty1 as ujima, and Restart=always brings the whole desktop back if i3/X dies — that IS the
 ;; session-recovery a standalone watchdog would otherwise provide. Conflicts=getty@tty1 hands tty1
 ;; over from the base console autologin; PAMName=login sets up the logind session (XDG_RUNTIME_DIR).
-;; NOTE: the systemd→startx pattern is fiddly — verify VT handover + Restart loop on real hardware.
+;; HW-VERIFIED: do NOT set TTYPath/StandardInput=tty — systemd grabbing tty1 collides with X's own
+;; VT management and the service flaps; without it startx opens vt1 itself and the session is stable.
 (def ^:private ujima-service
   (str "[Unit]\n"
        "Description=ujima desktop session\n"
@@ -27,11 +28,9 @@
        "[Service]\n"
        "User=ujima\n"
        "PAMName=login\n"
-       "TTYPath=/dev/tty1\n"
-       "StandardInput=tty\n"
        "StandardOutput=journal\n"
        "Restart=always\n"
-       "RestartSec=2\n"
+       "RestartSec=3\n"
        "ExecStart=/usr/bin/startx -- vt1\n"
        "\n"
        "[Install]\n"

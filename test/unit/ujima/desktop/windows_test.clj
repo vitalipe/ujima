@@ -31,6 +31,12 @@
     (is (= :write (get-in s [:windows "win-0001" :app-id])))))
 
 
+(deftest class-match-is-case-insensitive
+  ;; i3 reports e.g. "TuxPaint"/"Libreoffice-Writer"; the catalog wm-class may be lower-case
+  (let [s (play [{:type :window/new :con-id 5 :class "Libreoffice-Writer" :title "Essay"}])]
+    (is (= :write (get-in s [:windows "win-0001" :app-id])))))
+
+
 (deftest second-container-of-same-app-attaches-not-new-window
   ;; a save dialog / extra frame of a :single app joins the existing Ujima window
   (let [s (play [{:type :window/new :con-id 1 :class "ujima-wikipedia" :title "Wikipedia"}

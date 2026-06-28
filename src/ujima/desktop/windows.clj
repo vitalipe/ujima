@@ -14,16 +14,18 @@
      {:type :window/close :con-id n}
      {:type :window/title :con-id n :title \"…\"}
      {:type :window/focus :con-id n}"
-  (:require [ujima.desktop.catalog :as catalog]
+  (:require [clojure.string :as str]
+            [ujima.desktop.catalog :as catalog]
             [ujima.desktop.launch  :as launch]))
 
 
 (defn- class->app-id
-  "Static WM_CLASS -> app-id index for the launchable kinds (:shell has no tracked X window)."
+  "Static WM_CLASS -> app-id index for the launchable kinds (:shell has no tracked X window).
+   Keyed lower-case — WM_CLASS casing varies by app (i3 reports TuxPaint, Pcmanfm, …)."
   [cat]
   (into {} (for [app (catalog/apps cat)
                  :when (#{:web :desktop} (:kind app))]
-             [(launch/window-class app) (:id app)])))
+             [(str/lower-case (launch/window-class app)) (:id app)])))
 
 
 (defn init-state [cat]
@@ -42,7 +44,7 @@
 
 
 (defn- on-new [state {:keys [con-id class title]}]
-  (let [app-id   (get (:class->app-id state) class)
+  (let [app-id   (when class (get (:class->app-id state) (str/lower-case class)))
         existing (when app-id (win-for-app state app-id))]
     (cond
       ;; unmanaged window (no catalog class) — leave it to i3 (floats), don't track it

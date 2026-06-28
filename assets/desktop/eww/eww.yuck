@@ -85,7 +85,7 @@
   (dock))
 
 (defwindow volume
-  :monitor 0 :geometry (geometry :anchor "bottom center" :width "100%" :height "120px")
+  :monitor 0 :geometry (geometry :anchor "bottom center" :width "30%" :height "110px")
   :wm-ignore true :stacking "fg"
-  (box :halign "end" :valign "start" :style "padding:6px 14px 0 0;"
+  (box :halign "center" :valign "start" :style "padding-top:6px;"
     (volpanel)))

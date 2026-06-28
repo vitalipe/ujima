@@ -26,10 +26,10 @@
 .tray .clock { padding: 0 6px; }
 .sound { padding: 0 8px; }
 .sound:hover { background-color: #2c2f38; border-radius: 8px; }
-.volpanel { background-color: #23262e; border-radius: 14px; padding: 8px 16px; }
-.volpanel .volmute { padding: 0 4px; }
-.volpanel .volnum { color: #b8b8b8; min-width: 26px; }
-.volscale { min-width: 150px; }
-.volscale trough { background-color: #3a3e4a; border-radius: 8px; min-height: 6px; }
+.volpanel { background-color: #23262e; border-radius: 16px; padding: 12px 8px; }
+.volpanel .volmute { padding: 4px; }
+.volpanel .volnum { color: #b8b8b8; }
+.volscale { min-height: 150px; }
+.volscale trough { background-color: #3a3e4a; border-radius: 8px; min-width: 6px; }
 .volscale trough highlight { background-color: #4f8cff; border-radius: 8px; }
 .volscale slider { background-color: #ffffff; border-radius: 999px; min-width: 16px; min-height: 16px; margin: -6px; }

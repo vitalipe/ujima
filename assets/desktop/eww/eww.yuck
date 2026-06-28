@@ -54,7 +54,7 @@
 
 (defwindow launcher
   :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
-  :stacking "bg"
+  :windowtype "normal"
   (launcher))
 
 (defwindow dock

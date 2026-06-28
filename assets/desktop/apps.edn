@@ -9,6 +9,7 @@
  [{:id :launcher
    :label "Ujima"
    :kind :shell
+   :wm-class "Eww"
    :instance-policy :single
    :show-topbar? false
    :closable? false}

@@ -24,7 +24,7 @@
    Keyed lower-case — WM_CLASS casing varies by app (i3 reports TuxPaint, Pcmanfm, …)."
   [cat]
   (into {} (for [app (catalog/apps cat)
-                 :when (#{:web :desktop} (:kind app))]
+                 :when (#{:web :desktop :shell} (:kind app))]
              [(str/lower-case (launch/window-class app)) (:id app)])))
 
 
@@ -118,12 +118,13 @@
                                  app (catalog/app (:catalog state) (:app-id w))]]
                        {:id          (:id w)
                         :app-id      (:app-id w)
-                        :title       (:title w)
+                        :title       (if (= :launcher (:app-id w)) (:label app) (:title w))
                         :show-topbar (boolean (:show-topbar? app))
                         :closable    (boolean (:closable? app))}))]
     {:windows        windows
      :current        current
-     :current-window (some #(when (= (:id %) current) %) windows)  ; resolved for the topbar; nil on launcher
+     :current-window (or (some #(when (= (:id %) current) %) windows)
+                         {:show-topbar false :closable false})  ; resolved for the topbar; nil on launcher
      :status         (:status state)}))
 
 

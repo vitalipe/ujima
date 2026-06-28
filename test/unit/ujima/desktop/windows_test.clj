@@ -99,4 +99,4 @@
   (let [snap (w/snapshot (play [{:type :window/new :con-id 1 :class "ujima-wikipedia" :title "Wikipedia"}]))]
     (is (= "win-0001"  (get-in snap [:current-window :id])))
     (is (= "Wikipedia" (get-in snap [:current-window :title]))))
-  (is (nil? (:current-window (w/snapshot s0))) "null on the launcher"))
+  (is (false? (:show-topbar (:current-window (w/snapshot s0)))) "safe default when no current window"))

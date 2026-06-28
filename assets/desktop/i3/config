@@ -9,11 +9,8 @@ for_window [window_type="dialog"]  floating enable
 for_window [window_type="utility"] floating enable
 for_window [window_role="pop-up"]  floating enable
 
-# eww shell: eww's dock type doesn't reach i3, so the surfaces would TILE — float them all (by
-# class, which matches at map; title rules raced the title-set and missed). eww already marks the
-# topbar/dock sticky, so once floating they show on every workspace; the launcher (not sticky)
-# rides its own workspace.
-assign [class="Eww"] launcher
+# eww topbar/dock are :wm-ignore (override-redirect) in eww.yuck, so i3 doesn't manage them;
+# the launcher is a normal window the agent tracks + places on its own workspace like any app.
 
 # the agent: window/app lifecycle + the loopback API eww talks to (adjust the launch per deploy)
 exec --no-startup-id ujima-agent
@@ -21,6 +18,3 @@ exec --no-startup-id ujima-agent
 # eww shell: daemon + the three surfaces (top / mid / bottom), from the staged config
 exec_always --no-startup-id eww --config /opt/ujima/desktop/eww daemon
 exec_always --no-startup-id eww --config /opt/ujima/desktop/eww open-many topbar launcher dock
-
-# land on the launcher workspace once the surfaces are up
-exec --no-startup-id sh -c "sleep 1.5; i3-msg workspace launcher"

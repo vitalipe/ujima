@@ -15,10 +15,10 @@
 (defwidget topbar []
   (centerbox :class "topbar"
     (label :class "title" :halign "start"
-           :text {desktop.current == "launcher" ? "" : desktop.currentWindow.title})
+           :text {desktop.currentWindow.showTopbar ? desktop.currentWindow.title : ""})
     (box)
     (button :class "close" :halign "end"
-            :visible {desktop.current != "launcher"}
+            :visible {desktop.currentWindow.closable}
             :onclick "curl -sX POST ${api}/windows/current/close"
             "✕")))
 
@@ -37,7 +37,6 @@
 (defwidget dock []
   (centerbox :class "dock"
     (box :halign "start" :space-evenly false
-      (button :class "ujima" :onclick "curl -sX POST ${api}/apps/launcher/open" "Ujima")
       (for w in {desktop.windows}
         (button :class {w.id == desktop.current ? "win active" : "win"}
                 :onclick "curl -sX POST ${api}/windows/${w.id}/focus"

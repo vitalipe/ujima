@@ -1,3 +1,3 @@
 #!/bin/sh
-# UjimaOS — start the graphical session. Autologin -> startx -> this -> i3 (which execs the shell).
-exec i3
+# UjimaOS — startx runs this; i3 (with the staged config) execs the agent + eww shell.
+exec i3 -c /opt/ujima/desktop/i3/config

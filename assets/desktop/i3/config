@@ -12,6 +12,6 @@ for_window [window_role="pop-up"]  floating enable
 # the agent: window/app lifecycle + the loopback API eww talks to (adjust the launch per deploy)
 exec --no-startup-id ujima-agent
 
-# eww shell: daemon + the three surfaces (top / mid / bottom)
-exec_always --no-startup-id eww daemon
-exec_always --no-startup-id eww open-many topbar launcher dock
+# eww shell: daemon + the three surfaces (top / mid / bottom), from the staged config
+exec_always --no-startup-id eww --config /opt/ujima/desktop/eww daemon
+exec_always --no-startup-id eww --config /opt/ujima/desktop/eww open-many topbar launcher dock

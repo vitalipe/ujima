@@ -13,7 +13,6 @@ for_window [window_role="pop-up"]  floating enable
 # class, which matches at map; title rules raced the title-set and missed). eww already marks the
 # topbar/dock sticky, so once floating they show on every workspace; the launcher (not sticky)
 # rides its own workspace.
-for_window [class="Eww"] floating enable, border none
 assign [class="Eww"] launcher
 
 # the agent: window/app lifecycle + the loopback API eww talks to (adjust the launch per deploy)

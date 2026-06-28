@@ -1,0 +1,43 @@
+#!/bin/sh
+# info — quick status snapshot of THIS ujima dev device: overlay state, agent health, network,
+# build + disk. Run as the ujima user; no root needed. Dev convenience, staged to /ujima/dev by
+# tools.scripts.dev.
+set -u
+
+grn=$(printf '\033[0;32m'); red=$(printf '\033[1;31m'); bld=$(printf '\033[1m'); rst=$(printf '\033[0m')
+sec() { printf '\n%s%s%s\n' "$bld" "$1" "$rst"; }
+
+sec host
+printf '  hostname : %s\n' "$(hostname)"
+printf '  uptime   : %s\n' "$(uptime -p 2>/dev/null || uptime 2>/dev/null)"
+printf '  kernel   : %s\n' "$(uname -r)"
+printf '  release  : %s\n' "$(head -1 /etc/ujima-release 2>/dev/null || echo '(none)')"
+
+sec "root / overlay"
+if [ "$(findmnt -no FSTYPE / 2>/dev/null)" = overlay ]; then
+    printf '  overlay  : %sON%s  — / is read-only\n' "$grn" "$rst"
+else
+    printf '  overlay  : %sOFF%s — / is writable (lock-fs disabled)\n' "$red" "$rst"
+fi
+pu=$(grep -o 'root=PARTUUID=[^ ]*' /proc/cmdline 2>/dev/null | cut -d= -f3)
+case "$pu" in *-05) slot=A ;; *-06) slot=B ;; *) slot='?' ;; esac
+printf '  boot slot: %s (root=%s)\n' "$slot" "${pu:-?}"
+
+sec "agent (ujima.service)"
+act=$(systemctl is-active ujima 2>/dev/null || true)
+fail=$(systemctl is-failed ujima 2>/dev/null || true)
+nr=$(systemctl show ujima -p NRestarts --value 2>/dev/null || echo '?')
+if [ "$act" = active ] && [ "$fail" != failed ] && [ "${nr:-0}" = 0 ]; then
+    printf '  status   : %sCLEAN%s (active, 0 restarts)\n' "$grn" "$rst"
+else
+    printf '  status   : %s%s%s (failed=%s, restarts=%s)\n' "$red" "$act" "$rst" "$fail" "$nr"
+fi
+
+sec network
+ip -br addr show 2>/dev/null | grep -vw lo | sed 's/^/  /'
+printf '  gateway  : %s\n' "$(ip route 2>/dev/null | awk '/^default/{print $3; exit}')"
+printf '  wifi ssid: %s\n' "$(nmcli -t -f active,ssid dev wifi 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}')"
+
+sec disk
+df -h / /ujima/storage /ujima/settings 2>/dev/null | sed 's/^/  /'
+printf '\n'

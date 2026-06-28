@@ -6,8 +6,10 @@
                      src/ + config into /opt/ujima), then restart ujima.service.
      script <name>   run tools.scripts.<name>/run! live on the device — the running-system
                      analog of `tools image script` (which runs the same fn in the build chroot).
+     view <ip>       interactive x11vnc mirror of the device's :0 desktop — mouse + keyboard live.
+     screenshot <ip> pull a one-frame PNG of :0 to the host (a quick look / for Claude to verify).
 
-   Both talk to the device over sshpass+ssh with default ujima/ujima creds (dev boxes; see the
+   All talk to the device over sshpass+ssh with default ujima/ujima creds (dev boxes; see the
    public-access threat model). No live-safe gating: `script` runs whatever you name — note
    cleanup/base/ujimaify are destructive on a running box."
   (:require [clojure.string :as str]
@@ -126,3 +128,74 @@
     (throw (ex-info (str "unknown push target: " target
                          " — supported: " (str/join ", " (keys push-targets)))
                     {:target target}))))
+
+
+;; ---------------------------------------------------------------------------
+;; Screen relay (desktop iteration). view = interactive x11vnc (mouse+keyboard), screenshot =
+;; one-shot maim PNG. Both ride the shared ssh-transport; their device tools are baked DEV-ONLY by
+;; tools.scripts.dev (a VNC server must never ship in a release image).
+;; ---------------------------------------------------------------------------
+
+(defn screenshot!
+  "Pull a single PNG frame of the device's live :0 desktop to the host — the still that lets you (or
+   Claude) eyeball a desktop change without opening the interactive viewer. maim writes the PNG to
+   stdout on the device; ssh (no PTY) forwards it 8-bit-clean straight into the host file. Nothing is
+   left on the device (its root is an ephemeral overlay)."
+  [{:keys [ip out display xauth] :as opts}]
+  (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
+  (let [{:keys [password ssh-opts host] :as transport} (ssh-transport opts)
+        outf (or out "ujima-screen.png")]
+    (when-not (:ok? (remote-sh? transport "command -v maim >/dev/null"))
+      (throw (ex-info (str "maim missing on " ip " — run `tools dev script dev " ip
+                           "` to bake it (or reflash a dev image that ships it)")
+                      {:ip ip :cmd "maim"})))
+    (let [remote-cmd (str "DISPLAY=" display " XAUTHORITY=" xauth " maim")
+          {:keys [exit]} @(apply p/process {:out :write :out-file (fs/file outf) :err :inherit}
+                                 "sshpass" "-p" password "ssh" (concat ssh-opts [host remote-cmd]))]
+      (when-not (zero? exit)
+        (throw (ex-info (str "remote maim exited " exit " — is the desktop session up on " display "?")
+                        {:ip ip :exit exit})))
+      (when (or (not (fs/exists? outf)) (zero? (fs/size outf)))
+        (throw (ex-info "screenshot produced no data" {:ip ip :out (str outf)})))
+      (println "saved" (str outf))
+      {:ip ip :out (str outf)})))
+
+
+;; Host VNC viewers we know how to launch, best first. None ship by default —
+;; `sudo apt install tigervnc-viewer` provides xtigervncviewer.
+(def ^:private vnc-viewers ["xtigervncviewer" "vncviewer" "gvncviewer" "remmina" "vinagre"])
+
+(defn view!
+  "Open an INTERACTIVE live view of the device's :0 desktop — your mouse + keyboard land on the real
+   session (x11vnc, via XTEST). One ssh process both forwards the RFB port (`-L`) and runs x11vnc
+   bound to the device loopback (`-localhost`, never exposed); we wait for it to bind, then launch a
+   host VNC viewer through the tunnel. Closing the viewer tears down the ssh process (and its x11vnc)."
+  [{:keys [ip rfbport display xauth] :as opts}]
+  (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
+  (let [viewer (or (some #(when (fs/which %) %) vnc-viewers)
+                   (throw (ex-info "no VNC viewer on host — `sudo apt install tigervnc-viewer` (xtigervncviewer)"
+                                   {:tried vnc-viewers})))
+        {:keys [password ssh-opts host] :as transport} (ssh-transport opts)]
+    (when-not (:ok? (remote-sh? transport "command -v x11vnc >/dev/null"))
+      (throw (ex-info (str "x11vnc missing on " ip " — run `tools dev script dev " ip
+                           "` to bake it (or reflash a dev image that ships it)")
+                      {:ip ip :cmd "x11vnc"})))
+    (let [x11vnc (str "x11vnc -display " display " -auth " xauth
+                      " -localhost -rfbport " rfbport " -nopw -forever")
+          server (apply p/process {:out :inherit :err :inherit}
+                        "sshpass" "-p" password "ssh" "-L" (str rfbport ":localhost:" rfbport)
+                        (concat ssh-opts [host x11vnc]))]
+      (try
+        ;; Wait for x11vnc to bind on the DEVICE loopback (bash /dev/tcp — no nc needed). The ssh -L
+        ;; socket accepts host-side the moment ssh authenticates, so a host-side poll would pass too
+        ;; early; probe the remote port instead.
+        (when-not (:ok? (remote-sh? transport
+                          (str "for i in $(seq 1 50); do "
+                               "(exec 3<>/dev/tcp/localhost/" rfbport ") 2>/dev/null && exit 0; "
+                               "sleep 0.1; done; exit 1")))
+          (throw (ex-info "x11vnc did not start on the device in time" {:ip ip :rfbport rfbport})))
+        (println (str "connecting " viewer " -> " ip ":0  (mouse + keyboard live; close the window to end)"))
+        (p/shell {:inherit true :continue true} viewer (str "localhost:" rfbport))
+        {:ip ip :rfbport rfbport :viewer viewer}
+        (finally
+          (p/destroy-tree server))))))

@@ -1,8 +1,9 @@
 (ns tools.scripts.dev
   "Runs INSIDE the target chroot as root. Layers DEV-only conveniences onto a configured ujima
-   image: an SSH server for headless access, the assets/dev helper scripts (e.g. `wifi`) staged
-   at /ujima/dev, and a [ujima-dev] shell prompt (tagged with the overlay ro/rw state). Not part
-   of the release pipeline — run on dev images only.
+   image: an SSH server for headless access, x11vnc + maim for the desktop relay (`tools dev view`
+   / `dev screenshot`), the assets/dev helper scripts (e.g. `wifi`) staged at /ujima/dev, and a
+   [ujima-dev] shell prompt (tagged with the overlay ro/rw state). Not part of the release pipeline
+   — run on dev images only.
 
    Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup].
 
@@ -46,9 +47,12 @@
 
 (defn run! [{:keys [project]}]
   (with-console-out
-    ;; SSH server for headless dev access (raspios ships it present-but-disabled)
+    ;; headless dev access: SSH server (raspios ships it present-but-disabled) + rsync, plus the
+    ;; desktop-relay tools — x11vnc (interactive `dev view`) and maim (one-shot `dev screenshot`).
+    ;; DEV-ONLY by design: a VNC server is a remote-control surface that must never ship in a
+    ;; release image, so it goes here (release skips this script), NOT in tools.scripts.install.
     ($! apt-get update)
-    ($! apt-get install -y --no-install-recommends "openssh-server" "rsync")
+    ($! apt-get install -y --no-install-recommends "openssh-server" "rsync" "x11vnc" "maim")
     ($! systemctl enable "ssh")
     ;; Bake host keys into the rootfs now so they stay stable when a dev box runs under the
     ;; read-only overlay (assets/dev/lock-fs): sshd then reads them from the ro lower instead of

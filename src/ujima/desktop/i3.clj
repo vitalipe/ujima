@@ -55,8 +55,10 @@
 
 
 (defn place!
-  "Move a container to its Ujima window's workspace and focus that workspace — the i3 side of a
-   new/attached window the projection just recorded."
+  "Move a container to its Ujima window's workspace, switch to it, and explicitly focus the
+   container. The explicit focus matters: a bare `workspace` switch emits only workspace::focus
+   (which we don't subscribe to), so without it the projection's `current` never follows the app."
   [con-id workspace]
   (command! (format "[con_id=%d]" con-id) "move" "to" "workspace" workspace)
-  (command! "workspace" workspace))
+  (command! "workspace" workspace)
+  (command! (format "[con_id=%d]" con-id) "focus"))

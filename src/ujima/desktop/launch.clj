@@ -15,13 +15,13 @@
 
 (defn web-argv
   "Chromium --app argv: no chrome, a per-app WM_CLASS, and a SHARED ephemeral profile in tmpfs
-   (one browser process across content windows; wiped on reboot / Restart Session). Tiny disk
-   cache — content is LAN-local, refetch is cheap."
+   Per-app (not shared): chromium's --class is per-process, so a shared profile merges apps into
+   one (the 2nd --app window inherits the 1st's class). A profile per app keeps them separate."
   [app {:keys [chromium profile-dir]}]
   [(or chromium "chromium")
    (str "--app=" (:url app))
    (str "--class=" (window-class app))
-   (str "--user-data-dir=" profile-dir)
+   (str "--user-data-dir=" profile-dir "/" (name (:id app)))
    "--disk-cache-size=1"
    "--no-first-run"
    "--no-default-browser-check"])

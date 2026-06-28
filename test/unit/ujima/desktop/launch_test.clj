@@ -16,7 +16,7 @@
   (is (= ["chromium"
           "--app=http://ujima-content.local/wiki"
           "--class=ujima-wikipedia"
-          "--user-data-dir=/run/ujima/desktop/chrome"
+          "--user-data-dir=/run/ujima/desktop/chrome/wikipedia"
           "--disk-cache-size=1"
           "--no-first-run"
           "--no-default-browser-check"]

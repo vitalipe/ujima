@@ -8,7 +8,9 @@
     [clojure.string :as str]
     [babashka.fs :as fs]
     [lib.cli :as cli]
-    [lib.shell :refer [sh! require-root!]]
+    [lib.shell :refer [sh! require-root! $!]]
+    [ujima.linux.disk :as linux-disk]
+    [ujima.linux.disk.loop :as loopback]
     [tools.cmd.image :as image]))
 
 
@@ -57,6 +59,20 @@
     (fs/move tmp vendor {:replace-existing true})))
 
 
+(defn- expand-root!
+  "Grow the staged image + its root partition (raspios p2) to `size` so the chroot scripts have
+   room — the stock raspios root is ~2.4G and fills once the desktop packages (i3/X/GTK) land.
+   resize2fs is command-remapped (config/tools.local.edn) to a trixie-capable e2fsprogs; the host's
+   own is too old for trixie's ext4. -f skips the e2fsck gate (fresh copy of the cached vendor)."
+  [img size]
+  ($! truncate -s [size] [img])
+  (loopback/with-loopback-device [dev img]
+    (let [root (last (linux-disk/device->partitions dev))]
+      ($! parted -s [dev] "resizepart" "2" "100%")
+      ($! partprobe [dev])
+      ($! resize2fs -f [root]))))
+
+
 (defn stage!
   "Build a cached vendor base (base OS + packages + bb) and copy it to a working
    image. The vendor is built once; rm stage/vendor/<name>.img to rebuild it."
@@ -66,6 +82,7 @@
                                                  {:target target :available (vec (keys targets))})))
         vendor (vendor-img url)
         out    (str (fs/path stage-dir (stage-img-name)))]
+    (require-root!)
 
     ;; 1. vendor base (base + install), built once and cached
     (if (fs/exists? vendor)
@@ -76,6 +93,10 @@
     (fs/create-dirs stage-dir)
     (println "copy ->" out)
     (fs/copy vendor out {:replace-existing true})
+
+    ;; 2b. grow the staged rootfs so the chroot scripts have room (raspios root ~2.4G; desktop fills it)
+    (println "expand ->" out "(8G)")
+    (expand-root! out "8G")
 
     ;; 3. bake the prebuilt overlayroot initramfs (qemu segfaults building it in-chroot; static-copy)
     (image/initramfs! {:img out})

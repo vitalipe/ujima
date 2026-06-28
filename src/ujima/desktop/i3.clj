@@ -59,6 +59,9 @@
    container. The explicit focus matters: a bare `workspace` switch emits only workspace::focus
    (which we don't subscribe to), so without it the projection's `current` never follows the app."
   [con-id workspace]
-  (command! (format "[con_id=%d]" con-id) "move" "to" "workspace" workspace)
-  (command! "workspace" workspace)
-  (command! (format "[con_id=%d]" con-id) "focus"))
+  (let [c (format "[con_id=%d]" con-id)]
+    (command! c "floating" "disable")   ; fill the workspace (chromium --app trips a float rule)
+    (command! c "sticky" "disable")      ; stay on its own workspace (eww marks windows sticky)
+    (command! c "move" "to" "workspace" workspace)
+    (command! "workspace" workspace)
+    (command! c "focus")))

@@ -9,11 +9,12 @@ for_window [window_type="dialog"]  floating enable
 for_window [window_type="utility"] floating enable
 for_window [window_role="pop-up"]  floating enable
 
-# eww shell: eww's dock window-type doesn't reach i3, so the surfaces would TILE — float them.
-# topbar + dock are sticky chrome (visible on every workspace); the launcher lives on its own ws.
-for_window [title="Eww - topbar"]   floating enable, sticky enable, border none
-for_window [title="Eww - dock"]     floating enable, sticky enable, border none
-for_window [title="Eww - launcher"] floating enable, border none, move to workspace launcher
+# eww shell: eww's dock type doesn't reach i3, so the surfaces would TILE — float them all (by
+# class, which matches at map; title rules raced the title-set and missed). eww already marks the
+# topbar/dock sticky, so once floating they show on every workspace; the launcher (not sticky)
+# rides its own workspace.
+for_window [class="Eww"] floating enable, border none
+assign [class="Eww"] launcher
 
 # the agent: window/app lifecycle + the loopback API eww talks to (adjust the launch per deploy)
 exec --no-startup-id ujima-agent

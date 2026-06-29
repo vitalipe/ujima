@@ -10,24 +10,45 @@
             [babashka.fs :as fs]))
 
 
-;; The agent's boot service. Root: the agent reconciles system settings (hostnamectl, localectl,
-;; …) that need privilege. /usr/local/bin/bb is installed by tools.scripts.install; src + config
-;; are staged by tools.scripts.agent. Restart=on-failure so a crash retries without hammering.
+;; The graphical session is the boot service now — NOT the agent. The agent moved INTO the X
+;; session (it owns desktop lifecycle: i3 IPC, eww, app launch, audio — all session-scoped), so it
+;; runs as `ujima` via i3 `exec` (see /opt/ujima/desktop/i3/config) through the `ujima-agent`
+;; wrapper below. `ujima.service` is repurposed to run + SUPERVISE the session: systemd runs startx
+;; on tty1 as ujima, and Restart=always brings the whole desktop back if i3/X dies — that IS the
+;; session-recovery a standalone watchdog would otherwise provide. Conflicts=getty@tty1 hands tty1
+;; over from the base console autologin; PAMName=login sets up the logind session (XDG_RUNTIME_DIR).
+;; HW-VERIFIED: do NOT set TTYPath/StandardInput=tty — systemd grabbing tty1 collides with X's own
+;; VT management and the service flaps; without it startx opens vt1 itself and the session is stable.
 (def ^:private ujima-service
   (str "[Unit]\n"
-       "Description=ujima agent\n"
-       "After=network-online.target\n"
-       "Wants=network-online.target\n"
+       "Description=ujima desktop session\n"
+       "After=systemd-user-sessions.service\n"
+       "Conflicts=getty@tty1.service\n"
        "\n"
        "[Service]\n"
-       "Type=simple\n"
-       "WorkingDirectory=/opt/ujima\n"
-       "ExecStart=/usr/local/bin/bb -cp src -m ujima.core\n"
-       "Restart=on-failure\n"
-       "RestartSec=2\n"
+       "User=ujima\n"
+       "PAMName=login\n"
+       "StandardOutput=journal\n"
+       "Restart=always\n"
+       "RestartSec=3\n"
+       ;; -br = black root, so the 2-4s of session bring-up shows black, not the grey X weave
+       "ExecStart=/usr/bin/startx -- vt1 -br\n"
        "\n"
        "[Install]\n"
        "WantedBy=multi-user.target\n"))
+
+
+;; The in-session agent launcher. i3 execs `ujima-agent` as the session user, so app/window
+;; lifecycle + the loopback API run with the session env (DISPLAY, XDG_RUNTIME_DIR) — exactly what
+;; they need and what a root boot service couldn't give. Privileged ops still go through `sudo$`
+;; (ujima has NOPASSWD), so running as the user costs nothing.
+(def ^:private ujima-agent-wrapper
+  (str "#!/bin/sh\n"
+       "cd /opt/ujima\n"
+       ;; NOT exec: when the agent exits (crash/OOM), tear the session down with `i3-msg exit` so
+       ;; systemd's Restart=always rebuilds it cold — no orphaned eww/app zombies, one startup path.
+       "/usr/local/bin/bb -cp src -m ujima.core\n"
+       "i3-msg exit\n"))
 
 
 ;; Persistent, capped journal — backed by the storage partition via slot->fstab's /var/log/journal
@@ -60,9 +81,15 @@
 
 (defn run! [_opts]
   (with-console-out
-    ;; agent boot service (write + enable; restart-on-iterate is the CLI's job, not here)
+    ;; the desktop session service (write + enable; supervises startx→i3 with Restart=always)
     (spit "/etc/systemd/system/ujima.service" ujima-service)
     ($! systemctl enable "ujima")
+
+    ;; the in-session agent launcher (i3 execs this) + the staged xinitrc that startx runs
+    (spit "/usr/local/bin/ujima-agent" ujima-agent-wrapper)
+    ($! chmod "0755" ["/usr/local/bin/ujima-agent"])
+    (fs/create-dirs "/etc/X11/xinit")
+    ($! cp "/opt/ujima/desktop/xinitrc" "/etc/X11/xinit/xinitrc")
 
     ;; persistent capped journal on storage
     (fs/create-dirs "/etc/systemd/journald.conf.d")

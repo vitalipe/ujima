@@ -2,7 +2,6 @@
   (:require [clojure.core.async      :as async]
             [ujima.log               :as log]
 
-            [ujima.control :as control]
             [ujima.linux.token :as token]
 
             [ujima.agent.events   :as events]))
@@ -10,11 +9,8 @@
 
 (defn init! [_]
   (let [control-token-ch* (token/watch-control-token!)]
-    
-    (log/info "Starting Agent loop")
 
-    ;; reconcile persistent settings
-    (control/reconcile!)
+    (log/info "Starting Agent loop")
 
     ;; watch for events
     (async/thread
@@ -26,4 +22,3 @@
 
     ;; block
     @(promise)))
-

@@ -64,6 +64,46 @@
             :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
             :user     {:desc "SSH user"     :default "ujima"}
             :password {:desc "SSH password" :default "ujima"}
+            :port     {:desc "SSH port"     :default "22"}}}
+
+    "click"
+    {:usage "Usage: tools dev click <x> <y> <ip> [--button 1] [--count 1] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target dev/click!
+     :args [:x :y :ip]
+     :spec {:x        {:desc "X coordinate on :0 (screenshot px = xdotool coord)" :require true}
+            :y        {:desc "Y coordinate on :0" :require true}
+            :ip       {:desc "Target RPI host or IP" :require true}
+            :button   {:desc "Mouse button (1=left 2=mid 3=right)" :default "1"}
+            :count    {:desc "Click count (2 = double-click)" :default "1"}
+            :display  {:desc "X display" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima"}
+            :password {:desc "SSH password" :default "ujima"}
+            :port     {:desc "SSH port"     :default "22"}}}
+
+    "type"
+    {:usage "Usage: tools dev type <text> <ip> [--delay 40] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target dev/type!
+     :args [:text :ip]
+     :spec {:text     {:desc "Literal text to type on :0" :require true}
+            :ip       {:desc "Target RPI host or IP" :require true}
+            :delay    {:desc "ms between keystrokes" :default "40"}
+            :display  {:desc "X display" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima"}
+            :password {:desc "SSH password" :default "ujima"}
+            :port     {:desc "SSH port"     :default "22"}}}
+
+    "key"
+    {:usage "Usage: tools dev key <chord> <ip> [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target dev/key!
+     :args [:chord :ip]
+     :spec {:chord    {:desc "Key or chord, e.g. ctrl+f, Return, super+2" :require true}
+            :ip       {:desc "Target RPI host or IP" :require true}
+            :display  {:desc "X display" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima"}
+            :password {:desc "SSH password" :default "ujima"}
             :port     {:desc "SSH port"     :default "22"}}}}
 
    "loopback"

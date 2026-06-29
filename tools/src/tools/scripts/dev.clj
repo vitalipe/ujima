@@ -1,9 +1,9 @@
 (ns tools.scripts.dev
   "Runs INSIDE the target chroot as root. Layers DEV-only conveniences onto a configured ujima
-   image: an SSH server for headless access, x11vnc + maim for the desktop relay (`tools dev view`
-   / `dev screenshot`), the assets/dev helper scripts (e.g. `wifi`) staged at /ujima/dev, and a
-   [ujima-dev] shell prompt (tagged with the overlay ro/rw state). Not part of the release pipeline
-   — run on dev images only.
+   image: an SSH server for headless access, x11vnc + maim + xdotool for the desktop relay
+   (`tools dev view` / `dev screenshot` / `dev click|type|key`), the assets/dev helper scripts
+   (e.g. `wifi`) staged at /ujima/dev, and a [ujima-dev] shell prompt (tagged with the overlay
+   ro/rw state). Not part of the release pipeline — run on dev images only.
 
    Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup].
 
@@ -48,11 +48,13 @@
 (defn run! [{:keys [project]}]
   (with-console-out
     ;; headless dev access: SSH server (raspios ships it present-but-disabled) + rsync, plus the
-    ;; desktop-relay tools — x11vnc (interactive `dev view`) and maim (one-shot `dev screenshot`).
-    ;; DEV-ONLY by design: a VNC server is a remote-control surface that must never ship in a
-    ;; release image, so it goes here (release skips this script), NOT in tools.scripts.install.
+    ;; desktop-relay tools — x11vnc (interactive `dev view`), maim (one-shot `dev screenshot`), and
+    ;; xdotool (synthetic input for `dev click|type|key`). DEV-ONLY by design: a VNC server +
+    ;; synthetic-input tooling are remote-control surfaces that must never ship in a release image,
+    ;; so they go here (release skips this script), NOT in tools.scripts.install.
     ($! apt-get update)
-    ($! apt-get install -y --no-install-recommends "openssh-server" "rsync" "x11vnc" "maim")
+    ($! apt-get install -y --no-install-recommends
+        "openssh-server" "rsync" "x11vnc" "maim" "xdotool")
     ($! systemctl enable "ssh")
     ;; Bake host keys into the rootfs now so they stay stable when a dev box runs under the
     ;; read-only overlay (assets/dev/lock-fs): sshd then reads them from the ro lower instead of

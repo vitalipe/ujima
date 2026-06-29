@@ -8,6 +8,9 @@
                      analog of `tools image script` (which runs the same fn in the build chroot).
      view <ip>       interactive x11vnc mirror of the device's :0 desktop — mouse + keyboard live.
      screenshot <ip> pull a one-frame PNG of :0 to the host (a quick look / for Claude to verify).
+     click x y <ip>  synthetic pointer click at (x,y) on :0 (xdotool).
+     type <text> <ip>  type a literal string on :0 (xdotool).
+     key <chord> <ip>  send a key/chord on :0 — e.g. ctrl+f, Return, super+2 (xdotool).
 
    All talk to the device over sshpass+ssh with default ujima/ujima creds (dev boxes; see the
    public-access threat model). No live-safe gating: `script` runs whatever you name — note
@@ -200,3 +203,52 @@
         {:ip ip :rfbport rfbport :viewer viewer}
         (finally
           (p/destroy-tree server))))))
+
+
+;; ---------------------------------------------------------------------------
+;; Synthetic input (xdotool on :0) — the programmatic sibling of `dev view`: drive the desktop
+;; headlessly in a loop (screenshot -> click/type/key -> screenshot to verify). xdotool is baked
+;; DEV-ONLY by tools.scripts.dev; screenshot pixels map 1:1 to xdotool coords.
+;; ---------------------------------------------------------------------------
+
+(defn- sh-quote
+  "POSIX single-quote escaping, so an arbitrary string (spaces, quotes, $) survives the remote
+   shell as one literal argument."
+  [s]
+  (str "'" (str/replace (str s) "'" "'\\''") "'"))
+
+(defn- xdo!
+  "Run `xdotool <xargs>` on the device's :0 over ssh, with a loud preflight that xdotool is present.
+   `xargs` is everything after `xdotool`, already assembled + quoted."
+  [{:keys [ip display xauth] :as opts} xargs]
+  (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
+  (let [transport (ssh-transport opts)]
+    (when-not (:ok? (remote-sh? transport "command -v xdotool >/dev/null"))
+      (throw (ex-info (str "xdotool missing on " ip " — run `tools dev script dev " ip
+                           "` to bake it (or reflash a dev image that ships it)")
+                      {:ip ip :cmd "xdotool"})))
+    (remote-exec! transport
+                  (str "DISPLAY=" display " XAUTHORITY=" xauth " xdotool " xargs))))
+
+(defn click!
+  "Move the pointer to (x,y) on the device's :0 and click — synthetic input via xdotool. (x,y) are
+   screenshot pixels (1:1 with xdotool coords); --count 2 double-clicks."
+  [{:keys [x y button count] :as opts}]
+  (xdo! opts (str "mousemove " x " " y " click --repeat " count " " button))
+  (println (str "clicked button " button (when (not= count "1") (str " x" count)) " at " x "," y))
+  {:x x :y y :button button :count count})
+
+(defn type!
+  "Type a literal string on the device's :0 via xdotool (single-quote-escaped for the remote shell,
+   so spaces/quotes are safe)."
+  [{:keys [text delay] :as opts}]
+  (xdo! opts (str "type --clearmodifiers --delay " delay " -- " (sh-quote text)))
+  (println (str "typed " (clojure.core/count text) " chars"))
+  {:typed (clojure.core/count text)})
+
+(defn key!
+  "Send a key or chord on the device's :0 via xdotool — e.g. `ctrl+f`, `Return`, `super+2`."
+  [{:keys [chord] :as opts}]
+  (xdo! opts (str "key --clearmodifiers " (sh-quote chord)))
+  (println (str "key " chord))
+  {:key chord})

@@ -14,6 +14,7 @@
 (defvar ewwcmd "eww --config /opt/ujima/desktop/eww")
 (defvar vol 65)
 (defvar muted false)
+(defvar kbi 0)   ; mock keyboard layout index: 0=En 1=He 2=Sw (cycles on click)
 
 
 ;; --- top: current window title + close -----------------------------------
@@ -53,6 +54,8 @@
           (image :path "/opt/ujima/desktop/icons/${w.icon}.svg" :image-width 28 :image-height 28))))
     (box)
     (box :class "tray" :halign "end" :space-evenly false :spacing 8
+      (button :class "kbd" :onclick "${ewwcmd} update kbi=${kbi == 2 ? 0 : kbi + 1}"
+        (label :text {kbi == 0 ? "En" : kbi == 1 ? "He" : "Sw"}))
       (label :class "clock" :text {clock})
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
         (image :path {muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22)))))

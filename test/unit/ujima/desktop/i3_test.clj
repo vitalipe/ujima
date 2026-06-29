@@ -5,14 +5,30 @@
 
 
 (deftest normalize-window-events
-  (is (= {:type :window/new :con-id 42 :wm-window 1001 :class "ujima-wikipedia" :title "Wikipedia"}
+  (is (= {:type :window/new :con-id 42 :wm-window 1001 :class "ujima-wikipedia"
+          :transient? false :title "Wikipedia"}
          (i3/normalize {:change "new"
                         :container {:id 42 :window 1001 :name "Wikipedia"
                                     :window_properties {:class "ujima-wikipedia"}}})))
   (is (= {:type :window/close :con-id 7} (i3/normalize {:change "close" :container {:id 7}})))
-  (is (= {:type :window/title :con-id 7 :title "Essay.odt"}
+  (is (= {:type :window/title :con-id 7 :class nil :transient? false :title "Essay.odt"}
          (i3/normalize {:change "title" :container {:id 7 :name "Essay.odt"}})))
   (is (= {:type :window/focus :con-id 7} (i3/normalize {:change "focus" :container {:id 7}}))))
+
+
+(deftest normalize-carries-late-class-and-transient
+  ;; LibreOffice sets WM_CLASS after mapping, so the class shows up on a later title event; and the
+  ;; Tip-of-the-Day dialog is born transient (transient_for set)
+  (let [titled (i3/normalize {:change "title"
+                              :container {:id 9 :name "Untitled 1 — LibreOffice Writer"
+                                          :window_properties {:class "libreoffice-writer"}}})
+        dialog (i3/normalize {:change "new"
+                              :container {:id 3 :window 5 :name "Tip of the Day"
+                                          :window_properties {:class "libreoffice-writer"
+                                                              :transient_for 27262996}}})]
+    (is (= "libreoffice-writer" (:class titled)) "class rides on the title event")
+    (is (false? (:transient? titled)))
+    (is (true? (:transient? dialog)) "transient_for -> :transient? true")))
 
 
 (deftest normalize-ignores-non-window-changes

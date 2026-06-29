@@ -43,32 +43,47 @@
   (some (fn [[wid w]] (when (= app-id (:app-id w)) wid)) (:windows state)))
 
 
-(defn- on-new [state {:keys [con-id class title]}]
-  (let [app-id   (when class (get (:class->app-id state) (str/lower-case class)))
-        existing (when app-id (win-for-app state app-id))]
+(defn- track-con
+  "Track `con-id` under app `app-id`: attach to that app's existing Ujima window, or create a new
+   one. A transient (dialog) con never *creates* a primary window — it only attaches to an app
+   already tracked; with no host yet it's left to i3 to float (e.g. LibreOffice's Tip-of-the-Day,
+   which is born carrying the writer class)."
+  [state con-id app-id transient? title]
+  (if-let [existing (win-for-app state app-id)]
+    (-> state
+        (update-in [:windows existing :wm-windows] conj con-id)
+        (assoc-in  [:wm->win con-id] existing))
+    (if transient?
+      state
+      (let [wid (format "win-%04d" (:next-n state))
+            app (catalog/app (:catalog state) app-id)]
+        (-> state
+            (assoc-in [:windows wid] {:id         wid
+                                      :app-id     app-id
+                                      :title      (or title (:label app))
+                                      :workspace  wid
+                                      :wm-windows #{con-id}
+                                      :state      :running})
+            (update   :order conj wid)
+            (assoc-in [:wm->win con-id] wid)
+            (assoc    :current wid)
+            (update   :next-n inc))))))
+
+
+(defn- adopt
+  "Join an as-yet-untracked con to the catalog by WM_CLASS (lower-cased), then track it. No class
+   yet, no catalog match, or already tracked -> unchanged. Used for `new` and for a later `title`,
+   since a window's class can arrive after it maps (LibreOffice)."
+  [state con-id class transient? title]
+  (let [app-id (when class (get (:class->app-id state) (str/lower-case class)))]
     (cond
-      ;; unmanaged window (no catalog class) — leave it to i3 (floats), don't track it
-      (nil? app-id) state
+      (get-in state [:wm->win con-id]) state
+      (nil? app-id)                    state
+      :else (track-con state con-id app-id transient? title))))
 
-      ;; another container of an app we already track — attach to its Ujima window
-      existing (-> state
-                   (update-in [:windows existing :wm-windows] conj con-id)
-                   (assoc-in  [:wm->win con-id] existing))
 
-      ;; a new Ujima window: owns a fresh workspace, becomes current
-      :else (let [wid (format "win-%04d" (:next-n state))
-                  app (catalog/app (:catalog state) app-id)]
-              (-> state
-                  (assoc-in [:windows wid] {:id         wid
-                                            :app-id     app-id
-                                            :title      (or title (:label app))
-                                            :workspace  wid
-                                            :wm-windows #{con-id}
-                                            :state      :running})
-                  (update   :order conj wid)
-                  (assoc-in [:wm->win con-id] wid)
-                  (assoc    :current wid)
-                  (update   :next-n inc))))))
+(defn- on-new [state {:keys [con-id class transient? title]}]
+  (adopt state con-id class transient? title))
 
 
 (defn- on-close [state {:keys [con-id]}]
@@ -89,10 +104,10 @@
     state))
 
 
-(defn- on-title [state {:keys [con-id title]}]
+(defn- on-title [state {:keys [con-id class transient? title]}]
   (if-let [wid (get-in state [:wm->win con-id])]
-    (assoc-in state [:windows wid :title] title)
-    state))
+    (assoc-in state [:windows wid :title] title)        ; tracked -> just update its title
+    (adopt state con-id class transient? title)))        ; untracked -> its class may have arrived late
 
 
 (defn- on-focus [state {:keys [con-id]}]
@@ -136,6 +151,10 @@
 
 (defn window-for-con [state con-id] (get-in state [:wm->win con-id]))
 (defn window-for-app [state app-id] (win-for-app state app-id))
+(defn app-for-class
+  "Catalog app-id a WM_CLASS maps to (case-insensitive), or nil — lets the reconcile loop test a
+   live get_tree window against the catalog before replaying it."
+  [state class] (when class (get (:class->app-id state) (str/lower-case class))))
 (defn window         [state wid]    (get-in state [:windows wid]))
 (defn con-ids        [state wid]    (get-in state [:windows wid :wm-windows]))
 (defn current        [state]        (:current state))

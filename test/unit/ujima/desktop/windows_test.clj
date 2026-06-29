@@ -37,6 +37,43 @@
     (is (= :write (get-in s [:windows "win-0001" :app-id])))))
 
 
+(deftest late-class-adopted-on-title
+  ;; LibreOffice maps its doc window before setting WM_CLASS — the class only arrives on a later
+  ;; title event, so the window must be adopted then (not only at :window/new)
+  (let [s (play [{:type :window/new   :con-id 1 :class nil :title "LibreOffice"}
+                 {:type :window/title :con-id 1 :class "libreoffice-writer"
+                  :title "Untitled 1 — LibreOffice Writer"}])]
+    (is (= :write     (get-in s [:windows "win-0001" :app-id])))
+    (is (= "win-0001" (:current s)))
+    (is (= "Untitled 1 — LibreOffice Writer" (get-in s [:windows "win-0001" :title])))))
+
+
+(deftest transient-with-matching-class-not-adopted-as-primary
+  ;; LibreOffice's Tip-of-the-Day is born with the writer class but is a dialog — it must not
+  ;; become the primary Write window
+  (let [s (play [{:type :window/new :con-id 2 :class "libreoffice-writer" :transient? true
+                  :title "Tip of the Day"}])]
+    (is (empty? (:windows s)))
+    (is (= :launcher (:current s)))))
+
+
+(deftest transient-attaches-to-already-tracked-app
+  ;; once the app's primary window is tracked, its dialog (same class) joins it
+  (let [s (play [{:type :window/new :con-id 1 :class "libreoffice-writer" :title "Untitled 1"}
+                 {:type :window/new :con-id 2 :class "libreoffice-writer" :transient? true :title "Tip"}])]
+    (is (= 1 (count (:order s))) "still one Ujima window")
+    (is (= #{1 2} (get-in s [:windows "win-0001" :wm-windows])))))
+
+
+(deftest app-for-class-matches-catalog-case-insensitively
+  ;; the reconcile loop uses this to test a live get_tree window against the catalog
+  (is (= :write     (w/app-for-class s0 "libreoffice-writer")))
+  (is (= :write     (w/app-for-class s0 "Libreoffice-Writer")))
+  (is (= :wikipedia (w/app-for-class s0 "ujima-wikipedia")))
+  (is (nil? (w/app-for-class s0 "LibreOffice 25.2")) "the LibreOffice splash class is not a match")
+  (is (nil? (w/app-for-class s0 nil))))
+
+
 (deftest second-container-of-same-app-attaches-not-new-window
   ;; a save dialog / extra frame of a :single app joins the existing Ujima window
   (let [s (play [{:type :window/new :con-id 1 :class "ujima-wikipedia" :title "Wikipedia"}

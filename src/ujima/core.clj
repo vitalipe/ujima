@@ -18,7 +18,11 @@
     (shell/install-remap! (get-in env [:shell :commands] {}))
 
     (log/init!     (get-in env [:log]     {:level :info}))
-    (control/init! (get-in env [:control] {}))
-    (desktop/init! (get-in env [:desktop] {}))
-    (agent/init!   (get-in env [:agent]   {}))))
+
+    ;; explicit boot order: reconcile settings FIRST, then bring up the desktop (subscribe, API,
+    ;; eww, seed) so the shell that appears is the finished, reconciled desktop. Agent loop blocks last.
+    (control/init!     (get-in env [:control] {}))
+    (control/reconcile!)
+    (desktop/init!     (get-in env [:desktop] {}))
+    (agent/init!       (get-in env [:agent]   {}))))
 

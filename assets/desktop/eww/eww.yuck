@@ -6,7 +6,7 @@
 
 (deflisten desktop
   :initial `{"windows":[],"current":"launcher","currentWindow":null,"status":"ok"}`
-  `curl -sN --retry 999 --retry-connrefused http://127.0.0.1:1337/api/desktop/stream`)
+  `curl -sN http://127.0.0.1:1337/api/desktop/stream`)
 
 (defpoll clock :interval "10s" "date +%H:%M")
 

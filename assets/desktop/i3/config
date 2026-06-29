@@ -12,13 +12,10 @@ for_window [window_role="pop-up"]  floating enable
 # eww topbar/dock are :wm-ignore (override-redirect) in eww.yuck, so i3 doesn't manage them;
 # the launcher is a normal window the agent tracks + places on its own workspace like any app.
 
-# the agent: window/app lifecycle + the loopback API eww talks to (adjust the launch per deploy)
+# the agent owns the shell now: it reconciles settings, then brings up eww (daemon + surfaces)
+# itself once ready — so i3 only launches the agent + the compositor below.
 exec --no-startup-id ujima-agent
 
 # compositor: picom (xrender — no GL on the Pi) gives real transparency, so floating eww overlays
 # (the volume popover) show the dock/content through them instead of painting a black block.
 exec_always --no-startup-id picom --backend xrender
-
-# eww shell: daemon + the three surfaces (top / mid / bottom), from the staged config
-exec_always --no-startup-id eww --config /opt/ujima/desktop/eww daemon
-exec_always --no-startup-id eww --config /opt/ujima/desktop/eww open-many topbar launcher dock

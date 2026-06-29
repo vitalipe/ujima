@@ -44,6 +44,27 @@
     proc))
 
 
+(defn- tree-windows
+  "All real X-window leaf nodes under an i3 get_tree node (those carrying a :window id)."
+  [node]
+  (concat (when (:window node) [node])
+          (mapcat tree-windows (concat (:nodes node) (:floating_nodes node)))))
+
+
+(defn seed!
+  "Replay the currently-open i3 windows as :window/new events through `on-event`, so a window
+   mapped around subscribe time — the launcher the agent opens at startup — is tracked even when the
+   live subscription loses the race. Polls get_tree until a window appears (the launcher maps
+   asynchronously), ~4s max. Idempotent with the live stream (apply-event keys windows by con-id)."
+  [on-event]
+  (loop [n 0]
+    (let [wins (tree-windows (json/parse-string (shell/sh! :i3-msg :-t "get_tree") true))]
+      (cond
+        (seq wins) (doseq [w wins] (when-let [ev (normalize {:change "new" :container w})] (on-event ev)))
+        (< n 40)   (do (Thread/sleep 100) (recur (inc n)))
+        :else      (log/warn "seed: no windows in i3 tree after wait")))))
+
+
 (defn command!
   "Run an i3 command via i3-msg (returns its reply string; throws on failure)."
   [& args]

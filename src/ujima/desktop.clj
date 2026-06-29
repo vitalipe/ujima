@@ -23,9 +23,15 @@
     ;; single writer: only this i3 event thread mutates the projection; commands flow back as events
     (i3/subscribe!
       (fn [ev]
-        (swap! state* windows/apply-event ev)
-        (when (= :window/new (:type ev))
-          (when-let [wid (windows/window-for-con @state* (:con-id ev))]
-            (i3/place! (:con-id ev) wid)))
-        (http/broadcast! ctx)))
+        (let [before (windows/current @state*)]
+          (swap! state* windows/apply-event ev)
+          (when (= :window/new (:type ev))
+            (when-let [wid (windows/window-for-con @state* (:con-id ev))]
+              (i3/place! (:con-id ev) wid)))
+          ;; closing the focused window: i3 won't leave the now-empty workspace, so switch it to
+          ;; the new current (the launcher) ourselves.
+          (let [after (windows/current @state*)]
+            (when (and (= :window/close (:type ev)) (not= before after) (string? after))
+              (i3/command! "workspace" after)))
+          (http/broadcast! ctx))))
     (http/start! ctx (:http cfg))))

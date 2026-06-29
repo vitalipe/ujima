@@ -78,10 +78,13 @@
                     (update    :wm->win dissoc con-id))]
       ;; the workspace dies only when its LAST container is gone (a save dialog keeps it alive)
       (if (empty? (get-in state [:windows wid :wm-windows]))
-        (-> state
-            (update :windows dissoc wid)
-            (update :order   (fn [o] (vec (remove #{wid} o))))
-            (cond-> (= (:current state) wid) (assoc :current :launcher)))
+        (let [order' (vec (remove #{wid} (:order state)))]
+          (-> state
+              (update :windows dissoc wid)
+              (assoc  :order order')
+              ;; closing the focused window returns home — always the launcher (kiosk model)
+              (cond-> (= (:current state) wid)
+                (assoc :current (or (win-for-app state :launcher) :launcher)))))
         state))
     state))
 

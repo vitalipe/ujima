@@ -67,13 +67,24 @@
     (is (= :launcher (:current s)) "refocus launcher only after the confirmed close")))
 
 
+(deftest close-current-returns-to-launcher
+  ;; closing the focused app returns home (the launcher window), even with another app still open
+  (let [s  (play [{:type :window/new :con-id 1 :class "ujima-launcher"}        ; launcher win-0001
+                  {:type :window/new :con-id 2 :class "ujima-wikipedia"}       ; win-0002
+                  {:type :window/new :con-id 3 :class "libreoffice-writer"}])  ; win-0003 (current)
+        s2 (w/apply-event s {:type :window/close :con-id 3})]
+    (is (= "win-0001" (:current s2)) "back to the launcher window, not the other open app")
+    (is (= ["win-0001" "win-0002"] (:order s2)) "the other app stays open")))
+
+
 (deftest crash-close-reconciles-like-a-graceful-one
   ;; an app-initiated/crash close arrives as the same :window/close event
   (let [s (play [{:type :window/new   :con-id 1 :class "ujima-wikipedia"}
                  {:type :window/new   :con-id 2 :class "libreoffice-writer"}
                  {:type :window/close :con-id 1}])]
     (is (= ["win-0002"] (:order s)))
-    (is (nil? (get-in s [:wm->win 1])))))
+    (is (nil? (get-in s [:wm->win 1])))
+    (is (= "win-0002" (:current s)) "a background (non-current) close doesn't move focus")))
 
 
 (deftest title-event-updates-window-title

@@ -139,3 +139,9 @@
 (defn window         [state wid]    (get-in state [:windows wid]))
 (defn con-ids        [state wid]    (get-in state [:windows wid :wm-windows]))
 (defn current        [state]        (:current state))
+
+(defn launcher-con?
+  "True when con-id belongs to the launcher's window (eww's one tracked window); its close means
+   eww crashed, so the agent escalates to a session rebuild."
+  [state con-id]
+  (= :launcher (:app-id (window state (window-for-con state con-id)))))

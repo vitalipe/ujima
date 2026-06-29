@@ -77,6 +77,15 @@
     (is (= ["win-0001" "win-0002"] (:order s2)) "the other app stays open")))
 
 
+(deftest launcher-con-detects-eww-death
+  ;; the launcher's window::close == eww crashed (the one eww window we track + never close)
+  (let [s (play [{:type :window/new :con-id 1 :class "ujima-launcher"}       ; launcher win-0001
+                 {:type :window/new :con-id 2 :class "ujima-wikipedia"}])]   ; app win-0002
+    (is (true?  (w/launcher-con? s 1))  "the launcher's con")
+    (is (false? (w/launcher-con? s 2))  "an app's con")
+    (is (false? (w/launcher-con? s 99)) "an unknown con")))
+
+
 (deftest crash-close-reconciles-like-a-graceful-one
   ;; an app-initiated/crash close arrives as the same :window/close event
   (let [s (play [{:type :window/new   :con-id 1 :class "ujima-wikipedia"}

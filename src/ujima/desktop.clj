@@ -29,6 +29,13 @@
                 :launch-ctx {:chromium (:chromium cfg) :profile-dir (:profile-dir cfg)}}
         ;; single writer: only this handler mutates the projection; commands flow back as events
         handle (fn [ev]
+                 ;; eww died if the launcher's window closes — it's the one eww window we track and
+                 ;; never close ourselves, so its close == eww's process is gone. Exit so the wrapper's
+                 ;; `i3-msg exit` tears the session down and systemd cold-rebuilds it (Model 1).
+                 (when (and (= :window/close (:type ev))
+                            (windows/launcher-con? @state* (:con-id ev)))
+                   (log/error "launcher window gone (eww crashed) — exiting for a clean session rebuild")
+                   (System/exit 1))
                  (let [before (windows/current @state*)]
                    (swap! state* windows/apply-event ev)
                    (when (= :window/new (:type ev))

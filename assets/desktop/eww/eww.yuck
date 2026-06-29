@@ -53,16 +53,16 @@
           (image :path "/opt/ujima/desktop/icons/${w.icon}.svg" :image-width 28 :image-height 28))))
     (box)
     (box :class "tray" :halign "end" :space-evenly false :spacing 8
+      (label :class "clock" :text {clock})
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
-        (image :path {muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))
-      (label :class "clock" :text {clock}))))
+        (image :path {muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22)))))
 
 
 ;; --- volume overlay (mock): the dock speaker toggles this popover ---------
 (defwidget volpanel []
-  (box :class "volpanel" :orientation "v" :space-evenly false :spacing 8
+  (box :class "volpanel" :orientation "v" :space-evenly false :spacing 8 :hexpand true :vexpand true
     (label :class "volnum" :text {vol})
-    (scale :class "volscale" :orientation "v" :flipped true :min 0 :max 100
+    (scale :class "volscale" :orientation "v" :flipped true :vexpand true :min 0 :max 100
            :value {vol} :onchange "${ewwcmd} update vol={}")
     (button :class "volmute" :onclick "${ewwcmd} update muted=${muted ? false : true}"
       (image :path {muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))))
@@ -85,10 +85,9 @@
   (dock))
 
 (defwindow volume
-  :monitor 0 :geometry (geometry :anchor "bottom right" :width "12%" :height "250px")
+  :monitor 0 :geometry (geometry :anchor "bottom right" :width "4%" :height "210px")
   :wm-ignore true :stacking "fg"
-  (box :halign "center" :valign "end" :style "padding-bottom:8px;"
-    (volpanel)))
+  (volpanel))
 
 ;; invisible fullscreen click-catcher: opened with the popover (under it), any click closes both
 ;; so clicking outside the popover dismisses it. The popover is opened last → stacks on top.

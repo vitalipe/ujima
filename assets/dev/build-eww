@@ -12,6 +12,8 @@
 # cargo target dir are multi-GB and would otherwise land in the ephemeral tmpfs upper (RAM).
 set -eu
 
+# NB: the built binary's `eww --version` prints "0.5.0 <sha>", not 0.6.0 — upstream's internal version
+# trails its tags; the sha (d87c2fdb… == the v0.6.0 tag commit) is the real identifier, not the 0.5.0.
 EWW_REF="${EWW_REF:-v0.6.0}"          # pinned eww release; bump deliberately
 out=/ujima/dev/eww-out
 src=/ujima/dev/eww-src

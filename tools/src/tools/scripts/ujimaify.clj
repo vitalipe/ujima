@@ -31,7 +31,8 @@
        "StandardOutput=journal\n"
        "Restart=always\n"
        "RestartSec=3\n"
-       "ExecStart=/usr/bin/startx -- vt1\n"
+       ;; -br = black root, so the 2-4s of session bring-up shows black, not the grey X weave
+       "ExecStart=/usr/bin/startx -- vt1 -br\n"
        "\n"
        "[Install]\n"
        "WantedBy=multi-user.target\n"))
@@ -44,7 +45,10 @@
 (def ^:private ujima-agent-wrapper
   (str "#!/bin/sh\n"
        "cd /opt/ujima\n"
-       "exec /usr/local/bin/bb -cp src -m ujima.core\n"))
+       ;; NOT exec: when the agent exits (crash/OOM), tear the session down with `i3-msg exit` so
+       ;; systemd's Restart=always rebuilds it cold — no orphaned eww/app zombies, one startup path.
+       "/usr/local/bin/bb -cp src -m ujima.core\n"
+       "i3-msg exit\n"))
 
 
 ;; Persistent, capped journal — backed by the storage partition via slot->fstab's /var/log/journal

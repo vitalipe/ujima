@@ -51,9 +51,15 @@
       (try
         (when (lc/awaiting? @lifecycle*)
           (sync! state* handle)
-          (doseq [id (lc/expired @lifecycle* (System/currentTimeMillis) opening-timeout-ms)]
-            (log/warn "app never appeared — giving up" {:app id})
-            (swap! lifecycle* lc/forget id)))
+          (let [stale (lc/expired @lifecycle* (System/currentTimeMillis) opening-timeout-ms)]
+            (doseq [id stale]
+              (log/warn "app never appeared — giving up" {:app id})
+              (swap! lifecycle* lc/forget id))
+            ;; a staged launch never produced a window — don't strand the user on the empty staging
+            ;; workspace; once nothing else is opening, return home to the launcher.
+            (when (and (seq stale) (not (lc/awaiting? @lifecycle*)))
+              (when-let [home (windows/window-for-app @state* :launcher)]
+                (i3/command! "workspace" home)))))
         (catch Throwable e (log/error "sync failed" {:error (ex-message e)})))
       (Thread/sleep (if (lc/awaiting? @lifecycle*) 400 1000))
       (recur))))

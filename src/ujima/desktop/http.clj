@@ -67,6 +67,12 @@
 
 ;; --- command handlers (event-sourced: fire i3/launch, never mutate the projection) ---
 
+;; A new app maps on the focused workspace — the launcher's — and tiles 50/50 with it until adopt ->
+;; place! moves it off. Switch to an empty staging workspace *before* spawning so it maps there with
+;; nothing to split; place! then hands it to its own workspace. Internal name — won't collide with
+;; the win-NNNN workspaces or the launcher.
+(def ^:private staging-workspace "ujima-loading")
+
 (defn- open-app! [{:keys [state* lifecycle* catalog launch-ctx]} id]
   (let [app (catalog/app catalog (keyword id))
         aid (:id app)]
@@ -81,7 +87,8 @@
         (let [[old new] (swap-vals! lifecycle* lc/open aid (System/currentTimeMillis))]
           (if (identical? old new)
             (ok {:opening aid})                                              ; a launch is already in flight
-            (do (apply shell/sh (launch/launch-argv app launch-ctx))         ; -> window::new flows back
+            (do (i3/command! "workspace" staging-workspace)                  ; map it off the launcher's ws
+                (apply shell/sh (launch/launch-argv app launch-ctx))         ; -> window::new flows back
                 (ok {:launched aid}))))))))
 
 (defn- focus-window! [_ wid] (i3/command! "workspace" wid) (ok {:focused wid}))

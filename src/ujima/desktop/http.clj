@@ -5,7 +5,7 @@
      - command : POST open/focus/close. Commands are event-sourced — they fire i3/launch actions
                  and let the resulting i3 window events flow back through the single writer (the
                  i3 event thread). They never mutate the projection here.
-   ctx = {:state* :subs* :catalog :launch-ctx}."
+   ctx = {:state* :lifecycle* :subs* :catalog :launch-ctx}."
   (:require [clojure.string     :as str]
             [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json]]
@@ -14,6 +14,7 @@
             [ujima.desktop.catalog :as catalog]
             [ujima.desktop.launch  :as launch]
             [ujima.desktop.windows :as windows]
+            [ujima.desktop.lifecycle :as lc]
             [ujima.desktop.i3      :as i3]))
 
 
@@ -66,7 +67,7 @@
 
 ;; --- command handlers (event-sourced: fire i3/launch, never mutate the projection) ---
 
-(defn- open-app! [{:keys [state* catalog launch-ctx]} id]
+(defn- open-app! [{:keys [state* lifecycle* catalog launch-ctx]} id]
   (let [app (catalog/app catalog (keyword id))]
     (cond
       (nil? app)             (bad "unknown app")
@@ -74,14 +75,16 @@
       :else
       (if-let [wid (windows/window-for-app @state* (:id app))]
         (do (i3/command! "workspace" wid) (ok {:focused wid}))               ; :single -> focus existing
-        (do (apply shell/sh (launch/launch-argv app launch-ctx))             ; -> window::new flows back
+        (do (swap! lifecycle* lc/open (:id app) (System/currentTimeMillis))  ; await its window (gates sync!)
+            (apply shell/sh (launch/launch-argv app launch-ctx))             ; -> window::new flows back
             (ok {:launched (:id app)}))))))
 
 (defn- focus-window! [_ wid] (i3/command! "workspace" wid) (ok {:focused wid}))
 
-(defn- close-window! [{:keys [state*]} wid]
-  (if (windows/window @state* wid)
-    (do (doseq [con (windows/con-ids @state* wid)] (i3/close-con! con))      ; graceful: WM_DELETE
+(defn- close-window! [{:keys [state* lifecycle*]} wid]
+  (if-let [w (windows/window @state* wid)]
+    (do (swap! lifecycle* lc/closing (:app-id w))                            ; mark :closing until confirmed
+        (doseq [con (windows/con-ids @state* wid)] (i3/close-con! con))      ; graceful: WM_DELETE
         (ok {:closing wid}))
     (nf)))
 

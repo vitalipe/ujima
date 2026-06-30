@@ -152,7 +152,7 @@
 (defn window-for-con [state con-id] (get-in state [:wm->win con-id]))
 (defn window-for-app [state app-id] (win-for-app state app-id))
 (defn app-for-class
-  "Catalog app-id a WM_CLASS maps to (case-insensitive), or nil — lets the reconcile loop test a
+  "Catalog app-id a WM_CLASS maps to (case-insensitive), or nil — lets the sync loop test a
    live get_tree window against the catalog before replaying it."
   [state class] (when class (get (:class->app-id state) (str/lower-case class))))
 (defn window         [state wid]    (get-in state [:windows wid]))

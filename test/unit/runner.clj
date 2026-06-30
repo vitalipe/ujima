@@ -18,6 +18,7 @@
             [ujima.desktop.catalog-test]
             [ujima.desktop.launch-test]
             [ujima.desktop.windows-test]
+            [ujima.desktop.lifecycle-test]
             [ujima.desktop.i3-test]
             [ujima.desktop.http-test]))
 
@@ -41,6 +42,7 @@
     ujima.desktop.catalog-test
     ujima.desktop.launch-test
     ujima.desktop.windows-test
+    ujima.desktop.lifecycle-test
     ujima.desktop.i3-test
     ujima.desktop.http-test])
 

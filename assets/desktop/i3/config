@@ -12,6 +12,11 @@ for_window [window_role="pop-up"]  floating enable
 # eww topbar/dock are :wm-ignore (override-redirect) in eww.yuck, so i3 doesn't manage them;
 # the launcher is a normal window the agent tracks + places on its own workspace like any app.
 
+# the bars reserve no strut, so reserve their space here — keep in sync with eww.yuck heights
+# (topbar :height 36px, dock :height 48px) so apps tile into the mid-section, not under the bars.
+gaps top 36
+gaps bottom 48
+
 # the agent owns the shell now: it reconciles settings, then brings up eww (daemon + surfaces)
 # itself once ready — so i3 only launches the agent + the compositor below.
 exec --no-startup-id ujima-agent

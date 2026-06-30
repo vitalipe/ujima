@@ -12,6 +12,7 @@
 .dock .ujima { padding: 0 16px; font-weight: bold; }
 .dock .win { padding: 4px 10px; }
 .dock .win.active { background-color: #2c2f38; }
+.dock .win:hover { background-color: #2c2f38; border-radius: 8px; }
 .dock .clock { padding: 0 12px; color: #b8b8b8; }
 
 .launcher { background-color: #14161a; color: #e6e6e6; }

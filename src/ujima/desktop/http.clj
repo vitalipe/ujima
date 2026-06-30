@@ -69,17 +69,22 @@
 ;; --- command handlers (event-sourced: fire i3/launch, never mutate the projection) ---
 
 (defn- open-app! [{:keys [state* lifecycle* eww-config catalog launch-ctx]} id]
-  (let [app (catalog/app catalog (keyword id))]
+  (let [app (catalog/app catalog (keyword id))
+        aid (:id app)]
     (cond
       (nil? app)             (bad "unknown app")
       (= :shell (:kind app)) (do (i3/command! "workspace" "launcher") (ok {:focused "launcher"}))
       :else
-      (if-let [wid (windows/window-for-app @state* (:id app))]
-        (do (i3/command! "workspace" wid) (ok {:focused wid}))               ; :single -> focus existing
-        (do (swap! lifecycle* lc/open (:id app) (System/currentTimeMillis))  ; await its window (gates sync!)
-            (eww/loading! eww-config true)                                   ; black "..." over the startup churn
-            (apply shell/sh (launch/launch-argv app launch-ctx))             ; -> window::new flows back
-            (ok {:launched (:id app)}))))))
+      (if-let [wid (windows/window-for-app @state* aid)]
+        (do (i3/command! "workspace" wid) (ok {:focused wid}))               ; already mapped -> focus it
+        ;; claim the launch atomically: only the click whose swap adds the :opening entry launches;
+        ;; rapid repeats (entry already present) are no-ops, so N clicks spawn at most one instance.
+        (let [[old new] (swap-vals! lifecycle* lc/open aid (System/currentTimeMillis))]
+          (if (identical? old new)
+            (ok {:opening aid})                                              ; a launch is already in flight
+            (do (eww/loading! eww-config true)                               ; black "..." over the startup churn
+                (apply shell/sh (launch/launch-argv app launch-ctx))         ; -> window::new flows back
+                (ok {:launched aid}))))))))
 
 (defn- focus-window! [_ wid] (i3/command! "workspace" wid) (ok {:focused wid}))
 

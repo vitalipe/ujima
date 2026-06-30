@@ -6,9 +6,12 @@
 
 
 (defn open
-  "An app launch has begun — mark it :opening as of `now` (ms since epoch)."
+  "Claim a launch for `id`: mark it :opening as of `now` UNLESS it's already tracked (opening or
+   running). Idempotent, so applied with `swap-vals!` it is the launch lock — only the call whose
+   swap actually adds the entry (old ≢ new) should spawn; rapid repeat clicks become no-ops, so N
+   clicks open at most one instance."
   [m id now]
-  (assoc m id {:state :opening :since now}))
+  (if (contains? m id) m (assoc m id {:state :opening :since now})))
 
 (defn running
   "Its window is tracked now — :running. No-op for an app we aren't tracking the lifecycle of."

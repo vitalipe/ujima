@@ -13,6 +13,17 @@
       (is (= {} (lc/forget m :write))))))
 
 
+(deftest open-is-idempotent-launch-lock
+  ;; open only claims when the app isn't already tracked, so (with swap-vals!) it's the launch lock:
+  ;; rapid repeat launches don't each spawn an instance. The "win" is detected via identical? old/new.
+  (let [m1 (lc/open {} :write 100)
+        m2 (lc/open m1 :write 200)]
+    (is (identical? m1 m2) "re-opening an already-:opening app is a no-op (claim lost)")
+    (is (= 100 (get-in m2 [:write :since])) "the original :since is preserved")
+    (let [r (lc/running m1 :write)]
+      (is (identical? r (lc/open r :write 300)) "re-opening a :running app is a no-op too"))))
+
+
 (deftest closing-then-forget
   (let [m (-> (lc/open {} :write 0) (lc/running :write) (lc/closing :write))]
     (is (= :closing (get-in m [:write :state])))

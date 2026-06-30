@@ -65,18 +65,6 @@
       (recur))))
 
 
-(defn- wake-bars!
-  "Each new app window resets the override-redirect bars' pointer input — they stop acting on
-   clicks/hover until tapped (the double-click). After a new window is placed, tap one bar's no-op
-   center to re-wake all of them, saving + restoring the pointer so the cursor doesn't jump. Runs in
-   the background (xdotool warps the pointer); no-op if xdotool is absent."
-  []
-  (future
-    (Thread/sleep 500)   ; let the new window settle — its start is what resets the bars
-    (shell/sh? :bash "-c"
-               "eval $(xdotool getmouselocation --shell); xdotool mousemove 640 18 click 1; xdotool mousemove $X $Y")))
-
-
 (defn init! [cfg]
   (let [cat        (catalog/load! (:catalog cfg))
         state*     (atom (windows/init-state cat))
@@ -107,8 +95,7 @@
                      ;; the sync loop / a title event) — place it + mark its app :running.
                      (when (and (#{:window/new :window/title} (:type ev)) (nil? before-wid) after-wid)
                        (i3/place! con after-wid)
-                       (swap! lifecycle* lc/running (:app-id (windows/window @state* after-wid)))
-                       (wake-bars!))   ; a new window resets the override-redirect bars' input — re-wake
+                       (swap! lifecycle* lc/running (:app-id (windows/window @state* after-wid))))
                      (when (and (= :window/new (:type ev)) (:class ev) (nil? after-wid))
                        (log/info "unmanaged window" {:class (:class ev) :title (:title ev)})))
                    ;; the app's last window closed — drop it from the lifecycle.

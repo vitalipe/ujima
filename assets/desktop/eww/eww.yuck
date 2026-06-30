@@ -15,6 +15,8 @@
 (defvar vol 65)
 (defvar muted false)
 (defvar kbi 0)   ; mock keyboard layout index: 0=En 1=He 2=Sw (cycles on click)
+; a launcher click steals focus from the override-redirect bars → they go dormant; tap one to re-wake (pointer restored). No sleep — testing whether the focus-grab is the whole cause.
+(defvar wakebars "eval $(xdotool getmouselocation --shell); xdotool mousemove 640 18 click 1; xdotool mousemove $X $Y")
 
 
 ;; --- top: current window title + close -----------------------------------
@@ -33,15 +35,15 @@
   (box :class "launcher" :orientation "v" :halign "center" :valign "center" :space-evenly false
     (label :class "brand" :text "Ujima")
     (box :class "tiles" :orientation "h" :space-evenly true
-      (button :class "tile" :onclick "curl -sX POST ${api}/apps/wikipedia/open"
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/wikipedia/open; ${wakebars}"
         (image :path "/opt/ujima/desktop/icons/wikipedia.svg" :image-width 76 :image-height 76))
-      (button :class "tile" :onclick "curl -sX POST ${api}/apps/books/open"
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/books/open; ${wakebars}"
         (image :path "/opt/ujima/desktop/icons/books.svg" :image-width 76 :image-height 76))
-      (button :class "tile" :onclick "curl -sX POST ${api}/apps/write/open"
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/write/open; ${wakebars}"
         (image :path "/opt/ujima/desktop/icons/write.svg" :image-width 76 :image-height 76))
-      (button :class "tile" :onclick "curl -sX POST ${api}/apps/draw/open"
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/draw/open; ${wakebars}"
         (image :path "/opt/ujima/desktop/icons/draw.svg" :image-width 76 :image-height 76))
-      (button :class "tile" :onclick "curl -sX POST ${api}/apps/files/open"
+      (button :class "tile" :onclick "curl -sX POST ${api}/apps/files/open; ${wakebars}"
         (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 76 :image-height 76)))))
 
 ;; --- bottom: launcher + open windows + clock -----------------------------

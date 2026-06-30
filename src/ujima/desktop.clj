@@ -4,11 +4,11 @@
    so the shell that appears is the finished, reconciled desktop.
    cfg = {:catalog <path> :http {:host :port} :chromium <bin> :profile-dir <dir> :eww-config <dir>}."
   (:require [babashka.fs :as fs]
+            [lib.shell   :as shell]
             [ujima.log :as log]
             [ujima.desktop.catalog   :as catalog]
             [ujima.desktop.windows   :as windows]
             [ujima.desktop.lifecycle :as lc]
-            [ujima.desktop.eww       :as eww]
             [ujima.desktop.i3        :as i3]
             [ujima.desktop.http      :as http]))
 
@@ -16,6 +16,15 @@
 (def ^:private opening-timeout-ms
   "How long an app may sit :opening before we give up on it (crash, or a class that never matches)."
   12000)
+
+
+(defn- open-eww!
+  "Bring up the eww surfaces (auto-starts the daemon). Blocks: the call holds the foreground eww
+   daemon for the session's life, so it must be the LAST thing init! does."
+  [cfg]
+  (let [dir (or (:eww-config cfg) "/opt/ujima/desktop/eww")]
+    (log/info "opening shell" {:eww dir})
+    (shell/sh! :eww :--config dir "open-many" "topbar" "launcher" "dock")))
 
 
 (defn- sync!
@@ -34,9 +43,9 @@
 
 (defn- sync-loop!
   "Run `sync!` only while an app is :opening (awaiting its window), and forget ones that never show
-   up (opening-timeout-ms) — dropping the loading overlay if that empties the wait. Idle otherwise —
-   a light heartbeat that touches no i3/get_tree when nothing is launching. Starts before open-shell!."
-  [state* lifecycle* eww-config handle]
+   up (opening-timeout-ms). Idle otherwise — a light heartbeat that touches no i3/get_tree when
+   nothing is launching. Must start before the blocking open-eww!."
+  [state* lifecycle* handle]
   (future
     (loop []
       (try
@@ -44,8 +53,7 @@
           (sync! state* handle)
           (doseq [id (lc/expired @lifecycle* (System/currentTimeMillis) opening-timeout-ms)]
             (log/warn "app never appeared — giving up" {:app id})
-            (swap! lifecycle* lc/forget id))
-          (when-not (lc/awaiting? @lifecycle*) (eww/loading! eww-config false)))
+            (swap! lifecycle* lc/forget id)))
         (catch Throwable e (log/error "sync failed" {:error (ex-message e)})))
       (Thread/sleep (if (lc/awaiting? @lifecycle*) 400 1000))
       (recur))))
@@ -55,10 +63,8 @@
   (let [cat        (catalog/load! (:catalog cfg))
         state*     (atom (windows/init-state cat))
         lifecycle* (atom {})
-        eww-config (or (:eww-config cfg) "/opt/ujima/desktop/eww")
         ctx        {:state*     state*
                     :lifecycle* lifecycle*
-                    :eww-config eww-config
                     :subs*      (atom #{})
                     :catalog    cat
                     :launch-ctx {:chromium (:chromium cfg) :profile-dir (:profile-dir cfg)}}
@@ -80,12 +86,10 @@
                    (swap! state* windows/apply-event ev)
                    (let [after-wid (windows/window-for-con @state* con)]
                      ;; a con that just became tracked (a new window, or a late WM_CLASS picked up by
-                     ;; the sync loop / a title event) — place it, mark its app :running, and once
-                     ;; nothing is left :opening, drop the loading overlay to reveal it.
+                     ;; the sync loop / a title event) — place it + mark its app :running.
                      (when (and (#{:window/new :window/title} (:type ev)) (nil? before-wid) after-wid)
                        (i3/place! con after-wid)
-                       (swap! lifecycle* lc/running (:app-id (windows/window @state* after-wid)))
-                       (when-not (lc/awaiting? @lifecycle*) (eww/loading! eww-config false)))
+                       (swap! lifecycle* lc/running (:app-id (windows/window @state* after-wid))))
                      (when (and (= :window/new (:type ev)) (:class ev) (nil? after-wid))
                        (log/info "unmanaged window" {:class (:class ev) :title (:title ev)})))
                    ;; the app's last window closed — drop it from the lifecycle.
@@ -104,6 +108,5 @@
     (i3/subscribe! handle)                                          ; live window events (bg thread)
     (http/start! ctx (:http cfg))                                   ; eww-facing API (up before eww)
     (swap! lifecycle* lc/open :launcher (System/currentTimeMillis)) ; await the launcher we open next
-    (sync-loop! state* lifecycle* eww-config handle)                ; gated get_tree net — before eww
-    (log/info "opening shell" {:eww eww-config})
-    (eww/open-shell! eww-config)))                                   ; brings up the shell; this BLOCKS
+    (sync-loop! state* lifecycle* handle)                           ; gated get_tree net — before open-eww!
+    (open-eww! cfg)))                                                ; brings up the shell; this BLOCKS

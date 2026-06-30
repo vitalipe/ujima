@@ -15,7 +15,6 @@
             [ujima.desktop.launch  :as launch]
             [ujima.desktop.windows :as windows]
             [ujima.desktop.lifecycle :as lc]
-            [ujima.desktop.eww     :as eww]
             [ujima.desktop.i3      :as i3]))
 
 
@@ -68,7 +67,7 @@
 
 ;; --- command handlers (event-sourced: fire i3/launch, never mutate the projection) ---
 
-(defn- open-app! [{:keys [state* lifecycle* eww-config catalog launch-ctx]} id]
+(defn- open-app! [{:keys [state* lifecycle* catalog launch-ctx]} id]
   (let [app (catalog/app catalog (keyword id))
         aid (:id app)]
     (cond
@@ -82,8 +81,7 @@
         (let [[old new] (swap-vals! lifecycle* lc/open aid (System/currentTimeMillis))]
           (if (identical? old new)
             (ok {:opening aid})                                              ; a launch is already in flight
-            (do (eww/loading! eww-config true)                               ; black "..." over the startup churn
-                (apply shell/sh (launch/launch-argv app launch-ctx))         ; -> window::new flows back
+            (do (apply shell/sh (launch/launch-argv app launch-ctx))         ; -> window::new flows back
                 (ok {:launched aid}))))))))
 
 (defn- focus-window! [_ wid] (i3/command! "workspace" wid) (ok {:focused wid}))

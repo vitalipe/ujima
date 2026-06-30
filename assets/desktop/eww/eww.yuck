@@ -98,3 +98,15 @@
   :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
   :wm-ignore true :stacking "fg"
   (button :hexpand true :vexpand true :onclick "${ewwcmd} close volbackdrop volume"))
+
+
+;; --- loading overlay: a full-screen black "..." the agent opens while an app is :opening and
+;; closes once it's :running, so the launch churn (split/splash/late WM_CLASS) is never seen.
+(defwidget loading []
+  (box :class "loading" :hexpand true :vexpand true
+    (label :class "dots" :text "..." :hexpand true :vexpand true :halign "center" :valign "center")))
+
+(defwindow loading
+  :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
+  :wm-ignore true :stacking "fg"
+  (loading))

@@ -6,9 +6,10 @@
 
 ;; Audio rides the session PipeWire: wpctl (WirePlumber CLI) for get/set, pw-dump for
 ;; state as JSON. The agent runs inside the desktop session, so XDG_RUNTIME_DIR already
-;; points both at the session instance. A `sink` argument is a node id (see `sinks`),
-;; a node name, an output-class keyword (:usb | :hdmi), or a wpctl @alias@; the
-;; no-sink arities target the default sink.
+;; points both at the session instance. volume/volume! address a sink — node id (see
+;; `sinks`), node name, output-class keyword (:usb | :hdmi — nil no-op when no such
+;; sink is present), or wpctl @alias@ — and default to the default sink. mute/mute!
+;; are machine-wide (default sink only). switch-output! re-routes app audio to a sink.
 
 (def ^:private default-target "@DEFAULT_AUDIO_SINK@")
 
@@ -67,11 +68,12 @@
 
 
 (defn- resolve-sink
-  ;; class keyword -> its sink; sink map -> id; node name -> id; ids and @alias@ pass through
+  ;; class keyword -> its sink (nil when absent); sink map -> id; node name -> id;
+  ;; ids and @alias@ pass through
   [sink-or-class]
   (let [sink (cond-> sink-or-class (keyword? sink-or-class) class->sink)]
     (cond
-      (nil? sink) (throw (ex-info "no sink of class" {:class sink-or-class :sinks (mapv :name (sinks))}))
+      (nil? sink) nil
       (map? sink) (:id sink)
 
       (and (string? sink) (not (str/starts-with? sink "@")))
@@ -82,7 +84,7 @@
       :else sink)))
 
 
-(defn default-sink! [sink]
+(defn switch-output! [sink]
   ($! wpctl set-default [(resolve-sink sink)])
   (default-sink))
 
@@ -97,26 +99,22 @@
 
 (defn volume
   ([] (volume default-target))
-  ([sink-or-class] (:volume (volume-status (resolve-sink sink-or-class)))))
+  ([sink-or-class] (some-> (resolve-sink sink-or-class) volume-status :volume)))
 
 
 (defn volume!
   ([value] (volume! default-target value))
   ([sink-or-class value]
-   (let [value  (-> value int (max 0) (min 100))
-         target (resolve-sink sink-or-class)]
-     ($! wpctl set-volume [target] [(str value "%")])
-     (volume target))))
+   (when-let [target (resolve-sink sink-or-class)]
+     (let [value (-> value int (max 0) (min 100))]
+       ($! wpctl set-volume [target] [(str value "%")])
+       (volume target)))))
 
 
-(defn mute
-  ([] (mute default-target))
-  ([sink-or-class] (:muted? (volume-status (resolve-sink sink-or-class)))))
+(defn mute []
+  (:muted? (volume-status default-target)))
 
 
-(defn mute!
-  ([muted?] (mute! default-target muted?))
-  ([sink-or-class muted?]
-   (let [target (resolve-sink sink-or-class)]
-     ($! wpctl set-mute [target] (if muted? "1" "0"))
-     (mute target))))
+(defn mute! [muted?]
+  ($! wpctl set-mute [default-target] (if muted? "1" "0"))
+  (mute))

@@ -4,25 +4,16 @@
             [ujima.linux.audio  :as audio]))
 
 
-;; Per-class volume glue: getter is nil while no sink of that class is present, so the
-;; setter (a no-op then) re-applies each pass until the device shows up. Guarded here
-;; on purpose — an unplugged class is normal, not the error audio/volume would throw.
-(defn- class-volume [class]
-  (some-> (audio/class->sink class) audio/volume))
-
-(defn- class-volume! [class value]
-  (when-let [sink (audio/class->sink class)]
-    (audio/volume! sink value)))
-
-
 ;; Maps each setting (from ujima.control.defs) to the ujima.linux operation that
 ;; reads (:get) and applies (:set) it. All OS logic lives in ujima.linux.*; this
 ;; namespace only orchestrates. :get nil => no getter, the setting is set-only.
+;; An absent output class is normal (unplugged): audio/volume(!) no-op to nil, so
+;; the setting harmlessly re-applies each pass until the device shows up.
 (def handlers
   {[:system :hostname]    {:get system/hostname :set system/hostname!}
    [:system :timezone]    {:get system/timezone :set system/timezone!}
-   [:audio :usb :volume]  {:get #(class-volume :usb)  :set #(class-volume! :usb %)}
-   [:audio :hdmi :volume] {:get #(class-volume :hdmi) :set #(class-volume! :hdmi %)}
+   [:audio :usb :volume]  {:get #(audio/volume :usb)  :set #(audio/volume! :usb %)}
+   [:audio :hdmi :volume] {:get #(audio/volume :hdmi) :set #(audio/volume! :hdmi %)}
    [:audio :muted]        {:get audio/mute      :set audio/mute!}
    [:keyboard :layout]    {:get nil             :set #(system/keyboard-layouts! [%])}}) ;; getter is a TODO
 

@@ -34,4 +34,11 @@
     (is (= "@DEFAULT_AUDIO_SINK@" (#'audio/resolve-sink "@DEFAULT_AUDIO_SINK@")) "@alias@ passes through")
     (is (thrown? Exception (#'audio/resolve-sink "no-such-node-name")))
     (with-redefs [audio/sinks (constantly [])]
-      (is (thrown? Exception (#'audio/resolve-sink :usb)) "absent class is loud"))))
+      (is (nil? (#'audio/resolve-sink :usb)) "absent class -> nil"))))
+
+
+(deftest volume-fns-no-op-to-nil-when-class-absent
+  ;; guards fire before any wpctl call — nothing shells out here
+  (with-redefs [audio/sinks (constantly [])]
+    (is (nil? (audio/volume :usb)))
+    (is (nil? (audio/volume! :usb 50)))))

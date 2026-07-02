@@ -24,6 +24,39 @@
     ;; and toggled off on dev with assets/dev/lock-fs.
     ($! apt-get install -y --no-install-recommends "overlayroot")
 
+    ;; minimal desktop runtime (cached in the vendor base): i3 + core X + the legacy setuid Xorg.wrap
+    ;; (so the systemd session — a non-console user — can open the VT). eww is NOT apt — built from
+    ;; source (assets/dev/build-eww), staged by tools.scripts.desktop; libgtk-3-0 is its runtime lib
+    ;; (apt pulls the rest of the GTK stack). Pin the exact eww lib set from build-eww's `ldd` dump.
+    ($! apt-get install -y --no-install-recommends
+        "i3" "xserver-xorg-core" "xserver-xorg-input-libinput" "xinit"
+        "xserver-xorg-legacy"
+        "libgtk-3-0"
+        "librsvg2-common"   ; gdk-pixbuf SVG loader — lets eww render the SVG app icons (librsvg2-2 is just the lib)
+        "picom"             ; xrender compositor — transparency for floating eww overlays (volume popover)
+        "xdotool")          ; one synthetic tap at startup wakes the override-redirect bars' input (ujima.desktop/wake-bars!)
+
+    ;; X-from-systemd: let a non-console user start X via the setuid wrapper. HW-verified — without it
+    ;; Xorg dies "Cannot open virtual console (Permission denied)".
+    (spit "/etc/X11/Xwrapper.config" "allowed_users=anybody\nneeds_root_rights=yes\n")
+
+    ;; Pi 5 splits the render GPU (card0/v3d) from the display (card1); Xorg's autoconfig latches onto
+    ;; the render node and dies "no screens found". Mark the vc4 KMS device as the primary GPU.
+    ($! mkdir -p "/etc/X11/xorg.conf.d")
+    (spit "/etc/X11/xorg.conf.d/99-vc4.conf"
+          (str "Section \"OutputClass\"\n"
+               "  Identifier \"vc4\"\n"
+               "  MatchDriver \"vc4\"\n"
+               "  Driver \"modesetting\"\n"
+               "  Option \"PrimaryGPU\" \"true\"\n"
+               "EndSection\n"))
+
+    ;; classroom apps the launcher opens (assets/desktop/apps.edn): chromium for the web tiles
+    ;; (Wikipedia/Books, run as --app), libreoffice-writer for Write, tuxpaint for Draw, pcmanfm for
+    ;; Files. Writer-only (not the full suite) to match the catalog + keep the image lean.
+    ($! apt-get install -y --no-install-recommends
+        "chromium" "libreoffice-writer" "tuxpaint" "pcmanfm")
+
     ;; runtime babashka: the same vendored aarch64 binary we are running under,
     ;; copied + made executable in one shot
     ($! install -m "0755"

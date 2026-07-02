@@ -25,7 +25,8 @@
    (drive it from config if that ever changes)."
   []
   (when-not (:ok? ($? id "ujima"))
-    ($! useradd -m -s "/bin/bash" -G "sudo" "ujima"))
+    ;; video+render: GPU/DRM access so X (and eww/chromium) can use the display, not just software
+    ($! useradd -m -s "/bin/bash" -G "sudo,video,render" "ujima"))
   (-> ($ echo "ujima:ujima") ($! chpasswd)))
 
 
@@ -75,4 +76,7 @@
     ;; 3. login user (cloud-init is off, so nothing else makes one)
     (create-login-user!)
     (grant-passwordless-sudo!)
-    (enable-console-autologin!)))
+    (enable-console-autologin!)
+
+    ;; 4. map the hostname so sudo/X stop warning "unable to resolve host ujima"
+    ($! sh -c "grep -qw ujima /etc/hosts || printf '127.0.1.1\\tujima\\n' >> /etc/hosts")))

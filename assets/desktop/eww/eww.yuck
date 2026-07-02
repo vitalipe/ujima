@@ -1,0 +1,98 @@
+;; UjimaOS desktop shell — STATIC: same surfaces as the live shell (top/mid/bottom + volume),
+;; fixed mock values instead of agent/i3 state. No http, no deflisten; the tray state is eww-local.
+;; The redesigned app layer wires the tiles/dock/topbar back to real state later.
+
+(defpoll clock :interval "10s" "date +%H:%M")
+
+;; mock sound state — the real pactl audio is flaky, so the overlay is UI-only for now
+(defvar ewwcmd "eww --config /opt/ujima/desktop/eww")
+(defvar vol 65)
+(defvar muted false)
+(defvar kbi 0)   ; mock keyboard layout index: 0=En 1=He 2=Sw (cycles on click)
+; a launcher click steals focus from the override-redirect bars → they go dormant; tap one to re-wake (pointer restored)
+(defvar wakebars "eval $(xdotool getmouselocation --shell); xdotool mousemove 640 18 click 1; xdotool mousemove $X $Y")
+
+
+;; --- top: mock current-window title + inert close --------------------------
+(defwidget topbar []
+  (centerbox :class "topbar"
+    (label :class "title" :halign "start" :text "Wikipedia")
+    (box)
+    (button :class "close" :halign "end" "✕")))
+
+;; --- mid: launcher tiles (visual only) -------------------------------------
+(defwidget launcher []
+  (box :class "launcher" :orientation "v" :halign "center" :valign "center" :space-evenly false
+    (label :class "brand" :text "Ujima")
+    (box :class "tiles" :orientation "h" :space-evenly true
+      (button :class "tile" :onclick "${wakebars}"
+        (image :path "/opt/ujima/desktop/icons/wikipedia.svg" :image-width 76 :image-height 76))
+      (button :class "tile" :onclick "${wakebars}"
+        (image :path "/opt/ujima/desktop/icons/books.svg" :image-width 76 :image-height 76))
+      (button :class "tile" :onclick "${wakebars}"
+        (image :path "/opt/ujima/desktop/icons/write.svg" :image-width 76 :image-height 76))
+      (button :class "tile" :onclick "${wakebars}"
+        (image :path "/opt/ujima/desktop/icons/draw.svg" :image-width 76 :image-height 76))
+      (button :class "tile" :onclick "${wakebars}"
+        (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 76 :image-height 76)))))
+
+;; --- bottom: mock open-window row + tray + clock ----------------------------
+(defwidget dock []
+  (centerbox :class "dock"
+    (box :halign "start" :space-evenly false
+      (button :class "win active"
+        (image :path "/opt/ujima/desktop/icons/wikipedia.svg" :image-width 28 :image-height 28))
+      (button :class "win"
+        (image :path "/opt/ujima/desktop/icons/books.svg" :image-width 28 :image-height 28))
+      (button :class "win"
+        (image :path "/opt/ujima/desktop/icons/write.svg" :image-width 28 :image-height 28))
+      (button :class "win"
+        (image :path "/opt/ujima/desktop/icons/draw.svg" :image-width 28 :image-height 28))
+      (button :class "win"
+        (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 28 :image-height 28)))
+    (box)
+    (box :class "tray" :halign "end" :space-evenly false :spacing 8
+      (button :class "kbd" :onclick "${ewwcmd} update kbi=${kbi == 2 ? 0 : kbi + 1}"
+        (label :text {kbi == 0 ? "En" : kbi == 1 ? "He" : "Sw"}))
+      (label :class "clock" :text {clock})
+      (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
+        (image :path {muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22)))))
+
+
+;; --- volume overlay (mock): the dock speaker toggles this popover ---------
+(defwidget volpanel []
+  (box :class "volpanel" :orientation "v" :space-evenly false :spacing 8 :hexpand true :vexpand true
+    (label :class "volnum" :text {vol})
+    (scale :class "volscale" :orientation "v" :flipped true :vexpand true :min 0 :max 100
+           :value {vol} :onchange "${ewwcmd} update vol={}")
+    (button :class "volmute" :onclick "${ewwcmd} update muted=${muted ? false : true}"
+      (image :path {muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))))
+
+
+;; --- surfaces ------------------------------------------------------------
+(defwindow topbar
+  :monitor 0 :geometry (geometry :anchor "top center" :width "100%" :height "36px")
+  :wm-ignore true :stacking "fg"
+  (topbar))
+
+(defwindow launcher
+  :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
+  :windowtype "normal"
+  (launcher))
+
+(defwindow dock
+  :monitor 0 :geometry (geometry :anchor "bottom center" :width "100%" :height "48px")
+  :wm-ignore true :stacking "fg"
+  (dock))
+
+(defwindow volume
+  :monitor 0 :geometry (geometry :anchor "bottom right" :width "4%" :height "210px")
+  :wm-ignore true :stacking "fg"
+  (volpanel))
+
+;; invisible fullscreen click-catcher: opened with the popover (under it), any click closes both
+;; so clicking outside the popover dismisses it. The popover is opened last → stacks on top.
+(defwindow volbackdrop
+  :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
+  :wm-ignore true :stacking "fg"
+  (button :hexpand true :vexpand true :onclick "${ewwcmd} close volbackdrop volume"))

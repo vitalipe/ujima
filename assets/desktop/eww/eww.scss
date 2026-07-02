@@ -1,0 +1,38 @@
+// UjimaOS desktop shell — minimal dark theme.
+* { all: unset; font-family: "Inter", sans-serif; font-size: 13px; }
+
+.topbar, .dock { background-color: #1b1d23; color: #e6e6e6; }
+
+.topbar { padding: 0 12px; }
+.topbar .title { font-weight: bold; }
+.topbar .close { padding: 0 14px; }
+.topbar .close:hover { background-color: #c0392b; color: #ffffff; }
+
+.dock { padding: 0 8px; }
+.dock .ujima { padding: 0 16px; font-weight: bold; }
+.dock .win { padding: 4px 10px; }
+.dock .win.active { background-color: #2c2f38; }
+.dock .win:hover { background-color: #2c2f38; border-radius: 8px; }
+.dock .clock { padding: 0 12px; color: #b8b8b8; }
+
+.launcher { background-color: #14161a; color: #e6e6e6; }
+.launcher .brand { font-size: 32px; font-weight: bold; margin-bottom: 24px; }
+.launcher .tile {
+  padding: 12px; margin: 10px;
+  background-color: transparent; border-radius: 16px;
+}
+.launcher .tile:hover { background-color: #23262e; }
+
+// --- sound: dock speaker + volume overlay (mock) ---
+.tray .clock { padding: 0 6px; }
+.kbd { padding: 0 8px; color: #e6e6e6; font-weight: bold; }
+.kbd:hover { background-color: #2c2f38; border-radius: 8px; }
+.sound { padding: 0 8px; }
+.sound:hover { background-color: #2c2f38; border-radius: 8px; }
+.volpanel { background-color: #23262e; border-radius: 16px; padding: 12px 8px; }
+.volpanel .volmute { padding: 4px; }
+.volpanel .volnum { color: #b8b8b8; }
+.volscale { min-height: 150px; }
+.volscale trough { background-color: #3a3e4a; border-radius: 8px; min-width: 6px; }
+.volscale trough highlight { background-color: #4f8cff; border-radius: 8px; }
+.volscale slider { background-color: #ffffff; border-radius: 999px; min-width: 16px; min-height: 16px; margin: -6px; }

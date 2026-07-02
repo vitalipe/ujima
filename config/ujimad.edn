@@ -1,5 +1,5 @@
 {:log     {:level :warn}
  :shell   {:commands {}}
- :control {:storage "/ujima/settings/" 
-           :tmp     "/ujima/run/session"}}
-   
+ :control {:storage "/ujima/settings/"
+           :tmp     "/ujima/run/session"}
+ :desktop {:eww-config "/opt/ujima/desktop/eww"}}

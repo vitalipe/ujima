@@ -51,6 +51,14 @@
                "  Option \"PrimaryGPU\" \"true\"\n"
                "EndSection\n"))
 
+    ;; audio: per-user PipeWire + WirePlumber (ships wpctl — ujima.linux.desktop drives it).
+    ;; pipewire-pulse serves the PulseAudio socket (chromium's audio path via libpulse),
+    ;; pipewire-alsa routes plain ALSA apps. The user units are preset-enabled at install
+    ;; time and start with the session's `systemd --user` (ujima.service logs in via PAM).
+    ;; The session is seatless, so /dev/snd access needs the ujima user in `audio` (base).
+    ($! apt-get install -y --no-install-recommends
+        "pipewire" "pipewire-pulse" "pipewire-alsa" "wireplumber")
+
     ;; classroom apps the launcher opens (assets/desktop/apps.edn): chromium for the web tiles
     ;; (Wikipedia/Books, run as --app), libreoffice-writer for Write, tuxpaint for Draw, pcmanfm for
     ;; Files. Writer-only (not the full suite) to match the catalog + keep the image lean.

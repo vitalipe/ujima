@@ -25,8 +25,9 @@
    (drive it from config if that ever changes)."
   []
   (when-not (:ok? ($? id "ujima"))
-    ;; video+render: GPU/DRM access so X (and eww/chromium) can use the display, not just software
-    ($! useradd -m -s "/bin/bash" -G "sudo,video,render" "ujima"))
+    ;; video+render: GPU/DRM access so X (and eww/chromium) can use the display, not just software.
+    ;; audio: /dev/snd for the session PipeWire — the session is seatless (no logind ACLs)
+    ($! useradd -m -s "/bin/bash" -G "sudo,video,render,audio" "ujima"))
   (-> ($ echo "ujima:ujima") ($! chpasswd)))
 
 

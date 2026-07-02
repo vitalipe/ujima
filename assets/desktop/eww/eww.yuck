@@ -16,7 +16,7 @@
 ;; --- top: mock current-window title + inert close --------------------------
 (defwidget topbar []
   (centerbox :class "topbar"
-    (label :class "title" :halign "start" :text "Wikipedia")
+    (label :class "title" :halign "start" :text "[activity title here]")
     (box)
     (button :class "close" :halign "end" "✕")))
 
@@ -40,6 +40,8 @@
 (defwidget dock []
   (centerbox :class "dock"
     (box :halign "start" :space-evenly false
+      (button :class "win"
+        (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 28 :image-height 28))
       (button :class "win active"
         (image :path "/opt/ujima/desktop/icons/wikipedia.svg" :image-width 28 :image-height 28))
       (button :class "win"

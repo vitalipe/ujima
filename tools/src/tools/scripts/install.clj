@@ -51,7 +51,7 @@
                "  Option \"PrimaryGPU\" \"true\"\n"
                "EndSection\n"))
 
-    ;; audio: per-user PipeWire + WirePlumber (ships wpctl — ujima.linux.desktop drives it).
+    ;; audio: per-user PipeWire + WirePlumber (ships wpctl — ujima.linux.audio drives it).
     ;; pipewire-pulse serves the PulseAudio socket (chromium's audio path via libpulse),
     ;; pipewire-alsa routes plain ALSA apps. The user units are preset-enabled at install
     ;; time and start with the session's `systemd --user` (ujima.service logs in via PAM).

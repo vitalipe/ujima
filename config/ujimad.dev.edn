@@ -2,7 +2,7 @@
  :control {:storage "/tmp/ujima/settings/"
            :tmp     "/tmp/ujima/settings/session"}
 
- ;; Dev stubs: the daemon's whole command surface (linux/system + linux/desktop).
+ ;; Dev stubs: the daemon's whole command surface (linux/system + linux/audio).
  ;; sudo-wrapped setters are remapped on the WRAPPED command (remap skips `sudo -n`),
  ;; so a :sudo entry would be a no-op — each command is stubbed individually.
  :shell   {:commands {:hostnamectl ["echo"]   ; set-hostname (sudo)

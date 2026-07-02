@@ -1,17 +1,18 @@
 (ns ujima.control.reconcile
-  (:require [ujima.log           :as log]
-            [ujima.linux.system  :as system]
-            [ujima.linux.desktop :as desktop]))
+  (:require [ujima.log          :as log]
+            [ujima.linux.system :as system]
+            [ujima.linux.audio  :as audio]))
 
 
 ;; Per-class volume glue: getter is nil while no sink of that class is present, so the
-;; setter (a no-op then) re-applies each pass until the device shows up.
+;; setter (a no-op then) re-applies each pass until the device shows up. Guarded here
+;; on purpose — an unplugged class is normal, not the error audio/volume would throw.
 (defn- class-volume [class]
-  (some->> (desktop/sink-for-class class) :id desktop/volume))
+  (some-> (audio/class->sink class) audio/volume))
 
 (defn- class-volume! [class value]
-  (when-let [sink (desktop/sink-for-class class)]
-    (desktop/volume! (:id sink) value)))
+  (when-let [sink (audio/class->sink class)]
+    (audio/volume! sink value)))
 
 
 ;; Maps each setting (from ujima.control.defs) to the ujima.linux operation that
@@ -22,7 +23,7 @@
    [:system :timezone]    {:get system/timezone :set system/timezone!}
    [:audio :usb :volume]  {:get #(class-volume :usb)  :set #(class-volume! :usb %)}
    [:audio :hdmi :volume] {:get #(class-volume :hdmi) :set #(class-volume! :hdmi %)}
-   [:audio :muted]        {:get desktop/mute    :set desktop/mute!}
+   [:audio :muted]        {:get audio/mute      :set audio/mute!}
    [:keyboard :layout]    {:get nil             :set #(system/keyboard-layouts! [%])}}) ;; getter is a TODO
 
 

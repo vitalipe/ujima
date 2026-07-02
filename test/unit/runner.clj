@@ -16,7 +16,7 @@
             [ujima.control.reconcile-test]
             [ujima.control-test]
 
-            [ujima.linux.desktop-test]))
+            [ujima.linux.audio-test]))
 
 
 (def test-namespaces
@@ -36,7 +36,7 @@
     ujima.control.reconcile-test
     ujima.control-test
 
-    ujima.linux.desktop-test])
+    ujima.linux.audio-test])
 
 
 (defn -main [& _]

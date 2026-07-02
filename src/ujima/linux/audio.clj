@@ -1,4 +1,4 @@
-(ns ujima.linux.desktop
+(ns ujima.linux.audio
   (:require [cheshire.core  :as json]
             [clojure.string :as str]
             [lib.shell :refer [$!]]))
@@ -7,7 +7,8 @@
 ;; Audio rides the session PipeWire: wpctl (WirePlumber CLI) for get/set, pw-dump for
 ;; state as JSON. The agent runs inside the desktop session, so XDG_RUNTIME_DIR already
 ;; points both at the session instance. A `sink` argument is a node id (see `sinks`),
-;; a node name, or a wpctl @alias@; the no-sink arities target the default sink.
+;; a node name, an output-class keyword (:usb | :hdmi), or a wpctl @alias@; the
+;; no-sink arities target the default sink.
 
 (def ^:private default-target "@DEFAULT_AUDIO_SINK@")
 
@@ -35,6 +36,7 @@
           :default?    (= (:node.name props) default-name)})))
 
 
+
 (defn sinks []
   (let [objs (pw-objects)]
     (audio-nodes objs "Audio/Sink" (get (default-node-names objs) "default.audio.sink"))))
@@ -58,20 +60,26 @@
       (re-find #"(?i)hdmi" name) :hdmi)))
 
 
-(defn sink-for-class
+(defn class->sink
   "First sink of `class` (:usb | :hdmi), nil when absent."
   [class]
   (first (filter #(= class (output-class %)) (sinks))))
 
 
 (defn- resolve-sink
-  ;; node name -> node id; ids and @alias@ pass through
-  [sink]
-  (if (and (string? sink) (not (str/starts-with? sink "@")))
-    (let [known (sinks)]
-      (or (:id (first (filter #(= sink (:name %)) known)))
-          (throw (ex-info "no such sink" {:name sink :sinks (mapv :name known)}))))
-    sink))
+  ;; class keyword -> its sink; sink map -> id; node name -> id; ids and @alias@ pass through
+  [sink-or-class]
+  (let [sink (cond-> sink-or-class (keyword? sink-or-class) class->sink)]
+    (cond
+      (nil? sink) (throw (ex-info "no sink of class" {:class sink-or-class :sinks (mapv :name (sinks))}))
+      (map? sink) (:id sink)
+
+      (and (string? sink) (not (str/starts-with? sink "@")))
+      (let [known (sinks)]
+        (or (:id (first (filter #(= sink (:name %)) known)))
+            (throw (ex-info "no such sink" {:name sink :sinks (mapv :name known)}))))
+
+      :else sink)))
 
 
 (defn default-sink! [sink]
@@ -89,26 +97,26 @@
 
 (defn volume
   ([] (volume default-target))
-  ([sink] (:volume (volume-status (resolve-sink sink)))))
+  ([sink-or-class] (:volume (volume-status (resolve-sink sink-or-class)))))
 
 
 (defn volume!
   ([value] (volume! default-target value))
-  ([sink value]
+  ([sink-or-class value]
    (let [value  (-> value int (max 0) (min 100))
-         target (resolve-sink sink)]
+         target (resolve-sink sink-or-class)]
      ($! wpctl set-volume [target] [(str value "%")])
      (volume target))))
 
 
 (defn mute
   ([] (mute default-target))
-  ([sink] (:muted? (volume-status (resolve-sink sink)))))
+  ([sink-or-class] (:muted? (volume-status (resolve-sink sink-or-class)))))
 
 
 (defn mute!
   ([muted?] (mute! default-target muted?))
-  ([sink muted?]
-   (let [target (resolve-sink sink)]
+  ([sink-or-class muted?]
+   (let [target (resolve-sink sink-or-class)]
      ($! wpctl set-mute [target] (if muted? "1" "0"))
      (mute target))))

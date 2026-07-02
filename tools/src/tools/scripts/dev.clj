@@ -1,8 +1,9 @@
 (ns tools.scripts.dev
   "Runs INSIDE the target chroot as root. Layers DEV-only conveniences onto a configured ujima
-   image: an SSH server for headless access, the assets/dev helper scripts (e.g. `wifi`) staged
-   at /ujima/dev, and a [ujima-dev] shell prompt. Not part of the release pipeline — run on dev
-   images only.
+   image: an SSH server for headless access, x11vnc + maim + xdotool for the desktop relay
+   (`tools dev view` / `dev screenshot` / `dev click|type|key`), the assets/dev helper scripts
+   (e.g. `wifi`) staged at /ujima/dev, and a [ujima-dev] shell prompt (tagged with the overlay
+   ro/rw state). Not part of the release pipeline — run on dev images only.
 
    Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup].
 
@@ -14,10 +15,17 @@
 
 ;; Bash prompt for the dev image. The stock `ujima@<host>` prompt is easy to confuse with other
 ;; machines once you've SSH'd into a few boxes; a bold-yellow [ujima-dev] tag makes it clear which
-;; one you're on.
+;; one you're on. It also tags the overlay state — green [ro] (read-only overlay on) vs bold-red
+;; [rw] (overlay disabled via lock-fs, writable root) — decided once at shell startup, since the
+;; state only changes across a reboot.
 (def ^:private dev-prompt
   (str "# ujima dev image prompt (managed by tools.scripts.dev — overwritten each run)\n"
-       "PS1='\\[\\e[1;33m\\][ujima-dev]\\[\\e[0m\\] \\u@\\h:\\w\\$ '\n"))
+       "# overlay state, baked in at shell startup (only changes across a reboot):\n"
+       "if [ \"$(findmnt -no FSTYPE / 2>/dev/null)\" = overlay ]; then\n"
+       "    PS1='\\[\\e[1;33m\\][ujima-dev]\\[\\e[0m\\] \\[\\e[0;32m\\][ro]\\[\\e[0m\\] \\u@\\h:\\w\\$ '\n"
+       "else\n"
+       "    PS1='\\[\\e[1;33m\\][ujima-dev]\\[\\e[0m\\] \\[\\e[1;31m\\][rw]\\[\\e[0m\\] \\u@\\h:\\w\\$ '\n"
+       "fi\n"))
 
 
 (defn- install-dev-prompt!
@@ -39,9 +47,14 @@
 
 (defn run! [{:keys [project]}]
   (with-console-out
-    ;; SSH server for headless dev access (raspios ships it present-but-disabled)
+    ;; headless dev access: SSH server (raspios ships it present-but-disabled) + rsync, plus the
+    ;; desktop-relay tools — x11vnc (interactive `dev view`), maim (one-shot `dev screenshot`), and
+    ;; xdotool (synthetic input for `dev click|type|key`). DEV-ONLY by design: a VNC server +
+    ;; synthetic-input tooling are remote-control surfaces that must never ship in a release image,
+    ;; so they go here (release skips this script), NOT in tools.scripts.install.
     ($! apt-get update)
-    ($! apt-get install -y --no-install-recommends "openssh-server" "rsync")
+    ($! apt-get install -y --no-install-recommends
+        "openssh-server" "rsync" "x11vnc" "maim" "xdotool")
     ($! systemctl enable "ssh")
     ;; Bake host keys into the rootfs now so they stay stable when a dev box runs under the
     ;; read-only overlay (assets/dev/lock-fs): sshd then reads them from the ro lower instead of

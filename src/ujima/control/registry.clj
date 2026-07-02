@@ -34,9 +34,9 @@
 
 (defn effective-value [_registry scopes-data key]
   ;; Note: use use complete scopes, so when we add policy we don't change params
-  (->> scopes-data 
+  (->> scopes-data
     (map :settings)
-    (map key)
+    (map #(get % key)) ;; keys are path vectors, not IFn-able keywords
     (remove nil?)
     (last))) ;; for now we always :merge :override
 

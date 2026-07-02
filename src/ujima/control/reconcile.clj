@@ -4,15 +4,26 @@
             [ujima.linux.desktop :as desktop]))
 
 
+;; Per-class volume glue: getter is nil while no sink of that class is present, so the
+;; setter (a no-op then) re-applies each pass until the device shows up.
+(defn- class-volume [class]
+  (some->> (desktop/sink-for-class class) :id desktop/volume))
+
+(defn- class-volume! [class value]
+  (when-let [sink (desktop/sink-for-class class)]
+    (desktop/volume! (:id sink) value)))
+
+
 ;; Maps each setting (from ujima.control.defs) to the ujima.linux operation that
 ;; reads (:get) and applies (:set) it. All OS logic lives in ujima.linux.*; this
 ;; namespace only orchestrates. :get nil => no getter, the setting is set-only.
 (def handlers
-  {:system/hostname {:get system/hostname :set system/hostname!}
-   :system/timezone {:get system/timezone :set system/timezone!}
-   :audio/volume    {:get desktop/volume  :set desktop/volume!}
-   :audio/muted     {:get desktop/mute    :set desktop/mute!}
-   :keyboard/layout {:get nil             :set #(system/keyboard-layouts! [%])}}) ;; getter is a TODO
+  {[:system :hostname]    {:get system/hostname :set system/hostname!}
+   [:system :timezone]    {:get system/timezone :set system/timezone!}
+   [:audio :usb :volume]  {:get #(class-volume :usb)  :set #(class-volume! :usb %)}
+   [:audio :hdmi :volume] {:get #(class-volume :hdmi) :set #(class-volume! :hdmi %)}
+   [:audio :muted]        {:get desktop/mute    :set desktop/mute!}
+   [:keyboard :layout]    {:get nil             :set #(system/keyboard-layouts! [%])}}) ;; getter is a TODO
 
 
 (defn- converge-setting! [k desired {getter :get setter :set}]

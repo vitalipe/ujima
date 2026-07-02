@@ -5,7 +5,8 @@
   (:require [lib.util    :refer [index-by map-vals map-kv-vals]]
             [babashka.fs :refer [path]]
 
-            [lib.io :as io]
+            [lib.io    :as io]
+            [ujima.log :as log]
             [ujima.control.defs      :as defs]
             [ujima.control.reconcile :as reconcile]
             [ujima.control.registry  :refer [->registry
@@ -25,12 +26,20 @@
 (defonce ^:private storage*  (atom nil))
 
 
-(defn- slurp-scope [scope]
-  (io/slurp-edn (get @storage* scope) {}))
-  
+(defn- slurp-scope
+  "A scope file whose :schema doesn't match defs/schema (incl. pre-schema files) is
+   ignored — defaults apply, and the next write replaces it."
+  [scope]
+  (let [raw (io/slurp-edn (get @storage* scope) {})]
+    (if (and (map? raw) (or (empty? raw) (= defs/schema (:schema raw))))
+      raw
+      (do (log/warn "control: ignoring scope file, schema mismatch"
+                    {:scope scope :schema (:schema raw) :expected defs/schema})
+          {}))))
+
 
 (defn- spit-scope! [scope scope-edn]
-  (io/spit-file-atomic! (get @storage* scope) scope-edn))
+  (io/spit-file-atomic! (get @storage* scope) (assoc scope-edn :schema defs/schema)))
 
 
 ;; ---------------------------------------------------------------------------
@@ -71,8 +80,8 @@
    `f` MUST be pure over the passed map -- it must not read disk, other
    scopes, or the lock, or the atomicity guarantee breaks.
 
-   set:    (update-settings! :device #(assoc % :hostname \"meru-01\"))
-   clear:  (update-settings! :device #(dissoc % :hostname))
+   set:    (update-settings! :device #(assoc % [:system :hostname] \"meru-01\"))
+   clear:  (update-settings! :device #(dissoc % [:system :hostname]))
    multi:  (update-settings! :session #(merge % {...}))"
   [scope f]
 
@@ -88,7 +97,7 @@
 
 (defn settings!
   "Sugar over `update-settings!` for the common set-one-or-more-keys case.
-   (assoc-scope! :device :hostname \"meru-01\") "
+   (settings! :device [:system :hostname] \"meru-01\") "
   [scope k v & kvs]
   (update-settings! scope #(apply assoc % k v kvs)))
   

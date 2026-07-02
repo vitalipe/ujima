@@ -13,7 +13,10 @@
             [lib.io-test]
 
             [ujima.control.registry-test]
-            [ujima.control.reconcile-test]))
+            [ujima.control.reconcile-test]
+            [ujima.control-test]
+
+            [ujima.linux.desktop-test]))
 
 
 (def test-namespaces
@@ -30,7 +33,10 @@
     lib.io-test
 
     ujima.control.registry-test
-    ujima.control.reconcile-test])
+    ujima.control.reconcile-test
+    ujima.control-test
+
+    ujima.linux.desktop-test])
 
 
 (defn -main [& _]

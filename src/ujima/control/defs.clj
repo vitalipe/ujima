@@ -1,6 +1,11 @@
 (ns ujima.control.defs)
 
 
+;; persisted scope-file format version — bump when the stored shape changes
+;; (schema 1 = flat :settings map, path-vector keys)
+(def schema 1)
+
+
 (def scopes [{:key     :device
               :doc     "Persistent per-device config and policy"
               :persist? true}
@@ -14,27 +19,32 @@
               :persist? false}])
 
 
-(def settings [{:key     :system/hostname
+(def settings [{:key     [:system :hostname]
                 :doc     "LAN hostname for this machine (single label, not an FQDN)"
                 :default "ujima"
                 :scopes  #{:device}}
-              
-               {:key     :system/timezone
+
+               {:key     [:system :timezone]
                 :doc     "IANA timezone (tzdata name)"
                 :default "Africa/Dar_es_Salaam"
                 :scopes  #{:device}}
-                              
-               {:key     :keyboard/layout
+
+               {:key     [:keyboard :layout]
                 :doc     "XKB layout codes"
                 :default "en"
                 :scopes  #{:device :session :activity}}
 
-               {:key     :audio/muted
-                :doc     "Audio muted?"
+               {:key     [:audio :muted]
+                :doc     "Audio muted? (machine-wide)"
                 :default false
                 :scopes  #{:session :activity}}
 
-               {:key     :audio/volume
-                :doc     "volume 0-100"
-                :default 50
-                :scopes  #{:session :activity}}])
+               {:key     [:audio :usb :volume]
+                :doc     "USB headphones volume 0-100 (low default = ear-safe first plug)"
+                :default 40
+                :scopes  #{:device :session :activity}}
+
+               {:key     [:audio :hdmi :volume]
+                :doc     "HDMI output volume 0-100"
+                :default 70
+                :scopes  #{:device :session :activity}}])

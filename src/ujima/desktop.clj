@@ -3,9 +3,13 @@
    (--no-daemonize) with inherited stdio, so everything it prints — including its dying words —
    lands in the journal instead of a discarded capture pipe. init! blocks on the daemon process;
    it returning means eww is gone, and the caller tears the session down for a cold rebuild.
-   cfg = {:eww-config <dir>}."
+   Also brings up the widget-facing HTTP API + edge before the surfaces open, so their
+   defpolls have something to talk to from the first tick.
+   cfg = {:eww-config <dir> :http {:host <ip> :port <n>}}."
   (:require [lib.shell :as shell]
-            [ujima.log :as log]))
+            [ujima.log :as log]
+            [ujima.desktop.http  :as http]
+            [ujima.desktop.shell :as widgets]))
 
 
 (def ^:private ping-tries 40)   ; x 250ms = 10s for the daemon socket to come up
@@ -37,6 +41,8 @@
                  (shell/sh :eww :--config dir "daemon" :--no-daemonize))]
     (log/info "opening shell" {:eww dir})
     (await-daemon! dir)
+    (widgets/start!)
+    (http/start! (:http cfg))
     (shell/sh! :eww :--config dir "open-many" "topbar" "launcher" "dock")
     (let [{:keys [exit]} @daemon]
       (log/error "eww daemon exited — session over" {:exit exit}))))

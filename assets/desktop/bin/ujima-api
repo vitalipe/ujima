@@ -1,0 +1,14 @@
+#!/bin/sh
+# eww -> agent loopback API (ujima.desktop.http). Keeps curl/quoting out of yuck.
+#   ujima-api GET  /api/audio                                  # prints the response
+#   ujima-api POST /shell/mute/toggle '{"muted":true}' audio   # 4th arg: eww var updated with the response
+set -eu
+method=$1
+path=$2
+body=${3:-}
+var=${4:-}
+resp=$(curl -sf --max-time 3 -X "$method" ${body:+-d "$body"} "http://127.0.0.1:1337$path")
+if [ -n "$var" ]; then
+  exec eww --config /opt/ujima/desktop/eww update "$var=$resp"
+fi
+printf '%s\n' "$resp"

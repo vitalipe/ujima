@@ -33,6 +33,7 @@
 .volpanel .volmute { padding: 4px; }
 .volpanel .volnum { color: #b8b8b8; }
 .volscale { min-height: 150px; }
+.volscale.off { opacity: 0.35; }
 .volscale trough { background-color: #3a3e4a; border-radius: 8px; min-width: 6px; }
 .volscale trough highlight { background-color: #4f8cff; border-radius: 8px; }
 .volscale slider { background-color: #ffffff; border-radius: 999px; min-width: 16px; min-height: 16px; margin: -6px; }

@@ -1,16 +1,22 @@
-;; UjimaOS desktop shell — STATIC: same surfaces as the live shell (top/mid/bottom + volume),
-;; fixed mock values instead of agent/i3 state. No http, no deflisten; the tray state is eww-local.
-;; The redesigned app layer wires the tiles/dock/topbar back to real state later.
+;; UjimaOS desktop shell — tray volume/mute/keyboard wired to the agent's loopback API
+;; (ujima.desktop.http, 127.0.0.1:1337) through bin/ujima-api; launcher tiles + dock
+;; window row are still static mocks. Commands update the state vars from their own
+;; responses; the defpolls only self-heal drift, so their interval can stay lazy.
 
 (defpoll clock :interval "10s" "date +%H:%M")
 
-;; mock sound state — the real pactl audio is flaky, so the overlay is UI-only for now
 (defvar ewwcmd "eww --config /opt/ujima/desktop/eww")
-(defvar vol 65)
-(defvar muted false)
-(defvar kbi 0)   ; mock keyboard layout index: 0=En 1=He 2=Sw (cycles on click)
 ; a launcher click steals focus from the override-redirect bars → they go dormant; tap one to re-wake (pointer restored)
 (defvar wakebars "eval $(xdotool getmouselocation --shell); xdotool mousemove 640 18 click 1; xdotool mousemove $X $Y")
+
+;; agent state (JSON strings; safe initial so field access never sees garbage)
+(defpoll audio :interval "10s"
+  :initial "{\"volume\":null,\"muted\":false,\"output\":null}"
+  "/opt/ujima/desktop/bin/ujima-api GET /api/audio || echo '{\"volume\":null,\"muted\":false,\"output\":null}'")
+
+(defpoll kb :interval "30s"
+  :initial "{\"layout\":\"--\",\"layouts\":[]}"
+  "/opt/ujima/desktop/bin/ujima-api GET /api/input/keyboard || echo '{\"layout\":\"--\",\"layouts\":[]}'")
 
 
 ;; --- top: mock current-window title + inert close --------------------------
@@ -36,7 +42,7 @@
       (button :class "tile" :onclick "${wakebars}"
         (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 76 :image-height 76)))))
 
-;; --- bottom: mock open-window row + tray + clock ----------------------------
+;; --- bottom: mock open-window row + live tray + clock -----------------------
 (defwidget dock []
   (centerbox :class "dock"
     (box :halign "start" :space-evenly false
@@ -54,21 +60,33 @@
         (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 28 :image-height 28)))
     (box)
     (box :class "tray" :halign "end" :space-evenly false :spacing 8
-      (button :class "kbd" :onclick "${ewwcmd} update kbi=${kbi == 2 ? 0 : kbi + 1}"
-        (label :text {kbi == 0 ? "En" : kbi == 1 ? "He" : "Sw"}))
+      (button :class "kbd" :timeout "2s"
+        :onclick "/opt/ujima/desktop/bin/ujima-api POST /shell/keyboard/next '' kb"
+        (label :text {kb.layout}))
       (label :class "clock" :text {clock})
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
-        (image :path {muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22)))))
+        (image :path {audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22)))))
 
 
-;; --- volume overlay (mock): the dock speaker toggles this popover ---------
+;; --- volume overlay: slider moves are fire-and-forget (the agent debounces the
+;; --- drag into one settings write); mute posts the DESIRED state and refreshes
+;; --- `audio` from the response. Greyed when no output classifies (output null).
+;; `vol` mirrors the interaction so the number/knob react instantly instead of
+;; waiting out the poll; -1 = untouched, follow the agent. Once touched it pins
+;; to the last local value — fine while the widget is the only volume writer;
+;; the push layer replaces this.
+(defvar vol -1)
+
 (defwidget volpanel []
   (box :class "volpanel" :orientation "v" :space-evenly false :spacing 8 :hexpand true :vexpand true
-    (label :class "volnum" :text {vol})
-    (scale :class "volscale" :orientation "v" :flipped true :vexpand true :min 0 :max 100
-           :value {vol} :onchange "${ewwcmd} update vol={}")
-    (button :class "volmute" :onclick "${ewwcmd} update muted=${muted ? false : true}"
-      (image :path {muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))))
+    (label :class "volnum" :text {vol < 0 ? (audio.volume ?: "--") : vol})
+    (scale :class {(audio.volume ?: -1) == -1 ? "volscale off" : "volscale"}
+           :orientation "v" :flipped true :vexpand true :min 0 :max 101 :timeout "1s"
+           :value {vol < 0 ? (audio.volume ?: 0) : vol}
+           :onchange "${ewwcmd} update vol={} ; /opt/ujima/desktop/bin/ujima-api POST /shell/volume/move '{\"value\": {}}' >/dev/null")
+    (button :class "volmute" :timeout "2s"
+      :onclick "/opt/ujima/desktop/bin/ujima-api POST /shell/mute/toggle '{\"muted\": ${!audio.muted}}' audio"
+      (image :path {audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))))
 
 
 ;; --- surfaces ------------------------------------------------------------

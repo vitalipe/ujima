@@ -15,8 +15,10 @@
             [ujima.control.registry-test]
             [ujima.control.reconcile-test]
             [ujima.control-test]
+            [ujima.control.commands-test]
 
-            [ujima.linux.audio-test]))
+            [ujima.linux.audio-test]
+            [ujima.desktop.http-test]))
 
 
 (def test-namespaces
@@ -35,8 +37,10 @@
     ujima.control.registry-test
     ujima.control.reconcile-test
     ujima.control-test
+    ujima.control.commands-test
 
-    ujima.linux.audio-test])
+    ujima.linux.audio-test
+    ujima.desktop.http-test])
 
 
 (defn -main [& _]

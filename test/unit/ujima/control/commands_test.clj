@@ -15,13 +15,26 @@
   (is (= "us" (#'commands/next-of ["us"] "us"))          "single layout cycles to itself"))
 
 
-(deftest set-volume-writes-clamped-value-to-current-class
-  (let [written (atom nil)]
+(deftest set-volume-writes-clamped-value-and-returns-the-audio-resource
+  (let [written (atom nil)
+        store   (atom {[:audio :muted] false})]
     (with-redefs [audio/default-sink (constantly usb-sink)
-                  control/settings!  (fn [scope k v] (reset! written [scope k v]) {})]
-      (is (= {:volume 100} (commands/set-volume! 250))   "clamped before storing")
+                  control/settings   (fn [] @store)
+                  control/settings!  (fn [scope k v]
+                                       (reset! written [scope k v])
+                                       (swap! store assoc k v))]
+      (is (= {:volume 100 :muted false :output :usb} (commands/set-volume! 250))
+          "clamped before storing; write returns the fresh resource")
       (is (= [:session [:audio :usb :volume] 100] @written))
-      (is (= {:volume 42} (commands/set-volume! 42.6))   "coerced to int"))))
+      (is (= 42 (:volume (commands/set-volume! 42.6))) "coerced to int"))))
+
+
+(deftest set-mute-returns-the-audio-resource
+  (let [store (atom {[:audio :usb :volume] 55 [:audio :muted] false})]
+    (with-redefs [audio/default-sink (constantly usb-sink)
+                  control/settings   (fn [] @store)
+                  control/settings!  (fn [_ k v] (swap! store assoc k v))]
+      (is (= {:volume 55 :muted true :output :usb} (commands/set-mute! true))))))
 
 
 (deftest set-volume-rejects-when-no-output-classifies
@@ -37,17 +50,33 @@
          (try (commands/set-mute! "yes") (catch Exception e (:error (ex-data e)))))))
 
 
-(deftest next-layout-advances-from-effective-settings
-  (let [written (atom nil)]
-    (with-redefs [control/settings  (constantly {[:keyboard :layout]            "us"
-                                                 [:keyboard :available-layouts] ["us" "tz"]})
-                  control/settings! (fn [scope k v] (reset! written [scope k v]) {})]
-      (is (= {:layout "tz"} (commands/next-layout!)))
-      (is (= [:session [:keyboard :layout] "tz"] @written))))
+(deftest keyboard-status-publishes-the-cycle-as-next
+  (with-redefs [control/settings (constantly {[:keyboard :layout]            "tz"
+                                              [:keyboard :available-layouts] ["us" "tz"]})]
+    (is (= {:layout "tz" :layouts ["us" "tz"] :next "us"} (commands/keyboard-status))
+        "wraps"))
+  (with-redefs [control/settings (constantly {[:keyboard :layout]            "il"
+                                              [:keyboard :available-layouts] ["us" "tz"]})]
+    (is (= "us" (:next (commands/keyboard-status))) "unknown current -> first"))
   (with-redefs [control/settings (constantly {[:keyboard :layout]            "us"
                                               [:keyboard :available-layouts] []})]
-    (is (= :keyboard/no-layouts
-           (try (commands/next-layout!) (catch Exception e (:error (ex-data e))))))))
+    (is (nil? (:next (commands/keyboard-status))) "no layouts -> no next")))
+
+
+(deftest set-layout-accepts-only-available-codes-and-returns-the-keyboard-resource
+  (let [written (atom nil)
+        store   (atom {[:keyboard :layout]            "us"
+                       [:keyboard :available-layouts] ["us" "tz"]})]
+    (with-redefs [control/settings  (fn [] @store)
+                  control/settings! (fn [scope k v]
+                                      (reset! written [scope k v])
+                                      (swap! store assoc k v))]
+      (is (= {:layout "tz" :layouts ["us" "tz"] :next "us"} (commands/set-layout! "tz")))
+      (is (= [:session [:keyboard :layout] "tz"] @written))
+      (is (= :keyboard/unknown-layout
+             (try (commands/set-layout! "zz") (catch Exception e (:error (ex-data e))))))
+      (is (= :request/malformed
+             (try (commands/set-layout! nil) (catch Exception e (:error (ex-data e)))))))))
 
 
 (deftest audio-status-reads-settings-not-hw

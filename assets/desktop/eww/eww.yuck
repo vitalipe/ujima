@@ -15,8 +15,8 @@
   "/opt/ujima/desktop/bin/ujima-api GET /api/audio || echo '{\"volume\":null,\"muted\":false,\"output\":null}'")
 
 (defpoll kb :interval "30s"
-  :initial "{\"layout\":\"--\",\"layouts\":[]}"
-  "/opt/ujima/desktop/bin/ujima-api GET /api/input/keyboard || echo '{\"layout\":\"--\",\"layouts\":[]}'")
+  :initial "{\"layout\":\"--\",\"layouts\":[],\"next\":null}"
+  "/opt/ujima/desktop/bin/ujima-api GET /api/input/keyboard || echo '{\"layout\":\"--\",\"layouts\":[],\"next\":null}'")
 
 
 ;; --- top: mock current-window title + inert close --------------------------
@@ -60,8 +60,9 @@
         (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 28 :image-height 28)))
     (box)
     (box :class "tray" :halign "end" :space-evenly false :spacing 8
+      ; posts back the :next the server showed us — idempotent, a double-click can't double-advance
       (button :class "kbd" :timeout "2s"
-        :onclick "/opt/ujima/desktop/bin/ujima-api POST /shell/keyboard/next '' kb"
+        :onclick "/opt/ujima/desktop/bin/ujima-api POST /api/input/keyboard/layout '{\"layout\": \"${kb.next}\"}' kb"
         (label :text {kb.layout}))
       (label :class "clock" :text {clock})
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
@@ -85,7 +86,7 @@
            :value {vol < 0 ? (audio.volume ?: 0) : vol}
            :onchange "${ewwcmd} update vol={} ; /opt/ujima/desktop/bin/ujima-api POST /shell/volume/move '{\"value\": {}}' >/dev/null")
     (button :class "volmute" :timeout "2s"
-      :onclick "/opt/ujima/desktop/bin/ujima-api POST /shell/mute/toggle '{\"muted\": ${!audio.muted}}' audio"
+      :onclick "/opt/ujima/desktop/bin/ujima-api POST /api/audio/mute '{\"muted\": ${!audio.muted}}' audio"
       (image :path {audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))))
 
 

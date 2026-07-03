@@ -27,18 +27,3 @@
                      :value value})))
   (set-volume-throttled! value)
   nil)
-
-
-(defn toggle-mute!
-  "Set mute to the widget's DESIRED state (idempotent — a lost request can't flip
-   icon vs reality); returns the fresh audio resource."
-  [muted]
-  (commands/set-mute! muted)
-  (commands/audio-status))
-
-
-(defn next-layout!
-  "Advance to the next available layout; returns the fresh keyboard resource."
-  []
-  (commands/next-layout!)
-  (commands/keyboard-status))

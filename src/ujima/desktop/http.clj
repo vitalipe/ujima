@@ -1,10 +1,10 @@
 (ns ujima.desktop.http
   "The desktop's loopback HTTP API (http-kit). Transport only — parse the request,
    call ONE verb, serialize its result; no domain logic lives here. Two tiers:
-     /api/**    resource-grade settings API (ujima.control.commands; the future
-                console reuses these verbs)
-     /shell/**  the eww widget edge (ujima.desktop.shell): fire-and-forget volume
-                moves, optimistic toggles returning the fresh resource."
+     /api/**    the settings resource API (ujima.control.commands; the future
+                console reuses these verbs) — writes return the fresh resource
+     /shell/**  interaction verbs where interaction ≠ state (ujima.desktop.shell):
+                today only the throttled fire-and-forget volume moves."
   (:require [clojure.string     :as str]
             [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json json->edn]]
@@ -19,22 +19,21 @@
 
 ;; ex-info {:error <kw>} -> status; anything unmapped is a real bug -> 500.
 (def ^:private error-status
-  {:request/malformed    400
-   :audio/no-output      409
-   :keyboard/no-layouts  409})
+  {:request/malformed        400
+   :audio/no-output          409
+   :keyboard/unknown-layout  409})
 
 
 (defn route
   "Pure: [method uri] -> verb keyword, nil when unrouted (trailing slashes ok)."
   [method uri]
   (let [parts (->> (str/split (str uri) #"/") (remove str/blank?) vec)]
-    (get {[:get  ["api" "audio"]]             :audio/status
-          [:get  ["api" "input" "keyboard"]]  :keyboard/status
-          [:post ["api" "audio" "volume"]]    :audio/set-volume
-          [:post ["api" "audio" "mute"]]      :audio/set-mute
-          [:post ["shell" "volume" "move"]]   :shell/volume-move
-          [:post ["shell" "mute" "toggle"]]   :shell/mute-toggle
-          [:post ["shell" "keyboard" "next"]] :shell/keyboard-next}
+    (get {[:get  ["api" "audio"]]                    :audio/status
+          [:get  ["api" "input" "keyboard"]]         :keyboard/status
+          [:post ["api" "audio" "volume"]]           :audio/set-volume
+          [:post ["api" "audio" "mute"]]             :audio/set-mute
+          [:post ["api" "input" "keyboard" "layout"]] :keyboard/set-layout
+          [:post ["shell" "volume" "move"]]          :shell/volume-move}
          [method parts])))
 
 
@@ -47,9 +46,8 @@
         :keyboard/status     (json 200 (commands/keyboard-status))
         :audio/set-volume    (json 200 (commands/set-volume! (:value body)))
         :audio/set-mute      (json 200 (commands/set-mute! (:muted body)))
+        :keyboard/set-layout (json 200 (commands/set-layout! (:layout body)))
         :shell/volume-move   (do (shell/volume-moved! (:value body)) (json 202 {}))
-        :shell/mute-toggle   (json 200 (shell/toggle-mute! (:muted body)))
-        :shell/keyboard-next (json 200 (shell/next-layout!))
         (json 404 {:error "not found"})))
     (catch clojure.lang.ExceptionInfo e
       (if-let [status (error-status (:error (ex-data e)))]

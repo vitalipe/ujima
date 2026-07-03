@@ -80,4 +80,12 @@
     (enable-console-autologin!)
 
     ;; 4. map the hostname so sudo/X stop warning "unable to resolve host ujima"
-    ($! sh -c "grep -qw ujima /etc/hosts || printf '127.0.1.1\\tujima\\n' >> /etc/hosts")))
+    ($! sh -c "grep -qw ujima /etc/hosts || printf '127.0.1.1\\tujima\\n' >> /etc/hosts")
+
+    ;; 5. A/B disk mount points + bind targets — rootfs layout is build content, so every
+    ;;    image carries its own. The per-slot fstab that references them is written at
+    ;;    install time (ujima.device.ab.autoboot/slot->fstab).
+    (doseq [dir ["/mnt/settings"   "/mnt/storage"
+                 "/ujima/settings" "/ujima/storage"
+                 "/var/log/journal"]]
+      (fs/create-dirs dir))))

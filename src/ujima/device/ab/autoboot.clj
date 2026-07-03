@@ -1,6 +1,7 @@
 (ns ujima.device.ab.autoboot
   (:require
     [babashka.fs :as fs]
+    [clojure.string :as str]
     [lib.io                 :refer [file->uint-be]]
     [ujima.linux.disk       :refer [device->partitions]]
     [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
@@ -66,6 +67,20 @@
        "/mnt/storage/logs"                "  /var/log/journal none  bind,nofail     0  0\n"))
 
 
+(defn- rootfs-owner
+  ;; "uid:gid" of `user` in an unpacked rootfs, nil when absent (minimal test roots) —
+  ;; chown must use the TARGET's numeric ids; the installing host doesn't have the user.
+  [root-mnt user]
+  (let [passwd (fs/path root-mnt "etc/passwd")
+        line   (when (fs/exists? passwd)
+                 (->> (str/split-lines (slurp (str passwd)))
+                      (filter #(str/starts-with? % (str user ":")))
+                      (first)))]
+    (when line
+      (let [[_name _pw uid gid] (str/split line #":")]
+        (str uid ":" gid)))))
+
+
 (defrecord AutobootDisk [device]
 
   UjimaSystemDisk
@@ -111,22 +126,21 @@
       (with-mounted-vfat [boot-mnt boot]
         (autoboot/cmdline! boot-mnt (str "PARTUUID=" (slot->root-uuid slot))))
 
-      ;; per-slot fstab + mount points. Settings is bind-mounted per-slot onto /ujima/settings, so
-      ;; the rootfs needs both the raw /mnt/settings mount point and the /ujima/settings bind target.
-      (with-mounted-ext4 [root-mnt root]
-        (fs/create-dirs (fs/path root-mnt "etc"))   ; real rootfs has it; a minimal/test root may not
-        (spit (str (fs/path root-mnt "etc/fstab")) (slot->fstab slot))
+      ;; per-slot fstab. Its mount points / bind targets are rootfs content baked at build
+      ;; time (tools.scripts.base) — a pack is expected to carry them.
+      (let [agent-owner
+            (with-mounted-ext4 [root-mnt root]
+              (fs/create-dirs (fs/path root-mnt "etc"))   ; real rootfs has it; a minimal/test root may not
+              (spit (str (fs/path root-mnt "etc/fstab")) (slot->fstab slot))
+              (rootfs-owner root-mnt "ujima"))]
 
-        (fs/create-dirs (fs/path root-mnt "mnt/settings"))
-        (fs/create-dirs (fs/path root-mnt "mnt/storage"))
-
-        (fs/create-dirs (fs/path root-mnt "ujima/settings"))
-        (fs/create-dirs (fs/path root-mnt "ujima/storage"))
-        (fs/create-dirs (fs/path root-mnt "var/log/journal")))
-
-      ;; create this slot's settings subdir
-      (with-mounted-ext4 [cfg-mnt cfg-blk]
-        (fs/create-dirs (fs/path cfg-mnt (name slot))))
+        ;; this slot's settings subdir, owned by the agent user so it can write the device scope
+        ;; through the /ujima/settings bind (a root-owned dir breaks every device-scope write)
+        (with-mounted-ext4 [cfg-mnt cfg-blk]
+          (let [slot-dir (fs/path cfg-mnt (name slot))]
+            (fs/create-dirs slot-dir)
+            (when agent-owner
+              (sudo$! chown [agent-owner] [slot-dir])))))
 
       ;; journald logs dir on storage (the /var/log/journal bind source)
       (with-mounted-ext4 [storage-mnt storage-blk]

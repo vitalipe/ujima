@@ -59,6 +59,18 @@
        "SystemMaxUse=256M\n"))
 
 
+;; Agent-writable settings storage (the agent runs as ujima, the control plane writes scope
+;; files). /ujima/run holds the ephemeral scopes (session/activity) — under the overlay it
+;; lands in the tmpfs upper, so it must be recreated each boot. The `z` line fixes ownership
+;; of the device scope (the per-slot settings bind): the installer chowns it at install time
+;; (autoboot/install-into-slot!), but boxes installed before that fix have it root-owned —
+;; tmpfiles runs after local-fs.target, i.e. after the bind is mounted, and heals it.
+(def ^:private tmpfiles-conf
+  (str "d /ujima/run         0755 ujima ujima -\n"
+       "d /ujima/run/session 0755 ujima ujima -\n"
+       "z /ujima/settings    0755 ujima ujima -\n"))
+
+
 ;; Overlay-safe machine-id. Under the overlay (every image, see cmdline!) systemd can't persist
 ;; /etc/machine-id — writes hit the ephemeral tmpfs upper, so PID 1 mints a random id each boot,
 ;; churning journald's /var/log/journal/<machine-id>/ into one orphan dir per boot (defeating the
@@ -94,6 +106,9 @@
     ;; persistent capped journal on storage
     (fs/create-dirs "/etc/systemd/journald.conf.d")
     (spit "/etc/systemd/journald.conf.d/ujima.conf" journald-conf)
+
+    ;; agent-writable settings dirs: ephemeral scopes each boot + device-scope ownership heal
+    (spit "/etc/tmpfiles.d/ujima.conf" tmpfiles-conf)
 
     ;; overlay-safe machine-id: initramfs hook (the producer bakes it; image initramfs ships it)
     (let [hook "/etc/initramfs-tools/scripts/init-bottom/ujima-machine-id"]

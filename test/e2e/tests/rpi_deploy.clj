@@ -145,7 +145,8 @@
     (assert= "Expected per-slot settings subdir on the config partition"
              true (fs/exists? (fs/path cfg-mnt (name slot)))))
   ;; the slot's fstab: settings partition mounted REQUIRED (no nofail) at /mnt/settings, then
-  ;; bind-mounted per-slot onto /ujima/settings; plus both rootfs mount points.
+  ;; bind-mounted per-slot onto /ujima/settings. (The mount-point dirs themselves are build
+  ;; content — tools.scripts.base — not part of the install contract.)
   (with-mounted-ext4 [root-mnt (get-in info [:slots slot :root])]
     (let [fstab         (slurp (str (fs/path root-mnt "etc/fstab")))
           settings-line (->> (str/split-lines fstab)
@@ -158,11 +159,7 @@
       (assert-some! "fstab should bind /mnt/settings/<slot> onto /ujima/settings"
                     (re-find (re-pattern (str "/mnt/settings/" (name slot)
                                               "\\s+/ujima/settings\\s+none\\s+bind"))
-                             fstab))
-      (assert= "rootfs should have the /mnt/settings mount point"
-               true (fs/exists? (fs/path root-mnt "mnt/settings")))
-      (assert= "rootfs should have the /ujima/settings mount point"
-               true (fs/exists? (fs/path root-mnt "ujima/settings"))))))
+                             fstab)))))
 
 
 (defn assert-slot-logs! [info slot]
@@ -170,13 +167,11 @@
   (with-mounted-ext4 [s-mnt (:storage info)]
     (assert= "Expected /logs dir on the storage partition"
              true (fs/exists? (fs/path s-mnt "logs"))))
-  ;; the slot's fstab binds /var/log/journal onto storage, and the mount point exists
+  ;; the slot's fstab binds /var/log/journal onto storage
   (with-mounted-ext4 [root-mnt (get-in info [:slots slot :root])]
     (let [fstab (slurp (str (fs/path root-mnt "etc/fstab")))]
       (assert-some! "fstab should bind /var/log/journal onto /mnt/storage/logs"
-                    (re-find #"/mnt/storage/logs\s+/var/log/journal\s+none\s+bind" fstab))
-      (assert= "rootfs should have the /var/log/journal mount point"
-               true (fs/exists? (fs/path root-mnt "var/log/journal"))))))
+                    (re-find #"/mnt/storage/logs\s+/var/log/journal\s+none\s+bind" fstab)))))
 
 
 (defn test-install! [disk* pack-file slot expected-installed-slots]

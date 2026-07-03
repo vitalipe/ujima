@@ -45,6 +45,34 @@
        (spit bashrc (str "\n" srcline "\n") :append true)))))
 
 
+;; Audio test rig: snd-aloop is a REAL ALSA sink (honest volume/mute readback, unlike
+;; suspended null-sinks), and the rename rule makes it classify as :usb for the agent
+;; (ujima.linux.audio/output-class matches "usb" in node.name) — so the volume glue is
+;; testable on a dev box with no USB/HDMI audio attached. Matches the exact aloop node
+;; name so the paired capture source stays untouched.
+(def ^:private aloop-usb-rule
+  (str "# DEV RIG (ujima, managed by tools.scripts.dev): loopback sink classifies as :usb.\n"
+       "monitor.alsa.rules = [\n"
+       "  {\n"
+       "    matches = [\n"
+       "      { node.name = \"alsa_output.platform-snd_aloop.0.analog-stereo\" }\n"
+       "    ]\n"
+       "    actions = {\n"
+       "      update-props = {\n"
+       "        node.name        = \"alsa_output.platform-snd_aloop.0.usb-dev-rig\"\n"
+       "        node.description = \"Dev USB Rig (aloop)\"\n"
+       "      }\n"
+       "    }\n"
+       "  }\n"
+       "]\n"))
+
+
+(defn- install-audio-rig! []
+  (spit "/etc/modules-load.d/snd-aloop.conf" "snd-aloop\n")
+  (fs/create-dirs "/etc/wireplumber/wireplumber.conf.d")
+  (spit "/etc/wireplumber/wireplumber.conf.d/99-ujima-dev-audio-rig.conf" aloop-usb-rule))
+
+
 (defn run! [{:keys [project]}]
   (with-console-out
     ;; headless dev access: SSH server (raspios ships it present-but-disabled) + rsync, plus the
@@ -71,4 +99,8 @@
 
     ;; dev shell prompt: tag the ujima user's shell so an SSH/console session is obviously
     ;; *this* box, not one of the other machines you're logged into.
-    (install-dev-prompt!)))
+    (install-dev-prompt!)
+
+    ;; loopback audio sink that classifies as :usb — the agent's volume path is testable
+    ;; without real USB audio (takes effect after reboot / wireplumber restart).
+    (install-audio-rig!)))

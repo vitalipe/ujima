@@ -1,0 +1,15 @@
+#!/bin/sh
+# peek: one-line snapshot of the state the desktop shell drives — volume/mute on
+# the default sink (the target of the agent's volume path) + the X keyboard layout.
+# Timestamped for eyeballing apply latency:
+#   watch -n 0.3 /ujima/dev/peek
+export DISPLAY="${DISPLAY:-:0}" XAUTHORITY="${XAUTHORITY:-/home/ujima/.Xauthority}"
+
+vol=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null || echo "Volume: ?")
+pct=$(echo "$vol" | awk '{printf "%.0f", $2 * 100}' 2>/dev/null)
+case "$vol" in *MUTED*) mute="MUTED";; *) mute="unmuted";; esac
+sink=$(wpctl inspect @DEFAULT_AUDIO_SINK@ 2>/dev/null | sed -n 's/.*node.name = "\(.*\)".*/\1/p')
+kb=$(setxkbmap -query 2>/dev/null | sed -n 's/^layout: *//p')
+
+printf '%s  vol %-3s %-7s  kb %-3s  sink %s\n' \
+  "$(date +%H:%M:%S.%3N)" "${pct:-?}" "$mute" "${kb:-?}" "${sink:-none}"

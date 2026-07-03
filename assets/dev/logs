@@ -1,0 +1,12 @@
+#!/bin/sh
+# logs: the ujima session's journal. Everything the session prints — agent (bb),
+# eww, X — shares one inherited stdout tagged `startx`, and the session escapes
+# the unit cgroup, so `journalctl -u ujima` MISSES most of it. This filters by
+# the identifier + the unit's own lifecycle lines.
+#   /ujima/dev/logs                      follow live (last 50 + new)
+#   /ujima/dev/logs -b                   everything since boot
+#   /ujima/dev/logs --since "1h ago"     any journalctl args pass through
+# eww CONFIG errors (bad yuck/scss) live inside eww instead:
+#   eww --config /opt/ujima/desktop/eww logs
+[ $# -eq 0 ] && set -- -f -n 50
+exec sudo journalctl --no-hostname "$@" _SYSTEMD_UNIT=ujima.service + SYSLOG_IDENTIFIER=startx

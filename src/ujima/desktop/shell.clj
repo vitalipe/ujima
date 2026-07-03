@@ -1,47 +1,32 @@
 (ns ujima.desktop.shell
-  "The /shell widget edge: verbs shaped for the eww widgets (not the eww process —
-   that's ujima.desktop). A slider drag arrives as a stream of /volume/move values
-   with no mouseup event; the debouncer below emulates one — after settle-ms of
-   quiet, the LAST value becomes ONE control.commands call. Discrete verbs pass
-   straight through and return the fresh resource so a widget updates itself from
-   the response. The widget push/stream layer will accumulate here later."
-  (:require [ujima.log              :as log]
-            [ujima.control.commands :as commands])
-  (:import [java.util.concurrent LinkedBlockingQueue TimeUnit]))
+  (:require [lib.throttle           :refer [throttle-leading-trailing]]
+            [ujima.log              :as log]
+            [ujima.control.commands :as commands]))
 
 
-;; drag events arrive every ~20-50ms while the finger moves, so this much quiet
-;; reliably means "released"; it is also the floor of click-to-apply latency.
-(def ^:private settle-ms 250)
-
-(defonce ^:private moves (LinkedBlockingQueue.))
+;; the throttle delivers f's outcome into per-call promises; nobody derefs them on
+;; the fire-and-forget move path, so a bare set-volume! would fail silently — warn
+;; here (an unplugged sink mid-drag must show up in the journal)
+(defonce ^:private set-volume-throttled!
+  (throttle-leading-trailing 250
+    (fn [value]
+      (try (commands/set-volume! value)
+           (catch Exception e
+             (log/warn "volume move dropped" {:value value :error (ex-message e)}))))))
 
 
 (defn volume-moved!
-  "Record a slider position; returns immediately (fire-and-forget). The debouncer
-   applies the last one once the stream goes quiet."
+  "Record a slider position; returns immediately.
+
+   Applies the first value immediately, coalesces intermediate drag values,
+   and guarantees that the final dragged value is applied."
   [value]
   (when-not (number? value)
-    (throw (ex-info "volume must be a number" {:error :request/malformed :value value})))
-  (.offer moves value))
-
-
-(defn- debounce-loop! []
-  (loop [pending nil]
-    (if-some [v (.poll moves settle-ms TimeUnit/MILLISECONDS)]
-      (recur v)                                                ; still dragging — newest wins
-      (do (when (some? pending)
-            (try (commands/set-volume! pending)                ; the synthetic mouseup
-                 (catch Exception e
-                   (log/warn "volume move dropped" {:value pending :error (ex-message e)}))))
-          (recur nil)))))
-
-
-(defn start!
-  "Start the volume debouncer (process-lifetime; dies with the session)."
-  []
-  (future (debounce-loop!))
-  (log/info "desktop widget edge up" {:volume-settle-ms settle-ms}))
+    (throw (ex-info "volume must be a number"
+                    {:error :request/malformed
+                     :value value})))
+  (set-volume-throttled! value)
+  nil)
 
 
 (defn toggle-mute!

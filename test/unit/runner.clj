@@ -6,6 +6,7 @@
 
             [lib.shell-test]
             [lib.shell.command-test]
+            [lib.throttle-test]
 
             [ujima.sudo-test]
 
@@ -28,6 +29,7 @@
 
     lib.shell-test
     lib.shell.command-test
+    lib.throttle-test
 
     ujima.sudo-test
 

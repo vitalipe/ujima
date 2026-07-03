@@ -12,6 +12,7 @@
             [ujima.control.registry  :refer [->registry
                                              effective-value
                                              default-settings
+                                             reconcilable-settings
                                              update-settings-in-scope
                                              scopes]]))
 
@@ -91,8 +92,8 @@
         (slurp-scope)
         (update-settings-in-scope @registry* scope f)
         (spit-scope! scope))
-      
-      (reconcile/reconcile! (settings))))
+
+      (reconcile/reconcile! (reconcilable-settings @registry* (settings)))))
 
 
 (defn settings!
@@ -108,6 +109,6 @@
    writes nothing. Same lock and same convergence path as a mutation -- the only
    difference from `update-settings!` is the absence of a scope write."
   []
-  (locking lock* 
-    (reconcile/reconcile! (settings))))
+  (locking lock*
+    (reconcile/reconcile! (reconcilable-settings @registry* (settings)))))
   

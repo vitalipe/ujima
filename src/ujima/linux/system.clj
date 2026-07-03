@@ -1,6 +1,5 @@
 (ns ujima.linux.system
-  (:require [clojure.string :as str]
-            [lib.shell :refer [$?]]
+  (:require [lib.shell :refer [$?]]
             [ujima.linux.sudo :refer [sudo$?]]))
 
 
@@ -20,15 +19,6 @@
 (defn timezone! [timezone]
   (sudo$? timedatectl set-timezone [timezone])
   (:out ($? timedatectl show -p "Timezone" --value)))
-
-
-(defn keyboard-layouts []
-  []) ;; TODO
-
-
-(defn keyboard-layouts! [layouts]
-  (sudo$? localectl set-x11-keymap (str/join "," layouts))
-  (keyboard-layouts))
 
 
 (defn reboot! []

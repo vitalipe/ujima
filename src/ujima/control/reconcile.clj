@@ -1,7 +1,8 @@
 (ns ujima.control.reconcile
-  (:require [ujima.log          :as log]
-            [ujima.linux.system :as system]
-            [ujima.linux.audio  :as audio]))
+  (:require [ujima.log            :as log]
+            [ujima.linux.system   :as system]
+            [ujima.linux.keyboard :as keyboard]
+            [ujima.linux.audio    :as audio]))
 
 
 ;; Maps each setting (from ujima.control.defs) to the ujima.linux operation that
@@ -15,7 +16,7 @@
    [:audio :usb :volume]  {:get #(audio/volume :usb)  :set #(audio/volume! :usb %)}
    [:audio :hdmi :volume] {:get #(audio/volume :hdmi) :set #(audio/volume! :hdmi %)}
    [:audio :muted]        {:get audio/mute      :set audio/mute!}
-   [:keyboard :layout]    {:get nil             :set #(system/keyboard-layouts! [%])}}) ;; getter is a TODO
+   [:keyboard :layout]    {:get keyboard/layout :set keyboard/layout!}})
 
 
 (defn- converge-setting! [k desired {getter :get setter :set}]

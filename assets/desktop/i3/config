@@ -17,6 +17,11 @@ for_window [window_role="pop-up"]  floating enable
 gaps top 36
 gaps bottom 48
 
+# super+space cycles the keyboard layout — through the agent (concrete-state POST),
+# NEVER an XKB group toggle: X-side switching would drift from the control plane
+# and the next converge would snap it back.
+bindsym Mod4+space exec --no-startup-id /opt/ujima/desktop/bin/ujima-kbd-next
+
 # the agent owns the shell now: it reconciles settings, then brings up eww (daemon + surfaces)
 # itself once ready — so i3 only launches the agent + the compositor below.
 exec --no-startup-id ujima-agent

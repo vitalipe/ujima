@@ -9,7 +9,8 @@
   (is (= :audio/set-volume    (http/route :post "/api/audio/volume")))
   (is (= :audio/set-mute      (http/route :post "/api/audio/mute")))
   (is (= :keyboard/set-layout (http/route :post "/api/input/keyboard/layout")))
-  (is (= :shell/volume-move   (http/route :post "/shell/volume/move"))))
+  (is (= :ui/state            (http/route :get  "/ui/state")))
+  (is (= :ui/volume-move      (http/route :post "/ui/volume/move"))))
 
 
 (deftest route-tolerates-trailing-slashes
@@ -21,5 +22,5 @@
   (is (nil? (http/route :get  "/api/nope")))
   (is (nil? (http/route :post "/api/audio"))              "method matters")
   (is (nil? (http/route :get  "/api/input/keyboard/layout")) "writes are POST-only")
-  (is (nil? (http/route :post "/shell/mute/toggle"))      "retired shell routes are gone")
+  (is (nil? (http/route :post "/shell/volume/move"))      "the /shell tier is gone — it's /ui now")
   (is (nil? (http/route :get  "/"))))

@@ -22,9 +22,10 @@
 ;; ---------------------------------------------------------------------------
 
 
-(defonce ^:private lock*     (Object.))
-(defonce ^:private registry* (atom nil))
-(defonce ^:private storage*  (atom nil))
+(defonce ^:private lock*      (Object.))
+(defonce ^:private registry*  (atom nil))
+(defonce ^:private storage*   (atom nil))
+(defonce ^:private listeners* (atom []))
 
 
 (defn- slurp-scope
@@ -46,6 +47,24 @@
 ;; ---------------------------------------------------------------------------
 ;; Public API
 ;; ---------------------------------------------------------------------------
+
+
+(defn on-converge!
+  "Register `f` as a converge target next to the OS: it runs after EVERY converge
+   (each write and each external reconcile!), INSIDE the critical section — so
+   notifications are strictly ordered with converges. The contract that keeps that
+   safe: listeners are few, registered at boot, fast, one-way (ujima -> world) —
+   a listener must NEVER write settings (that recurses the converge). Failures are
+   logged and never break the converge itself."
+  [f]
+  (swap! listeners* conj f))
+
+
+(defn- notify-converged! [settings]
+  (doseq [f @listeners*]
+    (try (f settings)
+         (catch Throwable e
+           (log/error "control: converge listener failed" {:error (ex-message e)})))))
 
 
 (defn init! [{storage :storage tmp :tmp}]
@@ -93,7 +112,10 @@
         (update-settings-in-scope @registry* scope f)
         (spit-scope! scope))
 
-      (reconcile/reconcile! (reconcilable-settings @registry* (settings)))))
+      (let [effective (settings)]
+        (reconcile/reconcile! (reconcilable-settings @registry* effective))
+        (notify-converged! effective)
+        effective)))
 
 
 (defn settings!
@@ -110,5 +132,8 @@
    difference from `update-settings!` is the absence of a scope write."
   []
   (locking lock*
-    (reconcile/reconcile! (reconcilable-settings @registry* (settings)))))
+    (let [effective (settings)]
+      (reconcile/reconcile! (reconcilable-settings @registry* effective))
+      (notify-converged! effective)
+      effective)))
   

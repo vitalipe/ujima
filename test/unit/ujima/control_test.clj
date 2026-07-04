@@ -86,3 +86,19 @@
         (is (= defs/schema (:schema raw)))
         (is (= {[:system :hostname] "meru-01"} (:settings raw))
             "stale content discarded, not merged")))))
+
+
+(deftest converge-listeners-fire-on-writes-and-external-reconciles
+  (with-redefs [reconcile/handlers {}]
+    (fresh!)
+    (let [seen (atom [])]
+      (reset! @#'control/listeners* [])
+      (try
+        (control/on-converge! (fn [s] (swap! seen conj (get s [:audio :hdmi :volume]))))
+        (control/on-converge! (fn [_] (throw (ex-info "boom" {}))))   ; must never break a converge
+        (control/settings! :device [:audio :hdmi :volume] 85)
+        (is (= [85] @seen) "fires inside the write converge, sees effective settings")
+        (is (= 85 (get (control/settings) [:audio :hdmi :volume])) "throwing listener didn't break the write")
+        (control/reconcile!)
+        (is (= [85 85] @seen) "an external reconcile! is a converge too")
+        (finally (reset! @#'control/listeners* []))))))

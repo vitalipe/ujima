@@ -1,7 +1,8 @@
 ;; UjimaOS desktop shell — tray volume/mute/keyboard wired to the agent's loopback API
-;; (ujima.desktop.http, 127.0.0.1:1337) through bin/ujima-api; launcher tiles + dock
-;; window row are still static mocks. Commands update the state vars from their own
-;; responses; the defpolls only self-heal drift, so their interval can stay lazy.
+;; (ujima.desktop.http, 127.0.0.1:1337): widget state arrives on ONE pushed stream
+;; (/ui/state via deflisten — snapshot on connect, then a line per real change), and
+;; clicks are plain fire-and-forget POSTs through bin/ujima-api. Launcher tiles + dock
+;; window row are still static mocks.
 
 (defpoll clock :interval "10s" "date +%H:%M")
 
@@ -9,14 +10,11 @@
 ; a launcher click steals focus from the override-redirect bars → they go dormant; tap one to re-wake (pointer restored)
 (defvar wakebars "eval $(xdotool getmouselocation --shell); xdotool mousemove 640 18 click 1; xdotool mousemove $X $Y")
 
-;; agent state (JSON strings; safe initial so field access never sees garbage)
-(defpoll audio :interval "10s"
-  :initial "{\"volume\":null,\"muted\":false,\"output\":null}"
-  "/opt/ujima/desktop/bin/ujima-api GET /api/audio || echo '{\"volume\":null,\"muted\":false,\"output\":null}'")
-
-(defpoll kb :interval "30s"
-  :initial "{\"layout\":\"--\",\"layouts\":[],\"next\":null}"
-  "/opt/ujima/desktop/bin/ujima-api GET /api/input/keyboard || echo '{\"layout\":\"--\",\"layouts\":[],\"next\":null}'")
+;; the authoritative UI state (JSON); the while-loop is the reconnect story — an
+;; agent restart drops the connection, 1s later the snapshot line rehydrates us
+(deflisten state
+  :initial "{\"audio\":{\"volume\":null,\"muted\":false,\"output\":null},\"keyboard\":{\"layout\":\"--\",\"layouts\":[],\"next\":null}}"
+  "while true; do curl -sN http://127.0.0.1:1337/ui/state; sleep 1; done")
 
 
 ;; --- top: mock current-window title + inert close --------------------------
@@ -60,34 +58,35 @@
         (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 28 :image-height 28)))
     (box)
     (box :class "tray" :halign "end" :space-evenly false :spacing 8
-      ; posts back the :next the server showed us — idempotent, a double-click can't double-advance
+      ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
+      ; the label flips when the push lands
       (button :class "kbd" :timeout "2s"
-        :onclick "/opt/ujima/desktop/bin/ujima-api POST /api/input/keyboard/layout '{\"layout\": \"${kb.next}\"}' kb"
-        (label :text {kb.layout}))
+        :onclick "/opt/ujima/desktop/bin/ujima-api POST /api/input/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
+        (label :text {state.keyboard.layout}))
       (label :class "clock" :text {clock})
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
-        (image :path {audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22)))))
+        (image :path {state.audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22)))))
 
 
-;; --- volume overlay: slider moves are fire-and-forget (the agent debounces the
-;; --- drag into one settings write); mute posts the DESIRED state and refreshes
-;; --- `audio` from the response. Greyed when no output classifies (output null).
-;; `vol` mirrors the interaction so the number/knob react instantly instead of
-;; waiting out the poll; -1 = untouched, follow the agent. Once touched it pins
-;; to the last local value — fine while the widget is the only volume writer;
-;; the push layer replaces this.
+;; --- volume overlay: slider moves are fire-and-forget (the agent throttles the
+;; --- drag); mute posts the DESIRED state; everything reflects back via the
+;; --- /ui/state push. Greyed when no output classifies (output null).
+;; `vol` is eww-local interaction state: the number/knob track the finger
+;; instantly instead of waiting for the push round-trip; -1 = untouched, follow
+;; the agent. Once touched it pins to the last local value — fine while the
+;; widget is the only volume writer.
 (defvar vol -1)
 
 (defwidget volpanel []
   (box :class "volpanel" :orientation "v" :space-evenly false :spacing 8 :hexpand true :vexpand true
-    (label :class "volnum" :text {vol < 0 ? (audio.volume ?: "--") : vol})
-    (scale :class {(audio.volume ?: -1) == -1 ? "volscale off" : "volscale"}
+    (label :class "volnum" :text {vol < 0 ? (state.audio.volume ?: "--") : vol})
+    (scale :class {(state.audio.volume ?: -1) == -1 ? "volscale off" : "volscale"}
            :orientation "v" :flipped true :vexpand true :min 0 :max 101 :timeout "1s"
-           :value {vol < 0 ? (audio.volume ?: 0) : vol}
-           :onchange "${ewwcmd} update vol={} ; /opt/ujima/desktop/bin/ujima-api POST /shell/volume/move '{\"value\": {}}' >/dev/null")
+           :value {vol < 0 ? (state.audio.volume ?: 0) : vol}
+           :onchange "${ewwcmd} update vol={} ; /opt/ujima/desktop/bin/ujima-api POST /ui/volume/move '{\"value\": {}}' >/dev/null")
     (button :class "volmute" :timeout "2s"
-      :onclick "/opt/ujima/desktop/bin/ujima-api POST /api/audio/mute '{\"muted\": ${!audio.muted}}' audio"
-      (image :path {audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))))
+      :onclick "/opt/ujima/desktop/bin/ujima-api POST /api/audio/mute '{\"muted\": ${!state.audio.muted}}' >/dev/null"
+      (image :path {state.audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))))
 
 
 ;; --- surfaces ------------------------------------------------------------

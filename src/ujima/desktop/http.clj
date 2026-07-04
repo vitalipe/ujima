@@ -1,16 +1,16 @@
 (ns ujima.desktop.http
   "The desktop's loopback HTTP API (http-kit). Transport only — parse the request,
    call ONE verb, serialize its result; no domain logic lives here. Two tiers:
-     /api/**    the settings resource API (ujima.control.commands; the future
-                console reuses these verbs) — writes return the fresh resource
-     /shell/**  interaction verbs where interaction ≠ state (ujima.desktop.shell):
-                today only the throttled fire-and-forget volume moves."
+     /api/**  the settings resource API (ujima.control.commands; the future
+              console reuses these verbs) — writes return the fresh resource
+     /ui/**   the GUI edge (ujima.desktop.ui): the NDJSON state stream and the
+              verbs where interaction ≠ state (throttled volume moves)."
   (:require [clojure.string     :as str]
             [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json json->edn]]
             [ujima.log          :as log]
             [ujima.control.commands :as commands]
-            [ujima.desktop.shell    :as shell]))
+            [ujima.desktop.ui       :as ui]))
 
 
 (defn- json [status body]
@@ -33,7 +33,8 @@
           [:post ["api" "audio" "volume"]]           :audio/set-volume
           [:post ["api" "audio" "mute"]]             :audio/set-mute
           [:post ["api" "input" "keyboard" "layout"]] :keyboard/set-layout
-          [:post ["shell" "volume" "move"]]          :shell/volume-move}
+          [:get  ["ui" "state"]]                     :ui/state
+          [:post ["ui" "volume" "move"]]             :ui/volume-move}
          [method parts])))
 
 
@@ -47,7 +48,8 @@
         :audio/set-volume    (json 200 (commands/set-volume! (:value body)))
         :audio/set-mute      (json 200 (commands/set-mute! (:muted body)))
         :keyboard/set-layout (json 200 (commands/set-layout! (:layout body)))
-        :shell/volume-move   (do (shell/volume-moved! (:value body)) (json 202 {}))
+        :ui/state            (ui/stream req)
+        :ui/volume-move      (do (ui/volume-moved! (:value body)) (json 202 {}))
         (json 404 {:error "not found"})))
     (catch clojure.lang.ExceptionInfo e
       (if-let [status (error-status (:error (ex-data e)))]

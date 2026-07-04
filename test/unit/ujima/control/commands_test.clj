@@ -8,39 +8,26 @@
 (def ^:private usb-sink {:name "alsa_output.usb-Logitech_H390-00.analog-stereo"})
 
 
-(deftest next-of-cycles-wraps-and-recovers
-  (is (= "tz" (#'commands/next-of ["us" "tz"] "us")))
-  (is (= "us" (#'commands/next-of ["us" "tz"] "tz"))     "wraps")
-  (is (= "us" (#'commands/next-of ["us" "tz"] "il"))     "unknown current -> first")
-  (is (= "us" (#'commands/next-of ["us"] "us"))          "single layout cycles to itself"))
-
-
-(deftest set-volume-writes-clamped-value-and-returns-the-audio-resource
-  (let [written (atom nil)
-        store   (atom {[:audio :muted] false})]
+(deftest set-volume-writes-clamped-value-to-current-class
+  (let [written (atom nil)]
     (with-redefs [audio/default-sink (constantly usb-sink)
-                  control/settings   (fn [] @store)
-                  control/settings!  (fn [scope k v]
-                                       (reset! written [scope k v])
-                                       (swap! store assoc k v))]
-      (is (= {:volume 100 :muted false :output :usb} (commands/set-volume! 250))
-          "clamped before storing; write returns the fresh resource")
+                  control/settings!  (fn [scope k v] (reset! written [scope k v]) {})]
+      (is (= {:volume 100} (commands/set-volume! 250)) "clamped before storing; narrow ack")
       (is (= [:session [:audio :usb :volume] 100] @written))
-      (is (= 42 (:volume (commands/set-volume! 42.6))) "coerced to int"))))
-
-
-(deftest set-mute-returns-the-audio-resource
-  (let [store (atom {[:audio :usb :volume] 55 [:audio :muted] false})]
-    (with-redefs [audio/default-sink (constantly usb-sink)
-                  control/settings   (fn [] @store)
-                  control/settings!  (fn [_ k v] (swap! store assoc k v))]
-      (is (= {:volume 55 :muted true :output :usb} (commands/set-mute! true))))))
+      (is (= {:volume 42} (commands/set-volume! 42.6)) "coerced to int"))))
 
 
 (deftest set-volume-rejects-when-no-output-classifies
   (with-redefs [audio/default-sink (constantly nil)]
     (is (= :audio/no-output
            (try (commands/set-volume! 50) (catch Exception e (:error (ex-data e))))))))
+
+
+(deftest set-mute-writes-the-desired-state
+  (let [written (atom nil)]
+    (with-redefs [control/settings! (fn [scope k v] (reset! written [scope k v]) {})]
+      (is (= {:muted true} (commands/set-mute! true)))
+      (is (= [:session [:audio :muted] true] @written)))))
 
 
 (deftest verbs-reject-malformed-values
@@ -50,43 +37,13 @@
          (try (commands/set-mute! "yes") (catch Exception e (:error (ex-data e)))))))
 
 
-(deftest keyboard-status-publishes-the-cycle-as-next
-  (with-redefs [control/settings (constantly {[:keyboard :layout]            "tz"
-                                              [:keyboard :available-layouts] ["us" "tz"]})]
-    (is (= {:layout "tz" :layouts ["us" "tz"] :next "us"} (commands/keyboard-status))
-        "wraps"))
-  (with-redefs [control/settings (constantly {[:keyboard :layout]            "il"
-                                              [:keyboard :available-layouts] ["us" "tz"]})]
-    (is (= "us" (:next (commands/keyboard-status))) "unknown current -> first"))
-  (with-redefs [control/settings (constantly {[:keyboard :layout]            "us"
-                                              [:keyboard :available-layouts] []})]
-    (is (nil? (:next (commands/keyboard-status))) "no layouts -> no next")))
-
-
-(deftest set-layout-accepts-only-available-codes-and-returns-the-keyboard-resource
-  (let [written (atom nil)
-        store   (atom {[:keyboard :layout]            "us"
-                       [:keyboard :available-layouts] ["us" "tz"]})]
-    (with-redefs [control/settings  (fn [] @store)
-                  control/settings! (fn [scope k v]
-                                      (reset! written [scope k v])
-                                      (swap! store assoc k v))]
-      (is (= {:layout "tz" :layouts ["us" "tz"] :next "us"} (commands/set-layout! "tz")))
+(deftest set-layout-accepts-only-available-codes
+  (let [written (atom nil)]
+    (with-redefs [control/settings  (constantly {[:keyboard :available-layouts] ["us" "tz"]})
+                  control/settings! (fn [scope k v] (reset! written [scope k v]) {})]
+      (is (= {:layout "tz"} (commands/set-layout! "tz")))
       (is (= [:session [:keyboard :layout] "tz"] @written))
       (is (= :keyboard/unknown-layout
              (try (commands/set-layout! "zz") (catch Exception e (:error (ex-data e))))))
       (is (= :request/malformed
              (try (commands/set-layout! nil) (catch Exception e (:error (ex-data e)))))))))
-
-
-(deftest audio-status-reads-settings-not-hw
-  (with-redefs [audio/default-sink (constantly usb-sink)
-                control/settings   (constantly {[:audio :usb :volume]  55
-                                                [:audio :hdmi :volume] 70
-                                                [:audio :muted]        false})]
-    (is (= {:volume 55 :muted false :output :usb} (commands/audio-status))))
-  (with-redefs [audio/default-sink (constantly nil)
-                control/settings   (constantly {[:audio :usb :volume] 55
-                                                [:audio :muted]       true})]
-    (is (= {:volume nil :muted true :output nil} (commands/audio-status))
-        "no classifiable output -> nil volume, widgets grey out")))

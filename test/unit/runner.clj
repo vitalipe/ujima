@@ -14,9 +14,10 @@
             [lib.io-test]
 
             [ujima.control.registry-test]
-            [ujima.control.reconcile-test]
+            [ujima.reconcile-test]
             [ujima.control-test]
             [ujima.control.commands-test]
+            [ujima.control.queries-test]
 
             [ujima.linux.audio-test]
             [ujima.desktop.http-test]))
@@ -37,9 +38,10 @@
     lib.io-test
 
     ujima.control.registry-test
-    ujima.control.reconcile-test
+    ujima.reconcile-test
     ujima.control-test
     ujima.control.commands-test
+    ujima.control.queries-test
 
     ujima.linux.audio-test
     ujima.desktop.http-test])

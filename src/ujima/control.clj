@@ -1,20 +1,19 @@
 (ns ujima.control
-  "Control plane for the appliance: holds effective settings and drives device
-   state to match them."
+  "Control plane for the appliance: a pure settings machine — scopes, merge,
+   persistence — that notifies its converge targets (the OS port, the GUI port;
+   passed at init! by ujima.core) after every converge. It knows no port."
 
   (:require [lib.util    :refer [index-by map-vals map-kv-vals]]
             [babashka.fs :refer [path]]
 
             [lib.io    :as io]
             [ujima.log :as log]
-            [ujima.control.defs      :as defs]
-            [ujima.control.reconcile :as reconcile]
-            [ujima.control.registry  :refer [->registry
-                                             effective-value
-                                             default-settings
-                                             reconcilable-settings
-                                             update-settings-in-scope
-                                             scopes]]))
+            [ujima.control.defs     :as defs]
+            [ujima.control.registry :refer [->registry
+                                            effective-value
+                                            default-settings
+                                            update-settings-in-scope
+                                            scopes]]))
 
 
 ;; ---------------------------------------------------------------------------
@@ -22,10 +21,10 @@
 ;; ---------------------------------------------------------------------------
 
 
-(defonce ^:private lock*      (Object.))
-(defonce ^:private registry*  (atom nil))
-(defonce ^:private storage*   (atom nil))
-(defonce ^:private listeners* (atom []))
+(defonce ^:private lock*     (Object.))
+(defonce ^:private registry* (atom nil))
+(defonce ^:private storage*  (atom nil))
+(defonce ^:private targets*  (atom []))
 
 
 (defn- slurp-scope
@@ -49,28 +48,25 @@
 ;; ---------------------------------------------------------------------------
 
 
-(defn on-converge!
-  "Register `f` as a converge target next to the OS: it runs after EVERY converge
-   (each write and each external reconcile!), INSIDE the critical section — so
-   notifications are strictly ordered with converges. The contract that keeps that
-   safe: listeners are few, registered at boot, fast, one-way (ujima -> world) —
-   a listener must NEVER write settings (that recurses the converge). Failures are
-   logged and never break the converge itself."
-  [f]
-  (swap! listeners* conj f))
-
-
 (defn- notify-converged! [settings]
-  (doseq [f @listeners*]
+  (doseq [f @targets*]
     (try (f settings)
          (catch Throwable e
-           (log/error "control: converge listener failed" {:error (ex-message e)})))))
+           (log/error "control: converge target failed" {:error (ex-message e)})))))
 
 
-(defn init! [{storage :storage tmp :tmp}]
-  (reset! registry* (->registry {:settings defs/settings 
+(defn init!
+  "`:converge-targets` is the fixed set of ports this machine drives (the OS
+   port, the GUI port, …): each is called with the effective settings after
+   EVERY converge, INSIDE the critical section — strictly ordered, in vector
+   order. The contract that keeps that safe: targets are few, fast, one-way
+   (ujima -> world), and NEVER write settings (that recurses the converge).
+   A target's failure is logged and never breaks the converge itself."
+  [{storage :storage tmp :tmp targets :converge-targets}]
+  (reset! targets* (vec targets))
+  (reset! registry* (->registry {:settings defs/settings
                                  :scopes   defs/scopes}))
-  (reset! storage* (->> defs/scopes 
+  (reset! storage* (->> defs/scopes
                      (index-by :key)
                      (map-vals :persist?)
                      (map-vals {true storage false tmp})
@@ -113,7 +109,6 @@
         (spit-scope! scope))
 
       (let [effective (settings)]
-        (reconcile/reconcile! (reconcilable-settings @registry* effective))
         (notify-converged! effective)
         effective)))
 
@@ -127,13 +122,12 @@
 
 (defn reconcile!
   "External converge trigger (boot, udev, power events).
-   Converge-only: re-asserts device state from the CURRENT persisted scopes,
+   Converge-only: notifies every target with the CURRENT persisted scopes,
    writes nothing. Same lock and same convergence path as a mutation -- the only
    difference from `update-settings!` is the absence of a scope write."
   []
   (locking lock*
     (let [effective (settings)]
-      (reconcile/reconcile! (reconcilable-settings @registry* effective))
       (notify-converged! effective)
       effective)))
   

@@ -8,8 +8,7 @@
    cfg = {:eww-config <dir> :http {:host <ip> :port <n>}}."
   (:require [lib.shell :as shell]
             [ujima.log :as log]
-            [ujima.desktop.http :as http]
-            [ujima.desktop.ui   :as ui]))
+            [ujima.desktop.http :as http]))
 
 
 (def ^:private ping-tries 40)   ; x 250ms = 10s for the daemon socket to come up
@@ -42,8 +41,7 @@
     
     (log/info "opening shell" {:eww dir})
     (await-daemon! dir)
-    
-    (ui/start!)
+
     (http/start! (:http cfg))
     
     (shell/sh! :eww :--config dir "open-many" "topbar" "launcher" "dock")

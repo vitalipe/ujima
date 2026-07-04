@@ -1,8 +1,9 @@
 (ns ujima.desktop.http
-  "The desktop's loopback HTTP API (http-kit). Transport only — parse the request,
-   call ONE verb, serialize its result; no domain logic lives here. Two tiers:
-     /api/**  the settings resource API (ujima.control.commands; the future
-              console reuses these verbs) — writes return the fresh resource
+  "The desktop's loopback HTTP API (http-kit). Transport only — parse the
+   request, run at most ONE command, respond with a query (mechanical
+   command-then-query stitching; no domain logic lives here). Two tiers:
+     /api/**  the settings resource API (commands + queries; the future console
+              reuses them) — writes respond with the fresh resource
      /ui/**   the GUI edge (ujima.desktop.ui): the NDJSON state stream and the
               verbs where interaction ≠ state (throttled volume moves)."
   (:require [clojure.string     :as str]
@@ -10,6 +11,7 @@
             [lib.edn            :refer [edn->json json->edn]]
             [ujima.log          :as log]
             [ujima.control.commands :as commands]
+            [ujima.control.queries  :as queries]
             [ujima.desktop.ui       :as ui]))
 
 
@@ -43,11 +45,14 @@
     (let [verb (route (:request-method req) (:uri req))
           body (when (= :post (:request-method req)) (json->edn (:body req)))]
       (case verb
-        :audio/status        (json 200 (commands/audio-status))
-        :keyboard/status     (json 200 (commands/keyboard-status))
-        :audio/set-volume    (json 200 (commands/set-volume! (:value body)))
-        :audio/set-mute      (json 200 (commands/set-mute! (:muted body)))
-        :keyboard/set-layout (json 200 (commands/set-layout! (:layout body)))
+        :audio/status        (json 200 (queries/audio-status))
+        :keyboard/status     (json 200 (queries/keyboard-status))
+        :audio/set-volume    (do (commands/set-volume! (:value body))
+                                 (json 200 (queries/audio-status)))
+        :audio/set-mute      (do (commands/set-mute! (:muted body))
+                                 (json 200 (queries/audio-status)))
+        :keyboard/set-layout (do (commands/set-layout! (:layout body))
+                                 (json 200 (queries/keyboard-status)))
         :ui/state            (ui/stream req)
         :ui/volume-move      (do (ui/volume-moved! (:value body)) (json 202 {}))
         (json 404 {:error "not found"})))

@@ -3,17 +3,20 @@
             [clojure.edn :as edn]
             [babashka.fs :as fs]
             [ujima.control :as control]
-            [ujima.control.defs :as defs]
-            [ujima.control.reconcile :as reconcile]))
+            [ujima.control.defs :as defs]))
 
 
-;; Full control-plane loop against real temp files, with the OS handlers stubbed out.
+;; Full control-plane loop against real temp files. Control is a pure settings
+;; machine — no OS stubs needed; converge ports are whatever :converge-targets
+;; the test passes (none, unless it's testing the notification itself).
 
 
-(defn- fresh! []
-  (let [dir (str (fs/create-temp-dir))]
-    (control/init! {:storage dir :tmp dir})
-    dir))
+(defn- fresh!
+  ([] (fresh! []))
+  ([targets]
+   (let [dir (str (fs/create-temp-dir))]
+     (control/init! {:storage dir :tmp dir :converge-targets targets})
+     dir)))
 
 (defn- device-file [dir] (str dir "/device.edn"))
 
@@ -27,32 +30,29 @@
 
 
 (deftest write-stamps-schema-and-round-trips
-  (with-redefs [reconcile/handlers {}]
-    (let [dir (fresh!)]
-      (control/settings! :device [:audio :hdmi :volume] 85)
-      (let [raw (edn/read-string (slurp (device-file dir)))]
-        (is (= defs/schema (:schema raw)))
-        (is (= 85 (get-in raw [:settings [:audio :hdmi :volume]]))))
-      (is (= 85 (get (control/settings) [:audio :hdmi :volume]))))))
+  (let [dir (fresh!)]
+    (control/settings! :device [:audio :hdmi :volume] 85)
+    (let [raw (edn/read-string (slurp (device-file dir)))]
+      (is (= defs/schema (:schema raw)))
+      (is (= 85 (get-in raw [:settings [:audio :hdmi :volume]]))))
+    (is (= 85 (get (control/settings) [:audio :hdmi :volume])))))
 
 
 (deftest scope-precedence-and-sibling-path-independence
-  (with-redefs [reconcile/handlers {}]
-    (fresh!)
-    (control/settings! :device  [:audio :hdmi :volume] 85)
-    (control/settings! :session [:audio :usb :volume] 20)
-    (let [s (control/settings)]
-      (is (= 20 (get s [:audio :usb :volume]))  "session overrides default")
-      (is (= 85 (get s [:audio :hdmi :volume])) "sibling path untouched by session write"))
-    (control/settings! :activity [:audio :usb :volume] 5)
-    (is (= 5 (get (control/settings) [:audio :usb :volume])) "activity outranks session")))
+  (fresh!)
+  (control/settings! :device  [:audio :hdmi :volume] 85)
+  (control/settings! :session [:audio :usb :volume] 20)
+  (let [s (control/settings)]
+    (is (= 20 (get s [:audio :usb :volume]))  "session overrides default")
+    (is (= 85 (get s [:audio :hdmi :volume])) "sibling path untouched by session write"))
+  (control/settings! :activity [:audio :usb :volume] 5)
+  (is (= 5 (get (control/settings) [:audio :usb :volume])) "activity outranks session"))
 
 
 (deftest write-of-non-scope-key-is-pruned
-  (with-redefs [reconcile/handlers {}]
-    (fresh!)
-    (control/settings! :session [:system :hostname] "nope")   ; :device-only key
-    (is (= "ujima" (get (control/settings) [:system :hostname])))))
+  (fresh!)
+  (control/settings! :session [:system :hostname] "nope")   ; :device-only key
+  (is (= "ujima" (get (control/settings) [:system :hostname]))))
 
 
 (deftest file-with-matching-schema-loads
@@ -78,27 +78,21 @@
 
 
 (deftest write-over-stale-file-replaces-it
-  (with-redefs [reconcile/handlers {}]
-    (let [dir (fresh!)]
-      (spit (device-file dir) (pr-str {:settings {:audio/volume 55}}))   ; pre-schema content
-      (control/settings! :device [:system :hostname] "meru-01")
-      (let [raw (edn/read-string (slurp (device-file dir)))]
-        (is (= defs/schema (:schema raw)))
-        (is (= {[:system :hostname] "meru-01"} (:settings raw))
-            "stale content discarded, not merged")))))
+  (let [dir (fresh!)]
+    (spit (device-file dir) (pr-str {:settings {:audio/volume 55}}))   ; pre-schema content
+    (control/settings! :device [:system :hostname] "meru-01")
+    (let [raw (edn/read-string (slurp (device-file dir)))]
+      (is (= defs/schema (:schema raw)))
+      (is (= {[:system :hostname] "meru-01"} (:settings raw))
+          "stale content discarded, not merged"))))
 
 
-(deftest converge-listeners-fire-on-writes-and-external-reconciles
-  (with-redefs [reconcile/handlers {}]
-    (fresh!)
-    (let [seen (atom [])]
-      (reset! @#'control/listeners* [])
-      (try
-        (control/on-converge! (fn [s] (swap! seen conj (get s [:audio :hdmi :volume]))))
-        (control/on-converge! (fn [_] (throw (ex-info "boom" {}))))   ; must never break a converge
-        (control/settings! :device [:audio :hdmi :volume] 85)
-        (is (= [85] @seen) "fires inside the write converge, sees effective settings")
-        (is (= 85 (get (control/settings) [:audio :hdmi :volume])) "throwing listener didn't break the write")
-        (control/reconcile!)
-        (is (= [85 85] @seen) "an external reconcile! is a converge too")
-        (finally (reset! @#'control/listeners* []))))))
+(deftest converge-targets-fire-on-writes-and-external-reconciles
+  (let [seen (atom [])]
+    (fresh! [(fn [s] (swap! seen conj (get s [:audio :hdmi :volume])))
+             (fn [_] (throw (ex-info "boom" {})))])   ; must never break a converge
+    (control/settings! :device [:audio :hdmi :volume] 85)
+    (is (= [85] @seen) "fires inside the write converge, sees effective settings")
+    (is (= 85 (get (control/settings) [:audio :hdmi :volume])) "throwing target didn't break the write")
+    (control/reconcile!)
+    (is (= [85 85] @seen) "an external reconcile! is a converge too")))

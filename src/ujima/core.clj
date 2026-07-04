@@ -2,12 +2,15 @@
   (:require [lib.io                  :as io]
             [ujima.log               :as log]
 
-            [ujima.device  :as device]
-            [ujima.control :as control]
+            [ujima.device       :as device]
+            [ujima.control      :as control]
+            [ujima.control.defs :as defs]
+            [ujima.reconcile    :as reconcile]
             [lib.shell :as shell]
 
-            [ujima.desktop :as desktop]
-            [ujima.agent   :as agent]))
+            [ujima.desktop    :as desktop]
+            [ujima.desktop.ui :as ui]
+            [ujima.agent      :as agent]))
 
 
 
@@ -21,7 +24,11 @@
 
     ;; explicit boot order: reconcile settings first, start the agent loop (returns), then hand
     ;; the main thread to the shell — so the desktop that appears is the reconciled one.
-    (control/init!     (get-in env [:control] {}))
+    ;; control drives its converge ports in vector order: the OS first (converge-target also
+    ;; proves handler coverage — a gap fails the boot here, not a runtime pass), then the GUI.
+    (control/init!     (assoc (get-in env [:control] {})
+                              :converge-targets [(reconcile/converge-target defs/settings)
+                                                 ui/converge!]))
     (control/reconcile!)
     (agent/init!       (get-in env [:agent]   {}))
 

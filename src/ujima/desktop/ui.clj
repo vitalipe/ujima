@@ -1,15 +1,16 @@
 (ns ujima.desktop.ui
-  "The /ui tier: the GUI registered as a converge target next to the OS. One
-   authoritative NDJSON state stream feeds eww (deflisten) — a snapshot on
-   connect, then one line per converge that actually changed the projection —
-   plus the verbs where interaction ≠ state (throttled volume moves). Future
-   /ui domains (activities, windows) get their own streams here."
+  "The /ui tier: the GUI converge port, wired into control's :converge-targets
+   by ujima.core next to the OS port. One authoritative NDJSON state stream
+   feeds eww (deflisten) — a snapshot on connect, then one line per converge
+   that actually changed the projection — plus the verbs where interaction ≠
+   state (throttled volume moves). Future /ui domains (activities, windows)
+   get their own streams here."
   (:require [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json]]
             [lib.throttle       :refer [throttle-leading-trailing]]
             [ujima.log          :as log]
-            [ujima.control          :as control]
-            [ujima.control.commands :as commands]))
+            [ujima.control.commands :as commands]
+            [ujima.control.queries  :as queries]))
 
 
 ;; --- volume moves (interaction ≠ state) -------------------------------------
@@ -46,18 +47,19 @@
 
 
 (defn- state []
-  {:audio    (commands/audio-status)
-   :keyboard (commands/keyboard-status)})
+  {:audio    (queries/audio-status)
+   :keyboard (queries/keyboard-status)})
 
 
 (defn- state-line [st]
   (str (edn->json st) "\n"))
 
 
-(defn- on-converge
-  ;; runs INSIDE control's critical section (see control/on-converge! for the
-  ;; contract) — strictly ordered with converges, so the stream can't end on a
-  ;; stale line. Only writer of last-pushed*, serialized by that same lock.
+(defn converge!
+  "The GUI converge port (see control/init! for the target contract): runs
+   INSIDE control's critical section — strictly ordered with converges, so the
+   stream can't end on a stale line. Only writer of last-pushed*, serialized by
+   that same lock."
   [_settings]
   (let [st (state)]
     (when (not= st @last-pushed*)
@@ -77,10 +79,3 @@
                  (swap! subs* conj ch)
                  (http/send! ch (state-line (state)) false))
      :on-close (fn [ch _] (swap! subs* disj ch))}))
-
-
-(defn start!
-  "Register the GUI as a converge target."
-  []
-  (control/on-converge! on-converge)
-  (log/info "ui: registered as converge target"))

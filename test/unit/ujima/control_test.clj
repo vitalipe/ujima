@@ -95,5 +95,5 @@
     (control/settings! :device [:audio :hdmi :volume] 85)
     (is (= [[85 70]] @seen) "write converge: (effective, previous-effective)")
     (is (= 85 (get (control/settings) [:audio :hdmi :volume])) "throwing target didn't break the write")
-    (control/reconcile!)
+    (control/converge-fresh!)
     (is (= [[85 70] [85 nil]] @seen) "external converge: prv nil = assume nothing")))

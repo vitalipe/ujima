@@ -26,7 +26,7 @@
     ;; control drives its converge ports in vector order: linux first, then the GUI.
     (control/init!     (assoc (get-in env [:control] {})
                               :converge-targets [linux/converge! ui/converge!]))
-    (control/reconcile!)
+    (control/converge-fresh!)
     (agent/init!       (get-in env [:agent]   {}))
 
     ;; desktop/init! BLOCKS holding eww; it coming back means the shell died. Exit explicitly —

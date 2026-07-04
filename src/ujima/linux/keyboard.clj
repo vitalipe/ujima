@@ -3,7 +3,7 @@
 
 
 ;; Session keymap via setxkbmap — applies live to the whole X session, persists nothing:
-;; the control plane re-applies at boot (reconcile-first), which also keeps the read-only
+;; the control plane re-applies at boot (converge-first), which also keeps the read-only
 ;; image honest. The VT console keymap is a separate mechanism, out of scope here.
 
 (defn layout []

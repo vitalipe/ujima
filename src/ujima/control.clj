@@ -124,11 +124,12 @@
   (update-settings! scope #(apply assoc % k v kvs)))
   
 
-(defn reconcile!
-  "External converge trigger (boot, udev, power events).
-   Converge-only: notifies every target with the CURRENT persisted scopes,
-   writes nothing. Same lock and same convergence path as a mutation -- the only
-   difference from `update-settings!` is the absence of a scope write."
+(defn converge-fresh!
+  "External converge trigger (boot, udev, power events): assume nothing — every
+   target gets (effective, nil) and treats the whole world as possibly changed.
+   Converge-only: notifies with the CURRENT persisted scopes, writes nothing.
+   Same lock and same path as a mutation -- the only difference from
+   `update-settings!` is the absence of a scope write."
   []
   (locking lock*
     (let [effective (settings)]

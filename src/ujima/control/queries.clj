@@ -7,17 +7,11 @@
             [ujima.linux.audio :as audio]))
 
 
-(defn- current-output []
+(defn current-output
+  "The one live HW fact the projections need: the output class of the default
+   sink (:usb | :hdmi | nil)."
+  []
   (audio/output-class (audio/default-sink)))
-
-
-(defn- next-of
-  "The element after `current`, wrapping; (first xs) when current isn't in xs."
-  [xs current]
-  (let [i (.indexOf (vec xs) current)]
-    (if (neg? i)
-      (first xs)
-      (nth xs (mod (inc i) (count xs))))))
 
 
 (defn audio-status
@@ -32,13 +26,9 @@
 
 
 (defn keyboard-status
-  "{:layout <code> :layouts [<code>…] :next <code|nil>} — :next is the cycle
-   order published as data, so switcher clients post the concrete layout back
-   (idempotent) instead of asking us to advance."
+  "{:layout <code> :layouts [<code>…]} — the domain facts only; presentation
+   derivations (the switcher's cycle order) live in the UI projection."
   []
-  (let [s       (control/settings)
-        layout  (get s [:keyboard :layout])
-        layouts (get s [:keyboard :available-layouts])]
-    {:layout  layout
-     :layouts layouts
-     :next    (next-of layouts layout)}))
+  (let [s (control/settings)]
+    {:layout  (get s [:keyboard :layout])
+     :layouts (get s [:keyboard :available-layouts])}))

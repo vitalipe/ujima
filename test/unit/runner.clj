@@ -20,7 +20,8 @@
             [ujima.control.queries-test]
 
             [ujima.linux.audio-test]
-            [ujima.desktop.http-test]))
+            [ujima.desktop.http-test]
+            [ujima.desktop.ui-test]))
 
 
 (def test-namespaces
@@ -44,7 +45,8 @@
     ujima.control.queries-test
 
     ujima.linux.audio-test
-    ujima.desktop.http-test])
+    ujima.desktop.http-test
+    ujima.desktop.ui-test])
 
 
 (defn -main [& _]

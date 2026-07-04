@@ -21,21 +21,8 @@
         "no classifiable output -> nil volume, widgets grey out")))
 
 
-(deftest keyboard-status-publishes-the-cycle-as-next
+(deftest keyboard-status-is-domain-facts-only
   (with-redefs [control/settings (constantly {[:keyboard :layout]            "tz"
                                               [:keyboard :available-layouts] ["us" "tz"]})]
-    (is (= {:layout "tz" :layouts ["us" "tz"] :next "us"} (queries/keyboard-status))
-        "wraps"))
-  (with-redefs [control/settings (constantly {[:keyboard :layout]            "il"
-                                              [:keyboard :available-layouts] ["us" "tz"]})]
-    (is (= "us" (:next (queries/keyboard-status))) "unknown current -> first"))
-  (with-redefs [control/settings (constantly {[:keyboard :layout]            "us"
-                                              [:keyboard :available-layouts] []})]
-    (is (nil? (:next (queries/keyboard-status))) "no layouts -> no next")))
-
-
-(deftest next-of-cycles-wraps-and-recovers
-  (is (= "tz" (#'queries/next-of ["us" "tz"] "us")))
-  (is (= "us" (#'queries/next-of ["us" "tz"] "tz")) "wraps")
-  (is (= "us" (#'queries/next-of ["us" "tz"] "il")) "unknown current -> first")
-  (is (= "us" (#'queries/next-of ["us"] "us"))      "single layout cycles to itself"))
+    (is (= {:layout "tz" :layouts ["us" "tz"]} (queries/keyboard-status))
+        "no presentation fields — :next lives in the UI projection")))

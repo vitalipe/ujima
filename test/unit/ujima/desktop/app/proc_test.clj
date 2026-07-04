@@ -110,19 +110,6 @@
     (is (= "Wikipedia" (get-in s [:procs :wikipedia :title])) "first window's title lands")))
 
 
-(deftest started-learns-ad-hoc-classes
-  ;; an app the catalog never heard of: :proc/started teaches the index its :class,
-  ;; so its window adopts like any catalog app's
-  (let [notes {:id :notes :label "Notes" :exec ["notes-app"] :class "Ujima-Notes"}
-        s     (fold {:type :proc/started :app notes :pid 7}
-                    {:type :window/new :con-id 9 :class "ujima-notes" :transient? false :title "Notes"})]
-    (is (= :running (get-in s [:procs :notes :state])))
-    (is (= #{9} (get-in s [:procs :notes :windows])))
-    (is (= [{:id :notes :label "Notes" :icon "notes" :state :running :title "Notes"}]
-           (:apps (proc/snapshot s)))
-        "snapshot renders from the proc's own :app — no catalog anywhere")))
-
-
 (deftest proc-exit-marks-the-state
   (is (= :exited (get-in (fold wiki-new {:type :proc/exit :app-id :wikipedia})
                          [:procs :wikipedia :state])))

@@ -22,11 +22,13 @@
   :initial "{\"apps\":[],\"current\":null}"
   "while true; do curl -sN http://127.0.0.1:1337/ui/apps; sleep 1; done")
 
-;; the launchable-app catalog: immutable per session, so a slow poll (the first
-;; tick fires at open; the agent's API is up before the surfaces)
-(defpoll catalog :interval "1h"
+;; the launchable-app catalog: immutable per session — fetched ONCE (retry until the
+;; API answers, emit, then hold the pipe open: eww drops a listener's line when the
+;; script exits straight after it). If the catalog ever goes mutable it moves into
+;; settings and arrives via the /ui/state converge, not a poll.
+(deflisten catalog
   :initial "{\"apps\":[]}"
-  "curl -s http://127.0.0.1:1337/app/catalog")
+  "until curl -sf http://127.0.0.1:1337/app/catalog; do sleep 1; done; echo; exec sleep infinity")
 
 
 ;; --- top: mock current-window title + inert close --------------------------

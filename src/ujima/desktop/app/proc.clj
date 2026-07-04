@@ -1,11 +1,11 @@
 (ns ujima.desktop.app.proc
   "The proc store — a pure reducer folding normalized i3 window events (ujima.linux.i3)
    and proc events into procs {:app-id :app :pid :windows #{con-id} :state :title},
-   singleton per app id. Identity is the app map's :class: the store's :class->app index
-   is seeded from the catalog and LEARNS every :proc/started app, so ad-hoc apps adopt
-   like catalog ones. :pid comes from start-app!'s spawn; adoption-created procs (a
-   window we recognize but didn't spawn) carry :pid nil. Pure; the live atom and its
-   writers are ujima.desktop.app's."
+   singleton per app id. Identity is the app map's :class via the catalog-seeded
+   :class->app index — set once at load, immutable for the session (a mutable catalog
+   would live in settings and converge, not here). :pid comes from run!'s spawn;
+   adoption-created procs (a window we recognize but didn't spawn) carry :pid nil.
+   Pure; the live atom and its writers are ujima.desktop.app's."
   (:require [clojure.string :as str]))
 
 
@@ -79,15 +79,12 @@
 
 
 (defn- on-started
-  "start-app! spawned APP — the proc enters the lifecycle at :starting (New): in the
-   dock from click time, no windows yet; adoption promotes it to :running. The app's
-   :class is LEARNED into the adoption index (this is what lets non-catalog apps adopt;
-   same class from a different definition = last one wins). An existing proc only gets
-   :pid/:app refreshed (start-app! is ensure-open, so that's a defensive replay path)."
+  "run! spawned APP — the proc enters the lifecycle at :starting (New): in the dock
+   from click time, no windows yet; adoption promotes it to :running. An existing proc
+   only gets :pid/:app refreshed (run! is ensure-open, so that's a defensive replay
+   path)."
   [state {:keys [app pid]}]
-  (let [app-id (:id app)
-        state  (cond-> state
-                 (:class app) (assoc-in [:class->app (str/lower-case (:class app))] app))]
+  (let [app-id (:id app)]
     (if (get-in state [:procs app-id])
       (update-in state [:procs app-id] assoc :pid pid :app app)
       (-> state

@@ -13,7 +13,8 @@
   (is (= :ui/state         (http/route :get  "/ui/state")))
   (is (= :ui/apps          (http/route :get  "/ui/apps")))
   (is (= :ui/volume        (http/route :post "/ui/volume/move")))
-  (is (= :app/catalog      (http/route :get  "/app/catalog"))))
+  (is (= :app/catalog      (http/route :get  "/app/catalog")))
+  (is (= :app/run          (http/route :post "/app/run"))))
 
 
 (deftest route-tolerates-trailing-slashes
@@ -24,6 +25,7 @@
 (deftest route-rejects-unrouted
   (is (nil? (http/route :get  "/api/nope")))
   (is (nil? (http/route :post "/app/catalog"))      "the catalog is read-only")
+  (is (nil? (http/route :get  "/app/run"))          "run is POST-only")
   (is (nil? (http/route :post "/api/audio"))              "method matters")
   (is (nil? (http/route :get  "/api/input/keyboard/layout")) "writes are POST-only")
   (is (nil? (http/route :post "/shell/volume/move"))      "the /shell tier is gone — it's /ui now")

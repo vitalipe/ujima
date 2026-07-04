@@ -28,7 +28,8 @@
 (def ^:private error-status
   {:request/malformed        400
    :audio/no-output          409
-   :keyboard/unknown-layout  409})
+   :keyboard/unknown-layout  409
+   :app/unknown-app          404})
 
 
 (defn route
@@ -44,7 +45,8 @@
           [:get  ["ui" "state"]]                      :ui/state
           [:get  ["ui" "apps"]]                       :ui/apps
           [:post ["ui" "volume" "move"]]              :ui/volume
-          [:get  ["app" "catalog"]]                   :app/catalog}
+          [:get  ["app" "catalog"]]                   :app/catalog
+          [:post ["app" "run"]]                       :app/run}
          [method parts])))
 
 
@@ -67,6 +69,7 @@
         :ui/apps             (apps/stream req)
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         :app/catalog         (json 200 {:apps (app/catalog-listing)})
+        :app/run             (do (app/run! (keyword (:app-id body))) (json 202 {}))
         (json 404 {:error "not found"})))
     (catch clojure.lang.ExceptionInfo e
       (if-let [status (error-status (:error (ex-data e)))]

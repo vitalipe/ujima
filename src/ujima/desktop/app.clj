@@ -5,6 +5,7 @@
    single writer; readers get snapshots."
   (:require [babashka.fs :as fs]
             [lib.io      :as io]
+            [ujima.log   :as log]
             [ujima.desktop.app.catalog :as catalog]
             [ujima.desktop.app.proc    :as proc]))
 
@@ -31,3 +32,12 @@
 (defn catalog-listing [] (catalog/listing @catalog*))
 (defn handle-event!  [ev] (swap! procs* proc/apply-event ev))
 (defn procs-snapshot []   (proc/snapshot @procs*))
+
+
+(defn run!
+  "POST /app/run's verb — the ensure-open entry point. Stub: validates + logs;
+   the spawn and the :starting lifecycle land here next."
+  [id]
+  (when-not (get-in @catalog* [:by-id id])
+    (throw (ex-info "unknown app" {:error :app/unknown-app :id id})))
+  (log/info "app run requested" {:app id}))

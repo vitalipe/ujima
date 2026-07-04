@@ -36,13 +36,14 @@
     (box)
     (button :class "close" :halign "end" "✕")))
 
-;; --- mid: launcher tiles, catalog-driven (clicks inert until startup lands) ---
+;; --- mid: launcher tiles, catalog-driven; a click asks the agent to run the app ---
 (defwidget launcher []
   (box :class "launcher" :orientation "v" :halign "center" :valign "center" :space-evenly false
     (label :class "brand" :text "Ujima")
     (box :class "tiles" :orientation "h" :space-evenly true
       (for entry in {catalog.apps}
-        (button :class "tile" :onclick "${wakebars}"
+        (button :class "tile" :timeout "2s"
+          :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
           (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 76 :image-height 76))))))
 
 ;; --- bottom: running apps (the /ui/apps stream) + live tray + clock ----------

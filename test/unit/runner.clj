@@ -22,8 +22,9 @@
             [ujima.linux.audio-test]
             [ujima.linux.i3-test]
             [ujima.desktop.http-test]
-            [ujima.desktop.ui-test]
-            [ujima.desktop.app-test]
+            [ujima.desktop.http.ui-test]
+            [ujima.desktop.app.catalog-test]
+            [ujima.desktop.app.proc-test]
             [ujima.events.audio-test]
             [ujima.events.token-test]))
 
@@ -51,8 +52,9 @@
     ujima.linux.audio-test
     ujima.linux.i3-test
     ujima.desktop.http-test
-    ujima.desktop.ui-test
-    ujima.desktop.app-test
+    ujima.desktop.http.ui-test
+    ujima.desktop.app.catalog-test
+    ujima.desktop.app.proc-test
     ujima.events.audio-test
     ujima.events.token-test])
 

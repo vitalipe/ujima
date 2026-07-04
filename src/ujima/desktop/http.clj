@@ -4,8 +4,9 @@
    command-then-query stitching; no domain logic lives here). Three tiers:
      /api/**  the settings resource API (commands + queries; the future console
               reuses them) — writes respond with the fresh resource
-     /ui/**   the GUI edge (ujima.desktop.ui): the NDJSON state + apps streams
-              and the verbs where interaction ≠ state (throttled volume moves)
+     /ui/**   the GUI edge (desktop.http.ui settings, desktop.http.app apps):
+              the NDJSON streams and the verbs where interaction ≠ state
+              (throttled volume moves)
      /app/**  the app layer (ujima.desktop.app): the catalog now, start/stop/
               focus when the startup slice lands."
   (:require [clojure.string     :as str]
@@ -15,7 +16,8 @@
             [ujima.control.commands :as commands]
             [ujima.control.queries  :as queries]
             [ujima.desktop.app      :as app]
-            [ujima.desktop.ui       :as ui]))
+            [ujima.desktop.http.app :as apps]
+            [ujima.desktop.http.ui  :as ui]))
 
 
 (defn- json [status body]
@@ -62,7 +64,7 @@
         :keyboard/layout     (do (commands/change-keyboard-layout! (:layout body))
                                  (json 200 (queries/keyboard-status)))
         :ui/state            (ui/stream req)
-        :ui/apps             (ui/apps-stream req)
+        :ui/apps             (apps/stream req)
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         :app/catalog         (json 200 {:apps (app/catalog-listing)})
         (json 404 {:error "not found"})))

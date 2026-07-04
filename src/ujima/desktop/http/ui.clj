@@ -1,17 +1,16 @@
-(ns ujima.desktop.ui
-  "The /ui tier: the GUI converge port, wired into control's :converge-targets
-   by ujima.core next to the OS port. One authoritative NDJSON state stream
-   feeds eww (deflisten) — a snapshot on connect, then one line per converge
-   that actually changed the projection — plus the verbs where interaction ≠
-   state (throttled volume moves), and the apps stream (/ui/apps) over the
-   proc store. Future /ui domains get their own streams here."
+(ns ujima.desktop.http.ui
+  "The settings side of the /ui tier: the GUI converge port, wired into control's
+   :converge-targets by ujima.core next to the OS port. One authoritative NDJSON
+   state stream feeds eww (deflisten) — a snapshot on connect, then one line per
+   converge that actually changed the projection — plus the verbs where
+   interaction ≠ state (throttled volume moves). The apps stream is the sibling
+   ujima.desktop.http.app."
   (:require [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json]]
             [lib.throttle       :refer [throttle-leading-trailing]]
             [ujima.log          :as log]
             [ujima.control          :as control]
-            [ujima.control.commands :as commands]
-            [ujima.desktop.app      :as app]))
+            [ujima.control.commands :as commands]))
 
 
 ;; --- volume moves (interaction ≠ state) -------------------------------------
@@ -98,32 +97,3 @@
                  (swap! subs* conj ch)
                  (http/send! ch (state-line (settings->ui (control/settings))) false))
      :on-close (fn [ch _] (swap! subs* disj ch))}))
-
-
-;; --- the apps stream ----------------------------------------------------------
-
-(defonce ^:private apps-subs* (atom #{}))
-(defonce ^:private apps-last* (atom nil))
-
-
-(defn push-apps!
-  "Push an apps snapshot to the /ui/apps subscribers — deduped on the serialized
-   line, so a no-op fold (an unmanaged window's event) costs nothing on the wire.
-   Single caller: the events listener thread."
-  [snapshot]
-  (let [line (state-line snapshot)]
-    (when (not= line @apps-last*)
-      (reset! apps-last* line)
-      (doseq [ch @apps-subs*]
-        (http/send! ch line false)))))
-
-
-(defn apps-stream
-  "GET /ui/apps: same contract as /ui/state — a snapshot line on connect, then one
-   line per real change — over the proc store instead of settings."
-  [req]
-  (http/as-channel req
-    {:on-open  (fn [ch]
-                 (swap! apps-subs* conj ch)
-                 (http/send! ch (state-line (app/procs-snapshot)) false))
-     :on-close (fn [ch _] (swap! apps-subs* disj ch))}))

@@ -7,9 +7,9 @@
             [ujima.linux.converge :as linux]
             [lib.shell :as shell]
 
-            [ujima.desktop     :as desktop]
-            [ujima.desktop.ui  :as ui]
-            [ujima.desktop.app :as app]
+            [ujima.desktop         :as desktop]
+            [ujima.desktop.http.ui :as ui]
+            [ujima.desktop.app     :as app]
             [ujima.events      :as events]))
 
 

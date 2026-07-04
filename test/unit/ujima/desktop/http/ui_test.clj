@@ -1,6 +1,6 @@
-(ns ujima.desktop.ui-test
+(ns ujima.desktop.http.ui-test
   (:require [clojure.test :refer [deftest is]]
-            [ujima.desktop.ui :as ui]))
+            [ujima.desktop.http.ui :as ui]))
 
 
 (def ^:private settings

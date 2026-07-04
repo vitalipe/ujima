@@ -1,6 +1,6 @@
 (ns ujima.control.commands
   "User-intent write verbs over the control plane — the one place that maps
-   screen-facing intent (\"set THE volume\") onto concrete settings (which
+   screen-facing intent (\"change THE volume\") onto concrete settings (which
    output class's volume). Verbs are synchronous: control's lock serializes
    writers, and callers arrive at click rate (drag floods are throttled at the
    /ui edge before they get here). Writes land in the :session scope — cleared
@@ -16,7 +16,7 @@
   (audio/output-class (audio/default-sink)))
 
 
-(defn set-volume!
+(defn change-current-volume!
   "Set the current output class's volume. Clamps BEFORE storing — an out-of-range
    stored value would re-apply on every converge pass (HW caps at 100)."
   [value]
@@ -29,7 +29,7 @@
     (throw (ex-info "no classifiable audio output" {:error :audio/no-output}))))
 
 
-(defn set-mute!
+(defn change-mute!
   "Set mute to a concrete desired state (idempotent)."
   [muted]
   (when-not (boolean? muted)
@@ -38,7 +38,7 @@
   {:muted muted})
 
 
-(defn set-layout!
+(defn change-keyboard-layout!
   "Set a concrete layout code. Only codes in available-layouts are accepted —
    a stray code persisted into a scope would fail converge on every pass, so
    it must be rejected loudly here at the edge."

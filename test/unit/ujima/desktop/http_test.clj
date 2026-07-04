@@ -4,18 +4,18 @@
 
 
 (deftest route-maps-both-tiers
-  (is (= :audio/status        (http/route :get  "/api/audio")))
-  (is (= :keyboard/status     (http/route :get  "/api/input/keyboard")))
-  (is (= :audio/set-volume    (http/route :post "/api/audio/volume")))
-  (is (= :audio/set-mute      (http/route :post "/api/audio/mute")))
-  (is (= :keyboard/set-layout (http/route :post "/api/input/keyboard/layout")))
-  (is (= :ui/state            (http/route :get  "/ui/state")))
-  (is (= :ui/volume-move      (http/route :post "/ui/volume/move"))))
+  (is (= :audio/status     (http/route :get  "/api/audio")))
+  (is (= :keyboard/status  (http/route :get  "/api/input/keyboard")))
+  (is (= :audio/volume     (http/route :post "/api/audio/volume")))
+  (is (= :audio/mute       (http/route :post "/api/audio/mute")))
+  (is (= :keyboard/layout  (http/route :post "/api/input/keyboard/layout")))
+  (is (= :ui/state         (http/route :get  "/ui/state")))
+  (is (= :ui/volume        (http/route :post "/ui/volume/move"))))
 
 
 (deftest route-tolerates-trailing-slashes
-  (is (= :audio/set-mute (http/route :post "/api/audio/mute/")))
-  (is (= :audio/status   (http/route :get  "/api/audio/"))))
+  (is (= :audio/mute   (http/route :post "/api/audio/mute/")))
+  (is (= :audio/status (http/route :get  "/api/audio/"))))
 
 
 (deftest route-rejects-unrouted

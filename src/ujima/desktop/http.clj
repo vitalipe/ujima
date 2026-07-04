@@ -30,13 +30,13 @@
   "Pure: [method uri] -> verb keyword, nil when unrouted (trailing slashes ok)."
   [method uri]
   (let [parts (->> (str/split (str uri) #"/") (remove str/blank?) vec)]
-    (get {[:get  ["api" "audio"]]                    :audio/status
-          [:get  ["api" "input" "keyboard"]]         :keyboard/status
-          [:post ["api" "audio" "volume"]]           :audio/set-volume
-          [:post ["api" "audio" "mute"]]             :audio/set-mute
-          [:post ["api" "input" "keyboard" "layout"]] :keyboard/set-layout
-          [:get  ["ui" "state"]]                     :ui/state
-          [:post ["ui" "volume" "move"]]             :ui/volume-move}
+    (get {[:get  ["api" "audio"]]                     :audio/status
+          [:get  ["api" "input" "keyboard"]]          :keyboard/status
+          [:post ["api" "audio" "volume"]]            :audio/volume
+          [:post ["api" "audio" "mute"]]              :audio/mute
+          [:post ["api" "input" "keyboard" "layout"]] :keyboard/layout
+          [:get  ["ui" "state"]]                      :ui/state
+          [:post ["ui" "volume" "move"]]              :ui/volume}
          [method parts])))
 
 
@@ -47,14 +47,14 @@
       (case verb
         :audio/status        (json 200 (queries/audio-status))
         :keyboard/status     (json 200 (queries/keyboard-status))
-        :audio/set-volume    (do (commands/set-volume! (:value body))
+        :audio/volume        (do (commands/change-current-volume! (:value body))
                                  (json 200 (queries/audio-status)))
-        :audio/set-mute      (do (commands/set-mute! (:muted body))
+        :audio/mute          (do (commands/change-mute! (:muted body))
                                  (json 200 (queries/audio-status)))
-        :keyboard/set-layout (do (commands/set-layout! (:layout body))
+        :keyboard/layout     (do (commands/change-keyboard-layout! (:layout body))
                                  (json 200 (queries/keyboard-status)))
         :ui/state            (ui/stream req)
-        :ui/volume-move      (do (ui/volume-moved! (:value body)) (json 202 {}))
+        :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         (json 404 {:error "not found"})))
     (catch clojure.lang.ExceptionInfo e
       (if-let [status (error-status (:error (ex-data e)))]

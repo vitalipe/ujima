@@ -168,3 +168,30 @@
         (is (= "hi there" (sh/$! tool "hi there")))
         (finally
           (alter-var-root #'lib.shell/*spawn* (constantly orig)))))))
+
+
+(deftest with-timeout-test
+  (testing "a command past the deadline is hard-killed; the finisher sees the failure"
+    (let [t0 (System/currentTimeMillis)
+          r  (sh/with-timeout 150 (sh/$? sleep 10))]
+      (is (false? (:ok? r))                         "killed -> non-zero exit")
+      (is (< (- (System/currentTimeMillis) t0) 5000) "did not wait out the sleep")))
+
+  (testing "a command inside the deadline is untouched"
+    (is (:ok? (sh/with-timeout 5000 (sh/$? echo fast)))))
+
+  (testing "unbound (the default) never arms — lib behavior unchanged for build tools"
+    (is (:ok? (sh/$? sleep 0.05)))))
+
+
+(deftest leading-opts-end-to-end-test
+  (testing "stdin from a string — the canonical example"
+    (is (= "42" (sh/sh! {:in "42"} :cat)))
+    (is (= "42" (sh/$! {:in "42"} cat))))
+
+  (testing "per-call timeout kills; overrides a wider extent; explicit nil opts out"
+    (is (false? (:ok? (sh/$? {:timeout-ms 150} sleep 10))))
+    (is (false? (:ok? (sh/with-timeout 60000 (sh/$? {:timeout-ms 150} sleep 10))))
+        "per-call wins over the extent")
+    (is (:ok? (sh/with-timeout 100 (sh/$? {:timeout-ms nil} sleep 0.3)))
+        "explicit nil opts a single command out of the extent")))

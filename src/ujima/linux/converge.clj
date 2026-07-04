@@ -5,9 +5,15 @@
    re-plugged sink comes back at its own defaults with no setting changed).
    Domains are isolated: one failing block never stops the others."
   (:require [ujima.log            :as log]
+            [lib.shell            :as shell]
             [ujima.linux.system   :as system]
             [ujima.linux.keyboard :as keyboard]
             [ujima.linux.audio    :as audio]))
+
+
+;; converge runs inside control's critical section — a wedged tool must become a
+;; loud domain failure, never a forever-held settings lock
+(def ^:private command-timeout-ms 15000)
 
 
 (defn- converge-audio!
@@ -53,10 +59,11 @@
   "Drive linux to match `settings` (the full effective map). Settings without a
    consumer here are simply not linux's business."
   [settings _prv]
-  (doseq [[domain f] [[:audio    converge-audio!]
-                      [:keyboard converge-keyboard!]
-                      [:system   converge-system!]]]
-    (try (f settings)
-         (catch Throwable e
-           (log/error "converge: domain failed" {:domain domain :error (ex-message e)}))))
+  (shell/with-timeout command-timeout-ms
+    (doseq [[domain f] [[:audio    converge-audio!]
+                        [:keyboard converge-keyboard!]
+                        [:system   converge-system!]]]
+      (try (f settings)
+           (catch Throwable e
+             (log/error "converge: domain failed" {:domain domain :error (ex-message e)})))))
   settings)

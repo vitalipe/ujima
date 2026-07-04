@@ -3,7 +3,7 @@
             [clojure.string     :as str]
             [clojure.core.async :as async]
             [ujima.log          :as log]
-            [lib.shell :refer [$!]]))
+            [lib.shell :as shell :refer [$!]]))
 
 
 ;; Audio rides the session PipeWire: wpctl (WirePlumber CLI) for get/set, pw-dump
@@ -134,7 +134,7 @@
   (let [ch (async/chan (async/sliding-buffer 8))]
     (async/thread
       (loop [prv nil ok? true]
-        (let [now (try (topology)
+        (let [now (try (shell/with-timeout 15000 (topology))
                        (catch Throwable e
                          (when ok?
                            (log/warn "audio watch: topology read failed" {:error (ex-message e)}))

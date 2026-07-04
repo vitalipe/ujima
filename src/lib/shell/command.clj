@@ -78,15 +78,22 @@
 
 
 (defn sh*
-  "Run a command from already-evaluated Clojure data through `spawn`. `cmd` is argv[0] (or a
-   previous process, which becomes a `:prev` pipe stage); `args` splice via `value->tokens`.
-   Returns the spawn's process. Opts ride on `spawn`."
+  "Run a command from already-evaluated Clojure data through `spawn`. The FIRST arg
+   is dispatched by type: a previous process (becomes the `:prev` pipe stage), OR an
+   opts map for the spawn (p/process opts — :in, :dir, :env, … — unambiguous because
+   argv[0] is always a token, never a map), OR argv[0] itself. Everything after
+   splices into argv via `value->tokens`. Opts on a piped stage: pass `{:prev p …}`
+   as the leading opts map (a map AFTER a process is argv material and lowers to
+   k=v — as argv[0] that exec-fails loudly). Returns the spawn's process."
   [spawn cmd & args]
-  (let [prev? (process? cmd)
-        argv  (if prev? (apply ->argv args) (apply ->argv cmd args))]
+  (let [[prev opts args] (cond
+                           (process? cmd) [cmd  {}  args]
+                           (map? cmd)     [nil  cmd args]
+                           :else          [nil  {}  (cons cmd args)])
+        argv (apply ->argv args)]
     (when (or (empty? argv) (str/blank? (str (first argv))))
       (throw (ex-info "shell: empty command / blank argv[0]" {:argv argv})))
-    (spawn (if prev? {:prev cmd} {}) argv)))
+    (spawn (if prev {:prev prev} opts) argv)))
 
 
 ;; ---------------------------------------------------------------------------
@@ -124,11 +131,13 @@
 
 
 (defmacro $argv
-  "Lower forms to `{:cmd argv :opts {}}` without running — a dry run / explain."
+  "Lower forms to `{:cmd argv :opts opts}` without running — a dry run / explain.
+   A leading map LITERAL is the opts (matching `sh*`'s runtime dispatch)."
   [& forms]
   (when (empty? forms)
     (throw (ex-info "shell: $argv requires a command" {:forms forms})))
-  `{:cmd (->argv ~@(mapv lower-form forms)) :opts {}})
+  (let [[opts forms] (if (map? (first forms)) [(first forms) (rest forms)] [{} forms])]
+    `{:cmd (->argv ~@(mapv lower-form forms)) :opts ~opts}))
 
 
 (defmacro $>

@@ -189,3 +189,41 @@
       (with-redefs [cmd/spawn (recorder calls* proc)]
         (cmd/$> prev target))
       (is (= [{:opts {:prev prev :out (io/file target)} :argv ["cat"]}] @calls*)))))
+
+
+(deftest leading-opts-map-test
+  (testing "a leading map is spawn opts, not argv"
+    (let [seen (atom nil)]
+      (cmd/sh* (fn [opts argv] (reset! seen [opts argv]) :proc) {:in "42"} :cat)
+      (is (= [{:in "42"} ["cat"]] @seen))))
+
+  (testing "no map -> empty opts, argv unchanged"
+    (let [seen (atom nil)]
+      (cmd/sh* (fn [opts argv] (reset! seen [opts argv]) :proc) :echo "hi")
+      (is (= [{} ["echo" "hi"]] @seen))))
+
+  (testing "maps in argv positions still lower to k=v tokens"
+    (let [seen (atom nil)]
+      (cmd/sh* (fn [opts argv] (reset! seen [opts argv]) :proc) :dd {:if "/a" :of "/b"})
+      (is (= [{} ["dd" "if=/a" "of=/b"]] @seen))))
+
+  (testing "opts-only (no command) fails loud"
+    (is (thrown? Exception (cmd/sh* (fn [_ _] :proc) {:in "42"}))))
+
+  (testing "$argv reports a leading literal map as :opts"
+    (is (= {:cmd ["cat"] :opts {:in "42"}} (cmd/$argv {:in "42"} cat)))
+    (is (= {:cmd ["echo" "hi"] :opts {}}   (cmd/$argv echo hi)))))
+
+
+(deftest piped-stage-opts-test
+  (let [spawn (fn [opts argv] {:opts opts :argv argv})]
+    (with-redefs [cmd/process? (fn [x] (= ::proc x))]
+      (is (= {:opts {:prev ::proc :in "x"} :argv ["cat"]}
+             (cmd/sh* spawn {:prev ::proc :in "x"} :cat))
+          "opts on a piped stage: explicit :prev in the leading opts map")
+      (is (= {:opts {:prev ::proc} :argv ["in=x" "cat"]}
+             (cmd/sh* spawn ::proc {:in "x"} :cat))
+          "a map AFTER a process is argv, not opts — argv[0] 'in=x' exec-fails loudly")
+      (is (= {:opts {:prev ::proc} :argv ["dd" "if=/a"]}
+             (cmd/sh* spawn ::proc :dd {:if "/a"}))
+          "maps in argv positions after a pipe still lower to k=v"))))

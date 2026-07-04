@@ -10,6 +10,7 @@
    Standalone: this lib has no project deps — a remap table is supplied by the caller, never
    read from any global env."
   (:require [clojure.string    :as str]
+            [babashka.process  :as p]
             [lib.shell.command :as cmd]
             [lib.shell.exec    :as exec]))
 
@@ -23,6 +24,45 @@
    sudo). Install a remap baseline with `alter-var-root` (root binding -> global, thread-safe);
    compose per-op with `with-spawn`/`with-remap` (a nested `binding`)."
   cmd/spawn)
+
+
+;; ---------------------------------------------------------------------------
+;; Command timeout — an ARMED WATCHDOG on the runners, off by default. Daemons
+;; spawned outside a `with-timeout` extent (eww, udevadm monitor) are untouched.
+;; ---------------------------------------------------------------------------
+
+(def ^:dynamic *timeout-ms*
+  "When bound, every runner ($/$!/$?/sh/sh!/sh?) hard-kills its command after
+   this many ms — the finisher then sees a non-zero exit (throws / :ok? false)
+   instead of blocking forever on a wedged tool. nil (the default) = never.
+   A per-call `{:timeout-ms …}` opts entry overrides it (an explicit nil there
+   opts a single command out of an enclosing extent)."
+  nil)
+
+
+(defn- arming
+  "Spawn decorator: honor `:timeout-ms` — per-call opts first, else the ambient
+   *timeout-ms* — by hard-killing the process tree at the deadline. The key is
+   OURS, stripped before the spawn; the watchdog thread lives only as long as
+   the process does."
+  [spawn]
+  (fn [opts argv]
+    (let [ms   (if (contains? opts :timeout-ms) (:timeout-ms opts) *timeout-ms*)
+          proc (spawn (dissoc opts :timeout-ms) argv)]
+      (when ms
+        (future
+          (when-not (.waitFor ^java.lang.Process (:proc proc)
+                              (long ms) java.util.concurrent.TimeUnit/MILLISECONDS)
+            (p/destroy-tree proc))))
+      proc)))
+
+
+(defmacro with-timeout
+  "Run `body` with every runner's command hard-killed after `ms` — for code that
+   must not block forever (a converge holding the settings lock). Binds a dynamic
+   var: same-thread only, like all `with-*` here."
+  [ms & body]
+  `(binding [*timeout-ms* ~ms] ~@body))
 
 
 ;; ---------------------------------------------------------------------------
@@ -151,21 +191,24 @@
 
 (defmacro $
   "Build a command from shell-DSL forms and start it through `*spawn*` (returns a process).
+   A leading map is p/process opts (:in, :dir, :env, … + our :timeout-ms).
    Pipe with `->`: `(-> ($ echo hi) ($ cat))`."
   [& forms]
-  `(cmd/$* *spawn* ~@forms))
+  `(cmd/$* (arming *spawn*) ~@forms))
 
 
 (defmacro $!
-  "Run a command through `*spawn*`; return trimmed stdout, throwing on a non-zero exit."
+  "Run a command through `*spawn*`; return trimmed stdout, throwing on a non-zero exit.
+   A leading map is p/process opts (:in, :dir, :env, … + our :timeout-ms)."
   [& forms]
-  `(exec/out-or-fail! (cmd/$* *spawn* ~@forms)))
+  `(exec/out-or-fail! (cmd/$* (arming *spawn*) ~@forms)))
 
 
 (defmacro $?
-  "Run a command through `*spawn*` eagerly; return `{:ok? :exit :out :err}`. Does not throw."
+  "Run a command through `*spawn*` eagerly; return `{:ok? :exit :out :err}`. Does not throw.
+   A leading map is p/process opts (:in, :dir, :env, … + our :timeout-ms)."
   [& forms]
-  `(exec/result! (cmd/$* (capturing *spawn*) ~@forms)))
+  `(exec/result! (cmd/$* (arming (capturing *spawn*)) ~@forms)))
 
 
 (defmacro $argv
@@ -182,21 +225,24 @@
 
 
 (defn sh
-  "Run a command (from data) through `*spawn*`; return the process. Fn form of `$`."
+  "Run a command (from data) through `*spawn*`; return the process. Fn form of `$`.
+   A leading map is p/process opts (:in, :dir, :env, … + our :timeout-ms)."
   [& args]
-  (apply cmd/sh* *spawn* args))
+  (apply cmd/sh* (arming *spawn*) args))
 
 
 (defn sh!
-  "Run a command (from data) through `*spawn*`; return trimmed stdout, throwing. Fn form of `$!`."
+  "Run a command (from data) through `*spawn*`; return trimmed stdout, throwing. Fn form of `$!`.
+   A leading map is p/process opts (:in, :dir, :env, … + our :timeout-ms)."
   [& args]
-  (exec/out-or-fail! (apply cmd/sh* *spawn* args)))
+  (exec/out-or-fail! (apply cmd/sh* (arming *spawn*) args)))
 
 
 (defn sh?
-  "Run a command (from data) through `*spawn*` eagerly; return a result map, no throw. Fn form of `$?`."
+  "Run a command (from data) through `*spawn*` eagerly; return a result map, no throw. Fn form of `$?`.
+   A leading map is p/process opts (:in, :dir, :env, … + our :timeout-ms)."
   [& args]
-  (exec/result! (apply cmd/sh* (capturing *spawn*) args)))
+  (exec/result! (apply cmd/sh* (arming (capturing *spawn*)) args)))
 
 
 ;; Finishers re-exported so the convenience layer is one-stop.
@@ -274,6 +320,13 @@
   ;; command programmatically (apply / map / reduce):
   (sh! :git "rev-parse" "HEAD")              ;; => "9e12586…"
   (apply sh! :git "log" "--oneline" flags)
+
+  ;; a LEADING map is p/process opts (argv[0] is always a token, so it's unambiguous):
+  (sh! {:in "42"} :cat)                      ;; => "42"   stdin from a string
+  ($! {:dir "/tmp"} pwd)                     ;; => "/tmp"
+  ($? {:timeout-ms 200} sleep 10)            ;; => {:ok? false …}  hard-killed at the deadline
+  (with-timeout 15000                        ;; extent default; per-call opts override it,
+    ($! {:timeout-ms nil} some-slow-tool))   ;; and an explicit nil opts one command out
 
   ;; *spawn* is the seam. Install a remap baseline once (dev echo-stubs, path pins):
   (install-remap! {:dd ["echo" "dd"]  :mkfs.ext4 "/opt/sbin/mkfs.ext4"})

@@ -2,5 +2,6 @@
  :shell   {:commands {}}
  :control {:storage "/ujima/settings/"
            :tmp     "/ujima/run/session"}
+ :agent   {:audio-poll-ms 1000}
  :desktop {:eww-config "/opt/ujima/desktop/eww"
            :http       {:host "127.0.0.1" :port 1337}}}

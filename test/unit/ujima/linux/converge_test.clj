@@ -1,84 +1,104 @@
 (ns ujima.linux.converge-test
   (:require [clojure.test :refer [deftest is]]
-            [ujima.linux.converge :as converge]))
+            [ujima.linux.converge :as converge]
+            [ujima.linux.audio    :as audio]
+            [ujima.linux.keyboard :as keyboard]
+            [ujima.linux.system   :as system]))
 
 
-;; Tests the converge decision logic only (no OS): each test swaps `handlers`
-;; for stub :get/:set fns, where :set records the value it was called with.
-;; Keys are path vectors, the system's key shape. prv = nil means "assume
-;; nothing" (boot/udev); tests that aren't about prv-gating use it.
+;; Desired-vs-actual decision logic only (no OS): audio/full-topology and the setters are
+;; stubbed; :set-style stubs record what they were asked to do.
 
 
-(deftest skips-setter-when-already-in-sync
+(def ^:private world-hdmi-default
+  {:default :hdmi
+   :sinks   {:usb  {:id 60 :name "usb-a"  :volume 100 :muted false}
+             :hdmi {:id 51 :name "hdmi-x" :volume 70  :muted false}}})
+
+(def ^:private base-settings
+  {[:audio :active]      :usb
+   [:audio :usb :volume]  40
+   [:audio :hdmi :volume] 70
+   [:audio :muted]        false
+   [:keyboard :layout]    "us"
+   [:system :hostname]    "ujima"
+   [:system :timezone]    "Africa/Dar_es_Salaam"})
+
+
+(defn- quiet-others
+  "Stub keyboard/system as already-in-sync so audio tests stay focused."
+  [f]
+  (with-redefs [keyboard/layout  (constantly "us")
+                keyboard/layout! (fn [_] (throw (ex-info "unexpected" {})))
+                system/hostname  (constantly "ujima")
+                system/hostname! (fn [_] (throw (ex-info "unexpected" {})))
+                system/timezone  (constantly "Africa/Dar_es_Salaam")
+                system/timezone! (fn [_] (throw (ex-info "unexpected" {})))]
+    (f)))
+
+
+(deftest switches-to-active-and-asserts-only-real-diffs
+  (quiet-others
+    #(let [switched (atom nil) applied (atom {})]
+       (with-redefs [audio/full-topology          (constantly world-hdmi-default)
+                     audio/switch-output! (fn [id] (reset! switched id))
+                     audio/apply-sink!    (fn [id d] (swap! applied assoc id d))]
+         (converge/converge! base-settings nil))
+       (is (= 60 @switched)               "active :usb present but hdmi is default -> switch")
+       (is (= {60 {:volume 40}} @applied) "usb corrected to its class volume; hdmi already in sync"))))
+
+
+(deftest no-switch-when-active-is-default-or-absent
+  (quiet-others
+    #(let [switched (atom [])]
+       (with-redefs [audio/full-topology          (constantly (assoc world-hdmi-default :default :usb))
+                     audio/switch-output! (fn [id] (swap! switched conj id))
+                     audio/apply-sink!    (fn [_ _])]
+         (converge/converge! base-settings nil)
+         (converge/converge! (assoc base-settings [:audio :active] nil) nil)
+         (converge/converge! (assoc base-settings [:audio :active] :hdmi) nil))
+       (is (= [] (remove #{51} @switched)) "never switches to a sink that's absent or already right")
+       (is (= [51] (filter #{51} @switched)) "the hdmi case did switch (usb was default)"))))
+
+
+(deftest mute-is-machine-wide-across-all-present-sinks
+  (quiet-others
+    #(let [applied (atom {})]
+       (with-redefs [audio/full-topology          (constantly (assoc world-hdmi-default :default :usb))
+                     audio/switch-output! (fn [_])
+                     audio/apply-sink!    (fn [id d] (swap! applied assoc id d))]
+         (converge/converge! (assoc base-settings [:audio :muted] true) nil))
+       (is (= {60 {:volume 40 :muted true}
+               51 {:muted true}}
+              @applied)
+           "every present sink gets the mute flag; volume only where it differs"))))
+
+
+(deftest sick-audio-domain-does-not-block-the-others
+  (let [settings       (assoc base-settings [:keyboard :layout] "tz")
+        layout-applied (atom nil)]
+    (with-redefs [audio/full-topology      (fn [] (throw (ex-info "pipewire down" {})))
+                  keyboard/layout  (constantly "us")
+                  keyboard/layout! (fn [v] (reset! layout-applied v))
+                  system/hostname  (constantly "ujima")
+                  system/hostname! (fn [_])
+                  system/timezone  (constantly "Africa/Dar_es_Salaam")
+                  system/timezone! (fn [_])]
+      (is (= settings (converge/converge! settings nil)) "does not throw, returns settings"))
+    (is (= "tz" @layout-applied) "keyboard converged despite audio throwing")))
+
+
+(deftest keyboard-and-system-apply-only-on-difference
   (let [calls (atom [])]
-    (with-redefs [converge/handlers
-                  {[:a :k] {:get (constantly "v") :set #(swap! calls conj %)}}]
-      (converge/converge! {[:a :k] "v"} nil))
-    (is (= [] @calls))))
-
-
-(deftest applies-setter-with-desired-when-different
-  (let [calls (atom [])]
-    (with-redefs [converge/handlers
-                  {[:a :k] {:get (constantly "old") :set #(swap! calls conj %)}}]
-      (converge/converge! {[:a :k] "new"} nil))
-    (is (= ["new"] @calls))))
-
-
-(deftest set-only-handler-without-getter-always-applies
-  (let [calls (atom [])]
-    (with-redefs [converge/handlers
-                  {[:a :k] {:get nil :set #(swap! calls conj %)}}]
-      (converge/converge! {[:a :k] "x"} nil))
-    (is (= ["x"] @calls))))
-
-
-(deftest falsy-desired-is-applied-when-different
-  ;; [:audio :muted] false must converge (regression: falsy not treated as absent)
-  (let [calls (atom [])]
-    (with-redefs [converge/handlers
-                  {[:audio :muted] {:get (constantly true) :set #(swap! calls conj %)}}]
-      (converge/converge! {[:audio :muted] false} nil))
-    (is (= [false] @calls))))
-
-
-(deftest failing-setter-is-caught-and-others-still-converge
-  (let [calls (atom [])]
-    (with-redefs [converge/handlers
-                  {[:a :bad]  {:get (constantly "old") :set (fn [_] (throw (ex-info "boom" {})))}
-                   [:a :good] {:get (constantly "old") :set #(swap! calls conj %)}}]
-      (is (= {[:a :bad] "x" [:a :good] "y"}
-             (converge/converge! {[:a :bad] "x" [:a :good] "y"} nil))
-          "converge! does not throw and returns settings")
-      (is (= ["y"] @calls)
-          "the good setting still converged despite the bad one throwing"))))
-
-
-(deftest settings-without-a-handler-are-not-linux-business
-  (let [calls (atom [])]
-    (with-redefs [converge/handlers
-                  {[:a :known] {:get (constantly "old") :set #(swap! calls conj %)}}]
-      (converge/converge! {[:a :known] "new" [:a :unknown] "z"} nil))
-    (is (= ["new"] @calls))))
-
-
-(deftest prv-gates-untouched-keys-entirely
-  ;; a write-converge must not even READ the OS for keys that didn't change
-  (let [gets (atom 0)
-        sets (atom [])]
-    (with-redefs [converge/handlers
-                  {[:a :same]    {:get (fn [] (swap! gets inc) "x")   :set #(swap! sets conj %)}
-                   [:a :changed] {:get (fn [] (swap! gets inc) "old") :set #(swap! sets conj %)}}]
-      (converge/converge! {[:a :same] "x" [:a :changed] "new"}
-                          {[:a :same] "x" [:a :changed] "old"}))
-    (is (= 1 @gets)       "the unchanged key cost zero OS reads")
-    (is (= ["new"] @sets) "only the changed key converged")))
-
-
-(deftest nil-prv-sweeps-everything
-  (let [gets (atom 0)]
-    (with-redefs [converge/handlers
-                  {[:a :one] {:get (fn [] (swap! gets inc) "v") :set identity}
-                   [:a :two] {:get (fn [] (swap! gets inc) "v") :set identity}}]
-      (converge/converge! {[:a :one] "v" [:a :two] "v"} nil))
-    (is (= 2 @gets) "boot/udev: assume nothing, getter-compare all")))
+    (with-redefs [audio/full-topology      (constantly {:default nil :sinks {}})
+                  audio/apply-sink! (fn [_ _])
+                  audio/switch-output! (fn [_])
+                  keyboard/layout  (constantly "us")
+                  keyboard/layout! (fn [v] (swap! calls conj [:layout v]))
+                  system/hostname  (constantly "old-name")
+                  system/hostname! (fn [v] (swap! calls conj [:hostname v]))
+                  system/timezone  (constantly "Africa/Dar_es_Salaam")
+                  system/timezone! (fn [v] (swap! calls conj [:timezone v]))]
+      (converge/converge! base-settings nil))
+    (is (= [[:hostname "ujima"]] @calls)
+        "only the drifted hostname converged; layout and timezone were in sync")))

@@ -1,25 +1,17 @@
 (ns ujima.control.queries
-  "Read-side projections over the control plane, plus the one live HW fact they
-   need (the current output class). Feed the /api GETs, the POST response
-   stitching in the http layer, and the /ui state stream. Reads come from
-   settings (intent — what converge drives toward); only :output is live."
-  (:require [ujima.control     :as control]
-            [ujima.linux.audio :as audio]))
-
-
-(defn current-output
-  "The one live HW fact the projections need: the output class of the default
-   sink (:usb | :hdmi | nil)."
-  []
-  (audio/output-class (audio/default-sink)))
+  "Read-side projections over the control plane — pure settings reads, no
+   shell-outs: the [:audio :active] setting IS the truth for \"which output\"
+   (the agent's device policy keeps it aligned with the world). Feed the /api
+   GETs, the POST response stitching in the http layer, and the /ui stream."
+  (:require [ujima.control :as control]))
 
 
 (defn audio-status
   "{:volume 0-100|nil, :muted bool, :output :usb|:hdmi|nil}. Volume is nil when
-   no output classifies (widgets grey out)."
+   no output is active (widgets grey out)."
   []
   (let [s      (control/settings)
-        output (current-output)]
+        output (get s [:audio :active])]
     {:volume (when output (get s [:audio output :volume]))
      :muted  (get s [:audio :muted])
      :output output}))

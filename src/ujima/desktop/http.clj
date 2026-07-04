@@ -34,6 +34,7 @@
           [:get  ["api" "input" "keyboard"]]          :keyboard/status
           [:post ["api" "audio" "volume"]]            :audio/volume
           [:post ["api" "audio" "mute"]]              :audio/mute
+          [:post ["api" "audio" "output"]]            :audio/output
           [:post ["api" "input" "keyboard" "layout"]] :keyboard/layout
           [:get  ["ui" "state"]]                      :ui/state
           [:post ["ui" "volume" "move"]]              :ui/volume}
@@ -50,6 +51,8 @@
         :audio/volume        (do (commands/change-current-volume! (:value body))
                                  (json 200 (queries/audio-status)))
         :audio/mute          (do (commands/change-mute! (:muted body))
+                                 (json 200 (queries/audio-status)))
+        :audio/output        (do (commands/change-active-output! (:output body))
                                  (json 200 (queries/audio-status)))
         :keyboard/layout     (do (commands/change-keyboard-layout! (:layout body))
                                  (json 200 (queries/keyboard-status)))

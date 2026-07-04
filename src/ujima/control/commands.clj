@@ -8,25 +8,34 @@
    narrow ack of what they wrote; projections live in ujima.control.queries
    (the http layer stitches command-then-query for response bodies). Failures
    throw ex-info {:error <kw>} for the HTTP tier to map onto statuses."
-  (:require [ujima.control     :as control]
-            [ujima.linux.audio :as audio]))
-
-
-(defn- current-output []
-  (audio/output-class (audio/default-sink)))
+  (:require [ujima.control :as control]))
 
 
 (defn change-current-volume!
-  "Set the current output class's volume. Clamps BEFORE storing — an out-of-range
-   stored value would re-apply on every converge pass (HW caps at 100)."
+  "Set the ACTIVE output class's volume ([:audio :active] — the setting is the
+   truth for \"current\"). Clamps BEFORE storing — an out-of-range stored value
+   would re-apply on every converge pass (HW caps at 100)."
   [value]
   (when-not (number? value)
     (throw (ex-info "volume must be a number" {:error :request/malformed :value value})))
-  (if-let [output (current-output)]
+  (if-let [output (get (control/settings) [:audio :active])]
     (let [v (-> value int (max 0) (min 100))]
       (control/settings! :session [:audio output :volume] v)
       {:volume v})
-    (throw (ex-info "no classifiable audio output" {:error :audio/no-output}))))
+    (throw (ex-info "no active audio output" {:error :audio/no-output}))))
+
+
+(defn change-active-output!
+  "Select the active output class (nil = none). Written by the agent's device
+   policy on plug/unplug; the console can set it too. Idempotent — re-asserting
+   the same class still converges, which is what re-applies state onto a swapped
+   device of the same class."
+  [output]
+  (let [output (cond-> output (string? output) keyword)]
+    (when-not (contains? #{:usb :hdmi nil} output)
+      (throw (ex-info "unknown output class" {:error :request/malformed :value output})))
+    (control/settings! :session [:audio :active] output)
+    {:output output}))
 
 
 (defn change-mute!

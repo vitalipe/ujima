@@ -10,8 +10,7 @@
             [lib.throttle       :refer [throttle-leading-trailing]]
             [ujima.log          :as log]
             [ujima.control          :as control]
-            [ujima.control.commands :as commands]
-            [ujima.control.queries  :as queries]))
+            [ujima.control.commands :as commands]))
 
 
 ;; --- volume moves (interaction ≠ state) -------------------------------------
@@ -56,11 +55,12 @@
 
 
 (defn settings->ui
-  "Effective settings (+ the one live fact, the current output class) -> the UI
-   state blob. Presentation derivations belong here — :next is the switcher's
-   cycle order, not a domain fact."
-  [settings output]
-  (let [layout  (get settings [:keyboard :layout])
+  "Effective settings -> the UI state blob, pure ([:audio :active] is the truth
+   for which output). Presentation derivations belong here — :next is the
+   switcher's cycle order, not a domain fact."
+  [settings]
+  (let [output  (get settings [:audio :active])
+        layout  (get settings [:keyboard :layout])
         layouts (get settings [:keyboard :available-layouts])]
     {:audio    {:volume (when output (get settings [:audio output :volume]))
                 :muted  (get settings [:audio :muted])
@@ -82,7 +82,7 @@
    with converges, so the stream can't end on a stale line."
   [settings prv]
   (when (or (nil? prv) (not= settings prv))
-    (let [line (state-line (settings->ui settings (queries/current-output)))]
+    (let [line (state-line (settings->ui settings))]
       (doseq [ch @subs*]
         (http/send! ch line false)))))
 
@@ -95,7 +95,5 @@
   (http/as-channel req
     {:on-open  (fn [ch]
                  (swap! subs* conj ch)
-                 (http/send! ch (state-line (settings->ui (control/settings)
-                                                          (queries/current-output)))
-                             false))
+                 (http/send! ch (state-line (settings->ui (control/settings))) false))
      :on-close (fn [ch _] (swap! subs* disj ch))}))

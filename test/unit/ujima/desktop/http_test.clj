@@ -8,6 +8,7 @@
   (is (= :keyboard/status  (http/route :get  "/api/input/keyboard")))
   (is (= :audio/volume     (http/route :post "/api/audio/volume")))
   (is (= :audio/mute       (http/route :post "/api/audio/mute")))
+  (is (= :audio/output     (http/route :post "/api/audio/output")))
   (is (= :keyboard/layout  (http/route :post "/api/input/keyboard/layout")))
   (is (= :ui/state         (http/route :get  "/ui/state")))
   (is (= :ui/volume        (http/route :post "/ui/volume/move"))))

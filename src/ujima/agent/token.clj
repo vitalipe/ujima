@@ -1,4 +1,4 @@
-(ns ujima.agent.events
+(ns ujima.agent.token
   (:require [ujima.log :as log]))
 
 

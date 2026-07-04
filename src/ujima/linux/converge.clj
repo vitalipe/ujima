@@ -1,50 +1,62 @@
 (ns ujima.linux.converge
-  "\"Here is ujima state — go apply it to linux.\" The OS converge port, wired
-   into control's :converge-targets by ujima.core. Applies what it has handlers
-   for — a setting nobody handles is simply not linux's business. prv gates the
-   work: a write-converge touches only the keys that changed; a nil prv (boot,
-   udev — assume nothing) sweeps everything through the getter-compare."
+  "\"Here is ujima state — go apply it to linux.\" Desired-vs-ACTUAL, per domain:
+   each block reads its slice of the world and corrects only real differences.
+   prv is deliberately ignored — a settings diff can't see world drift (a
+   re-plugged sink comes back at its own defaults with no setting changed).
+   Domains are isolated: one failing block never stops the others."
   (:require [ujima.log            :as log]
             [ujima.linux.system   :as system]
             [ujima.linux.keyboard :as keyboard]
             [ujima.linux.audio    :as audio]))
 
 
-;; Maps a setting (ujima.control.defs key) to the ujima.linux operation that
-;; reads (:get) and applies (:set) it. All OS logic lives in ujima.linux.*; this
-;; namespace only orchestrates. :get nil => no getter, the setting is set-only.
-;; An absent output class is normal (unplugged): audio volume(!) no-op to nil,
-;; so the setting harmlessly re-applies each pass until the device shows up.
-(def handlers
-  {[:system :hostname]    {:get system/hostname :set system/hostname!}
-   [:system :timezone]    {:get system/timezone :set system/timezone!}
-   [:audio :usb :volume]  {:get #(audio/volume :usb)  :set #(audio/volume! :usb %)}
-   [:audio :hdmi :volume] {:get #(audio/volume :hdmi) :set #(audio/volume! :hdmi %)}
-   [:audio :muted]        {:get audio/mute      :set audio/mute!}
-   [:keyboard :layout]    {:get keyboard/layout :set keyboard/layout!}})
+(defn- converge-audio!
+  ;; the active class's sink becomes the default (pinning it also disarms
+  ;; wireplumber's auto-switch); every present classified sink is driven to its
+  ;; class volume + the machine-wide mute — asserting mute everywhere keeps the
+  ;; gaps between converges safe (wireplumber's own unplug-fallback lands on an
+  ;; already-converged sink).
+  [settings]
+  (let [{:keys [default sinks]} (audio/full-topology)
+        active (get settings [:audio :active])]
+    (when-let [sink (get sinks active)]
+      (when (not= active default)
+        (log/info "converge: switching output" {:to active})
+        (audio/switch-output! (:id sink))))
+    (doseq [[class actual] sinks]
+      (let [desired {:volume (get settings [:audio class :volume])
+                     :muted  (get settings [:audio :muted])}
+            diff    (into {} (filter (fn [[k v]] (and (some? v) (not= v (get actual k))))
+                                     desired))]
+        (when (seq diff)
+          (log/info "converge: applying" {:sink class :diff diff})
+          (audio/apply-sink! (:id actual) diff))))))
 
 
-(defn- converge-setting! [k desired {getter :get setter :set}]
-  (try
-    (let [current (when getter (getter))]
-      (if (and getter (= current desired))
-        (log/debug "converge: in sync" k)
-        (do
-          (log/info "converge: applying" {:setting k :value desired})
-          (setter desired))))
-    (catch Throwable e
-      (log/error "converge: failed" {:setting k :error (ex-message e)}))))
+(defn- converge-keyboard! [settings]
+  (let [desired (get settings [:keyboard :layout])]
+    (when (and desired (not= desired (keyboard/layout)))
+      (log/info "converge: applying" {:setting [:keyboard :layout] :value desired})
+      (keyboard/layout! desired))))
+
+
+(defn- converge-system! [settings]
+  (doseq [[k current apply!] [[[:system :hostname] system/hostname system/hostname!]
+                              [[:system :timezone] system/timezone system/timezone!]]]
+    (let [desired (get settings k)]
+      (when (and desired (not= desired (current)))
+        (log/info "converge: applying" {:setting k :value desired})
+        (apply! desired)))))
 
 
 (defn converge!
-  "Drive linux to match `settings` (the full effective map). Keys equal in `prv`
-   are skipped wholesale; nil prv converges everything. Idempotent (getter-compare
-   per setting) and resilient (a per-setting failure is logged, the rest still
-   converge)."
-  [settings prv]
-  (doseq [[k h] handlers]
-    (when (and (contains? settings k)
-               (or (nil? prv)
-                   (not= (get settings k) (get prv k))))
-      (converge-setting! k (get settings k) h)))
+  "Drive linux to match `settings` (the full effective map). Settings without a
+   consumer here are simply not linux's business."
+  [settings _prv]
+  (doseq [[domain f] [[:audio    converge-audio!]
+                      [:keyboard converge-keyboard!]
+                      [:system   converge-system!]]]
+    (try (f settings)
+         (catch Throwable e
+           (log/error "converge: domain failed" {:domain domain :error (ex-message e)}))))
   settings)

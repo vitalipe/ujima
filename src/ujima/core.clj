@@ -9,7 +9,7 @@
 
             [ujima.desktop    :as desktop]
             [ujima.desktop.ui :as ui]
-            [ujima.agent      :as agent]))
+            [ujima.events      :as events]))
 
 
 
@@ -27,7 +27,7 @@
     (control/init!     (assoc (get-in env [:control] {})
                               :converge-targets [linux/converge! ui/converge!]))
     (control/converge-fresh!)
-    (agent/init!       (get-in env [:agent]   {}))
+    (events/init!      (get-in env [:events]  {}))
 
     ;; desktop/init! BLOCKS holding eww; it coming back means the shell died. Exit explicitly —
     ;; agent threads must not keep bb alive, or the wrapper's `i3-msg exit` never runs and

@@ -1,12 +1,12 @@
-(ns ujima.agent
+(ns ujima.events
   (:require [clojure.core.async :as async]
             [ujima.log          :as log]
 
             [ujima.linux.usb   :as usb]
             [ujima.linux.audio :as audio]
 
-            [ujima.agent.token :as token-events]
-            [ujima.agent.audio :as audio-events]))
+            [ujima.events.token :as token-events]
+            [ujima.events.audio :as audio-events]))
 
 
 (defn- listen!
@@ -26,7 +26,7 @@
   "Wire the world's event sources to their policies (bg threads); init! returns —
    the main thread goes on to hold the shell."
   [cfg]
-  (log/info "Starting Agent loop")
+  (log/info "starting event listeners")
 
   ;; keeps [:audio :active] aligned with plugged hardware
   (listen! (audio/watch-sinks! {:interval-ms (:audio-poll-ms cfg 1000)})

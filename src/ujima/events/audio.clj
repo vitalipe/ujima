@@ -1,7 +1,7 @@
-(ns ujima.agent.audio
+(ns ujima.events.audio
   "Audio device policy: what [:audio :active] should be as sinks come and go.
    Decisions only — the watching is linux.audio/watch-sinks!, the listener
-   thread is ujima.agent. Rules: a NEW class wins (plugging headphones means
+   thread is ujima.events. Rules: a NEW class wins (plugging headphones means
    you want them); a vanished active falls back by class priority; a baseline
    event (before = classes) keeps a valid existing choice — an agent restart
    must not re-decide over a session's pick."

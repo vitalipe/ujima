@@ -1,7 +1,7 @@
-(ns ujima.agent.token
+(ns ujima.events.token
   "Control-token policy: does any mounted usb storage carry the ujima control
    token? Decisions only — the watching is linux.usb/watch-storage!, the
-   listener thread is ujima.agent. The actions are idempotent ensure-style:
+   listener thread is ujima.events. The actions are idempotent ensure-style:
    storage events fire on any mount change, token-relevant or not."
   (:require [babashka.fs :as fs]
             [ujima.log   :as log]))

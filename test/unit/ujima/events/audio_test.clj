@@ -1,22 +1,22 @@
-(ns ujima.agent.audio-test
+(ns ujima.events.audio-test
   (:require [clojure.test :refer [deftest is]]
             [ujima.control          :as control]
             [ujima.control.commands :as commands]
-            [ujima.agent.audio :as agent-audio]))
+            [ujima.events.audio :as events-audio]))
 
 
 (deftest pick-active-policy
-  (is (= :usb  (agent-audio/pick-active #{:hdmi} #{:hdmi :usb} :hdmi))
+  (is (= :usb  (events-audio/pick-active #{:hdmi} #{:hdmi :usb} :hdmi))
       "a NEW class wins — plugging headphones means you want them")
-  (is (= :hdmi (agent-audio/pick-active #{:usb} #{:usb :hdmi} :usb))
+  (is (= :hdmi (events-audio/pick-active #{:usb} #{:usb :hdmi} :usb))
       "newest wins even over an active choice")
-  (is (= :hdmi (agent-audio/pick-active #{:usb :hdmi} #{:hdmi} :usb))
+  (is (= :hdmi (events-audio/pick-active #{:usb :hdmi} #{:hdmi} :usb))
       "vanished active falls back by class priority")
-  (is (nil?  (agent-audio/pick-active #{:usb} #{} :usb))
+  (is (nil?  (events-audio/pick-active #{:usb} #{} :usb))
       "nothing present -> nil (widgets grey out)")
-  (is (= :hdmi (agent-audio/pick-active #{:usb :hdmi} #{:usb :hdmi} :hdmi))
+  (is (= :hdmi (events-audio/pick-active #{:usb :hdmi} #{:usb :hdmi} :hdmi))
       "baseline tick keeps a valid existing choice — agent restart must not re-decide")
-  (is (= :usb  (agent-audio/pick-active #{:usb :hdmi} #{:usb :hdmi} nil))
+  (is (= :usb  (events-audio/pick-active #{:usb :hdmi} #{:usb :hdmi} nil))
       "baseline without a choice -> priority order"))
 
 
@@ -26,7 +26,7 @@
   (let [written (atom [])]
     (with-redefs [control/settings              (constantly {[:audio :active] :usb})
                   commands/change-active-output! (fn [v] (swap! written conj v) {:output v})]
-      (agent-audio/on-sinks-changed! {:before #{:usb} :classes #{:usb}})
-      (agent-audio/on-sinks-changed! {:before #{:usb} :classes #{:usb :hdmi}}))
+      (events-audio/on-sinks-changed! {:before #{:usb} :classes #{:usb}})
+      (events-audio/on-sinks-changed! {:before #{:usb} :classes #{:usb :hdmi}}))
     (is (= [:usb :hdmi] @written)
         "swap re-asserts the same class; a new class wins")))

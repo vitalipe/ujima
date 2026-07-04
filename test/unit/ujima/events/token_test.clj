@@ -1,7 +1,7 @@
-(ns ujima.agent.token-test
+(ns ujima.events.token-test
   (:require [clojure.test :refer [deftest is]]
             [babashka.fs :as fs]
-            [ujima.agent.token :as token]))
+            [ujima.events.token :as token]))
 
 
 (deftest on-storage-changed-decides-from-the-event-mounts

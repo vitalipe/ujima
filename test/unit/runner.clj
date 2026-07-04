@@ -14,7 +14,7 @@
             [lib.io-test]
 
             [ujima.control.registry-test]
-            [ujima.reconcile-test]
+            [ujima.linux.converge-test]
             [ujima.control-test]
             [ujima.control.commands-test]
             [ujima.control.queries-test]
@@ -38,7 +38,7 @@
     lib.io-test
 
     ujima.control.registry-test
-    ujima.reconcile-test
+    ujima.linux.converge-test
     ujima.control-test
     ujima.control.commands-test
     ujima.control.queries-test

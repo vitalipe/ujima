@@ -34,11 +34,10 @@
                 :default "us"
                 :scopes  #{:device :session :activity}}
 
-               {:key        [:keyboard :available-layouts]
-                :doc        "XKB layout codes offered in the layout switcher UI"
-                :default    ["us" "tz"]
-                :reconcile? false ;; data-only: consumed by us, never applied to the OS
-                :scopes     #{:device}}
+               {:key     [:keyboard :available-layouts]
+                :doc     "XKB layout codes offered in the layout switcher UI (data-only: no converge handler consumes it)"
+                :default ["us" "tz"]
+                :scopes  #{:device}}
 
                {:key     [:audio :muted]
                 :doc     "Audio muted? (machine-wide)"

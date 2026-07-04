@@ -129,20 +129,6 @@
 
 
 ;; ---------------------------------------------------------------------------
-;; reconcilable-settings
-;; ---------------------------------------------------------------------------
-
-(deftest reconcilable-settings-strips-data-only
-  (let [r (registry/->registry
-            {:scopes   [{:key :device :persist? true}]
-             :settings [{:key [:a :one]  :default "d1"  :scopes #{:device}}
-                        {:key [:a :list] :default ["x"] :scopes #{:device} :reconcile? false}]})]
-    (is (= {[:a :one] "d1"}
-           (registry/reconcilable-settings r {[:a :one] "d1" [:a :list] ["x" "y"]}))
-        "data-only settings never reach reconcile")))
-
-
-;; ---------------------------------------------------------------------------
 ;; real schema invariant (guards typos in defs.clj)
 ;; ---------------------------------------------------------------------------
 

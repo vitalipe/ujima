@@ -87,12 +87,13 @@
           "stale content discarded, not merged"))))
 
 
-(deftest converge-targets-fire-on-writes-and-external-reconciles
+(deftest converge-targets-receive-effective-and-previous
   (let [seen (atom [])]
-    (fresh! [(fn [s] (swap! seen conj (get s [:audio :hdmi :volume])))
-             (fn [_] (throw (ex-info "boom" {})))])   ; must never break a converge
+    (fresh! [(fn [s prv] (swap! seen conj [(get s [:audio :hdmi :volume])
+                                           (some-> prv (get [:audio :hdmi :volume]))]))
+             (fn [_ _] (throw (ex-info "boom" {})))])   ; must never break a converge
     (control/settings! :device [:audio :hdmi :volume] 85)
-    (is (= [85] @seen) "fires inside the write converge, sees effective settings")
+    (is (= [[85 70]] @seen) "write converge: (effective, previous-effective)")
     (is (= 85 (get (control/settings) [:audio :hdmi :volume])) "throwing target didn't break the write")
     (control/reconcile!)
-    (is (= [85 85] @seen) "an external reconcile! is a converge too")))
+    (is (= [[85 70] [85 nil]] @seen) "external converge: prv nil = assume nothing")))

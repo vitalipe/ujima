@@ -48,20 +48,22 @@
 ;; ---------------------------------------------------------------------------
 
 
-(defn- notify-converged! [settings]
+(defn- notify-converged! [settings prv]
   (doseq [f @targets*]
-    (try (f settings)
+    (try (f settings prv)
          (catch Throwable e
            (log/error "control: converge target failed" {:error (ex-message e)})))))
 
 
 (defn init!
   "`:converge-targets` is the fixed set of ports this machine drives (the OS
-   port, the GUI port, …): each is called with the effective settings after
-   EVERY converge, INSIDE the critical section — strictly ordered, in vector
-   order. The contract that keeps that safe: targets are few, fast, one-way
-   (ujima -> world), and NEVER write settings (that recurses the converge).
-   A target's failure is logged and never breaks the converge itself."
+   port, the GUI port, …): each is called with (effective, previous-effective)
+   after EVERY converge, INSIDE the critical section — strictly ordered, in
+   vector order. previous is nil on external converges (boot, udev): assume
+   nothing, everything may have changed. The contract that keeps this safe:
+   targets are few, fast, one-way (ujima -> world), and NEVER write settings
+   (that recurses the converge). A target's failure is logged and never breaks
+   the converge itself."
   [{storage :storage tmp :tmp targets :converge-targets}]
   (reset! targets* (vec targets))
   (reset! registry* (->registry {:settings defs/settings
@@ -103,14 +105,16 @@
 
   (locking lock*
 
+    (let [prv (settings)]
+
       (->> scope
         (slurp-scope)
         (update-settings-in-scope @registry* scope f)
         (spit-scope! scope))
 
       (let [effective (settings)]
-        (notify-converged! effective)
-        effective)))
+        (notify-converged! effective prv)
+        effective))))
 
 
 (defn settings!
@@ -128,6 +132,6 @@
   []
   (locking lock*
     (let [effective (settings)]
-      (notify-converged! effective)
+      (notify-converged! effective nil)
       effective)))
   

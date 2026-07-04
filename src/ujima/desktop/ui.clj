@@ -42,8 +42,7 @@
 
 ;; --- the state stream --------------------------------------------------------
 
-(defonce ^:private subs*        (atom #{}))
-(defonce ^:private last-pushed* (atom nil))
+(defonce ^:private subs* (atom #{}))
 
 
 (defn- state []
@@ -56,17 +55,16 @@
 
 
 (defn converge!
-  "The GUI converge port (see control/init! for the target contract): runs
-   INSIDE control's critical section — strictly ordered with converges, so the
-   stream can't end on a stale line. Only writer of last-pushed*, serialized by
-   that same lock."
-  [_settings]
-  (let [st (state)]
-    (when (not= st @last-pushed*)
-      (reset! last-pushed* st)
-      (let [line (state-line st)]
-        (doseq [ch @subs*]
-          (http/send! ch line false))))))
+  "The GUI converge port (see control/init! for the target contract): stateless —
+   pushes the rebuilt projection when settings actually changed, and always when
+   prv is nil (external converge: live HW facts like :output may have moved with
+   no settings write). Runs INSIDE control's critical section — strictly ordered
+   with converges, so the stream can't end on a stale line."
+  [settings prv]
+  (when (or (nil? prv) (not= settings prv))
+    (let [line (state-line (state))]
+      (doseq [ch @subs*]
+        (http/send! ch line false)))))
 
 
 (defn stream

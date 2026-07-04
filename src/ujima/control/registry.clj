@@ -24,14 +24,6 @@
   (map-vals :default settings-by-key))
 
 
-(defn reconcilable-settings
-  ;; strip data-only settings (:reconcile? false) — owned by us, never applied to the OS
-  [{settings-by-key :settings-by-key} effective]
-  (->> effective
-    (filter (fn [[k _]] (get (settings-by-key k) :reconcile? true)))
-    (into {})))
-
-
 (defn scope->allowed-settings [{settings-of-scope :settings-of-scope} scope]
   (settings-of-scope scope))
 

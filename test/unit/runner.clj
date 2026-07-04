@@ -22,7 +22,8 @@
             [ujima.linux.audio-test]
             [ujima.desktop.http-test]
             [ujima.desktop.ui-test]
-            [ujima.agent.audio-test]))
+            [ujima.agent.audio-test]
+            [ujima.agent.token-test]))
 
 
 (def test-namespaces
@@ -48,7 +49,8 @@
     ujima.linux.audio-test
     ujima.desktop.http-test
     ujima.desktop.ui-test
-    ujima.agent.audio-test])
+    ujima.agent.audio-test
+    ujima.agent.token-test])
 
 
 (defn -main [& _]

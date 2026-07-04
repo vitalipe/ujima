@@ -1,11 +1,30 @@
 (ns ujima.agent.token
-  (:require [ujima.log :as log]))
+  "Control-token policy: does any mounted usb storage carry the ujima control
+   token? Decisions only — the watching is linux.usb/watch-storage!, the
+   listener thread is ujima.agent. The actions are idempotent ensure-style:
+   storage events fire on any mount change, token-relevant or not."
+  (:require [babashka.fs :as fs]
+            [ujima.log   :as log]))
 
 
-(defn on-control-token-change! [token]
+(def ^:private token-file ".ujima-control-token")
 
-  (when (:present? token)
-    (log/info "control token present, open admin app!"))
 
-  (when-not (:present? token)
-    (log/info "control token missing, close admin app!")))
+(defn- find-token
+  "The token file's path on one of `mounts`, nil when absent."
+  [mounts]
+  (->> mounts
+       (map #(fs/path % token-file))
+       (filter fs/exists?)
+       (first)))
+
+
+(defn on-storage-changed!
+  "Handle one storage event: ensure the admin surface matches token presence.
+   Returns the token path (or nil) — the decision, for tests."
+  [{:keys [mounts]}]
+  (if-let [token (find-token mounts)]
+    (do (log/info "control token present, open admin app!" {:token (str token)})
+        (str token))
+    (do (log/info "control token missing, close admin app!")
+        nil)))

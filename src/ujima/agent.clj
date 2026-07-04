@@ -1,8 +1,8 @@
 (ns ujima.agent
-  (:require [clojure.core.async      :as async]
-            [ujima.log               :as log]
+  (:require [clojure.core.async :as async]
+            [ujima.log          :as log]
 
-            [ujima.linux.token :as token]
+            [ujima.linux.usb   :as usb]
             [ujima.linux.audio :as audio]
 
             [ujima.agent.token :as token-events]
@@ -22,19 +22,16 @@
         (recur)))))
 
 
-(defn init! [cfg]
-  (let [control-token-ch* (token/watch-control-token!)
-        sink-events-ch    (audio/watch-sinks! {:interval-ms (:audio-poll-ms cfg 1000)})]
+(defn init!
+  "Wire the world's event sources to their policies (bg threads); init! returns —
+   the main thread goes on to hold the shell."
+  [cfg]
+  (log/info "Starting Agent loop")
 
-    (log/info "Starting Agent loop")
+  ;; keeps [:audio :active] aligned with plugged hardware
+  (listen! (audio/watch-sinks! {:interval-ms (:audio-poll-ms cfg 1000)})
+           audio-events/on-sinks-changed!)
 
-    ;; device policy: keeps [:audio :active] aligned with plugged hardware
-    (listen! sink-events-ch audio-events/on-sinks-changed!)
-
-    ;; watch for events (bg thread); init! returns — the main thread goes on to hold the shell
-    (async/thread
-      (loop [prv-token nil]
-        (when-let [token (async/<!! control-token-ch*)] ;; chan still open?
-          (when (not= prv-token token)
-            (token-events/on-control-token-change! token))
-          (recur token))))))
+  ;; admin surface follows the control token on usb storage
+  (listen! (usb/watch-storage!)
+           token-events/on-storage-changed!))

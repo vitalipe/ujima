@@ -1,33 +1,41 @@
 (ns ujima.desktop.app.proc
   "The proc store — a pure reducer folding normalized i3 window events (ujima.linux.i3)
-   into procs {:app-id :pid :windows #{con-id} :state :title}, singleton per app id.
-   Identity is the WM_CLASS the catalog names; :pid arrives with start-app! (the startup
-   slice) — until then procs exist only through window adoption. Pure; the live atom and
-   its single writer are ujima.desktop.app's."
+   and proc events into procs {:app-id :app :pid :windows #{con-id} :state :title},
+   singleton per app id. Identity is the app map's :class: the store's :class->app index
+   is seeded from the catalog and LEARNS every :proc/started app, so ad-hoc apps adopt
+   like catalog ones. :pid comes from start-app!'s spawn; adoption-created procs (a
+   window we recognize but didn't spawn) carry :pid nil. Pure; the live atom and its
+   writers are ujima.desktop.app's."
   (:require [clojure.string :as str]))
 
 
-(defn init [catalog]
-  {:catalog catalog
-   :procs   {}      ; app-id -> proc
-   :order   []      ; app-id adoption order (dock order)
-   :wm->app {}      ; con-id -> app-id
-   :current nil})   ; focused app, nil while an unmanaged window (or nothing) has focus
+(defn init [class->app]
+  {:class->app (or class->app {})   ; lower-cased WM_CLASS -> app map (catalog seed + learned)
+   :procs      {}                   ; app-id -> proc
+   :order      []                   ; app-id adoption order (dock order)
+   :wm->app    {}                   ; con-id -> app-id
+   :current    nil})                ; focused app, nil while an unmanaged window has focus
 
 
 (defn- adopt
   "Join CON-ID to the app its WM_CLASS names. Extra windows of a tracked app attach to
-   its proc; a transient (dialog) never *creates* one — it only attaches (LibreOffice's
-   Tip-of-the-Day is born carrying the writer class). Tracked cons and unknown classes
-   pass through, so replays are idempotent."
+   its proc (promoting :starting -> :running — the spawned window arrived); a transient
+   (dialog) never *creates* a proc — it only attaches (LibreOffice's Tip-of-the-Day is
+   born carrying the writer class). Tracked cons and unknown classes pass through, so
+   replays are idempotent."
   [state {:keys [con-id class transient? title]}]
-  (let [app-id (when class (get-in state [:catalog :class->id (str/lower-case class)]))]
+  (let [app    (when class (get-in state [:class->app (str/lower-case class)]))
+        app-id (:id app)]
     (cond
       (get-in state [:wm->app con-id]) state
       (nil? app-id)                    state
 
       (get-in state [:procs app-id])
       (-> state
+          (update-in [:procs app-id]
+                     (fn [p] (cond-> p
+                               (= :starting (:state p)) (assoc :state :running)  ; New -> Running
+                               (nil? (:title p))         (assoc :title title))))
           (update-in [:procs app-id :windows] conj con-id)
           (assoc-in  [:wm->app con-id] app-id))
 
@@ -36,7 +44,8 @@
       :else
       (-> state
           (assoc-in [:procs app-id] {:app-id  app-id
-                                     :pid     nil     ; start-app! stamps it (startup slice)
+                                     :app     app
+                                     :pid     nil     ; a window we recognize but didn't spawn
                                      :windows #{con-id}
                                      :state   :running
                                      :title   title})
@@ -69,9 +78,31 @@
   (assoc state :current (get-in state [:wm->app con-id])))
 
 
+(defn- on-started
+  "start-app! spawned APP — the proc enters the lifecycle at :starting (New): in the
+   dock from click time, no windows yet; adoption promotes it to :running. The app's
+   :class is LEARNED into the adoption index (this is what lets non-catalog apps adopt;
+   same class from a different definition = last one wins). An existing proc only gets
+   :pid/:app refreshed (start-app! is ensure-open, so that's a defensive replay path)."
+  [state {:keys [app pid]}]
+  (let [app-id (:id app)
+        state  (cond-> state
+                 (:class app) (assoc-in [:class->app (str/lower-case (:class app))] app))]
+    (if (get-in state [:procs app-id])
+      (update-in state [:procs app-id] assoc :pid pid :app app)
+      (-> state
+          (assoc-in [:procs app-id] {:app-id  app-id
+                                     :app     app
+                                     :pid     pid
+                                     :windows #{}
+                                     :state   :starting
+                                     :title   nil})
+          (update :order conj app-id)))))
+
+
 (defn- on-exit
-  "A spawned pid died (the startup slice wires the producer). Its windows follow with
-   their own close events; the mark is what the crash taxonomy reads."
+  "The spawned pid died. Its windows follow with their own close events; the mark is
+   what the crash taxonomy reads."
   [state {:keys [app-id]}]
   (cond-> state
     (get-in state [:procs app-id]) (assoc-in [:procs app-id :state] :exited)))
@@ -81,23 +112,24 @@
   "Fold one normalized event into the store. Pure; unknown types pass through."
   [state event]
   (case (:type event)
-    :window/new   (adopt    state event)
-    :window/title (on-title state event)
-    :window/close (on-close state event)
-    :window/focus (on-focus state event)
-    :proc/exit    (on-exit  state event)
+    :window/new   (adopt      state event)
+    :window/title (on-title   state event)
+    :window/close (on-close   state event)
+    :window/focus (on-focus   state event)
+    :proc/started (on-started state event)
+    :proc/exit    (on-exit    state event)
     state))
 
 
 (defn snapshot
-  "The /ui/apps wire shape (lib.edn camelCases keys on the way out)."
+  "The /ui/apps wire shape (lib.edn camelCases keys on the way out). Everything renders
+   from the proc's own :app — the store needs no catalog."
   [state]
   {:apps    (mapv (fn [id]
-                    (let [p (get-in state [:procs id])
-                          a (get-in state [:catalog :by-id id])]
+                    (let [p (get-in state [:procs id])]
                       {:id    id
-                       :label (:label a)
-                       :icon  (or (:icon a) (name id))
+                       :label (get-in p [:app :label])
+                       :icon  (or (get-in p [:app :icon]) (name id))
                        :state (:state p)
                        :title (:title p)}))
                   (:order state))

@@ -5,27 +5,22 @@
   (:require [clojure.string :as str]))
 
 
-(defn window-class
-  "The WM_CLASS this app's windows are adopted by: a declared natural :class (natives),
-   else the stamped ujima-<id>."
-  [app]
-  (or (:class app) (str "ujima-" (name (:id app)))))
-
-
 (defn- validate!
-  "Loud structural check — a bad baked catalog is a build error, not a runtime surprise."
+  "Loud structural check — a bad baked catalog is a build error, not a runtime surprise.
+   :class is required: it is the adoption key (for chromium apps it must match the
+   --class= inside :exec — drift means the app never leaves :starting)."
   [apps]
-  (doseq [{:keys [id label exec] :as app} apps]
+  (doseq [{:keys [id label exec class] :as app} apps]
     (when-not id    (throw (ex-info "catalog app missing :id" {:app app})))
     (when-not label (throw (ex-info "catalog app missing :label" {:id id})))
     (when-not (and (vector? exec) (seq exec))
       (throw (ex-info "catalog app missing :exec" {:id id})))
-    (when (and (:class app) (:class-flag app))
-      (throw (ex-info "catalog app declares both :class and :class-flag" {:id id}))))
+    (when-not (string? class)
+      (throw (ex-info "catalog app missing :class" {:id id}))))
   (let [ids (map :id apps)]
     (when (not= (count ids) (count (distinct ids)))
       (throw (ex-info "catalog has duplicate app :id" {:ids ids}))))
-  (let [classes (map (comp str/lower-case window-class) apps)]
+  (let [classes (map (comp str/lower-case :class) apps)]
     (when (not= (count classes) (count (distinct classes)))
       (throw (ex-info "catalog apps share a WM_CLASS" {:classes classes}))))
   apps)
@@ -33,13 +28,13 @@
 
 (defn ->catalog
   "Index raw {:apps [...]} edn: creation order, by-id, and the lower-cased WM_CLASS ->
-   app-id adoption index (casing varies by app — i3 reports TuxPaint, Pcmanfm, …).
+   app-map adoption seed (casing varies by app — i3 reports TuxPaint, Pcmanfm, …).
    Validates loudly."
   [raw]
   (let [apps (validate! (vec (:apps raw)))]
-    {:order     (mapv :id apps)
-     :by-id     (into {} (map (juxt :id identity)) apps)
-     :class->id (into {} (map (fn [a] [(str/lower-case (window-class a)) (:id a)])) apps)}))
+    {:order      (mapv :id apps)
+     :by-id      (into {} (map (juxt :id identity)) apps)
+     :class->app (into {} (map (fn [a] [(str/lower-case (:class a)) a])) apps)}))
 
 
 (defn listing

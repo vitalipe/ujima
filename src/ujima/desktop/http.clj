@@ -69,7 +69,11 @@
         :ui/apps             (apps/stream req)
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         :app/catalog         (json 200 {:apps (app/catalog-listing)})
-        :app/run             (do (app/run! (keyword (:app-id body))) (json 202 {}))
+        ;; run folds :proc/started on this thread — publish it so the dock shows the
+        ;; :starting proc at click time, not first-window time
+        :app/run             (do (app/run-from-catalog! (keyword (:app-id body)))
+                                 (apps/push!)
+                                 (json 202 {}))
         (json 404 {:error "not found"})))
     (catch clojure.lang.ExceptionInfo e
       (if-let [status (error-status (:error (ex-data e)))]

@@ -7,11 +7,14 @@
 (def ^:private cat
   (catalog/->catalog
     {:apps [{:id :wikipedia :label "Wikipedia" :icon "wikipedia"
-             :exec ["chromium" "--app=https://wikipedia.com"] :class-flag "--class"}
+             :exec ["chromium" "--app=https://wikipedia.com" "--class=ujima-wikipedia"]
+             :class "ujima-wikipedia"}
             {:id :write :label "Write" :icon "write"
              :exec ["libreoffice" "--writer"] :class "libreoffice-writer"}]}))
 
-(def ^:private s0 (proc/init cat))
+(def ^:private wiki-app (get-in cat [:by-id :wikipedia]))
+
+(def ^:private s0 (proc/init (:class->app cat)))
 
 (defn- fold [& evs] (reduce proc/apply-event s0 evs))
 
@@ -23,7 +26,8 @@
   (let [s (fold wiki-new)]
     (is (= #{42} (get-in s [:procs :wikipedia :windows])))
     (is (= :running (get-in s [:procs :wikipedia :state])))
-    (is (nil? (get-in s [:procs :wikipedia :pid])) "no spawn in this slice")
+    (is (= wiki-app (get-in s [:procs :wikipedia :app])) "the proc carries its app map")
+    (is (nil? (get-in s [:procs :wikipedia :pid])) "recognized but not spawned by us")
     (is (= [:wikipedia] (:order s)))
     (is (= :wikipedia (:current s)))))
 
@@ -81,6 +85,42 @@
   (is (= :wikipedia (:current (fold wiki-new {:type :window/focus :con-id 42}))))
   (is (nil? (:current (fold wiki-new {:type :window/focus :con-id 999})))
       "unmanaged focus clears the highlight"))
+
+
+(deftest started-enters-at-starting
+  ;; New: in the dock from click time, no windows yet
+  (let [s (fold {:type :proc/started :app wiki-app :pid 4242})]
+    (is (= {:app-id :wikipedia :app wiki-app :pid 4242 :windows #{} :state :starting :title nil}
+           (get-in s [:procs :wikipedia])))
+    (is (= [:wikipedia] (:order s)))
+    (is (nil? (:current s)) "no window, no focus"))
+  (let [replay (fold {:type :proc/started :app wiki-app :pid 1}
+                     {:type :proc/started :app wiki-app :pid 2})]
+    (is (= 2 (get-in replay [:procs :wikipedia :pid])) "replay refreshes the pid")
+    (is (= [:wikipedia] (:order replay)) "and never duplicates the proc")))
+
+
+(deftest adoption-promotes-starting-to-running
+  ;; New -> Running: the spawned proc's window maps and attaches
+  (let [s (fold {:type :proc/started :app wiki-app :pid 4242}
+                wiki-new)]
+    (is (= :running (get-in s [:procs :wikipedia :state])))
+    (is (= 4242 (get-in s [:procs :wikipedia :pid])) "pid survives the promotion")
+    (is (= #{42} (get-in s [:procs :wikipedia :windows])))
+    (is (= "Wikipedia" (get-in s [:procs :wikipedia :title])) "first window's title lands")))
+
+
+(deftest started-learns-ad-hoc-classes
+  ;; an app the catalog never heard of: :proc/started teaches the index its :class,
+  ;; so its window adopts like any catalog app's
+  (let [notes {:id :notes :label "Notes" :exec ["notes-app"] :class "Ujima-Notes"}
+        s     (fold {:type :proc/started :app notes :pid 7}
+                    {:type :window/new :con-id 9 :class "ujima-notes" :transient? false :title "Notes"})]
+    (is (= :running (get-in s [:procs :notes :state])))
+    (is (= #{9} (get-in s [:procs :notes :windows])))
+    (is (= [{:id :notes :label "Notes" :icon "notes" :state :running :title "Notes"}]
+           (:apps (proc/snapshot s)))
+        "snapshot renders from the proc's own :app — no catalog anywhere")))
 
 
 (deftest proc-exit-marks-the-state

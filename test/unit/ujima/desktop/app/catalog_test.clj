@@ -5,7 +5,8 @@
 
 (def ^:private raw
   {:apps [{:id :wikipedia :label "Wikipedia" :icon "wikipedia"
-           :exec ["chromium" "--app=https://wikipedia.com"] :class-flag "--class"}
+           :exec ["chromium" "--app=https://wikipedia.com" "--class=ujima-wikipedia"]
+           :class "ujima-wikipedia"}
           {:id :write :label "Write" :icon "write"
            :exec ["libreoffice" "--writer"] :class "libreoffice-writer"}
           {:id :draw :label "Draw"
@@ -14,15 +15,11 @@
 (def ^:private cat (catalog/->catalog raw))
 
 
-(deftest window-class-stamped-vs-natural
-  (is (= "ujima-wikipedia"   (catalog/window-class {:id :wikipedia :class-flag "--class"})))
-  (is (= "TuxPaint.TuxPaint" (catalog/window-class {:id :draw :class "TuxPaint.TuxPaint"}))))
-
-
-(deftest indexes-lower-cased-classes
-  ;; WM_CLASS casing varies by app — the adoption index is lower-cased
-  (is (= :draw      (get-in cat [:class->id "tuxpaint.tuxpaint"])))
-  (is (= :wikipedia (get-in cat [:class->id "ujima-wikipedia"]))))
+(deftest indexes-lower-cased-classes-to-app-maps
+  ;; WM_CLASS casing varies by app — the adoption seed is lower-cased, values = full maps
+  (is (= :draw      (get-in cat [:class->app "tuxpaint.tuxpaint" :id])))
+  (is (= :wikipedia (get-in cat [:class->app "ujima-wikipedia" :id])))
+  (is (= ["tuxpaint"] (get-in cat [:class->app "tuxpaint.tuxpaint" :exec]))))
 
 
 (deftest listing-projects-in-order-with-icon-default
@@ -34,15 +31,15 @@
 
 (deftest validates-loudly
   (is (thrown? clojure.lang.ExceptionInfo
-        (catalog/->catalog {:apps [{:id :a :label "A"}]}))
+        (catalog/->catalog {:apps [{:id :a :label "A" :class "x"}]}))
       "missing :exec")
   (is (thrown? clojure.lang.ExceptionInfo
-        (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"]}
+        (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"]}]}))
+      ":class is required — it is the adoption key")
+  (is (thrown? clojure.lang.ExceptionInfo
+        (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"] :class "x"}
                                    {:id :a :label "A2" :exec ["y"] :class "y"}]}))
       "duplicate ids")
-  (is (thrown? clojure.lang.ExceptionInfo
-        (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"] :class "X" :class-flag "--class"}]}))
-      "both class sources")
   (is (thrown? clojure.lang.ExceptionInfo
         (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"] :class "Same"}
                                    {:id :b :label "B" :exec ["y"] :class "same"}]}))

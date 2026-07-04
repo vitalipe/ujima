@@ -1,25 +1,31 @@
 ;; UjimaOS app catalog — pure-data launch specs (tmp/app-model/index.md), baked to
-;; /opt/ujima/desktop/apps.edn. The agent loads it once at init (ujima.desktop.app) as by-id
-;; sugar for the HTTP/eww edge; the executor never consults it. Adding an app = one entry.
+;; /opt/ujima/desktop/apps.edn. desktop/app.clj loads it once at init as by-id sugar for
+;; the HTTP/eww edge; the executor runs :exec VERBATIM and never consults the catalog.
+;; Ad-hoc app maps (same shape) can be started directly — adding an app = one entry.
 ;;
-;;   :exec        command + params — content (URLs, documents) lives here, never in the model
-;;   :class       natural WM_CLASS (native apps) — the window-adoption key
-;;   :class-flag  stamped-class apps (chromium) get <flag>=ujima-<id> at spawn instead;
-;;                their adoption key is ujima-<id>
-;;   :icon        name under /opt/ujima/desktop/icons/<icon>.svg (defaults to :id)
-;;   :on-exit     :close (default) | :relaunch — uncommanded-death policy (startup slice)
+;;   :exec   the literal argv — content AND flags live here, nothing is stamped
+;;   :class  the WM_CLASS its windows map with — the adoption key; for chromium apps it
+;;           must match the --class= inside :exec (drift = the app never leaves :starting)
+;;   :icon   name under /opt/ujima/desktop/icons/<icon>.svg (defaults to :id)
+;;   :on-exit :close (default) | :relaunch — uncommanded-death policy (future slice)
+;;
+;; chromium profiles are flat /tmp paths (parent always exists — chromium silently falls
+;; back to the shared default profile when the parent dir is missing); per-launch fresh
+;; profiles arrive with the ujima-browser wrapper.
 {:apps
  [{:id    :wikipedia
    :label "Wikipedia"
    :icon  "wikipedia"
-   :exec  ["chromium" "--app=https://wikipedia.com"]
-   :class-flag "--class"}
+   :exec  ["chromium" "--app=https://wikipedia.com" "--class=ujima-wikipedia"
+           "--user-data-dir=/tmp/ujima-wikipedia" "--no-first-run" "--disk-cache-size=1"]
+   :class "ujima-wikipedia"}
 
   {:id    :books
    :label "Books"
    :icon  "books"
-   :exec  ["chromium" "--app=http://ujima-content.local/books"]
-   :class-flag "--class"}
+   :exec  ["chromium" "--app=http://ujima-content.local/books" "--class=ujima-books"
+           "--user-data-dir=/tmp/ujima-books" "--no-first-run" "--disk-cache-size=1"]
+   :class "ujima-books"}
 
   {:id    :write
    :label "Write"

@@ -4,9 +4,11 @@
 
             [ujima.linux.usb   :as usb]
             [ujima.linux.audio :as audio]
+            [ujima.linux.i3    :as i3]
 
             [ujima.events.token :as token-events]
-            [ujima.events.audio :as audio-events]))
+            [ujima.events.audio :as audio-events]
+            [ujima.events.apps  :as apps-events]))
 
 
 (defn- listen!
@@ -34,4 +36,8 @@
 
   ;; admin surface follows the control token on usb storage
   (listen! (usb/watch-storage!)
-           token-events/on-storage-changed!))
+           token-events/on-storage-changed!)
+
+  ;; the proc store follows the i3 window stream (baseline replays already-mapped windows)
+  (listen! (i3/watch-windows!)
+           apps-events/on-window-event!))

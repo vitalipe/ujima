@@ -4,4 +4,5 @@
            :tmp     "/ujima/run/session"}
  :events  {:audio-poll-ms 1000}
  :desktop {:eww-config "/opt/ujima/desktop/eww"
+           :catalog    "/opt/ujima/desktop/apps.edn"
            :http       {:host "127.0.0.1" :port 1337}}}

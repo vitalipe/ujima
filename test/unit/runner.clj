@@ -20,8 +20,10 @@
             [ujima.control.queries-test]
 
             [ujima.linux.audio-test]
+            [ujima.linux.i3-test]
             [ujima.desktop.http-test]
             [ujima.desktop.ui-test]
+            [ujima.desktop.app-test]
             [ujima.events.audio-test]
             [ujima.events.token-test]))
 
@@ -47,8 +49,10 @@
     ujima.control.queries-test
 
     ujima.linux.audio-test
+    ujima.linux.i3-test
     ujima.desktop.http-test
     ujima.desktop.ui-test
+    ujima.desktop.app-test
     ujima.events.audio-test
     ujima.events.token-test])
 

@@ -1,17 +1,20 @@
 (ns ujima.desktop.http
   "The desktop's loopback HTTP API (http-kit). Transport only — parse the
    request, run at most ONE command, respond with a query (mechanical
-   command-then-query stitching; no domain logic lives here). Two tiers:
+   command-then-query stitching; no domain logic lives here). Three tiers:
      /api/**  the settings resource API (commands + queries; the future console
               reuses them) — writes respond with the fresh resource
-     /ui/**   the GUI edge (ujima.desktop.ui): the NDJSON state stream and the
-              verbs where interaction ≠ state (throttled volume moves)."
+     /ui/**   the GUI edge (ujima.desktop.ui): the NDJSON state + apps streams
+              and the verbs where interaction ≠ state (throttled volume moves)
+     /app/**  the app layer (ujima.desktop.app): the catalog now, start/stop/
+              focus when the startup slice lands."
   (:require [clojure.string     :as str]
             [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json json->edn]]
             [ujima.log          :as log]
             [ujima.control.commands :as commands]
             [ujima.control.queries  :as queries]
+            [ujima.desktop.app      :as app]
             [ujima.desktop.ui       :as ui]))
 
 
@@ -37,7 +40,9 @@
           [:post ["api" "audio" "output"]]            :audio/output
           [:post ["api" "input" "keyboard" "layout"]] :keyboard/layout
           [:get  ["ui" "state"]]                      :ui/state
-          [:post ["ui" "volume" "move"]]              :ui/volume}
+          [:get  ["ui" "apps"]]                       :ui/apps
+          [:post ["ui" "volume" "move"]]              :ui/volume
+          [:get  ["app" "catalog"]]                   :app/catalog}
          [method parts])))
 
 
@@ -57,7 +62,9 @@
         :keyboard/layout     (do (commands/change-keyboard-layout! (:layout body))
                                  (json 200 (queries/keyboard-status)))
         :ui/state            (ui/stream req)
+        :ui/apps             (ui/apps-stream req)
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
+        :app/catalog         (json 200 {:apps (app/catalog-listing)})
         (json 404 {:error "not found"})))
     (catch clojure.lang.ExceptionInfo e
       (if-let [status (error-status (:error (ex-data e)))]

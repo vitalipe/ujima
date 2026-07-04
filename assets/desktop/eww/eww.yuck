@@ -1,8 +1,9 @@
-;; UjimaOS desktop shell — tray volume/mute/keyboard wired to the agent's loopback API
-;; (ujima.desktop.http, 127.0.0.1:1337): widget state arrives on ONE pushed stream
-;; (/ui/state via deflisten — snapshot on connect, then a line per real change), and
-;; clicks are plain fire-and-forget POSTs through bin/ujima-api. Launcher tiles + dock
-;; window row are still static mocks.
+;; UjimaOS desktop shell — wired to the agent's loopback API (ujima.desktop.http,
+;; 127.0.0.1:1337): widget state arrives on pushed streams (deflisten — snapshot on
+;; connect, then a line per real change; settings on /ui/state, running apps on
+;; /ui/apps), the launcher tiles render the app catalog (/app/catalog — immutable per
+;; session, hence a poll), and clicks are plain fire-and-forget POSTs through
+;; bin/ujima-api. Tile/dock clicks stay inert until the startup slice lands.
 
 (defpoll clock :interval "10s" "date +%H:%M")
 
@@ -16,6 +17,17 @@
   :initial "{\"audio\":{\"volume\":null,\"muted\":false,\"output\":null},\"keyboard\":{\"layout\":\"--\",\"layouts\":[],\"next\":null}}"
   "while true; do curl -sN http://127.0.0.1:1337/ui/state; sleep 1; done")
 
+;; the running apps (the proc store's snapshot) — same push contract as `state`
+(deflisten apps
+  :initial "{\"apps\":[],\"current\":null}"
+  "while true; do curl -sN http://127.0.0.1:1337/ui/apps; sleep 1; done")
+
+;; the launchable-app catalog: immutable per session, so a slow poll (the first
+;; tick fires at open; the agent's API is up before the surfaces)
+(defpoll catalog :interval "1h"
+  :initial "{\"apps\":[]}"
+  "curl -s http://127.0.0.1:1337/app/catalog")
+
 
 ;; --- top: mock current-window title + inert close --------------------------
 (defwidget topbar []
@@ -24,38 +36,24 @@
     (box)
     (button :class "close" :halign "end" "✕")))
 
-;; --- mid: launcher tiles (visual only) -------------------------------------
+;; --- mid: launcher tiles, catalog-driven (clicks inert until startup lands) ---
 (defwidget launcher []
   (box :class "launcher" :orientation "v" :halign "center" :valign "center" :space-evenly false
     (label :class "brand" :text "Ujima")
     (box :class "tiles" :orientation "h" :space-evenly true
-      (button :class "tile" :onclick "${wakebars}"
-        (image :path "/opt/ujima/desktop/icons/wikipedia.svg" :image-width 76 :image-height 76))
-      (button :class "tile" :onclick "${wakebars}"
-        (image :path "/opt/ujima/desktop/icons/books.svg" :image-width 76 :image-height 76))
-      (button :class "tile" :onclick "${wakebars}"
-        (image :path "/opt/ujima/desktop/icons/write.svg" :image-width 76 :image-height 76))
-      (button :class "tile" :onclick "${wakebars}"
-        (image :path "/opt/ujima/desktop/icons/draw.svg" :image-width 76 :image-height 76))
-      (button :class "tile" :onclick "${wakebars}"
-        (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 76 :image-height 76)))))
+      (for entry in {catalog.apps}
+        (button :class "tile" :onclick "${wakebars}"
+          (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 76 :image-height 76))))))
 
-;; --- bottom: mock open-window row + live tray + clock -----------------------
+;; --- bottom: running apps (the /ui/apps stream) + live tray + clock ----------
 (defwidget dock []
   (centerbox :class "dock"
     (box :halign "start" :space-evenly false
       (button :class "win"
         (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 28 :image-height 28))
-      (button :class "win active"
-        (image :path "/opt/ujima/desktop/icons/wikipedia.svg" :image-width 28 :image-height 28))
-      (button :class "win"
-        (image :path "/opt/ujima/desktop/icons/books.svg" :image-width 28 :image-height 28))
-      (button :class "win"
-        (image :path "/opt/ujima/desktop/icons/write.svg" :image-width 28 :image-height 28))
-      (button :class "win"
-        (image :path "/opt/ujima/desktop/icons/draw.svg" :image-width 28 :image-height 28))
-      (button :class "win"
-        (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 28 :image-height 28)))
+      (for a in {apps.apps}
+        (button :class {a.id == apps.current ? "win active" : "win"}
+          (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 28 :image-height 28))))
     (box)
     (box :class "tray" :halign "end" :space-evenly false :spacing 8
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;

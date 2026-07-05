@@ -13,15 +13,19 @@
 
 (defn- listen!
   "Drain a watcher channel into its handler, forever; a handler failure is
-   logged and never kills the listener."
-  [ch handle!]
+   logged and never kills the listener. The channel CLOSING means a world
+   watcher died — a desktop that looks alive but is frozen — so exit loudly
+   and let systemd rebuild the session."
+  [watcher ch handle!]
   (async/thread
     (loop []
-      (when-let [event (async/<!! ch)]
-        (try (handle! event)
-             (catch Throwable e
-               (log/error "agent: event handler failed" {:error (ex-message e)})))
-        (recur)))))
+      (if-let [event (async/<!! ch)]
+        (do (try (handle! event)
+                 (catch Throwable e
+                   (log/error "agent: event handler failed" {:watcher watcher :error (ex-message e)})))
+            (recur))
+        (do (log/error "agent: watcher stream ended — dying for a session rebuild" {:watcher watcher})
+            (System/exit 1))))))
 
 
 (defn init!
@@ -31,14 +35,17 @@
   (log/info "starting event listeners")
 
   ;; keeps [:audio :active] aligned with plugged hardware
-  (listen! (audio/watch-sinks! {:interval-ms (:audio-poll-ms cfg 1000)})
+  (listen! :audio-sinks
+           (audio/watch-sinks! {:interval-ms (:audio-poll-ms cfg 1000)})
            audio-events/on-sinks-changed!)
 
   ;; admin surface follows the control token on usb storage
-  (listen! (usb/watch-storage!)
+  (listen! :usb-storage
+           (usb/watch-storage!)
            token-events/on-storage-changed!)
 
   ;; the app plane derives from the i3 tree — window events are its ticks, and the
   ;; stream also echoes back the :recheck/* self-events the app asked i3 for
-  (listen! (i3/watch-windows!)
+  (listen! :i3-windows
+           (i3/watch-windows!)
            apps-events/on-event!))

@@ -105,11 +105,11 @@
 (defn emit!
   "Deliver EV onto the window-event stream NOW — commands ride the same pipe as
    window events, so all handling is queue-ordered on the one listener thread.
-   Dropped loudly when no watch is active."
+   Dropped loudly when no watch is active or the stream has closed."
   [ev]
-  (if-let [ch @out*]
-    (async/>!! ch ev)
-    (log/warn "emit!: no active window watch — event dropped" ev)))
+  (let [ch @out*]
+    (when-not (and ch (async/>!! ch ev))
+      (log/warn "emit!: no active window watch — event dropped" ev))))
 
 
 (defn emit-in!

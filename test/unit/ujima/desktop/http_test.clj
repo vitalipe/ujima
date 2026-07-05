@@ -12,6 +12,7 @@
   (is (= :keyboard/layout  (http/route :post "/api/input/keyboard/layout")))
   (is (= :ui/state         (http/route :get  "/ui/state")))
   (is (= :ui/apps          (http/route :get  "/ui/apps")))
+  (is (= :ui/keyboard-next (http/route :get  "/ui/keyboard/layout/next")))
   (is (= :ui/volume        (http/route :post "/ui/volume/move")))
   (is (= :app/catalog      (http/route :get  "/app/catalog")))
   (is (= :app/run          (http/route :post "/app/run")))

@@ -70,6 +70,16 @@
                 :next    (next-of layouts layout)}}))
 
 
+(defn keyboard-next
+  "GET /ui/keyboard/layout/next: the switcher's next layout as a one-shot read,
+   so the keybind needn't tap the state stream. Same cycle order settings->ui
+   streams; :next stays a /ui concern (set via POST /api/input/keyboard/layout)."
+  []
+  (let [s (control/settings)]
+    {:next (next-of (get s [:keyboard :available-layouts])
+                    (get s [:keyboard :layout]))}))
+
+
 (defn- state-line [st]
   (str (edn->json st) "\n"))
 

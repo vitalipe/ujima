@@ -44,6 +44,7 @@
           [:post ["api" "input" "keyboard" "layout"]] :keyboard/layout
           [:get  ["ui" "state"]]                      :ui/state
           [:get  ["ui" "apps"]]                       :ui/apps
+          [:get  ["ui" "keyboard" "layout" "next"]]   :ui/keyboard-next
           [:post ["ui" "volume" "move"]]              :ui/volume
           [:get  ["app" "catalog"]]                   :app/catalog
           [:post ["app" "run"]]                       :app/run
@@ -69,6 +70,7 @@
                                  (json 200 (queries/keyboard-status)))
         :ui/state            (ui/stream req)
         :ui/apps             (apps/stream req)
+        :ui/keyboard-next    (json 200 (ui/keyboard-next))
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         :app/catalog         (json 200 {:apps (app/catalog-listing)})
         :app/run             (do (app/run-from-catalog! (keyword (:app-id body)))

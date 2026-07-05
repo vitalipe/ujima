@@ -1,10 +1,10 @@
 #!/bin/sh
 # super+space: cycle the keyboard layout. A keybind is a stateless widget — read
-# the UI projection (one snapshot line off the state stream), post back the
-# concrete `next` it published (idempotent; two reads of the same state collapse
-# into one advance). Absorb into ujimactl when that lands.
+# the presentation-derived `next` (one-shot GET, no stream tap) and post it back
+# to the domain setter (idempotent; two reads of the same state collapse into one
+# advance). Absorb into ujimactl when that lands.
 set -eu
-next=$(curl -sN --max-time 2 http://127.0.0.1:1337/ui/state | head -n1 \
+next=$(curl -sf --max-time 2 http://127.0.0.1:1337/ui/keyboard/layout/next \
        | sed -n 's/.*"next":"\([^"]*\)".*/\1/p')
 [ -n "$next" ] || exit 0   # no layouts configured -> nothing to cycle
 exec curl -sf --max-time 3 -o /dev/null -X POST \

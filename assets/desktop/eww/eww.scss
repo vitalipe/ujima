@@ -15,9 +15,9 @@ $accent: #7ea8cc;    // soft blue
 // bar/dock bgs are solid mixes of the design's alphas — the bars sit over the
 // black root, so real translucency would only darken them.
 .topbar { background-color: #101317; border-bottom: 1px solid $panel-brd; color: $text; }
-.topbar .idcell { min-width: 52px; border-right: 1px solid $panel-brd; }
+// the cell shares the tab's tint — on the near-black bar a plain cell reads as a black hole
+.topbar .idcell { min-width: 52px; border-right: 1px solid $panel-brd; background-color: rgba(126, 168, 204, 0.10); }
 .topbar .idchip { min-width: 26px; min-height: 26px; border-radius: 8px; }
-.topbar .idchip.home { background-color: rgba(126, 168, 204, 0.16); }  // launcher glyph when nothing is focused
 .topbar .idchip.wikipedia { background-color: rgba(168, 154, 201, 0.16); }
 .topbar .idchip.books { background-color: rgba(205, 180, 136, 0.16); }
 .topbar .idchip.write { background-color: rgba(126, 196, 189, 0.16); }
@@ -26,7 +26,7 @@ $accent: #7ea8cc;    // soft blue
 .topbar .tab { background-color: rgba(126, 168, 204, 0.10); border-bottom: 2px solid $accent; padding: 0 14px; }
 // home/launcher: nothing focused — the design has NO bar there; a truly vanishing
 // strip is window-layer work (gaps re-flow), so the deferred look is a quiet strip
-.topbar .bar.off .idcell { border-right-color: transparent; }
+.topbar .bar.off .idcell { border-right-color: transparent; background-color: transparent; }
 .topbar .bar.off .tab { background-color: transparent; border-bottom-color: transparent; }
 .topbar .title { font-weight: 600; }
 .topbar .close { min-width: 22px; min-height: 22px; border-radius: 6px; color: $dim; }

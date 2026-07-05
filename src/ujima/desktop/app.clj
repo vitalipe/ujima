@@ -19,7 +19,6 @@
 (defonce ^:private wintents* (atom {}))  ; the window plane's state: con-id -> asked-at
 (defonce ^:private procs*    (atom {}))  ; the proc plane's state: the spawn registry
 (defonce ^:private push*     (atom nil)) ; the GUI edge, wired by core (set-push!)
-(defonce ^:private lock      (Object.))  ; snapshot-now runs on http threads; everything else on the listener
 
 
 (def ^:private staging-workspace "ujima-loading")  ; spawn maps here, not splitting the launcher
@@ -51,36 +50,42 @@
 (defn catalog-listing [] (catalog/listing @catalog*))
 
 
-(defn- converge!
-  "Fresh tree -> place -> resolve both planes -> derive -> publish. Returns the view."
+(defn- look!
+  "Ingest reality: read the tree, settle our ledgers against it (answered
+   close-intents pruned, windowed spawns marked), derive. Touches nothing real —
+   asking for a view cannot move a window."
   []
-  (locking lock
-    (let [ws     (windows/from-tree (i3/get-tree!))
-          placed (windows/to-place @catalog* ws home-workspace)]
-      (doseq [{:keys [con-id workspace]} placed]
-        (i3/place! con-id workspace))
-      (let [ws       (if (seq placed) (windows/from-tree (i3/get-tree!)) ws)
-            _        (swap! wintents* windows/resolve-intents ws)
-            registry (swap! procs* procs/mark-windowed (windows/apps-present @catalog* ws))
-            view     (lc/view @catalog* ws registry)]
-        (when-let [push! @push*]
-          (push! (lc/snapshot view)))
-        ;; stranded on a dead app workspace (i3 never leaves one by itself) -> home;
-        ;; staging is the loading wait, the proc recheck owns rescuing it
-        (when (nil? (:current view))
-          (let [fws (i3/focused-workspace)]
-            (when-not (#{home-workspace staging-workspace} fws)
-              (i3/switch-workspace! home-workspace))))
-        view))))
+  (let [ws       (windows/from-tree (i3/get-tree!))
+        _        (swap! wintents* windows/resolve-intents ws)
+        registry (swap! procs* procs/mark-windowed (windows/apps-present @catalog* ws))]
+    {:ws ws :view (lc/view @catalog* ws registry)}))
 
 
-(defn snapshot-now
-  "The current wire snapshot."
-  []
-  (lc/snapshot (converge!)))
+(defn- publish! [view]
+  (when-let [push! @push*]
+    (push! (lc/snapshot view))))
 
 
-;; --- the actions (listener thread only; each returns truthy iff it changed the world) ---
+;; --- the act phase (listener thread only; each returns truthy iff it changed the world) ---
+
+(defn- enforce-placement!
+  "Move strays per the plan."
+  [ws]
+  (let [plan (windows/to-place @catalog* ws home-workspace)]
+    (doseq [{:keys [con-id workspace]} plan]
+      (i3/place! con-id workspace))
+    (boolean (seq plan))))
+
+
+(defn- rescue-stranded!
+  "Nothing of ours focused on a dead app workspace (i3 never leaves one) -> home.
+   Staging is the loading wait; the proc recheck owns it."
+  [view]
+  (when (nil? (:current view))
+    (let [fws (i3/focused-workspace)]
+      (when-not (#{home-workspace staging-workspace} fws)
+        (i3/switch-workspace! home-workspace)
+        true))))
 
 (defn- do-run!
   "Gate on the derived SM: :running -> focus (ensure-open), :new -> no-op,
@@ -89,7 +94,7 @@
   (case (lc/state-of view id)
     :running (do (log/info "app already open — focusing" {:app id})
                  (i3/switch-workspace! (name id))
-                 false)
+                 true)     ; moved focus = acted
     :new     (do (log/info "run gated — still opening" {:app id})
                  false)
     ;; :shutdown — no orphans if the agent dies; :inherit — an unread pipe would fill
@@ -125,8 +130,8 @@
 
 
 (defn- expire-proc!
-  "The spawn never windowed (the entry converge just re-read the tree): kill the
-   leftover, drop the entry, rescue the user from staging."
+  "The spawn never windowed (the look just re-read the tree): kill the leftover,
+   drop the entry, rescue the user from staging."
   [{:keys [app-id at]}]
   (let [{:keys [handle spawned-at windowed?]} (get @procs* app-id)]
     (when (and handle (= at spawned-at) (not windowed?))
@@ -147,19 +152,32 @@
     true))
 
 
+(defn- act!
+  "ALL world mutations live here: placement, the event's own action, the
+   stranded-rescue. Truthy when anything changed."
+  [ev {:keys [ws view]}]
+  (let [placed?  (enforce-placement! ws)
+        acted?   (case (:type ev)
+                   :app/run           (do-run! view (:app ev))
+                   :app/close-focused (do-close-focused! view)
+                   :recheck/proc      (expire-proc! ev)
+                   :recheck/window    (expire-window-intent! ev)
+                   nil)
+        ;; rescue reacts to WORLD-initiated changes (ticks) only: an act that just
+        ;; moved focus must not be undone by the stale pre-act view
+        rescued? (when-not (or placed? acted?)
+                   (rescue-stranded! view))]
+    (or placed? acted? rescued?)))
+
+
 (defn handle-event!
-  "The single entry. Converge first — expiries never act on stale facts — then
-   act, then converge again only when something changed."
+  "The single entry, the only thinking place: look, act, look again when anything
+   changed, publish."
   [ev]
-  (locking lock
-    (let [view (converge!)]
-      (when (case (:type ev)
-              :app/run           (do-run! view (:app ev))
-              :app/close-focused (do-close-focused! view)
-              :recheck/proc      (expire-proc! ev)
-              :recheck/window    (expire-window-intent! ev)
-              nil)
-        (converge!)))))
+  (let [{:keys [view] :as world} (look!)]
+    (publish! (if (act! ev world)
+                (:view (look!))
+                view))))
 
 
 ;; --- the verbs: validate what must fail loudly, emit the rest onto the pipe ---

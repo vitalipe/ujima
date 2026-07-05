@@ -1,11 +1,10 @@
 (ns ujima.desktop.http.app
-  "The app side of the /ui tier: the /ui/apps NDJSON stream — a snapshot line on
-   connect, then one line per real change (same contract as /ui/state). push! is the
-   GUI edge desktop.app publishes through (core wires it via app/set-push!); this ns
-   only serializes and fans out."
+  "The apps GUI edge: serialize + fan out. push! is wired into desktop.app by core;
+   a new subscriber greets with the last PUBLISHED line — the edge never computes
+   (before the first publish: empty; the boot baseline publishes before any client
+   connects)."
   (:require [org.httpkit.server :as http]
-            [lib.edn            :refer [edn->json]]
-            [ujima.desktop.app  :as app]))
+            [lib.edn            :refer [edn->json]]))
 
 
 (defonce ^:private subs*      (atom #{}))
@@ -13,10 +12,12 @@
 
 (defn- line [snapshot] (str (edn->json snapshot) "\n"))
 
+(def ^:private empty-line (line {:apps [] :current nil :current-title nil}))
+
 
 (defn push!
-  "Publish a snapshot to the /ui/apps subscribers — deduped on the serialized line,
-   so a no-op derive costs nothing on the wire."
+  "Publish a snapshot to the subscribers — deduped on the serialized line, so a
+   no-op look costs nothing on the wire."
   [snapshot]
   (let [l (line snapshot)]
     (when (not= l @last-line*)
@@ -26,10 +27,9 @@
 
 
 (defn stream
-  "GET /ui/apps."
   [req]
   (http/as-channel req
     {:on-open  (fn [ch]
                  (swap! subs* conj ch)
-                 (http/send! ch (line (app/snapshot-now)) false))
+                 (http/send! ch (or @last-line* empty-line) false))
      :on-close (fn [ch _] (swap! subs* disj ch))}))

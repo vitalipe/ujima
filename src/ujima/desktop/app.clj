@@ -23,9 +23,6 @@
 (defonce ^:private lock     (Object.))   ; one critical section: derive + gate + act
 
 
-(def ^:private new-recheck-ms     25000)  ; LibreOffice needs ~20s to a window on the Pi
-(def ^:private closing-recheck-ms 10000)  ; past this, a quit-confirm is holding the window
-
 (def ^:private staging-workspace "ujima-loading")  ; spawn maps here, not splitting the launcher
 (def ^:private home-workspace    "1")              ; where eww's launcher window lives
 
@@ -80,35 +77,33 @@
         view))))
 
 
-(defn tick!
-  "A window event happened — re-derive and publish (the event's content is
-   irrelevant: the tree is the state)."
-  []
-  (converge!))
-
-
 (defn snapshot-now
   "The current wire snapshot (the stream's on-connect line)."
   []
   (proc/snapshot (converge!)))
 
 
-(defn- arm-recheck!
-  "The no-event net: after MS, converge (the tree may have answered silently —
-   LibreOffice's class swap emits no event) and expire the intent if it still
-   stands: a :new that never windowed re-arms the tile (and rescues the user from
-   the empty staging workspace), a :closing held by a quit-confirm honestly
-   reverts to :running."
-  [id ms]
-  (future
-    (Thread/sleep (long ms))
+(defn handle-event!
+  "The single event entry — everything the window stream carries lands here via
+   ujima.events. Any event is a tick: converge from a fresh tree. The synthetic
+   rechecks (i3/emit-in! echoes them back for us) additionally expire the EXACT
+   intent they were armed for (:app-id + :at) when the tree still hasn't answered
+   it: a :new that never windowed re-arms the tile (and rescues the user from the
+   empty staging workspace), a :closing held by a quit-confirm honestly reverts
+   to :running."
+  [ev]
+  (locking lock
     (converge!)
-    (when-let [{:keys [phase]} (get @side* id)]
-      (log/warn "app intent expired" {:app id :phase phase})
-      (swap! side* dissoc id)
-      (when (and (= :new phase) (= staging-workspace (i3/focused-workspace)))
-        (i3/switch-workspace! home-workspace))
-      (converge!))))
+    (when-let [phase ({:recheck/opening :new
+                       :recheck/closing :closing} (:type ev))]
+      (let [{:keys [app-id at]} ev]
+        (when (= {:phase phase :at at}
+                 (select-keys (get @side* app-id) [:phase :at]))
+          (log/warn "app intent expired" {:app app-id :phase phase})
+          (swap! side* dissoc app-id)
+          (when (and (= :new phase) (= staging-workspace (i3/focused-workspace)))
+            (i3/switch-workspace! home-workspace))
+          (converge!))))))
 
 
 (defn require-valid-app! [{:keys [id exec class] :as app}]
@@ -141,12 +136,15 @@
         (:new :closing) (log/info "run gated" {:app id :state st})
         ;; :shutdown — no orphaned apps if the agent dies outside a clean session teardown;
         ;; :inherit — app stdio goes to the journal like eww's (an unread pipe would fill)
-        (let [_    (i3/switch-workspace! staging-workspace)
-              proc (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec)
-              pid  (try (.pid (:proc proc)) (catch Throwable _ nil))]
+        (let [_      (i3/switch-workspace! staging-workspace)
+              proc   (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec)
+              pid    (try (.pid (:proc proc)) (catch Throwable _ nil))
+              intent {:phase :new :at (System/currentTimeMillis)}]
+          
           (swap! handles* assoc id proc)
-          (swap! side* assoc id {:phase :new :at (System/currentTimeMillis)})
-          (arm-recheck! id new-recheck-ms)
+          (swap! side* assoc id intent)
+          (i3/hint-open! id (:at intent))
+          
           (log/info "app spawned" {:app id :pid pid})
           (converge!))))))
 
@@ -177,10 +175,13 @@
           app-id  (:current view)]
       (if-not (and focused app-id)
         (log/info "close gated — no managed window focused" {})
-        (do (swap! side* assoc app-id {:phase :closing
-                                       :con   (:con-id focused)
-                                       :at    (System/currentTimeMillis)})
-            (i3/kill-con! (:con-id focused))
-            (arm-recheck! app-id closing-recheck-ms)
-            (log/info "close sent" {:app app-id :con (:con-id focused)})
-            (converge!))))))
+        (let [intent {:phase :closing
+                      :con   (:con-id focused)
+                      :at    (System/currentTimeMillis)}]
+          (swap! side* assoc app-id intent)
+          
+          (i3/kill-con! (:con-id focused))
+          (i3/hint-close! app-id (:at intent))
+          (log/info "close sent" {:app app-id :con (:con-id focused)})
+          
+          (converge!))))))

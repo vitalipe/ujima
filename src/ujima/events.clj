@@ -38,6 +38,7 @@
   (listen! (usb/watch-storage!)
            token-events/on-storage-changed!)
 
-  ;; the proc store follows the i3 window stream (baseline replays already-mapped windows)
+  ;; the app plane derives from the i3 tree — window events are its ticks, and the
+  ;; stream also echoes back the :recheck/* self-events the app asked i3 for
   (listen! (i3/watch-windows!)
-           apps-events/on-window-event!))
+           apps-events/on-event!))

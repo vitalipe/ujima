@@ -1,9 +1,9 @@
 (ns ujima.events.apps
-  "Window-event policy: any i3 window event is just a tick — the tree is the state,
-   desktop.app re-derives and publishes. Mechanism (subscribe, baseline, normalize)
-   lives in ujima.linux.i3."
+  "App-plane policy: the window stream carries everything — real i3 window events
+   and the :recheck/* self-events the app asked i3 to echo back — and every one of
+   them goes to desktop.app's single entry. Mechanism lives in ujima.linux.i3."
   (:require [ujima.desktop.app :as app]))
 
 
-(defn on-window-event! [_ev]
-  (app/tick!))
+(defn on-event! [ev]
+  (app/handle-event! ev))

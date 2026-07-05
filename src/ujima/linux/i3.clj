@@ -97,18 +97,39 @@
   (keep #(normalize {:change "new" :container %}) (tree-windows tree)))
 
 
+(defonce ^:private out*
+  ;; the active watch channel — emit-in! delivers synthetic events onto it
+  (atom nil))
+
+
+(defn emit-in!
+  "Deliver EV onto the window-event stream after MS — the app plane's way of asking
+   the window world to \"tell me again later\" (:recheck/opening, :recheck/closing;
+   the event carries the asker's intent identity). Pure delayed delivery: all
+   handling happens downstream like any window event. Dropped loudly when no watch
+   is active."
+  [ms ev]
+  (future
+    (Thread/sleep (long ms))
+    (if-let [ch @out*]
+      (async/>!! ch ev)
+      (log/warn "emit-in!: no active window watch — event dropped" ev))))
+
+
 (defn watch-windows!
-  "Stream normalized window events on the returned channel: subscribe first, then the
-   baseline (a window mapping in between arrives twice — adoption must be idempotent),
-   then live events. Blocking puts — window events are deltas and must not drop. The
-   subscription is expected to outlive the session (`i3-msg reload`, never `restart`);
-   if the stream ends anyway it's logged loudly and the channel closes."
+  "Stream the window world on the returned channel: subscribe first, then the
+   baseline (a window mapping in between arrives twice — consumers must tolerate
+   replays), then live normalized events — plus the synthetic events emit-in!
+   echoes back. Blocking puts. The subscription is expected to outlive the session
+   (`i3-msg reload`, never `restart`); if the stream ends anyway it's logged loudly
+   and the channel closes."
   []
   (let [ch   (async/chan 64)
         ;; :shutdown — finally never runs when bb itself is killed (session cycle);
         ;; without it every restart would orphan an i3-msg monitor
         proc (shell/sh {:out :stream :err :stream :shutdown p/destroy-tree}
                        :i3-msg :-t "subscribe" :-m "[\"window\"]")]
+    (reset! out* ch)
     (async/thread
       (try
         (doseq [ev (baseline-events (get-tree!))]
@@ -124,3 +145,13 @@
           (try (p/destroy-tree proc) (catch Throwable _))
           (async/close! ch))))
     ch))
+
+
+(defn hint-open! [app-id at]
+  (emit-in! 25000 {:type :recheck/opening :app-id app-id :at at}))
+
+
+(defn hint-close! [app-id at]
+  (emit-in! 10000 {:type :recheck/closing :app-id app-id :at at}))
+
+

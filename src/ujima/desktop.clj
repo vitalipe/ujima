@@ -45,7 +45,6 @@
     (http/start! (:http cfg))
     
     (shell/sh! :eww :--config dir "open-many" "topbar" "launcher" "dock")
-    
-    ;; start eww 
+
     (let [{:keys [exit]} @daemon]
       (log/error "eww daemon exited — session over" {:exit exit}))))

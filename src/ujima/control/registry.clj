@@ -33,7 +33,7 @@
 
 
 (defn effective-value [_registry scopes-data key]
-  ;; Note: use use complete scopes, so when we add policy we don't change params
+  ;; Note: use complete scopes, so when we add policy we don't change params
   (->> scopes-data
     (map :settings)
     (map #(get % key)) ;; keys are path vectors, not IFn-able keywords

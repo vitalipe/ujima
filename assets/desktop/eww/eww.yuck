@@ -3,7 +3,7 @@
 ;; connect, then a line per real change; settings on /ui/state, running apps on
 ;; /ui/apps), the launcher tiles render the app catalog (/app/catalog — immutable per
 ;; session, hence a poll), and clicks are plain fire-and-forget POSTs through
-;; bin/ujima-api. Tile/dock clicks stay inert until the startup slice lands.
+;; bin/ujima-api.
 
 (defpoll clock :interval "10s" "date +%H:%M")
 

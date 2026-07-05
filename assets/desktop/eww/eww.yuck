@@ -31,12 +31,14 @@
   "until curl -sf http://127.0.0.1:1337/app/catalog; do sleep 1; done; echo; exec sleep infinity")
 
 
-;; --- top: the focused app's title; ✕ closes the FOCUSED WINDOW (not the app) --
+;; --- top: the focused app's title; ✕ closes the FOCUSED WINDOW (not the app),
+;; --- and hides on the launcher (nothing of ours focused = nothing to close)
 (defwidget topbar []
   (centerbox :class "topbar"
     (label :class "title" :halign "start" :text {apps.currentTitle ?: ""})
     (box)
     (button :class "close" :halign "end" :timeout "2s"
+      :visible {(apps.current ?: "") != ""}
       :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
       "✕")))
 

@@ -38,7 +38,7 @@
 
 
 (defn listing
-  "The GET /app/catalog projection: [{:id :label :icon}] in catalog order."
+  "The launcher's projection: [{:id :label :icon}] in catalog order."
   [catalog]
   (mapv (fn [id]
           (let [a (get-in catalog [:by-id id])]

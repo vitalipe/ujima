@@ -1,26 +1,25 @@
 (ns ujima.desktop.app
-  "The app domain's live edge: the i3 tree is the state, this ns keeps only the
-   side-intents i3 can't know (app.proc derives the per-app SM from both) plus the
-   process handles. Every mutation and every window event funnels into converge! —
-   fresh tree, resolve answered intents, publish (core wires the GUI push via
-   set-push!). run! gates on the derived state (only :closed may open); timers are
-   the no-event net (a failed spawn re-arms the tile, LibreOffice's silent class
-   swap gets seen). Validation/indexing is app.catalog."
+  "The app domain's edge — an actor over the single window stream. Three planes,
+   each owning only its own state: windows (close-intents), procs (the spawn
+   registry), lifecycle (nothing — a pure join). Window events, :recheck/* echoes
+   and the commands the verbs emit! all ride linux.i3's stream into handle-event!."
   (:require [babashka.fs      :as fs]
             [babashka.process :as p]
             [lib.io    :as io]
             [lib.shell :as shell]
             [ujima.log :as log]
-            [ujima.linux.i3            :as i3]
-            [ujima.desktop.app.catalog :as catalog]
-            [ujima.desktop.app.proc    :as proc]))
+            [ujima.linux.i3              :as i3]
+            [ujima.desktop.app.catalog   :as catalog]
+            [ujima.desktop.app.windows   :as windows]
+            [ujima.desktop.app.procs     :as procs]
+            [ujima.desktop.app.lifecycle :as lc]))
 
 
-(defonce ^:private catalog* (atom nil))
-(defonce ^:private side*    (atom {}))   ; app-id -> {:phase :new|:closing :con n :at ms}
-(defonce ^:private handles* (atom {}))   ; app-id -> live process handle (pid via (.pid (:proc h)))
-(defonce ^:private push*    (atom nil))  ; the GUI edge, wired by core (set-push!)
-(defonce ^:private lock     (Object.))   ; one critical section: derive + gate + act
+(defonce ^:private catalog*  (atom nil))
+(defonce ^:private wintents* (atom {}))  ; the window plane's state: con-id -> asked-at
+(defonce ^:private procs*    (atom {}))  ; the proc plane's state: the spawn registry
+(defonce ^:private push*     (atom nil)) ; the GUI edge, wired by core (set-push!)
+(defonce ^:private lock      (Object.))  ; snapshot-now runs on http threads; everything else on the listener
 
 
 (def ^:private staging-workspace "ujima-loading")  ; spawn maps here, not splitting the launcher
@@ -28,8 +27,8 @@
 
 
 (defn load-catalog!
-  "Load + index apps.edn from PATH. A missing or unreadable file throws — a broken
-   image, not an empty desktop."
+  "Load + index apps.edn. Missing or unreadable throws — a broken image, not an
+   empty desktop."
   [path]
   (when-not (and path (fs/exists? (str path)))
     (throw (ex-info "app catalog not found" {:path (str path)})))
@@ -38,12 +37,13 @@
       (throw (ex-info "app catalog unreadable" {:path (str path)})))
     (let [cat (catalog/->catalog raw)]
       (reset! catalog* cat)
-      (reset! side* {})
+      (reset! wintents* {})
+      (reset! procs* {})
       cat)))
 
 
 (defn set-push!
-  "Install the GUI edge (core passes desktop.http.app's push!)."
+  "Install the GUI edge (wired by core)."
   [f]
   (reset! push* f))
 
@@ -52,24 +52,21 @@
 
 
 (defn- converge!
-  "Fresh tree -> resolve answered side-intents -> enforce placement -> derive ->
-   publish. Returns the derived view. Every path in this ns funnels here; the lock
-   is reentrant. Placement is desired-vs-actual and self-quieting: a placed window
-   stops matching to-place, so steady-state ticks enforce nothing."
+  "Fresh tree -> place -> resolve both planes -> derive -> publish. Returns the view."
   []
   (locking lock
-    (let [ws     (proc/windows (i3/get-tree!))
-          placed (proc/to-place @catalog* ws home-workspace)]
+    (let [ws     (windows/from-tree (i3/get-tree!))
+          placed (windows/to-place @catalog* ws home-workspace)]
       (doseq [{:keys [con-id workspace]} placed]
         (i3/place! con-id workspace))
-      (let [ws   (if (seq placed) (proc/windows (i3/get-tree!)) ws)
-            side (swap! side* #(proc/resolve-side @catalog* ws %))
-            view (proc/derive-view @catalog* ws side)]
+      (let [ws       (if (seq placed) (windows/from-tree (i3/get-tree!)) ws)
+            _        (swap! wintents* windows/resolve-intents ws)
+            registry (swap! procs* procs/mark-windowed (windows/apps-present @catalog* ws))
+            view     (lc/view @catalog* ws registry)]
         (when-let [push! @push*]
-          (push! (proc/snapshot view)))
-        ;; nothing of ours focused and the user is on a dead app workspace (its last
-        ;; window just closed — i3 won't leave it by itself) -> return home. Staging is
-        ;; exempt: that's the loading wait, the :new recheck owns rescuing it.
+          (push! (lc/snapshot view)))
+        ;; stranded on a dead app workspace (i3 never leaves one by itself) -> home;
+        ;; staging is the loading wait, the proc recheck owns rescuing it
         (when (nil? (:current view))
           (let [fws (i3/focused-workspace)]
             (when-not (#{home-workspace staging-workspace} fws)
@@ -78,33 +75,94 @@
 
 
 (defn snapshot-now
-  "The current wire snapshot (the stream's on-connect line)."
+  "The current wire snapshot."
   []
-  (proc/snapshot (converge!)))
+  (lc/snapshot (converge!)))
+
+
+;; --- the actions (listener thread only; each returns truthy iff it changed the world) ---
+
+(defn- do-run!
+  "Gate on the derived SM: :running -> focus (ensure-open), :new -> no-op,
+   :closed -> spawn onto staging; placement hands it to its own workspace."
+  [view {:keys [id exec] :as app}]
+  (case (lc/state-of view id)
+    :running (do (log/info "app already open — focusing" {:app id})
+                 (i3/switch-workspace! (name id))
+                 false)
+    :new     (do (log/info "run gated — still opening" {:app id})
+                 false)
+    ;; :shutdown — no orphans if the agent dies; :inherit — an unread pipe would fill
+    (let [_    (i3/switch-workspace! staging-workspace)
+          proc (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec)
+          pid  (try (.pid (:proc proc)) (catch Throwable _ nil))
+          at   (System/currentTimeMillis)]
+      (swap! procs* assoc id {:handle proc :pid pid :spawned-at at})
+      (i3/hint-proc! id at)
+      (log/info "app spawned" {:app id :pid pid})
+      true)))
+
+
+(defn- do-close-focused!
+  "WM_close the FOCUSED window — a window verb: one LibreOffice doc closes, the
+   app stays :running. A pending intent gates a re-close."
+  [view]
+  (let [{:keys [con-id]} (:focused view)]
+    (cond
+      (or (nil? con-id) (nil? (:current view)))
+      (do (log/info "close gated — no managed window focused" {}) false)
+
+      (get @wintents* con-id)
+      (do (log/info "close already pending" {:con con-id}) false)
+
+      :else
+      (let [at (System/currentTimeMillis)]
+        (swap! wintents* assoc con-id at)
+        (i3/kill-con! con-id)
+        (i3/hint-window! con-id at)
+        (log/info "close sent" {:con con-id})
+        true))))
+
+
+(defn- expire-proc!
+  "The spawn never windowed (the entry converge just re-read the tree): kill the
+   leftover, drop the entry, rescue the user from staging."
+  [{:keys [app-id at]}]
+  (let [{:keys [handle spawned-at windowed?]} (get @procs* app-id)]
+    (when (and handle (= at spawned-at) (not windowed?))
+      (log/warn "spawn never windowed — killing it" {:app app-id})
+      (try (p/destroy-tree handle) (catch Throwable _))
+      (swap! procs* dissoc app-id)
+      (when (= staging-workspace (i3/focused-workspace))
+        (i3/switch-workspace! home-workspace))
+      true)))
+
+
+(defn- expire-window-intent!
+  "The close went unanswered — a quit-confirm holds the window. Drop the intent."
+  [{:keys [con-id at]}]
+  (when (= at (get @wintents* con-id))
+    (log/warn "close unanswered — the window kept itself open" {:con con-id})
+    (swap! wintents* dissoc con-id)
+    true))
 
 
 (defn handle-event!
-  "The single event entry — everything the window stream carries lands here via
-   ujima.events. Any event is a tick: converge from a fresh tree. The synthetic
-   rechecks (i3/emit-in! echoes them back for us) additionally expire the EXACT
-   intent they were armed for (:app-id + :at) when the tree still hasn't answered
-   it: a :new that never windowed re-arms the tile (and rescues the user from the
-   empty staging workspace), a :closing held by a quit-confirm honestly reverts
-   to :running."
+  "The single entry. Converge first — expiries never act on stale facts — then
+   act, then converge again only when something changed."
   [ev]
   (locking lock
-    (converge!)
-    (when-let [phase ({:recheck/opening :new
-                       :recheck/closing :closing} (:type ev))]
-      (let [{:keys [app-id at]} ev]
-        (when (= {:phase phase :at at}
-                 (select-keys (get @side* app-id) [:phase :at]))
-          (log/warn "app intent expired" {:app app-id :phase phase})
-          (swap! side* dissoc app-id)
-          (when (and (= :new phase) (= staging-workspace (i3/focused-workspace)))
-            (i3/switch-workspace! home-workspace))
-          (converge!))))))
+    (let [view (converge!)]
+      (when (case (:type ev)
+              :app/run           (do-run! view (:app ev))
+              :app/close-focused (do-close-focused! view)
+              :recheck/proc      (expire-proc! ev)
+              :recheck/window    (expire-window-intent! ev)
+              nil)
+        (converge!)))))
 
+
+;; --- the verbs: validate what must fail loudly, emit the rest onto the pipe ---
 
 (defn require-valid-app! [{:keys [id exec class] :as app}]
   (when (nil? app)
@@ -116,41 +174,16 @@
   true)
 
 
-(defn- app-state [view id]
-  (:state (some #(when (= id (:id %)) %) (:apps view))))
-
-
 (defn run!
-  "The run command, gated by the derived SM: a :running app gets FOCUSED (ensure-open
-   — the dock button and the launcher tile are the same verb), :new/:closing no-op
-   (can't open while opening or closing), only :closed spawns — onto the staging
-   workspace, so the window maps there instead of splitting the launcher; converge's
-   placement then hands it to its own workspace and switches to it."
-  [{:keys [id exec] :as app}]
+  "Validate, then ride the pipe — gating and spawning happen on the listener
+   thread, queue-ordered with the window events."
+  [app]
   (require-valid-app! app)
-  (locking lock
-    (let [st (app-state (converge!) id)]
-      (case st
-        :running (do (log/info "app already open — focusing" {:app id})
-                     (i3/switch-workspace! (name id)))
-        (:new :closing) (log/info "run gated" {:app id :state st})
-        ;; :shutdown — no orphaned apps if the agent dies outside a clean session teardown;
-        ;; :inherit — app stdio goes to the journal like eww's (an unread pipe would fill)
-        (let [_      (i3/switch-workspace! staging-workspace)
-              proc   (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec)
-              pid    (try (.pid (:proc proc)) (catch Throwable _ nil))
-              intent {:phase :new :at (System/currentTimeMillis)}]
-          
-          (swap! handles* assoc id proc)
-          (swap! side* assoc id intent)
-          (i3/hint-open! id (:at intent))
-          
-          (log/info "app spawned" {:app id :pid pid})
-          (converge!))))))
+  (i3/emit! {:type :app/run :app app}))
 
 
 (defn run-from-catalog!
-  "POST /app/run's verb: resolve ID in the catalog and hand the map to run!."
+  "Resolve ID in the catalog (unknown fails loudly) and run!."
   [id]
   (let [app (get-in @catalog* [:by-id id])]
     (when-not app
@@ -158,30 +191,13 @@
     (run! app)))
 
 
+(defn close-focused!
+  "Ask the pipe to close the focused window."
+  []
+  (i3/emit! {:type :app/close-focused}))
+
+
 (defn go-home!
-  "POST /app/home's verb: switch to the launcher's workspace."
+  "Switch to the launcher's workspace (no state — direct)."
   []
   (i3/switch-workspace! home-workspace))
-
-
-(defn close-focused!
-  "POST /app/close's verb: WM_close to the FOCUSED window (not the app — one
-   LibreOffice doc closes, the app lives while other windows do). The agent
-   resolves focus from the tree itself; an unmanaged focus is a no-op."
-  []
-  (locking lock
-    (let [view    (converge!)
-          focused (:focused view)
-          app-id  (:current view)]
-      (if-not (and focused app-id)
-        (log/info "close gated — no managed window focused" {})
-        (let [intent {:phase :closing
-                      :con   (:con-id focused)
-                      :at    (System/currentTimeMillis)}]
-          (swap! side* assoc app-id intent)
-          
-          (i3/kill-con! (:con-id focused))
-          (i3/hint-close! app-id (:at intent))
-          (log/info "close sent" {:app app-id :con (:con-id focused)})
-          
-          (converge!))))))

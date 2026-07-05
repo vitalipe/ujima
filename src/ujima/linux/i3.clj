@@ -102,18 +102,24 @@
   (atom nil))
 
 
+(defn emit!
+  "Deliver EV onto the window-event stream NOW — commands ride the same pipe as
+   window events, so all handling is queue-ordered on the one listener thread.
+   Dropped loudly when no watch is active."
+  [ev]
+  (if-let [ch @out*]
+    (async/>!! ch ev)
+    (log/warn "emit!: no active window watch — event dropped" ev)))
+
+
 (defn emit-in!
-  "Deliver EV onto the window-event stream after MS — the app plane's way of asking
-   the window world to \"tell me again later\" (:recheck/opening, :recheck/closing;
-   the event carries the asker's intent identity). Pure delayed delivery: all
-   handling happens downstream like any window event. Dropped loudly when no watch
-   is active."
+  "emit!, delayed by MS — the \"tell me again later\" echo (:recheck/*; the event
+   carries the asker's intent identity). Pure delayed delivery: all handling
+   happens downstream like any window event."
   [ms ev]
   (future
     (Thread/sleep (long ms))
-    (if-let [ch @out*]
-      (async/>!! ch ev)
-      (log/warn "emit-in!: no active window watch — event dropped" ev))))
+    (emit! ev)))
 
 
 (defn watch-windows!
@@ -147,11 +153,17 @@
     ch))
 
 
-(defn hint-open! [app-id at]
-  (emit-in! 25000 {:type :recheck/opening :app-id app-id :at at}))
+(defn hint-proc!
+  "Echo a proc-plane recheck: did APP-ID's spawn (identified by AT = its
+   :spawned-at) ever produce a window? 25s — LibreOffice needs ~20s on the Pi."
+  [app-id at]
+  (emit-in! 25000 {:type :recheck/proc :app-id app-id :at at}))
 
 
-(defn hint-close! [app-id at]
-  (emit-in! 10000 {:type :recheck/closing :app-id app-id :at at}))
+(defn hint-window!
+  "Echo a window-plane recheck: did CON-ID (close asked at AT) actually close?
+   Past 10s a quit-confirm is holding it."
+  [con-id at]
+  (emit-in! 10000 {:type :recheck/window :con-id con-id :at at}))
 
 

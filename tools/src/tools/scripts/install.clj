@@ -62,8 +62,10 @@
     ;; classroom apps the launcher opens (assets/desktop/apps.edn): chromium for the web tiles
     ;; (Wikipedia/Books, run as --app), libreoffice-writer for Write, tuxpaint for Draw, pcmanfm for
     ;; Files. Writer-only (not the full suite) to match the catalog + keep the image lean.
+    ;; libreoffice-gtk3 = the GTK3 VCL plugin: without it LO ignores the system GTK theme and
+    ;; draws its own light chrome — the desktop step's Nordic/dark styling never reaches Write.
     ($! apt-get install -y --no-install-recommends
-        "chromium" "libreoffice-writer" "tuxpaint" "pcmanfm")
+        "chromium" "libreoffice-writer" "libreoffice-gtk3" "tuxpaint" "pcmanfm")
 
     ;; runtime babashka: the same vendored aarch64 binary we are running under,
     ;; copied + made executable in one shot

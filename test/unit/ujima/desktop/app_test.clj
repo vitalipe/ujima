@@ -62,8 +62,10 @@
                                               (swap! fx* conj [:switch ws]))
                 i3/place!            (fn [con ws] (swap! fx* conj [:place con ws]))
                 i3/kill-con!         (fn [con] (swap! fx* conj [:kill con]))
-                i3/hint-proc!        (fn [id at] (swap! fx* conj [:hint-proc id at]))
-                i3/hint-window!      (fn [con at] (swap! fx* conj [:hint-window con at]))
+                i3/emit-in!          (fn [_ms {:keys [type] :as ev}]   ; the recheck echoes
+                                       (case type
+                                         :recheck/proc   (swap! fx* conj [:hint-proc (:app-id ev) (:at ev)])
+                                         :recheck/window (swap! fx* conj [:hint-window (:con-id ev) (:at ev)])))
                 shell/sh             (fn [& args] (swap! fx* conj [:spawn (vec (rest args))])
                                                   {:proc nil})]
     (f)))
@@ -85,6 +87,20 @@
   (is (= [[:spawn ["tuxpaint"]]] (fx-of :spawn)))
   (is (= 1 (count (fx-of :hint-proc))) "the never-windowed recheck is armed")
   (is (= :new (state-of :paint))))
+
+
+(deftest run-rescues-home-when-the-spawn-throws
+  ;; an absent binary throws at spawn: no registry entry exists for the recheck
+  ;; to expire, so the rescue must happen inline — and a later run may retry
+  (setup! [] "1")
+  (stubbed
+    #(with-redefs [shell/sh (fn [& _] (throw (ex-info "No such file" {})))]
+       (app/handle-event! run-paint)))
+  (is (= [[:switch "ujima-loading"] [:switch "1"]] (fx-of :switch)) "staging, then straight home")
+  (is (= [] (fx-of :hint-proc)) "nothing to recheck")
+  (is (nil? (state-of :paint)) "still :closed — gone from the snapshot")
+  (stubbed #(app/handle-event! run-paint))
+  (is (= 1 (count (fx-of :spawn))) "the retry spawns"))
 
 
 (deftest run-gates-while-still-opening

@@ -90,9 +90,24 @@
         (i3/switch-workspace! home-workspace)
         true))))
 
+(defn- hint-proc!
+  "Echo a proc-plane recheck: did APP-ID's spawn (identified by AT = its
+   :spawned-at) ever produce a window? 25s — LibreOffice needs ~20s on the Pi."
+  [app-id at]
+  (i3/emit-in! 25000 {:type :recheck/proc :app-id app-id :at at}))
+
+
+(defn- hint-window!
+  "Echo a window-plane recheck: did CON-ID (close asked at AT) actually close?
+   Past 10s a quit-confirm is holding it."
+  [con-id at]
+  (i3/emit-in! 10000 {:type :recheck/window :con-id con-id :at at}))
+
+
 (defn- do-run!
   "Gate on the derived SM: :running -> focus (ensure-open), :new -> no-op,
-   :closed -> spawn onto staging; placement hands it to its own workspace."
+   :closed -> spawn onto staging; placement hands it to its own workspace, and
+   a THROWING spawn rescues straight home."
   [view {:keys [id exec] :as app}]
   (case (lc/state-of view id)
     :running (do (log/info "app already open — focusing" {:app id})
@@ -101,14 +116,20 @@
     :new     (do (log/info "run gated — still opening" {:app id})
                  false)
     ;; :shutdown — no orphans if the agent dies; :inherit — an unread pipe would fill
-    (let [_    (i3/switch-workspace! staging-workspace)
-          proc (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec)
-          pid  (try (.pid (:proc proc)) (catch Throwable _ nil))
-          at   (System/currentTimeMillis)]
-      (swap! procs* assoc id {:handle proc :pid pid :spawned-at at})
-      (i3/hint-proc! id at)
-      (log/info "app spawned" {:app id :pid pid})
-      true)))
+    (do (i3/switch-workspace! staging-workspace)
+        (try
+          (let [proc (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec)
+                pid  (try (.pid (:proc proc)) (catch Throwable _ nil))
+                at   (System/currentTimeMillis)]
+            (swap! procs* assoc id {:handle proc :pid pid :spawned-at at})
+            (hint-proc! id at)
+            (log/info "app spawned" {:app id :pid pid})
+            true)
+          (catch Throwable e
+            ;; nothing registered, no recheck armed — rescue here or nowhere
+            (log/error "app spawn failed" {:app id :error (ex-message e)})
+            (i3/switch-workspace! home-workspace)
+            true)))))
 
 
 (defn- do-close-focused!
@@ -127,7 +148,7 @@
       (let [at (System/currentTimeMillis)]
         (swap! wintents* assoc con-id at)
         (i3/kill-con! con-id)
-        (i3/hint-window! con-id at)
+        (hint-window! con-id at)
         (log/info "close sent" {:con con-id})
         true))))
 

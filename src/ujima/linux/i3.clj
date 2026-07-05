@@ -151,19 +151,3 @@
           (try (p/destroy-tree proc) (catch Throwable _))
           (async/close! ch))))
     ch))
-
-
-(defn hint-proc!
-  "Echo a proc-plane recheck: did APP-ID's spawn (identified by AT = its
-   :spawned-at) ever produce a window? 25s — LibreOffice needs ~20s on the Pi."
-  [app-id at]
-  (emit-in! 25000 {:type :recheck/proc :app-id app-id :at at}))
-
-
-(defn hint-window!
-  "Echo a window-plane recheck: did CON-ID (close asked at AT) actually close?
-   Past 10s a quit-confirm is holding it."
-  [con-id at]
-  (emit-in! 10000 {:type :recheck/window :con-id con-id :at at}))
-
-

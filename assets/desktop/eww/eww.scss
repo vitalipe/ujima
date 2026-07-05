@@ -1,6 +1,6 @@
 // UjimaOS desktop shell — turn-14 skin: soft-blue charcoal shell (design handoff
-// tmp/UjimaOS Dark Theme Design-handoff.zip, section #t14). Fonts land in step 2;
-// "Public Sans" falls back to the system face until then.
+// tmp/UjimaOS Dark Theme Design-handoff.zip, section #t14). Public Sans is vendored
+// (assets/fonts) and installed by tools.scripts.desktop.
 $bg: #14171b;        // desktop / launcher base
 $panel: #1b2027;     // dock / popover surface
 $panel-brd: #282e38;
@@ -46,8 +46,10 @@ $accent: #7ea8cc;    // soft blue
   background-color: $bg;
   color: $text;
 }
-.launcher .tile { padding: 16px 10px; border-radius: 18px; }
+.launcher .head { font-size: 12px; letter-spacing: 2px; color: $faint; font-weight: 600; margin-bottom: 30px; }
+.launcher .tile { padding: 16px 10px; border-radius: 18px; min-width: 104px; }
 .launcher .tile:hover { background-color: rgba(255, 255, 255, 0.05); }
+.launcher .tlabel { font-size: 13px; color: $text; }
 .launcher .chip { min-width: 64px; min-height: 64px; border-radius: 18px; }
 .launcher .chip.wikipedia { background-color: rgba(168, 154, 201, 0.16); }
 .launcher .chip.books { background-color: rgba(205, 180, 136, 0.16); }

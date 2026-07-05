@@ -48,16 +48,19 @@
           "✕")))))
 
 ;; --- mid: launcher tiles, catalog-driven; a click asks the agent to run the app.
-;; --- Step-1 skin is textless — icon chips only; labels + heading return with fonts.
 ;; --- The outer box (no halign) carries the background across the whole window.
 (defwidget launcher []
   (box :class "launcher"
-    (box :class "tiles" :orientation "h" :halign "center" :valign "center" :space-evenly false :spacing 8
-      (for entry in {catalog.apps}
-        (button :class "tile" :timeout "2s"
-          :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
-          (box :class "chip ${entry.id}"
-            (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 30 :image-height 30)))))))
+    (box :orientation "v" :halign "center" :valign "center" :space-evenly false
+      (label :class "head" :text "ALL APPS")
+      (box :class "tiles" :orientation "h" :space-evenly false :spacing 8
+        (for entry in {catalog.apps}
+          (button :class "tile" :timeout "2s"
+            :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
+            (box :orientation "v" :space-evenly false :spacing 12
+              (box :class "chip ${entry.id}" :halign "center"
+                (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 30 :image-height 30))
+              (label :class "tlabel" :text {entry.label}))))))))
 
 ;; --- bottom: launcher tile left (lit when home), running apps centered (the
 ;; --- /ui/apps stream), tray right. A dock click is the same verb as a launcher

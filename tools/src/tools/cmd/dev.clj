@@ -72,7 +72,8 @@
 ;; other large/private untracked files that must never go over the wire to a Pi. A new script
 ;; that reads a new asset dir adds one entry here.
 (def ^:private stage-paths ["src" "tools/src" "config" "assets/dev" "assets/tools"
-                            "assets/desktop" "assets/eww"])   ; desktop.clj reads these
+                            "assets/desktop" "assets/eww"
+                            "assets/fonts" "assets/themes"])  ; desktop.clj reads these
 
 
 (defn script!

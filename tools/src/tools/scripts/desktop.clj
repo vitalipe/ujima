@@ -31,4 +31,28 @@
     (let [eww (str project "/assets/eww/eww-aarch64-latest")]
       (if (fs/exists? eww)
         ($! install -m "0755" [eww] "/usr/local/bin/eww")
-        (println "desktop: no assets/eww/eww-aarch64-latest yet — eww not staged")))))
+        (println "desktop: no assets/eww/eww-aarch64-latest yet — eww not staged")))
+
+    ;; shell typography + app-content theme: vendored data files, no apt — freeze-safe, and this
+    ;; same script carries them to a live dev Pi. Public Sans is the shell face (eww.scss);
+    ;; Nordic + /etc/gtk-3.0 give GTK app content (pcmanfm, LO, dialogs) the design's Nord side.
+    (let [fonts (str project "/assets/fonts/public-sans")]
+      (if (fs/exists? fonts)
+        (do (fs/create-dirs "/usr/share/fonts/truetype")
+            ($! rm -rf "/usr/share/fonts/truetype/public-sans")
+            ($! cp -a [fonts] "/usr/share/fonts/truetype/public-sans")
+            ($! fc-cache -f))
+        (println "desktop: no assets/fonts/public-sans — shell font not staged")))
+
+    (let [theme (str project "/assets/themes/Nordic")]
+      (if (fs/exists? theme)
+        (do (fs/create-dirs "/usr/share/themes")
+            ($! rm -rf "/usr/share/themes/Nordic")
+            ($! cp -a [theme] "/usr/share/themes/Nordic")
+            (fs/create-dirs "/etc/gtk-3.0")
+            (spit "/etc/gtk-3.0/settings.ini"
+                  (str "[Settings]\n"
+                       "gtk-theme-name=Nordic\n"
+                       "gtk-application-prefer-dark-theme=1\n"
+                       "gtk-font-name=Public Sans 10\n")))
+        (println "desktop: no assets/themes/Nordic — app theme not staged")))))

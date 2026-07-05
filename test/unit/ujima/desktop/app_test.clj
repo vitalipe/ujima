@@ -188,11 +188,11 @@
   (is (= [] (fx-of :switch)) "windows live here — nothing to rescue"))
 
 
-(deftest run-from-catalog-resolves-or-throws
+(deftest run-resolves-in-the-catalog-or-throws
   (setup! [] "1")
   (let [emitted (atom nil)]
     (with-redefs [i3/emit! (fn [ev] (reset! emitted ev))]
-      (app/run-from-catalog! :paint)
+      (app/run! :paint)
       (is (= :app/run (:type @emitted)))
       (is (= ["tuxpaint"] (get-in @emitted [:app :exec])) "the catalog's full app map rides the event")
-      (is (thrown? clojure.lang.ExceptionInfo (app/run-from-catalog! :nope))))))
+      (is (thrown? clojure.lang.ExceptionInfo (app/run! :nope))))))

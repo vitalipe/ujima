@@ -204,33 +204,18 @@
                 view))))
 
 
-;; --- the verbs: validate what must fail loudly, emit the rest onto the pipe ---
-
-(defn require-valid-app! [{:keys [id exec class] :as app}]
-  (when (nil? app)
-    (throw (ex-info "unknown app" {:error :app/unknown-app})))
-
-  (when-not (and id (vector? exec) (seq exec) (string? class))
-    (throw (ex-info "app map needs :id, :exec and :class" {:error :app/invalid-app :app app})))
-
-  true)
-
+;; --- the verbs: resolve what must fail loudly, emit the rest onto the pipe ---
 
 (defn run!
-  "Validate, then ride the pipe — gating and spawning happen on the listener
-   thread, queue-ordered with the window events."
-  [app]
-  (require-valid-app! app)
-  (i3/emit! {:type :app/run :app app}))
-
-
-(defn run-from-catalog!
-  "Resolve ID in the catalog (unknown fails loudly) and run!."
+  "Resolve ID in the catalog and ride the pipe — gating and spawning happen on
+   the listener thread, queue-ordered with the window events. Catalog membership
+   IS the validation: the model adopts by cataloged class, so an uncataloged
+   spawn would never mark windowed and its own recheck would kill it."
   [id]
   (let [app (get-in @catalog* [:by-id id])]
     (when-not app
       (throw (ex-info "unknown app" {:error :app/unknown-app :id id})))
-    (run! app)))
+    (i3/emit! {:type :app/run :app app})))
 
 
 (defn close-focused!

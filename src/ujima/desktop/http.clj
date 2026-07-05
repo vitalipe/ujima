@@ -73,7 +73,7 @@
         :ui/keyboard-next    (json 200 (ui/keyboard-next))
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         :app/catalog         (json 200 {:apps (app/catalog-listing)})
-        :app/run             (do (app/run-from-catalog! (keyword (:app-id body)))
+        :app/run             (do (app/run! (keyword (:app-id body)))
                                  (json 202 {}))
         :app/close           (do (app/close-focused!)
                                  (json 202 {}))

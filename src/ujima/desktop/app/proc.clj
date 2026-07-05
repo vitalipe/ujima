@@ -1,133 +1,122 @@
 (ns ujima.desktop.app.proc
-  "The proc store — a pure reducer folding normalized i3 window events (ujima.linux.i3)
-   and proc events into procs {:app-id :app :pid :windows #{con-id} :state :title},
-   singleton per app id. Identity is the app map's :class via the catalog-seeded
-   :class->app index — set once at load, immutable for the session (a mutable catalog
-   would live in settings and converge, not here). :pid comes from run!'s spawn;
-   adoption-created procs (a window we recognize but didn't spawn) carry :pid nil.
-   Pure; the live atom and its writers are ujima.desktop.app's."
+  "The per-app state machine, derived — never folded. The i3 tree is the state; we keep
+   only what i3 can't know (side-intents): :new = we spawned and await the window,
+   :closing = we sent WM_close to a con and await its removal. Each app's :state is a
+   pure function of (tree windows, side-intents):
+
+     :closed  no window with the app's class          (and no :new intent)
+     :new     no window yet, but we just spawned      (intent; timers resolve it)
+     :running window(s) present                       (presence clears :new)
+     :closing window still present after WM_close     (absence clears :closing)
+
+   This derivation is what makes LibreOffice adoptable: its settled WM_CLASS never rides
+   any i3 event, but it IS in the tree. Pure; the live side atom, the timers and the
+   spawns are ujima.desktop.app's."
   (:require [clojure.string :as str]))
 
 
-(defn init [class->app]
-  {:class->app (or class->app {})   ; lower-cased WM_CLASS -> app map (catalog seed + learned)
-   :procs      {}                   ; app-id -> proc
-   :order      []                   ; app-id adoption order (dock order)
-   :wm->app    {}                   ; con-id -> app-id
-   :current    nil})                ; focused app, nil while an unmanaged window has focus
+(defn windows
+  "The i3 tree flattened to the windows we reason about, with placement context:
+   [{:con-id n :class :title :focused? :workspace :floating? :transient?} ...]. Pure."
+  [tree]
+  (letfn [(walk [node ws floating?]
+            (let [ws (if (= "workspace" (:type node)) (:name node) ws)]
+              (concat
+                (when (:window node)
+                  [{:con-id     (:id node)
+                    :class      (get-in node [:window_properties :class])
+                    :title      (:name node)
+                    :focused?   (boolean (:focused node))
+                    :workspace  ws
+                    :floating?  floating?
+                    :transient? (some? (get-in node [:window_properties :transient_for]))}])
+                (mapcat #(walk % ws floating?) (:nodes node))
+                (mapcat #(walk % ws true) (:floating_nodes node)))))]
+    (vec (walk tree nil false))))
 
 
-(defn- adopt
-  "Join CON-ID to the app its WM_CLASS names. Extra windows of a tracked app attach to
-   its proc (promoting :starting -> :running — the spawned window arrived); a transient
-   (dialog) never *creates* a proc — it only attaches (LibreOffice's Tip-of-the-Day is
-   born carrying the writer class). Tracked cons and unknown classes pass through, so
-   replays are idempotent."
-  [state {:keys [con-id class transient? title]}]
-  (let [app    (when class (get-in state [:class->app (str/lower-case class)]))
-        app-id (:id app)]
-    (cond
-      (get-in state [:wm->app con-id]) state
-      (nil? app-id)                    state
-
-      (get-in state [:procs app-id])
-      (-> state
-          (update-in [:procs app-id]
-                     (fn [p] (cond-> p
-                               (= :starting (:state p)) (assoc :state :running)  ; New -> Running
-                               (nil? (:title p))         (assoc :title title))))
-          (update-in [:procs app-id :windows] conj con-id)
-          (assoc-in  [:wm->app con-id] app-id))
-
-      transient? state
-
-      :else
-      (-> state
-          (assoc-in [:procs app-id] {:app-id  app-id
-                                     :app     app
-                                     :pid     nil     ; a window we recognize but didn't spawn
-                                     :windows #{con-id}
-                                     :state   :running
-                                     :title   title})
-          (update :order conj app-id)
-          (assoc-in [:wm->app con-id] app-id)
-          (assoc :current app-id)))))
+(defn- windows-of [ws class]
+  (filterv #(and (:class %) (= (str/lower-case (:class %)) (str/lower-case class))) ws))
 
 
-(defn- on-title [state {:keys [con-id title] :as ev}]
-  (if-let [app-id (get-in state [:wm->app con-id])]
-    (assoc-in state [:procs app-id :title] title)
-    (adopt state ev)))    ; untracked — its class may have arrived late (LibreOffice)
+(defn app-state
+  "One app's SM state from its windows and its side-intent (:new | :closing | nil)."
+  [app-windows intent]
+  (cond
+    (seq app-windows) (if (= :closing intent) :closing :running)
+    (= :new intent)   :new
+    :else             :closed))
 
 
-(defn- on-close [state {:keys [con-id]}]
-  (if-let [app-id (get-in state [:wm->app con-id])]
-    (let [state (-> state
-                    (update-in [:procs app-id :windows] disj con-id)
-                    (update :wm->app dissoc con-id))]
-      (if (seq (get-in state [:procs app-id :windows]))
-        state    ; a dialog closing keeps the proc alive
-        (-> state
-            (update :procs dissoc app-id)
-            (update :order #(vec (remove #{app-id} %)))
-            (cond-> (= app-id (:current state)) (assoc :current nil)))))
-    state))
+(defn derive-view
+  "The whole model, derived: per-app states + the focused app + the wire snapshot.
+   CATALOG = the loaded {:order :by-id :class->app}; WS = (windows tree);
+   SIDE = {app-id {:phase :new|:closing :con n :at ms :pid n}}. Pure."
+  [catalog ws side]
+  (let [class->id (into {} (map (fn [[c a]] [c (:id a)])) (:class->app catalog))
+        focused   (some #(when (:focused? %) %) ws)
+        current   (when-let [c (:class focused)] (get class->id (str/lower-case c)))
+        apps      (mapv (fn [id]
+                          (let [app  (get-in catalog [:by-id id])
+                                wins (windows-of ws (:class app))
+                                st   (app-state wins (get-in side [id :phase]))]
+                            {:id      id
+                             :label   (:label app)
+                             :icon    (or (:icon app) (name id))
+                             :state   st
+                             :title   (:title (or (some #(when (:focused? %) %) wins)
+                                                  (first wins)))
+                             :windows (mapv :con-id wins)}))
+                        (:order catalog))]
+    {:apps    apps
+     :current current
+     :focused focused}))
 
 
-(defn- on-focus [state {:keys [con-id]}]
-  (assoc state :current (get-in state [:wm->app con-id])))
+(defn to-place
+  "The placement plan (desktop-base's place!, derived): every non-transient window of
+   a catalog app that floats (chromium --app trips the i3 pop-up float rule) or sits
+   off its app's workspace (workspace name = the app id) must move — and so does the
+   launcher (eww makes its one managed window floating AND sticky, so untouched it
+   shadows every workspace, stacking above the tiled apps), which belongs tiled on
+   HOME. Dialogs stay floating where i3 put them. Pure — self-quieting: a placed
+   window stops matching."
+  [catalog ws home]
+  (vec (for [w ws
+             :let [target (when (:class w)
+                            (if (= "eww" (str/lower-case (:class w)))
+                              home
+                              (some-> (get-in catalog [:class->app (str/lower-case (:class w))])
+                                      :id
+                                      name)))]
+             :when (and target
+                        (not (:transient? w))
+                        (or (:floating? w)
+                            (not= target (:workspace w))))]
+         {:con-id (:con-id w) :workspace target})))
 
 
-(defn- on-started
-  "run! spawned APP — the proc enters the lifecycle at :starting (New): in the dock
-   from click time, no windows yet; adoption promotes it to :running. An existing proc
-   only gets :pid/:app refreshed (run! is ensure-open, so that's a defensive replay
-   path)."
-  [state {:keys [app pid]}]
-  (let [app-id (:id app)]
-    (if (get-in state [:procs app-id])
-      (update-in state [:procs app-id] assoc :pid pid :app app)
-      (-> state
-          (assoc-in [:procs app-id] {:app-id  app-id
-                                     :app     app
-                                     :pid     pid
-                                     :windows #{}
-                                     :state   :starting
-                                     :title   nil})
-          (update :order conj app-id)))))
-
-
-(defn- on-exit
-  "The spawned pid died. Its windows follow with their own close events; the mark is
-   what the crash taxonomy reads."
-  [state {:keys [app-id]}]
-  (cond-> state
-    (get-in state [:procs app-id]) (assoc-in [:procs app-id :state] :exited)))
-
-
-(defn apply-event
-  "Fold one normalized event into the store. Pure; unknown types pass through."
-  [state event]
-  (case (:type event)
-    :window/new   (adopt      state event)
-    :window/title (on-title   state event)
-    :window/close (on-close   state event)
-    :window/focus (on-focus   state event)
-    :proc/started (on-started state event)
-    :proc/exit    (on-exit    state event)
-    state))
+(defn resolve-side
+  "Which side-intents the tree has answered: :new with a window present is done
+   (New -> Running), :closing whose con is gone is done (Closing -> Closed).
+   Returns the pruned side map. Pure — the edge swaps it in on every derive."
+  [catalog ws side]
+  (reduce-kv (fn [m id {:keys [phase con] :as intent}]
+               (let [wins (windows-of ws (:class (get-in catalog [:by-id id])))]
+                 (cond
+                   (and (= :new phase) (seq wins))                              m  ; window arrived
+                   (and (= :closing phase) (not-any? #(= con (:con-id %)) wins)) m ; that window gone
+                   :else (assoc m id intent))))
+             {}
+             side))
 
 
 (defn snapshot
-  "The /ui/apps wire shape (lib.edn camelCases keys on the way out). Everything renders
-   from the proc's own :app — the store needs no catalog."
-  [state]
-  {:apps    (mapv (fn [id]
-                    (let [p (get-in state [:procs id])]
-                      {:id    id
-                       :label (get-in p [:app :label])
-                       :icon  (or (get-in p [:app :icon]) (name id))
-                       :state (:state p)
-                       :title (:title p)}))
-                  (:order state))
-   :current (:current state)})
+  "The /ui/apps wire shape (lib.edn camelCases keys): non-:closed apps in catalog
+   order, the focused app, and the focused app's title resolved for the topbar."
+  [view]
+  (let [visible (filterv #(not= :closed (:state %)) (:apps view))
+        current (:current view)]
+    {:apps          (mapv #(dissoc % :windows) visible)
+     :current       current
+     :current-title (:title (some #(when (= current (:id %)) %) visible))}))

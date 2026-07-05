@@ -46,7 +46,9 @@
           [:get  ["ui" "apps"]]                       :ui/apps
           [:post ["ui" "volume" "move"]]              :ui/volume
           [:get  ["app" "catalog"]]                   :app/catalog
-          [:post ["app" "run"]]                       :app/run}
+          [:post ["app" "run"]]                       :app/run
+          [:post ["app" "close"]]                     :app/close
+          [:post ["app" "home"]]                      :app/home}
          [method parts])))
 
 
@@ -69,10 +71,11 @@
         :ui/apps             (apps/stream req)
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         :app/catalog         (json 200 {:apps (app/catalog-listing)})
-        ;; run folds :proc/started on this thread — publish it so the dock shows the
-        ;; :starting proc at click time, not first-window time
         :app/run             (do (app/run-from-catalog! (keyword (:app-id body)))
-                                 (apps/push!)
+                                 (json 202 {}))
+        :app/close           (do (app/close-focused!)
+                                 (json 202 {}))
+        :app/home            (do (app/go-home!)
                                  (json 202 {}))
         (json 404 {:error "not found"})))
     (catch clojure.lang.ExceptionInfo e

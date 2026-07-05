@@ -12,113 +12,113 @@
             {:id :write :label "Write" :icon "write"
              :exec ["libreoffice" "--writer"] :class "libreoffice-writer"}]}))
 
-(def ^:private wiki-app (get-in cat [:by-id :wikipedia]))
 
-(def ^:private s0 (proc/init (:class->app cat)))
-
-(defn- fold [& evs] (reduce proc/apply-event s0 evs))
-
-(def ^:private wiki-new
-  {:type :window/new :con-id 42 :class "ujima-wikipedia" :transient? false :title "Wikipedia"})
-
-
-(deftest adopts-a-catalog-classed-window
-  (let [s (fold wiki-new)]
-    (is (= #{42} (get-in s [:procs :wikipedia :windows])))
-    (is (= :running (get-in s [:procs :wikipedia :state])))
-    (is (= wiki-app (get-in s [:procs :wikipedia :app])) "the proc carries its app map")
-    (is (nil? (get-in s [:procs :wikipedia :pid])) "recognized but not spawned by us")
-    (is (= [:wikipedia] (:order s)))
-    (is (= :wikipedia (:current s)))))
+(def ^:private tree
+  ;; shaped like a real get_tree: named workspaces, one tiled app, one floating dialog
+  {:nodes [{:id 0 :type "output"
+            :nodes [{:id 1 :type "workspace" :name "wikipedia"
+                     :nodes [{:id 42 :window 1001 :name "Wikipedia" :focused true
+                              :window_properties {:class "ujima-wikipedia"}}
+                             {:id 5 :nodes []}]
+                     :floating_nodes [{:id 7 :window 1002 :name "Tip of the Day"
+                                       :window_properties {:class "libreoffice-writer"
+                                                           :transient_for 42}}]}
+                    {:id 2 :type "workspace" :name "write"
+                     :nodes [{:id 9 :window 1003 :name "Essay.odt"
+                              :window_properties {:class "libreoffice-writer"}}]}]}]})
 
 
-(deftest ignores-unknown-classes-and-replays
-  (is (= s0 (fold {:type :window/new :con-id 9 :class "firefox" :transient? false :title "x"})))
-  (is (= (fold wiki-new) (fold wiki-new wiki-new)) "baseline replay is idempotent"))
+(deftest windows-flattens-with-placement-context
+  (is (= [{:con-id 42 :class "ujima-wikipedia" :title "Wikipedia" :focused? true
+           :workspace "wikipedia" :floating? false :transient? false}
+          {:con-id 7 :class "libreoffice-writer" :title "Tip of the Day" :focused? false
+           :workspace "wikipedia" :floating? true :transient? true}
+          {:con-id 9 :class "libreoffice-writer" :title "Essay.odt" :focused? false
+           :workspace "write" :floating? false :transient? false}]
+         (proc/windows tree))))
 
 
-(deftest extra-windows-attach-to-the-singleton
-  (let [s (fold wiki-new
-                {:type :window/new :con-id 43 :class "ujima-wikipedia" :transient? false :title "popup"})]
-    (is (= #{42 43} (get-in s [:procs :wikipedia :windows])))
-    (is (= [:wikipedia] (:order s)) "still one proc")))
+(deftest to-place-plans-floaters-and-strays
+  (let [ws (proc/windows tree)]
+    (is (= [] (proc/to-place cat ws "1"))
+        "everything home: tiled on its app's workspace, the dialog floats in peace"))
+  (is (= [{:con-id 42 :workspace "wikipedia"}]
+         (proc/to-place cat [{:con-id 42 :class "ujima-wikipedia" :title "W" :focused? false
+                              :workspace "ujima-loading" :floating? false :transient? false}]
+                        "1"))
+      "a staged window moves to its app's workspace")
+  (is (= [{:con-id 42 :workspace "wikipedia"}]
+         (proc/to-place cat [{:con-id 42 :class "ujima-wikipedia" :title "W" :focused? false
+                              :workspace "wikipedia" :floating? true :transient? false}]
+                        "1"))
+      "a floating app window gets tiled even on the right workspace")
+  (is (= [{:con-id 3 :workspace "1"}]
+         (proc/to-place cat [{:con-id 3 :class "Eww" :title "Eww - launcher" :focused? false
+                              :workspace "wikipedia" :floating? true :transient? false}]
+                        "1"))
+      "the launcher: eww floats+sticks it over everything — it belongs tiled on HOME")
+  (is (= [] (proc/to-place cat [{:con-id 3 :class "Eww" :title "Eww - launcher" :focused? false
+                                 :workspace "1" :floating? false :transient? false}
+                                {:con-id 8 :class "firefox" :title "x" :focused? false
+                                 :workspace "1" :floating? true :transient? false}]
+                           "1"))
+      "a placed launcher rests; unmanaged windows are not ours to move"))
 
 
-(deftest transients-attach-but-never-create
-  (let [dialog {:type :window/new :con-id 7 :class "libreoffice-writer" :transient? true
-                :title "Tip of the Day"}]
-    (is (= s0 (fold dialog)) "no host proc -> ignored")
-    (let [s (fold {:type :window/new :con-id 6 :class "libreoffice-writer" :transient? false :title "doc"}
-                  dialog)]
-      (is (= #{6 7} (get-in s [:procs :write :windows]))))))
+(deftest app-state-machine
+  (is (= :closed  (proc/app-state [] nil)))
+  (is (= :new     (proc/app-state [] :new))          "we spawned, i3 hasn't shown it yet")
+  (is (= :running (proc/app-state [{:con-id 1}] nil)))
+  (is (= :running (proc/app-state [{:con-id 1}] :new)) "presence wins — New resolved by the tree")
+  (is (= :closing (proc/app-state [{:con-id 1}] :closing)) "close sent, window still up")
+  (is (= :closed  (proc/app-state [] :closing))     "absence wins — Closing resolved by the tree"))
 
 
-(deftest late-class-adopts-on-title
-  ;; LibreOffice: maps with no class, the class rides a later title event
-  (let [s (fold {:type :window/new   :con-id 5 :class nil :transient? false :title "Untitled"}
-                {:type :window/title :con-id 5 :class "libreoffice-writer" :transient? false :title "Essay.odt"})]
-    (is (= #{5} (get-in s [:procs :write :windows])))
-    (is (= "Essay.odt" (get-in s [:procs :write :title])))))
+(deftest derive-view-reads-the-tree
+  (let [ws   (proc/windows tree)
+        view (proc/derive-view cat ws {})]
+    (is (= :running (:state (first (:apps view)))))
+    (is (= :wikipedia (:current view)) "focus resolves to the owning app")
+    (is (= "Wikipedia" (:title (first (:apps view)))))
+    (is (= :running (:state (second (:apps view))))
+        "the settled LibreOffice class is IN the tree — derivation adopts what events never carried")))
 
 
-(deftest title-updates-a-tracked-proc
-  (let [s (fold wiki-new
-                {:type :window/title :con-id 42 :class "ujima-wikipedia" :transient? false
-                 :title "Wikipedia — Cats"})]
-    (is (= "Wikipedia — Cats" (get-in s [:procs :wikipedia :title])))))
+(deftest derive-view-honors-side-intents
+  (let [view (proc/derive-view cat [] {:wikipedia {:phase :new :at 0}})]
+    (is (= :new (:state (first (:apps view)))) "spawned, awaiting the window"))
+  (let [ws   [{:con-id 9 :class "ujima-wikipedia" :title "W" :focused? false}]
+        view (proc/derive-view cat ws {:wikipedia {:phase :closing :con 9 :at 0}})]
+    (is (= :closing (:state (first (:apps view)))) "close sent, quit-confirm may be holding it")))
 
 
-(deftest close-drops-the-proc-only-with-its-last-window
-  (let [s2 (fold wiki-new
-                 {:type :window/new :con-id 43 :class "ujima-wikipedia" :transient? false :title "p"})]
-    (is (= #{42} (get-in (proc/apply-event s2 {:type :window/close :con-id 43})
-                         [:procs :wikipedia :windows]))
-        "a dialog closing keeps the proc")
-    (let [gone (reduce proc/apply-event s2 [{:type :window/close :con-id 43}
-                                            {:type :window/close :con-id 42}])]
-      (is (nil? (get-in gone [:procs :wikipedia])))
-      (is (= [] (:order gone)))
-      (is (nil? (:current gone))))))
-
-
-(deftest focus-follows-tracked-windows
-  (is (= :wikipedia (:current (fold wiki-new {:type :window/focus :con-id 42}))))
-  (is (nil? (:current (fold wiki-new {:type :window/focus :con-id 999})))
-      "unmanaged focus clears the highlight"))
-
-
-(deftest started-enters-at-starting
-  ;; New: in the dock from click time, no windows yet
-  (let [s (fold {:type :proc/started :app wiki-app :pid 4242})]
-    (is (= {:app-id :wikipedia :app wiki-app :pid 4242 :windows #{} :state :starting :title nil}
-           (get-in s [:procs :wikipedia])))
-    (is (= [:wikipedia] (:order s)))
-    (is (nil? (:current s)) "no window, no focus"))
-  (let [replay (fold {:type :proc/started :app wiki-app :pid 1}
-                     {:type :proc/started :app wiki-app :pid 2})]
-    (is (= 2 (get-in replay [:procs :wikipedia :pid])) "replay refreshes the pid")
-    (is (= [:wikipedia] (:order replay)) "and never duplicates the proc")))
-
-
-(deftest adoption-promotes-starting-to-running
-  ;; New -> Running: the spawned proc's window maps and attaches
-  (let [s (fold {:type :proc/started :app wiki-app :pid 4242}
-                wiki-new)]
-    (is (= :running (get-in s [:procs :wikipedia :state])))
-    (is (= 4242 (get-in s [:procs :wikipedia :pid])) "pid survives the promotion")
-    (is (= #{42} (get-in s [:procs :wikipedia :windows])))
-    (is (= "Wikipedia" (get-in s [:procs :wikipedia :title])) "first window's title lands")))
-
-
-(deftest proc-exit-marks-the-state
-  (is (= :exited (get-in (fold wiki-new {:type :proc/exit :app-id :wikipedia})
-                         [:procs :wikipedia :state])))
-  (is (= s0 (fold {:type :proc/exit :app-id :wikipedia})) "unknown proc ignored"))
+(deftest resolve-side-lets-the-tree-answer
+  (let [ws [{:con-id 9 :class "ujima-wikipedia" :title "W" :focused? false}]]
+    (is (= {} (proc/resolve-side cat ws {:wikipedia {:phase :new :at 0}}))
+        "New -> Running: the window arrived")
+    (is (= {:wikipedia {:phase :new :at 0}}
+           (proc/resolve-side cat [] {:wikipedia {:phase :new :at 0}}))
+        "still waiting — the timer owns expiry, not the tree")
+    (is (= {} (proc/resolve-side cat [] {:wikipedia {:phase :closing :con 9 :at 0}}))
+        "Closing -> Closed: the window went away")
+    (is (= {:wikipedia {:phase :closing :con 9 :at 0}}
+           (proc/resolve-side cat ws {:wikipedia {:phase :closing :con 9 :at 0}}))
+        "close sent but the window persists (TuxPaint's confirm)")
+    (is (= {} (proc/resolve-side cat
+                                 [{:con-id 10 :class "libreoffice-writer" :title "doc2" :focused? false}]
+                                 {:write {:phase :closing :con 9 :at 0}}))
+        "the CLOSED window is gone — another window of the app keeps it :running, intent done")))
 
 
 (deftest snapshot-is-the-wire-shape
-  (is (= {:apps [{:id :wikipedia :label "Wikipedia" :icon "wikipedia"
-                  :state :running :title "Wikipedia"}]
-          :current :wikipedia}
-         (proc/snapshot (fold wiki-new))))
-  (is (= {:apps [] :current nil} (proc/snapshot s0))))
+  (let [view (proc/derive-view cat (proc/windows tree) {})]
+    (is (= {:apps [{:id :wikipedia :label "Wikipedia" :icon "wikipedia"
+                    :state :running :title "Wikipedia"}
+                   {:id :write :label "Write" :icon "write"
+                    :state :running :title "Tip of the Day"}]
+            :current :wikipedia
+            :current-title "Wikipedia"}
+           (proc/snapshot view))))
+  (is (= {:apps [] :current nil :current-title nil}
+         (proc/snapshot (proc/derive-view cat [] {})))
+      ":closed apps stay off the wire"))

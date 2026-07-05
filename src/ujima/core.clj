@@ -7,9 +7,10 @@
             [ujima.linux.converge :as linux]
             [lib.shell :as shell]
 
-            [ujima.desktop         :as desktop]
-            [ujima.desktop.http.ui :as ui]
-            [ujima.desktop.app     :as app]
+            [ujima.desktop          :as desktop]
+            [ujima.desktop.http.ui  :as ui]
+            [ujima.desktop.http.app :as apps]
+            [ujima.desktop.app      :as app]
             [ujima.events      :as events]))
 
 
@@ -32,6 +33,7 @@
     ;; the catalog (the window-adoption class index) must exist before the i3 watcher's
     ;; baseline lands; a missing catalog is a broken image — die loudly here
     (app/load-catalog! (get-in env [:desktop :catalog]))
+    (app/set-push!     apps/push!)
     (events/init!      (get-in env [:events]  {}))
 
     ;; desktop/init! BLOCKS holding eww; it coming back means the shell died. Exit explicitly —

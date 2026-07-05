@@ -17,9 +17,9 @@
   :initial "{\"audio\":{\"volume\":null,\"muted\":false,\"output\":null},\"keyboard\":{\"layout\":\"--\",\"layouts\":[],\"next\":null}}"
   "while true; do curl -sN http://127.0.0.1:1337/ui/state; sleep 1; done")
 
-;; the running apps (the proc store's snapshot) — same push contract as `state`
+;; the running apps (derived from the i3 tree) — same push contract as `state`
 (deflisten apps
-  :initial "{\"apps\":[],\"current\":null}"
+  :initial "{\"apps\":[],\"current\":null,\"currentTitle\":null}"
   "while true; do curl -sN http://127.0.0.1:1337/ui/apps; sleep 1; done")
 
 ;; the launchable-app catalog: immutable per session — fetched ONCE (retry until the
@@ -31,12 +31,14 @@
   "until curl -sf http://127.0.0.1:1337/app/catalog; do sleep 1; done; echo; exec sleep infinity")
 
 
-;; --- top: mock current-window title + inert close --------------------------
+;; --- top: the focused app's title; ✕ closes the FOCUSED WINDOW (not the app) --
 (defwidget topbar []
   (centerbox :class "topbar"
-    (label :class "title" :halign "start" :text "[activity title here]")
+    (label :class "title" :halign "start" :text {apps.currentTitle ?: ""})
     (box)
-    (button :class "close" :halign "end" "✕")))
+    (button :class "close" :halign "end" :timeout "2s"
+      :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
+      "✕")))
 
 ;; --- mid: launcher tiles, catalog-driven; a click asks the agent to run the app ---
 (defwidget launcher []
@@ -49,13 +51,16 @@
           (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 76 :image-height 76))))))
 
 ;; --- bottom: running apps (the /ui/apps stream) + live tray + clock ----------
+;; a dock click is the same verb as a launcher tile: run = ensure-open = focus
 (defwidget dock []
   (centerbox :class "dock"
     (box :halign "start" :space-evenly false
-      (button :class "win"
+      (button :class "win" :timeout "2s"
+        :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
         (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 28 :image-height 28))
       (for a in {apps.apps}
-        (button :class {a.id == apps.current ? "win active" : "win"}
+        (button :class {a.id == apps.current ? "win active" : "win"} :timeout "2s"
+          :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"
           (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 28 :image-height 28))))
     (box)
     (box :class "tray" :halign "end" :space-evenly false :spacing 8

@@ -14,7 +14,8 @@
   (is (= :ui/apps          (http/route :get  "/ui/apps")))
   (is (= :ui/volume        (http/route :post "/ui/volume/move")))
   (is (= :app/catalog      (http/route :get  "/app/catalog")))
-  (is (= :app/run          (http/route :post "/app/run"))))
+  (is (= :app/run          (http/route :post "/app/run")))
+  (is (= :app/close        (http/route :post "/app/close"))))
 
 
 (deftest route-tolerates-trailing-slashes

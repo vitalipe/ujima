@@ -51,6 +51,45 @@
   (json/parse-string (shell/sh! :i3-msg :-t "get_tree") true))
 
 
+(defn command!
+  "Run an i3 command via i3-msg (returns its reply string; throws on failure)."
+  [& args]
+  (apply shell/sh! :i3-msg args))
+
+
+(defn kill-con!
+  "WM_close the container — polite: an app may answer with a quit-confirm and keep
+   the window (TuxPaint does; the SM's :closing recheck handles it)."
+  [con-id]
+  (command! (format "[con_id=%d]" con-id) "kill"))
+
+
+(defn switch-workspace! [ws]
+  (command! "workspace" ws))
+
+
+(defn focused-workspace
+  "The visible workspace's name (i3-msg -t get_workspaces)."
+  []
+  (->> (json/parse-string (shell/sh! :i3-msg :-t "get_workspaces") true)
+       (some #(when (:focused %) (:name %)))))
+
+
+(defn place!
+  "Move a container to WORKSPACE, switch to it, and explicitly focus it. Mined from
+   desktop-base: floating disable fills the workspace (chromium --app trips the i3
+   pop-up float rule), sticky disable keeps it off other workspaces (eww marks
+   windows sticky), and the explicit focus matters — a bare workspace switch emits
+   only workspace::focus, which we don't subscribe to."
+  [con-id workspace]
+  (let [c (format "[con_id=%d]" con-id)]
+    (command! c "floating" "disable")
+    (command! c "sticky" "disable")
+    (command! c "move" "to" "workspace" workspace)
+    (command! "workspace" workspace)
+    (command! c "focus")))
+
+
 (defn baseline-events
   "Every real window in an i3 TREE as a :window/new event — what a fresh watcher emits
    so consumers adopt windows that mapped before it was listening. Pure."

@@ -6,9 +6,9 @@
             [ujima.linux.audio :as audio]
             [ujima.linux.i3    :as i3]
 
+            [ujima.desktop.app  :as app]
             [ujima.events.token :as token-events]
-            [ujima.events.audio :as audio-events]
-            [ujima.events.apps  :as apps-events]))
+            [ujima.events.audio :as audio-events]))
 
 
 (defn- listen!
@@ -48,4 +48,4 @@
   ;; stream also echoes back the :recheck/* self-events the app asked i3 for
   (listen! :i3-windows
            (i3/watch-windows!)
-           apps-events/on-event!))
+           app/handle-event!))

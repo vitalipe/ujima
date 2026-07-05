@@ -20,7 +20,7 @@
                               wins (windows/of-class ws (:class app))]
                           {:id      id
                            :label   (:label app)
-                           :icon    (or (:icon app) (name id))
+                           :icon    (:icon app)
                            :state   (cond
                                       (seq wins)                    :running
                                       (procs/awaiting? registry id) :new

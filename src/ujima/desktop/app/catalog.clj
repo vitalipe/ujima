@@ -27,11 +27,12 @@
 
 
 (defn ->catalog
-  "Index raw {:apps [...]} edn: creation order, by-id, and the lower-cased WM_CLASS ->
-   app-map adoption seed (casing varies by app — i3 reports TuxPaint, Pcmanfm, …).
-   Validates loudly."
+  "Index raw {:apps [...]} edn: creation order, by-id (:icon defaulted to the id),
+   and the lower-cased WM_CLASS -> app-map adoption seed (casing varies by app —
+   i3 reports TuxPaint, Pcmanfm, …). Validates loudly."
   [raw]
-  (let [apps (validate! (vec (:apps raw)))]
+  (let [apps (mapv (fn [a] (update a :icon #(or % (name (:id a)))))
+                   (validate! (vec (:apps raw))))]
     {:order      (mapv :id apps)
      :by-id      (into {} (map (juxt :id identity)) apps)
      :class->app (into {} (map (fn [a] [(str/lower-case (:class a)) a])) apps)}))
@@ -42,5 +43,5 @@
   [catalog]
   (mapv (fn [id]
           (let [a (get-in catalog [:by-id id])]
-            {:id id :label (:label a) :icon (or (:icon a) (name id))}))
+            {:id id :label (:label a) :icon (:icon a)}))
         (:order catalog)))

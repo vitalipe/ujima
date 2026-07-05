@@ -8,8 +8,11 @@
 (defpoll clock :interval "10s" "date +%H:%M")
 
 (defvar ewwcmd "eww --config /opt/ujima/desktop/eww")
-; a launcher click steals focus from the override-redirect bars → they go dormant; tap one to re-wake (pointer restored)
-(defvar wakebars "eval $(xdotool getmouselocation --shell); xdotool mousemove 640 18 click 1; xdotool mousemove $X $Y")
+; a launcher click steals focus from the override-redirect bars → they go dormant; only a REAL
+; XTEST click on a bar re-wakes them (a click SENT via XSendEvent does not — HW-tested). Tap the
+; far top-right corner: the arrow glyph draws down-right from its hotspot, so parked at 1279,0
+; it clips to a ~1px sliver for the one frame it's there — effectively invisible — then hops back.
+(defvar wakebars "eval $(xdotool getmouselocation --shell); xdotool mousemove 1279 0 click 1; xdotool mousemove $X $Y")
 
 ;; the authoritative UI state (JSON); the while-loop is the reconnect story — an
 ;; agent restart drops the connection, 1s later the snapshot line rehydrates us

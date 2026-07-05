@@ -32,14 +32,20 @@
 
 
 ;; --- top: one full-width "tab" — focused app's title + ✕ (closes the FOCUSED
-;; --- WINDOW, not the app). The idcell is the 52px app-icon slot, empty until
-;; --- icons land. On the launcher (nothing focused) the tab blanks to a quiet
-;; --- strip ("bar off"). The dynamic class lives on the INNER box: eww evaluates
-;; --- a window-root widget's :class once at open and never again (HW-observed).
+;; --- WINDOW, not the app). The idcell shows the focused app's icon in a tinted
+;; --- chip; `current` doubles as the icon name (catalog defaults :icon to :id —
+;; --- an app that overrides :icon needs the icon name in /ui/apps first). On the
+;; --- launcher (nothing focused) the tab blanks to a quiet strip ("bar off").
+;; --- The dynamic class lives on the INNER box: eww evaluates a window-root
+;; --- widget's :class once at open and never again (HW-observed).
 (defwidget topbar []
   (box :class "topbar"
     (box :class {(apps.current ?: "") == "" ? "bar off" : "bar"} :space-evenly false
-      (box :class "idcell")
+      (box :class "idcell"
+        (box :class {"idchip " + (apps.current ?: "")} :halign "center" :valign "center"
+          :visible {(apps.current ?: "") != ""}
+          (image :path "/opt/ujima/desktop/icons/${(apps.current ?: "") == "" ? "launcher" : apps.current}.svg"
+                 :image-width 15 :image-height 15)))
       (box :class "tab" :space-evenly false :hexpand true
         (label :class "title" :halign "start" :hexpand true :text {apps.currentTitle ?: ""})
         (button :class "close" :valign "center" :timeout "2s"

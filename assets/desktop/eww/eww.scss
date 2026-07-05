@@ -16,6 +16,12 @@ $accent: #7ea8cc;    // soft blue
 // black root, so real translucency would only darken them.
 .topbar { background-color: #101317; border-bottom: 1px solid $panel-brd; color: $text; }
 .topbar .idcell { min-width: 52px; border-right: 1px solid $panel-brd; }
+.topbar .idchip { min-width: 26px; min-height: 26px; border-radius: 8px; }
+.topbar .idchip.wikipedia { background-color: rgba(168, 154, 201, 0.16); }
+.topbar .idchip.books { background-color: rgba(205, 180, 136, 0.16); }
+.topbar .idchip.write { background-color: rgba(126, 196, 189, 0.16); }
+.topbar .idchip.draw { background-color: rgba(201, 154, 166, 0.16); }
+.topbar .idchip.files { background-color: rgba(126, 168, 204, 0.16); }
 .topbar .tab { background-color: rgba(126, 168, 204, 0.10); border-bottom: 2px solid $accent; padding: 0 14px; }
 // home/launcher: nothing focused — the design has NO bar there; a truly vanishing
 // strip is window-layer work (gaps re-flow), so the deferred look is a quiet strip
@@ -27,12 +33,13 @@ $accent: #7ea8cc;    // soft blue
 
 // --- dock: launcher left, running apps centered, tray right ------------------
 .dock { background-color: #191d24; border-top: 1px solid $panel-brd; padding: 8px 16px; color: $text; }
-.dock .home, .dock .win { min-width: 40px; min-height: 40px; border-radius: 11px; }
+.dock .home, .dock .win { min-width: 40px; min-height: 40px; border-radius: 11px; transition: background-color 150ms ease; }
 .dock .home { background-color: rgba(126, 168, 204, 0.16); border: 1px solid transparent; }
+.dock .home:hover { background-color: rgba(126, 168, 204, 0.30); }
 .dock .home.active { background-color: rgba(126, 168, 204, 0.26); border-color: rgba(126, 168, 204, 0.4); }
 .dock .win:hover { background-color: rgba(255, 255, 255, 0.07); }
 .dock .win.active { background-color: rgba(126, 168, 204, 0.16); }
-.dock .tray .kbd { padding: 0 10px; border-radius: 11px; color: $dim; font-weight: 500; }
+.dock .tray .kbd { padding: 0 10px; border-radius: 11px; color: $dim; font-weight: 500; transition: background-color 150ms ease; }
 .dock .tray .kbd:hover { background-color: rgba(255, 255, 255, 0.07); color: $text; }
 .dock .tray .sound { min-width: 36px; min-height: 40px; border-radius: 11px; }
 .dock .tray .sound:hover { background-color: rgba(255, 255, 255, 0.07); }
@@ -47,7 +54,7 @@ $accent: #7ea8cc;    // soft blue
   color: $text;
 }
 .launcher .head { font-size: 12px; letter-spacing: 2px; color: $faint; font-weight: 600; margin-bottom: 30px; }
-.launcher .tile { padding: 16px 10px; border-radius: 18px; min-width: 104px; }
+.launcher .tile { padding: 16px 10px; border-radius: 18px; min-width: 104px; transition: background-color 150ms ease; }
 .launcher .tile:hover { background-color: rgba(255, 255, 255, 0.05); }
 .launcher .tlabel { font-size: 13px; color: $text; }
 .launcher .chip { min-width: 64px; min-height: 64px; border-radius: 18px; }

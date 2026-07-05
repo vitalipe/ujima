@@ -17,6 +17,7 @@ $accent: #7ea8cc;    // soft blue
 .topbar { background-color: #101317; border-bottom: 1px solid $panel-brd; color: $text; }
 .topbar .idcell { min-width: 52px; border-right: 1px solid $panel-brd; }
 .topbar .idchip { min-width: 26px; min-height: 26px; border-radius: 8px; }
+.topbar .idchip.home { background-color: rgba(126, 168, 204, 0.16); }  // launcher glyph when nothing is focused
 .topbar .idchip.wikipedia { background-color: rgba(168, 154, 201, 0.16); }
 .topbar .idchip.books { background-color: rgba(205, 180, 136, 0.16); }
 .topbar .idchip.write { background-color: rgba(126, 196, 189, 0.16); }

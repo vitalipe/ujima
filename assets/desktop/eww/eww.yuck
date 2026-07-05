@@ -42,8 +42,7 @@
   (box :class "topbar"
     (box :class {(apps.current ?: "") == "" ? "bar off" : "bar"} :space-evenly false
       (box :class "idcell"
-        (box :class {"idchip " + (apps.current ?: "")} :halign "center" :valign "center"
-          :visible {(apps.current ?: "") != ""}
+        (box :class {"idchip " + ((apps.current ?: "") == "" ? "home" : apps.current)} :halign "center" :valign "center"
           (image :path "/opt/ujima/desktop/icons/${(apps.current ?: "") == "" ? "launcher" : apps.current}.svg"
                  :image-width 15 :image-height 15)))
       (box :class "tab" :space-evenly false :hexpand true

@@ -78,12 +78,15 @@
 
 
 (defn- rescue-stranded!
-  "Nothing of ours focused on a dead app workspace (i3 never leaves one) -> home.
-   Staging is the loading wait; the proc recheck owns it."
-  [view]
-  (when (nil? (:current view))
+  "The focused workspace is DEAD — zero windows, i3 never leaves one by itself ->
+   home. Not \"no managed window focused\": that is also true mid focus-handoff and
+   on unmanaged windows (LO's Start Center), where yanking would be wrong. Staging
+   is the loading wait; the proc recheck owns it."
+  [{:keys [ws view]}]
+  (when (nil? (:current view))                       ; fast path: managed focus = alive
     (let [fws (i3/focused-workspace)]
-      (when-not (#{home-workspace staging-workspace} fws)
+      (when (and (not (#{home-workspace staging-workspace} fws))
+                 (not-any? #(= fws (:workspace %)) ws))
         (i3/switch-workspace! home-workspace)
         true))))
 
@@ -155,7 +158,7 @@
 (defn- act!
   "ALL world mutations live here: placement, the event's own action, the
    stranded-rescue. Truthy when anything changed."
-  [ev {:keys [ws view]}]
+  [ev {:keys [ws view] :as world}]
   (let [placed?  (enforce-placement! ws)
         acted?   (case (:type ev)
                    :app/run           (do-run! view (:app ev))
@@ -166,7 +169,7 @@
         ;; rescue reacts to WORLD-initiated changes (ticks) only: an act that just
         ;; moved focus must not be undone by the stale pre-act view
         rescued? (when-not (or placed? acted?)
-                   (rescue-stranded! view))]
+                   (rescue-stranded! world))]
     (or placed? acted? rescued?)))
 
 

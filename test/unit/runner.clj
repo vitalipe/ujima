@@ -27,6 +27,7 @@
             [ujima.desktop.app.windows-test]
             [ujima.desktop.app.procs-test]
             [ujima.desktop.app.lifecycle-test]
+            [ujima.desktop.app-test]
             [ujima.events.audio-test]
             [ujima.events.token-test]))
 
@@ -59,6 +60,7 @@
     ujima.desktop.app.windows-test
     ujima.desktop.app.procs-test
     ujima.desktop.app.lifecycle-test
+    ujima.desktop.app-test
     ujima.events.audio-test
     ujima.events.token-test])
 

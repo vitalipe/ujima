@@ -31,49 +31,57 @@
   "until curl -sf http://127.0.0.1:1337/app/catalog; do sleep 1; done; echo; exec sleep infinity")
 
 
-;; --- top: the focused app's title; ✕ closes the FOCUSED WINDOW (not the app),
-;; --- and hides on the launcher (nothing of ours focused = nothing to close)
+;; --- top: one full-width "tab" — focused app's title + ✕ (closes the FOCUSED
+;; --- WINDOW, not the app). The idcell is the 52px app-icon slot, empty until
+;; --- icons land. On the launcher (nothing focused) the tab blanks to a quiet
+;; --- strip ("bar off"). The dynamic class lives on the INNER box: eww evaluates
+;; --- a window-root widget's :class once at open and never again (HW-observed).
 (defwidget topbar []
-  (centerbox :class "topbar"
-    (label :class "title" :halign "start" :text {apps.currentTitle ?: ""})
-    (box)
-    (button :class "close" :halign "end" :timeout "2s"
-      :visible {(apps.current ?: "") != ""}
-      :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
-      "✕")))
+  (box :class "topbar"
+    (box :class {(apps.current ?: "") == "" ? "bar off" : "bar"} :space-evenly false
+      (box :class "idcell")
+      (box :class "tab" :space-evenly false :hexpand true
+        (label :class "title" :halign "start" :hexpand true :text {apps.currentTitle ?: ""})
+        (button :class "close" :valign "center" :timeout "2s"
+          :visible {(apps.current ?: "") != ""}
+          :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
+          "✕")))))
 
-;; --- mid: launcher tiles, catalog-driven; a click asks the agent to run the app ---
+;; --- mid: launcher tiles, catalog-driven; a click asks the agent to run the app.
+;; --- Step-1 skin is textless — icon chips only; labels + heading return with fonts.
+;; --- The outer box (no halign) carries the background across the whole window.
 (defwidget launcher []
-  (box :class "launcher" :orientation "v" :halign "center" :valign "center" :space-evenly false
-    (label :class "brand" :text "Ujima")
-    (box :class "tiles" :orientation "h" :space-evenly true
+  (box :class "launcher"
+    (box :class "tiles" :orientation "h" :halign "center" :valign "center" :space-evenly false :spacing 8
       (for entry in {catalog.apps}
         (button :class "tile" :timeout "2s"
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
-          (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 76 :image-height 76))))))
+          (box :class "chip ${entry.id}"
+            (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 30 :image-height 30)))))))
 
-;; --- bottom: running apps (the /ui/apps stream) + live tray + clock ----------
-;; a dock click is the same verb as a launcher tile: run = ensure-open = focus
+;; --- bottom: launcher tile left (lit when home), running apps centered (the
+;; --- /ui/apps stream), tray right. A dock click is the same verb as a launcher
+;; --- tile: run = ensure-open = focus
 (defwidget dock []
   (centerbox :class "dock"
     (box :halign "start" :space-evenly false
-      (button :class "win" :timeout "2s"
+      (button :class {(apps.current ?: "") == "" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
-        (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 28 :image-height 28))
+        (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 21 :image-height 21)))
+    (box :halign "center" :space-evenly false :spacing 4
       (for a in {apps.apps}
         (button :class {a.id == apps.current ? "win active" : "win"} :timeout "2s"
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"
-          (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 28 :image-height 28))))
-    (box)
-    (box :class "tray" :halign "end" :space-evenly false :spacing 8
+          (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 21 :image-height 21))))
+    (box :class "tray" :halign "end" :space-evenly false :spacing 4
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
       ; the label flips when the push lands
       (button :class "kbd" :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /api/input/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
         (label :text {state.keyboard.layout}))
-      (label :class "clock" :text {clock})
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
-        (image :path {state.audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22)))))
+        (image :path {state.audio.muted ? "/opt/ujima/desktop/icons/speaker-muted.svg" : "/opt/ujima/desktop/icons/speaker.svg"} :image-width 19 :image-height 19))
+      (label :class "clock" :text {clock}))))
 
 
 ;; --- volume overlay: slider moves are fire-and-forget (the agent throttles the
@@ -99,7 +107,7 @@
 
 ;; --- surfaces ------------------------------------------------------------
 (defwindow topbar
-  :monitor 0 :geometry (geometry :anchor "top center" :width "100%" :height "36px")
+  :monitor 0 :geometry (geometry :anchor "top center" :width "100%" :height "46px")
   :wm-ignore true :stacking "fg"
   (topbar))
 
@@ -109,14 +117,17 @@
   (launcher))
 
 (defwindow dock
-  :monitor 0 :geometry (geometry :anchor "bottom center" :width "100%" :height "48px")
+  :monitor 0 :geometry (geometry :anchor "bottom center" :width "100%" :height "56px")
   :wm-ignore true :stacking "fg"
   (dock))
 
+;; the window is larger than the card: the transparent wrapper's padding floats the
+;; card above the dock and off the screen edge (margins on the ROOT widget won't do —
+;; eww promotes the root's background to the whole window)
 (defwindow volume
-  :monitor 0 :geometry (geometry :anchor "bottom right" :width "4%" :height "210px")
+  :monitor 0 :geometry (geometry :anchor "bottom right" :width "76px" :height "330px")
   :wm-ignore true :stacking "fg"
-  (volpanel))
+  (box :class "volwrap" (volpanel)))
 
 ;; invisible fullscreen click-catcher: opened with the popover (under it), any click closes both
 ;; so clicking outside the popover dismisses it. The popover is opened last → stacks on top.

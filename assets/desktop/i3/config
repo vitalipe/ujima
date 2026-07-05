@@ -1,8 +1,16 @@
 # UjimaOS — minimal i3 config. No i3bar; eww is the shell, the agent owns app/window lifecycle.
-font pango:Inter 10
+# new windows stack as tabs (cover the previous), never tile-split; font 1 + a
+# topbar-matched palette shrink the only surviving decoration — the tab bar — to
+# an invisible ~2px sliver that blends into the topbar above it
+font pango:Inter 1
 default_border none
 default_floating_border none
 hide_edge_borders both
+workspace_layout tabbed
+client.focused          #1b1d23 #1b1d23 #1b1d23 #1b1d23 #1b1d23
+client.focused_inactive #1b1d23 #1b1d23 #1b1d23 #1b1d23 #1b1d23
+client.unfocused        #1b1d23 #1b1d23 #1b1d23 #1b1d23 #1b1d23
+client.urgent           #1b1d23 #1b1d23 #1b1d23 #1b1d23 #1b1d23
 
 # dialogs/popups float; deliberately NO fullscreen keybind — the eww bars must stay visible
 for_window [window_type="dialog"]  floating enable

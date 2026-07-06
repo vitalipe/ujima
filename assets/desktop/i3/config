@@ -7,10 +7,10 @@ default_border none
 default_floating_border none
 hide_edge_borders both
 workspace_layout tabbed
-client.focused          #12151a #12151a #12151a #12151a #12151a
-client.focused_inactive #12151a #12151a #12151a #12151a #12151a
-client.unfocused        #12151a #12151a #12151a #12151a #12151a
-client.urgent           #12151a #12151a #12151a #12151a #12151a
+client.focused          #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
+client.focused_inactive #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
+client.unfocused        #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
+client.urgent           #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
 
 # dialogs/popups float; deliberately NO fullscreen keybind — the eww bars must stay visible
 for_window [window_type="dialog"]  floating enable

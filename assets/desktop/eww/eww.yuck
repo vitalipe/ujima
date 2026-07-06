@@ -71,19 +71,26 @@
     (box :class "trayhd" :space-evenly false :valign "center"
       (box :class "traydot")
       (label :class "traylabel" :halign "start" :xalign 0 :text name))
-    (box :class "traytiles" :orientation "h" :space-evenly false :spacing 14
+    (box :class "traytiles" :orientation "h" :halign "center" :space-evenly false :spacing 14
       (for entry in {catalog.apps}
         (traytile :entry entry :cat cat)))))
 
+;; nested centerboxes reliably centre the block in BOTH axes (a lone child in a
+;; plain box parks at the start); the trays block sits in the middle-of-middle.
 (defwidget launcher []
-  (box :class "launcher"
-    (box :class "trays" :orientation "v" :halign "center" :valign "center" :space-evenly false :spacing 20
-      (box :orientation "h" :space-evenly false :spacing 20 :valign "start"
-        (tray :cat "learn" :name "LEARN")
-        (tray :cat "office" :name "OFFICE"))
-      (box :orientation "h" :space-evenly false :spacing 20 :valign "start"
-        (tray :cat "create" :name "CREATE")
-        (tray :cat "web-files" :name "WEB & FILES")))))
+  (centerbox :class "launcher" :orientation "v"
+    (box)
+    (centerbox :orientation "h"
+      (box)
+      (box :class "trays" :orientation "v" :space-evenly false :spacing 20
+        (box :orientation "h" :halign "center" :space-evenly false :spacing 20 :valign "start"
+          (tray :cat "learn" :name "LEARN")
+          (tray :cat "office" :name "OFFICE"))
+        (box :orientation "h" :halign "center" :space-evenly false :spacing 20 :valign "start"
+          (tray :cat "create" :name "CREATE")
+          (tray :cat "web-files" :name "WEB & FILES")))
+      (box))
+    (box)))
 
 ;; --- bottom: launcher tile left (lit when home), running apps centered (the
 ;; --- /ui/apps stream), tray right. A dock click is the same verb as a launcher

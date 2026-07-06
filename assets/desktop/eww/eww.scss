@@ -49,11 +49,9 @@ $faint: #697180;
   background-color: $bg;
   color: $text;
 }
-.launcher .tray { padding: 18px 20px; border-radius: 24px; min-width: 150px; }   // fit the category label above a single tile
-.launcher .tray.cat-learn     { background-color: rgba(126, 158, 214, 0.09); box-shadow: inset 0 0 0 1px rgba(126, 158, 214, 0.16); }
-.launcher .tray.cat-office    { background-color: rgba(168, 150, 201, 0.09); box-shadow: inset 0 0 0 1px rgba(168, 150, 201, 0.16); }
-.launcher .tray.cat-create    { background-color: rgba(206, 147, 166, 0.09); box-shadow: inset 0 0 0 1px rgba(206, 147, 166, 0.16); }
-.launcher .tray.cat-web-files { background-color: rgba(134, 184, 126, 0.09); box-shadow: inset 0 0 0 1px rgba(134, 184, 126, 0.16); }
+// no tray box at all (no frame, no fill) — the category shows only in the dot +
+// label (and the open ring/dot). Padding just spaces the groups apart.
+.launcher .tray { padding: 14px 18px; min-width: 150px; }
 .launcher .trayhd { margin-bottom: 14px; }
 .launcher .traydot { min-width: 8px; min-height: 8px; border-radius: 2px; margin-right: 8px; }
 .launcher .tray.cat-learn .traydot     { background-color: #7e9ed6; }

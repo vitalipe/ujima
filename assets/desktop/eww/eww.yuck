@@ -68,9 +68,9 @@
 
 (defwidget tray [cat name]
   (box :class "tray cat-${cat}" :orientation "v" :space-evenly false :valign "start"
-    (box :class "trayhd" :space-evenly false :valign "center" :hexpand true
+    (box :class "trayhd" :space-evenly false :valign "center"
       (box :class "traydot")
-      (label :class "traylabel" :halign "start" :hexpand true :limit-width 20 :text name))
+      (label :class "traylabel" :halign "start" :xalign 0 :text name))
     (box :class "traytiles" :orientation "h" :space-evenly false :spacing 14
       (for entry in {catalog.apps}
         (traytile :entry entry :cat cat)))))

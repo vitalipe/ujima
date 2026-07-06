@@ -22,10 +22,13 @@ $faint: #697180;
 .topbar .close:hover { background-color: rgba(214, 131, 131, 0.2); color: #e2a6a6; }
 
 // --- dock (33a): 68px, #1b2027 — launcher Sand · apps 32px, active = category ----
-.dock { background-color: $panel; border-top: 1px solid $panel-brd; padding: 0 18px; color: $text; }
-// launcher / home: Sand is its own category (never a group colour), always lit
-.dock .home { min-width: 52px; min-height: 52px; border-radius: 13px; background-color: rgba(203, 168, 120, 0.18); box-shadow: inset 0 0 0 1.5px rgba(203, 168, 120, 0.45); }
-.dock .home:hover { background-color: rgba(203, 168, 120, 0.28); }
+// 8px vertical padding keeps the tiles SQUARE (52×52) — without it they stretch to
+// the full 68px and the highlight reads tall/narrow.
+.dock { background-color: $panel; border-top: 1px solid $panel-brd; padding: 8px 18px; color: $text; }
+// launcher / home: neutral at rest, Sand glow only when the launcher is the active view (.active)
+.dock .home { min-width: 52px; min-height: 52px; border-radius: 13px; transition: background-color 150ms ease; }
+.dock .home:hover { background-color: rgba(255, 255, 255, 0.07); }
+.dock .home.active { background-color: rgba(203, 168, 120, 0.18); box-shadow: inset 0 0 0 1.5px rgba(203, 168, 120, 0.45); }
 // running apps: bare logo at rest, neutral hover, ACTIVE glows its category colour
 .dock .win { min-width: 52px; min-height: 52px; border-radius: 13px; transition: background-color 150ms ease; }
 .dock .win:hover { background-color: rgba(255, 255, 255, 0.07); }

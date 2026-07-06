@@ -74,9 +74,11 @@
 ;; --- tile: run = ensure-open = focus
 (defwidget dock []
   (centerbox :class "dock"
-    ;; launcher / home — Sand (its own category, always lit); design 33a far-left 9-dot grid
+    ;; launcher / home — its dock tile is "selected" (Sand) only when the launcher IS
+    ;; the active view (nothing focused); neutral once an app takes over. Same rule as
+    ;; the app tiles: exactly one thing selected at a time (home, or the active app).
     (box :halign "start" :space-evenly false
-      (button :class "home" :timeout "2s"
+      (button :class {(apps.current ?: "") == "" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
         (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 25 :image-height 25)))
     ;; running apps — bare 32px vendor logos; the ACTIVE one glows its category color

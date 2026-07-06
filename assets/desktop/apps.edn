@@ -3,44 +3,52 @@
 ;; the HTTP/eww edge; the executor runs :exec VERBATIM and never consults the catalog.
 ;; Ad-hoc app maps (same shape) can be started directly — adding an app = one entry.
 ;;
-;;   :exec   the literal argv — content AND flags live here, nothing is stamped
-;;   :class  the WM_CLASS its windows map with — the adoption key; for chromium apps it
-;;           must match the --class= inside :exec (drift = the app never leaves :starting)
-;;   :icon   name under /opt/ujima/desktop/icons/<icon>.svg (defaults to :id)
-;;   :on-exit :close (default) | :relaunch — uncommanded-death policy (future slice)
+;;   :exec     the literal argv — content AND flags live here, nothing is stamped
+;;   :class    the WM_CLASS its windows map with — the adoption key; for chromium apps it
+;;             must match the --class= inside :exec (drift = the app never leaves :starting)
+;;   :icon     name under /opt/ujima/desktop/icons/<icon>.svg (defaults to :id)
+;;   :category v0.9 color-grouping (design turns 31b/33a): :learn :office :create :web-files.
+;;             Flows to the eww edge (launcher + dock), which paints the group/active color;
+;;             the hex lives in eww.scss (.cat-*), the server only carries the keyword.
+;;   :on-exit  :close (default) | :relaunch — uncommanded-death policy (future slice)
 ;;
 ;; chromium profiles are flat /tmp paths (parent always exists — chromium silently falls
 ;; back to the shared default profile when the parent dir is missing); per-launch fresh
 ;; profiles arrive with the ujima-browser wrapper.
 {:apps
- [{:id    :wikipedia
-   :label "Wikipedia"
-   :icon  "wikipedia"
-   :exec  ["chromium" "--app=https://wikipedia.com" "--class=ujima-wikipedia"
-           "--user-data-dir=/tmp/ujima-wikipedia" "--no-first-run" "--disk-cache-size=1"]
-   :class "ujima-wikipedia"}
+ [{:id       :wikipedia
+   :label    "Wikipedia"
+   :icon     "wikipedia"
+   :category :learn
+   :exec     ["chromium" "--app=https://wikipedia.com" "--class=ujima-wikipedia"
+              "--user-data-dir=/tmp/ujima-wikipedia" "--no-first-run" "--disk-cache-size=1"]
+   :class    "ujima-wikipedia"}
 
-  {:id    :books
-   :label "Books"
-   :icon  "books"
-   :exec  ["chromium" "--app=http://ujima-content.local/books" "--class=ujima-books"
-           "--user-data-dir=/tmp/ujima-books" "--no-first-run" "--disk-cache-size=1"]
-   :class "ujima-books"}
+  {:id       :books
+   :label    "Books"
+   :icon     "books"
+   :category :learn
+   :exec     ["chromium" "--app=http://ujima-content.local/books" "--class=ujima-books"
+              "--user-data-dir=/tmp/ujima-books" "--no-first-run" "--disk-cache-size=1"]
+   :class    "ujima-books"}
 
-  {:id    :write
-   :label "Write"
-   :icon  "write"
-   :exec  ["libreoffice" "--writer"]
-   :class "libreoffice-writer"}
+  {:id       :write
+   :label    "Write"
+   :icon     "write"
+   :category :office
+   :exec     ["libreoffice" "--writer"]
+   :class    "libreoffice-writer"}
 
-  {:id    :draw
-   :label "Draw"
-   :icon  "draw"
-   :exec  ["tuxpaint"]
-   :class "TuxPaint.TuxPaint"}
+  {:id       :draw
+   :label    "Draw"
+   :icon     "draw"
+   :category :create
+   :exec     ["tuxpaint"]
+   :class    "TuxPaint.TuxPaint"}
 
-  {:id    :files
-   :label "Files"
-   :icon  "files"
-   :exec  ["pcmanfm" "/home/ujima/Files"]
-   :class "pcmanfm"}]}
+  {:id       :files
+   :label    "Files"
+   :icon     "files"
+   :category :web-files
+   :exec     ["pcmanfm" "/home/ujima/Files"]
+   :class    "pcmanfm"}]}

@@ -1,54 +1,45 @@
-// UjimaOS desktop shell — turn-14 skin: soft-blue charcoal shell (design handoff
-// tmp/UjimaOS Dark Theme Design-handoff.zip, section #t14). Public Sans is vendored
-// (assets/fonts) and installed by tools.scripts.desktop.
-$bg: #14171b;        // desktop / launcher base
-$panel: #1b2027;     // dock / popover surface
+// UjimaOS desktop shell — v0.9 color-category skin (design turns 25b/31b/32a/33a).
+// Shell neutrals + Public Sans; apps are grouped into 4 colour categories. The RULE:
+// no colour = at rest · category colour = on/active (bg rgba(c,.18) + ring rgba(c,.45)).
+// Category comes from apps.edn :category → the eww edge; the hex lives here.
+$bg: #14171b;         // desktop / launcher base
+$toppane: #12151a;    // top pane (darker than the dock)
+$panel: #1b2027;      // dock / popover surface
 $panel-brd: #282e38;
 $text: #e7eaef;
 $dim: #9aa4b2;
 $faint: #697180;
-$accent: #7ea8cc;    // soft blue
 
 * { all: unset; font-family: "Public Sans", sans-serif; font-size: 13px; }
 
-// --- top bar: [empty 52px app-icon cell][one full-width tab: title + ✕] ------
-// bar/dock bgs are solid mixes of the design's alphas — the bars sit over the
-// black root, so real translucency would only darken them.
-.topbar { background-color: #101317; border-bottom: 1px solid $panel-brd; color: $text; }
-// the cell shares the tab's tint — on the near-black bar a plain cell reads as a black hole
-.topbar .idcell { min-width: 52px; border-right: 1px solid $panel-brd; background-color: rgba(126, 168, 204, 0.10); }
-.topbar .idchip { min-width: 26px; min-height: 26px; border-radius: 8px; }
-.topbar .idchip.wikipedia { background-color: rgba(168, 154, 201, 0.16); }
-.topbar .idchip.books { background-color: rgba(205, 180, 136, 0.16); }
-.topbar .idchip.write { background-color: rgba(126, 196, 189, 0.16); }
-.topbar .idchip.draw { background-color: rgba(201, 154, 166, 0.16); }
-.topbar .idchip.files { background-color: rgba(126, 168, 204, 0.16); }
-.topbar .tab { background-color: rgba(126, 168, 204, 0.10); border-bottom: 2px solid $accent; padding: 0 14px; }
-// home/launcher: nothing focused — the design has NO bar there; a truly vanishing
-// strip is window-layer work (gaps re-flow), so the deferred look is a quiet strip
-.topbar .bar.off .idcell { border-right-color: transparent; background-color: transparent; }
-.topbar .bar.off .tab { background-color: transparent; border-bottom-color: transparent; }
+// --- top pane (33a): flat, 48px, #12151a — app icon · App — Title · ✕ -----------
+// STYLE-ONLY vs the turn-14 bar: no tab underline/tint. ✕ keeps master's red hover.
+.topbar { background-color: $toppane; border-bottom: 1px solid $panel-brd; color: $text; padding: 0 8px 0 0; }
+.topbar .bar.off { background-color: transparent; }   // home: quiet strip, nothing focused
+.topbar .idcell { min-width: 48px; }
 .topbar .title { font-weight: 600; }
-.topbar .close { min-width: 22px; min-height: 22px; border-radius: 6px; color: $dim; }
+.topbar .close { min-width: 30px; min-height: 30px; border-radius: 8px; color: $dim; font-size: 15px; }
 .topbar .close:hover { background-color: rgba(214, 131, 131, 0.2); color: #e2a6a6; }
 
-// --- dock: launcher left, running apps centered, tray right ------------------
-.dock { background-color: #191d24; border-top: 1px solid $panel-brd; padding: 8px 16px; color: $text; }
-.dock .home, .dock .win { min-width: 40px; min-height: 40px; border-radius: 11px; transition: background-color 150ms ease; }
-.dock .home { background-color: rgba(126, 168, 204, 0.16); border: 1px solid transparent; }
-.dock .home:hover { background-color: rgba(126, 168, 204, 0.30); }
-.dock .home.active { background-color: rgba(126, 168, 204, 0.26); border-color: rgba(126, 168, 204, 0.4); }
+// --- dock (33a): 68px, #1b2027 — launcher Sand · apps 32px, active = category ----
+.dock { background-color: $panel; border-top: 1px solid $panel-brd; padding: 0 18px; color: $text; }
+// launcher / home: Sand is its own category (never a group colour), always lit
+.dock .home { min-width: 52px; min-height: 52px; border-radius: 13px; background-color: rgba(203, 168, 120, 0.18); box-shadow: inset 0 0 0 1.5px rgba(203, 168, 120, 0.45); }
+.dock .home:hover { background-color: rgba(203, 168, 120, 0.28); }
+// running apps: bare logo at rest, neutral hover, ACTIVE glows its category colour
+.dock .win { min-width: 52px; min-height: 52px; border-radius: 13px; transition: background-color 150ms ease; }
 .dock .win:hover { background-color: rgba(255, 255, 255, 0.07); }
-.dock .win.active { background-color: rgba(126, 168, 204, 0.16); }
+.dock .win.cat-learn     { background-color: rgba(126, 158, 214, 0.18); box-shadow: inset 0 0 0 1.5px rgba(126, 158, 214, 0.45); }
+.dock .win.cat-office    { background-color: rgba(168, 150, 201, 0.18); box-shadow: inset 0 0 0 1.5px rgba(168, 150, 201, 0.45); }
+.dock .win.cat-create    { background-color: rgba(206, 147, 166, 0.18); box-shadow: inset 0 0 0 1.5px rgba(206, 147, 166, 0.45); }
+.dock .win.cat-web-files { background-color: rgba(134, 184, 126, 0.18); box-shadow: inset 0 0 0 1.5px rgba(134, 184, 126, 0.45); }
 .dock .tray .kbd { padding: 0 10px; border-radius: 11px; color: $dim; font-weight: 500; transition: background-color 150ms ease; }
 .dock .tray .kbd:hover { background-color: rgba(255, 255, 255, 0.07); color: $text; }
-.dock .tray .sound { min-width: 36px; min-height: 40px; border-radius: 11px; }
+.dock .tray .sound { min-width: 40px; min-height: 44px; border-radius: 11px; }
 .dock .tray .sound:hover { background-color: rgba(255, 255, 255, 0.07); }
 .dock .tray .clock { padding: 0 8px 0 6px; color: $dim; font-weight: 500; }
 
-// --- launcher: the home surface — textless icon-chip grid (step 1) -----------
-// radial glow per design; if GTK rejects the syntax (journal CSS errors) fall
-// back to: linear-gradient(to bottom, #1a2029, #14171b 58%)
+// --- launcher: current flat grid kept; chip neutral at rest, glows when OPEN ------
 .launcher {
   background-image: radial-gradient(ellipse 130% 90% at 50% -12%, #1a2029 0%, #14171b 58%);
   background-color: $bg;
@@ -58,15 +49,15 @@ $accent: #7ea8cc;    // soft blue
 .launcher .tile { padding: 16px 10px; border-radius: 18px; min-width: 104px; transition: background-color 150ms ease; }
 .launcher .tile:hover { background-color: rgba(255, 255, 255, 0.05); }
 .launcher .tlabel { font-size: 13px; color: $text; }
-.launcher .chip { min-width: 64px; min-height: 64px; border-radius: 18px; }
-.launcher .chip.wikipedia { background-color: rgba(168, 154, 201, 0.16); }
-.launcher .chip.books { background-color: rgba(205, 180, 136, 0.16); }
-.launcher .chip.write { background-color: rgba(126, 196, 189, 0.16); }
-.launcher .chip.draw { background-color: rgba(201, 154, 166, 0.16); }
-.launcher .chip.files { background-color: rgba(126, 168, 204, 0.16); }
+.launcher .chip { min-width: 64px; min-height: 64px; border-radius: 18px; }   // neutral at rest
+// an OPEN app's tile glows its category colour (the " on" class is added once jq is verified)
+.launcher .chip.cat-learn.on     { background-color: rgba(126, 158, 214, 0.18); box-shadow: inset 0 0 0 1.5px rgba(126, 158, 214, 0.45); }
+.launcher .chip.cat-office.on    { background-color: rgba(168, 150, 201, 0.18); box-shadow: inset 0 0 0 1.5px rgba(168, 150, 201, 0.45); }
+.launcher .chip.cat-create.on    { background-color: rgba(206, 147, 166, 0.18); box-shadow: inset 0 0 0 1.5px rgba(206, 147, 166, 0.45); }
+.launcher .chip.cat-web-files.on { background-color: rgba(134, 184, 126, 0.18); box-shadow: inset 0 0 0 1.5px rgba(134, 184, 126, 0.45); }
 
 // --- volume popover ----------------------------------------------------------
-.volwrap { padding: 0 12px 68px 0; }  // float the card: 56px dock + 12px gap, 12px edge inset
+.volwrap { padding: 0 12px 80px 0; }   // float the card above the 68px dock + edge inset
 .volpanel { background-color: $panel; border: 1px solid $panel-brd; border-radius: 16px; padding: 12px 8px; }
 .volpanel .volmute { padding: 4px; border-radius: 8px; }
 .volpanel .volmute:hover { background-color: rgba(255, 255, 255, 0.07); }
@@ -74,5 +65,5 @@ $accent: #7ea8cc;    // soft blue
 .volscale { min-height: 150px; }
 .volscale.off { opacity: 0.35; }
 .volscale trough { background-color: $panel-brd; border-radius: 8px; min-width: 6px; }
-.volscale trough highlight { background-color: $accent; border-radius: 8px; }
+.volscale trough highlight { background-color: #7e9ed6; border-radius: 8px; }
 .volscale slider { background-color: $text; border-radius: 999px; min-width: 16px; min-height: 16px; margin: -6px; }

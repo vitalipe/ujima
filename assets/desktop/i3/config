@@ -7,10 +7,10 @@ default_border none
 default_floating_border none
 hide_edge_borders both
 workspace_layout tabbed
-client.focused          #101317 #101317 #101317 #101317 #101317
-client.focused_inactive #101317 #101317 #101317 #101317 #101317
-client.unfocused        #101317 #101317 #101317 #101317 #101317
-client.urgent           #101317 #101317 #101317 #101317 #101317
+client.focused          #12151a #12151a #12151a #12151a #12151a
+client.focused_inactive #12151a #12151a #12151a #12151a #12151a
+client.unfocused        #12151a #12151a #12151a #12151a #12151a
+client.urgent           #12151a #12151a #12151a #12151a #12151a
 
 # dialogs/popups float; deliberately NO fullscreen keybind — the eww bars must stay visible
 for_window [window_type="dialog"]  floating enable
@@ -21,9 +21,9 @@ for_window [window_role="pop-up"]  floating enable
 # the launcher is a normal window the agent tracks + places on its own workspace like any app.
 
 # the bars reserve no strut, so reserve their space here — keep in sync with eww.yuck heights
-# (topbar :height 46px, dock :height 56px) so apps tile into the mid-section, not under the bars.
-gaps top 46
-gaps bottom 56
+# (topbar :height 48px, dock :height 68px) so apps tile into the mid-section, not under the bars.
+gaps top 48
+gaps bottom 68
 
 # super+space cycles the keyboard layout — through the agent (concrete-state POST),
 # NEVER an XKB group toggle: X-side switching would drift from the control plane

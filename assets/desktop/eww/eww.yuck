@@ -34,27 +34,23 @@
   "until curl -sf http://127.0.0.1:1337/app/catalog; do sleep 1; done; echo; exec sleep infinity")
 
 
-;; --- top: one full-width "tab" — focused app's title + ✕ (closes the FOCUSED
-;; --- WINDOW, not the app). The idcell shows the focused app's icon in a tinted
-;; --- chip; `current` doubles as the icon name (catalog defaults :icon to :id —
-;; --- an app that overrides :icon needs the icon name in /ui/apps first). On the
-;; --- launcher (nothing focused) the tab blanks to a quiet strip ("bar off").
-;; --- The dynamic class lives on the INNER box: eww evaluates a window-root
-;; --- widget's :class once at open and never again (HW-observed).
+;; --- top pane (v0.9 spec 33a): flat, 48px, app icon · App — Title · close (✕).
+;; --- STYLE-ONLY change from the turn-14 bar — the ✕ keeps master's behaviour and
+;; --- red hover; the tab underline/tint is dropped (tabs are out for v0.9). ✕ closes
+;; --- the FOCUSED WINDOW. On the launcher (nothing focused) it blanks ("bar off").
+;; --- Dynamic class stays on the INNER box (eww evals a window-root :class once).
 (defwidget topbar []
   (box :class "topbar"
     (box :class {(apps.current ?: "") == "" ? "bar off" : "bar"} :space-evenly false
-      (box :class "idcell"
-        (box :class {"idchip " + (apps.current ?: "")} :halign "center" :valign "center"
-          :visible {(apps.current ?: "") != ""}
-          (image :path "/opt/ujima/desktop/icons/${(apps.current ?: "") == "" ? "launcher" : apps.current}.svg"
-                 :image-width 15 :image-height 15)))
-      (box :class "tab" :space-evenly false :hexpand true
-        (label :class "title" :halign "start" :hexpand true :text {apps.currentTitle ?: ""})
-        (button :class "close" :valign "center" :timeout "2s"
-          :visible {(apps.current ?: "") != ""}
-          :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
-          "✕")))))
+      (box :class "idcell" :valign "center"
+        (image :path "/opt/ujima/desktop/icons/${(apps.current ?: "") == "" ? "launcher" : apps.current}.svg"
+               :image-width 20 :image-height 20
+               :visible {(apps.current ?: "") != ""}))
+      (label :class "title" :halign "start" :hexpand true :text {apps.currentTitle ?: ""})
+      (button :class "close" :valign "center" :timeout "2s"
+        :visible {(apps.current ?: "") != ""}
+        :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
+        "✕"))))
 
 ;; --- mid: launcher tiles, catalog-driven; a click asks the agent to run the app.
 ;; --- The outer box (no halign) carries the background across the whole window.
@@ -67,7 +63,9 @@
           (button :class "tile" :timeout "2s"
             :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
             (box :orientation "v" :space-evenly false :spacing 12
-              (box :class "chip ${entry.id}" :halign "center"
+              ;; v0.9: neutral at rest; an OPEN app glows its category color. jq checks
+              ;; whether this catalog id is in the live running-apps stream.
+              (box :class {"chip cat-" + (entry.category ?: "none") + (jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")") ? " on" : "")} :halign "center"
                 (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 30 :image-height 30))
               (label :class "tlabel" :text {entry.label}))))))))
 
@@ -76,15 +74,18 @@
 ;; --- tile: run = ensure-open = focus
 (defwidget dock []
   (centerbox :class "dock"
+    ;; launcher / home — Sand (its own category, always lit); design 33a far-left 9-dot grid
     (box :halign "start" :space-evenly false
-      (button :class {(apps.current ?: "") == "" ? "home active" : "home"} :timeout "2s"
+      (button :class "home" :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
-        (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 21 :image-height 21)))
-    (box :halign "center" :space-evenly false :spacing 4
+        (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 25 :image-height 25)))
+    ;; running apps — bare 32px vendor logos; the ACTIVE one glows its category color
+    (box :halign "center" :space-evenly false :spacing 6
       (for a in {apps.apps}
-        (button :class {a.id == apps.current ? "win active" : "win"} :timeout "2s"
+        (button :class {a.id == apps.current ? "win active cat-" + (a.category ?: "none") : "win"} :timeout "2s"
+          :tooltip {a.label}
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"
-          (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 21 :image-height 21))))
+          (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 32 :image-height 32))))
     (box :class "tray" :halign "end" :space-evenly false :spacing 4
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
       ; the label flips when the push lands
@@ -119,7 +120,7 @@
 
 ;; --- surfaces ------------------------------------------------------------
 (defwindow topbar
-  :monitor 0 :geometry (geometry :anchor "top center" :width "100%" :height "46px")
+  :monitor 0 :geometry (geometry :anchor "top center" :width "100%" :height "48px")
   :wm-ignore true :stacking "fg"
   (topbar))
 
@@ -129,7 +130,7 @@
   (launcher))
 
 (defwindow dock
-  :monitor 0 :geometry (geometry :anchor "bottom center" :width "100%" :height "56px")
+  :monitor 0 :geometry (geometry :anchor "bottom center" :width "100%" :height "68px")
   :wm-ignore true :stacking "fg"
   (dock))
 

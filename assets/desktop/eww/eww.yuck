@@ -52,22 +52,38 @@
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
         "✕"))))
 
-;; --- mid: launcher tiles, catalog-driven; a click asks the agent to run the app.
-;; --- The outer box (no halign) carries the background across the whole window.
+;; --- launcher (v0.9, design 25c): apps grouped into category TRAYS — a soft
+;; --- category-tinted box with a coloured label. Tiles are neutral; an OPEN app
+;; --- gets a category ring + corner dot. Names hidden (hover-reveal is deferred).
+;; --- Each tray renders every catalog app but shows only its own category's (GTK
+;; --- collapses the hidden ones, so no gaps); jq drives the open indicator.
+(defwidget traytile [entry cat]
+  (button :class "tile" :timeout "2s" :visible {entry.category == cat}
+    :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
+    (overlay
+      (box :class {"chip" + (jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")") ? " on cat-" + cat : "")} :halign "center" :valign "center"
+        (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 46 :image-height 46))
+      (box :class "opendot cat-${cat}" :halign "end" :valign "start"
+        :visible {jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")")}))))
+
+(defwidget tray [cat name]
+  (box :class "tray cat-${cat}" :orientation "v" :space-evenly false :valign "start"
+    (box :class "trayhd" :space-evenly false :valign "center" :hexpand true
+      (box :class "traydot")
+      (label :class "traylabel" :halign "start" :hexpand true :limit-width 20 :text name))
+    (box :class "traytiles" :orientation "h" :space-evenly false :spacing 14
+      (for entry in {catalog.apps}
+        (traytile :entry entry :cat cat)))))
+
 (defwidget launcher []
   (box :class "launcher"
-    (box :orientation "v" :halign "center" :valign "center" :space-evenly false
-      (label :class "head" :text "ALL APPS")
-      (box :class "tiles" :orientation "h" :space-evenly false :spacing 8
-        (for entry in {catalog.apps}
-          (button :class "tile" :timeout "2s"
-            :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
-            (box :orientation "v" :space-evenly false :spacing 12
-              ;; v0.9: neutral at rest; an OPEN app glows its category color. jq checks
-              ;; whether this catalog id is in the live running-apps stream.
-              (box :class {"chip cat-" + (entry.category ?: "none") + (jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")") ? " on" : "")} :halign "center"
-                (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 30 :image-height 30))
-              (label :class "tlabel" :text {entry.label}))))))))
+    (box :class "trays" :orientation "v" :halign "center" :valign "center" :space-evenly false :spacing 20
+      (box :orientation "h" :space-evenly false :spacing 20 :valign "start"
+        (tray :cat "learn" :name "LEARN")
+        (tray :cat "office" :name "OFFICE"))
+      (box :orientation "h" :space-evenly false :spacing 20 :valign "start"
+        (tray :cat "create" :name "CREATE")
+        (tray :cat "web-files" :name "WEB & FILES")))))
 
 ;; --- bottom: launcher tile left (lit when home), running apps centered (the
 ;; --- /ui/apps stream), tray right. A dock click is the same verb as a launcher

@@ -23,28 +23,65 @@ $accent: #7ea8cc;    // soft blue
 .topbar .idchip.write { background-color: rgba(126, 196, 189, 0.16); }
 .topbar .idchip.draw { background-color: rgba(201, 154, 166, 0.16); }
 .topbar .idchip.files { background-color: rgba(126, 168, 204, 0.16); }
-.topbar .tab { background-color: rgba(126, 168, 204, 0.10); border-bottom: 2px solid $accent; padding: 0 14px; }
+// peek: calm current-doc name + badge; hover reveals the doc chips (15b)
+.topbar .peek { padding: 0 12px; }
+.topbar .curname { font-size: 13.5px; font-weight: 600; color: $text; }
+.topbar .badge {
+  min-width: 20px; min-height: 20px; padding: 0 6px; margin-left: 10px;
+  border-radius: 10px; background-color: rgba(126, 168, 204, 0.14);
+  color: $accent; font-size: 11px; font-weight: 600;
+}
+.topbar .chip { min-height: 30px; padding: 0 12px; border-radius: 8px; color: $dim; font-size: 12.5px; font-weight: 500; }
+.topbar .chip:hover { background-color: rgba(255, 255, 255, 0.06); color: $text; }
+.topbar .chip.active {
+  background-color: rgba(126, 168, 204, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(126, 168, 204, 0.3);
+  color: $text; font-weight: 600;
+}
+// ✕ in its own 52px cell, solid-red hover (19b) — the loudest 'this closes' signal
+.topbar .closecell { min-width: 52px; border-left: 1px solid $panel-brd; }
+.topbar .close {
+  min-width: 30px; min-height: 30px; border-radius: 8px; color: $dim; font-size: 15px;
+  transition: background-color .14s ease, color .14s ease, box-shadow .14s ease;
+}
+.topbar .close:hover { background-color: #d66a6a; color: #ffffff; box-shadow: 0 4px 12px -3px rgba(214, 106, 106, 0.6); }
 // home/launcher: nothing focused — the design has NO bar there; a truly vanishing
 // strip is window-layer work (gaps re-flow), so the deferred look is a quiet strip
 .topbar .bar.off .idcell { border-right-color: transparent; background-color: transparent; }
-.topbar .bar.off .tab { background-color: transparent; border-bottom-color: transparent; }
-.topbar .title { font-weight: 600; }
-.topbar .close { min-width: 22px; min-height: 22px; border-radius: 6px; color: $dim; }
-.topbar .close:hover { background-color: rgba(214, 131, 131, 0.2); color: #e2a6a6; }
+.topbar .bar.off .closecell { border-left-color: transparent; }
 
 // --- dock: launcher left, running apps centered, tray right ------------------
 .dock { background-color: #191d24; border-top: 1px solid $panel-brd; padding: 8px 16px; color: $text; }
-.dock .home, .dock .win { min-width: 40px; min-height: 40px; border-radius: 11px; transition: background-color 150ms ease; }
-.dock .home { background-color: rgba(126, 168, 204, 0.16); border: 1px solid transparent; }
-.dock .home:hover { background-color: rgba(126, 168, 204, 0.30); }
-.dock .home.active { background-color: rgba(126, 168, 204, 0.26); border-color: rgba(126, 168, 204, 0.4); }
+.dock .homeslot { min-width: 72px; }   // footprint the big launcher (homebtn window) floats over
+.dock .win { min-width: 40px; min-height: 40px; border-radius: 11px; transition: background-color 150ms ease; }
 .dock .win:hover { background-color: rgba(255, 255, 255, 0.07); }
 .dock .win.active { background-color: rgba(126, 168, 204, 0.16); }
+// fancy-dock magnify: icon rendered at 40 (sharp), shown ~22 at rest via scale-DOWN
+// (crisp), grown to native 40 on hover — never upscaled past its raster (no blur,
+// unlike scale() on a small render). The translate lifts it as it grows so the
+// bottom stays put and it magnifies UPWARD out of the tile.
+.dock .winicon { -gtk-icon-transform: scale(0.55); transition: -gtk-icon-transform 160ms ease; }
+.dock .win:hover .winicon { -gtk-icon-transform: translate(0px, -9px) scale(1.0); }
+
+// the big launcher rising out of the dock (homebtn overlay window)
+.homewrap { padding: 0 0 8px 16px; }   // sit on the dock's left, matching its 16px inset
+.homebig {
+  min-width: 100px; min-height: 100px; border-radius: 26px;
+  background-color: rgba(126, 168, 204, 0.16);
+  box-shadow: 0 14px 30px -10px rgba(0, 0, 0, 0.75);
+  transition: background-color 150ms ease;
+}
+.homebig:hover { background-color: rgba(126, 168, 204, 0.30); }
+.homebig.active { background-color: rgba(126, 168, 204, 0.26); box-shadow: inset 0 0 0 1px rgba(126, 168, 204, 0.4), 0 14px 30px -10px rgba(0, 0, 0, 0.75); }
 .dock .tray .kbd { padding: 0 10px; border-radius: 11px; color: $dim; font-weight: 500; transition: background-color 150ms ease; }
 .dock .tray .kbd:hover { background-color: rgba(255, 255, 255, 0.07); color: $text; }
 .dock .tray .sound { min-width: 36px; min-height: 40px; border-radius: 11px; }
 .dock .tray .sound:hover { background-color: rgba(255, 255, 255, 0.07); }
 .dock .tray .clock { padding: 0 8px 0 6px; color: $dim; font-weight: 500; }
+// dock icon label = a native GTK tooltip (its own popup window, so it clears the
+// 56px dock without clipping), themed to the 18a pill. GTK owns the ~fade + delay.
+tooltip { background-color: #0c0e11; border: 1px solid $panel-brd; border-radius: 7px; }
+tooltip label { color: $text; font-size: 11px; font-weight: 500; padding: 1px 4px; }
 
 // --- launcher: the home surface — textless icon-chip grid (step 1) -----------
 // radial glow per design; if GTK rejects the syntax (journal CSS errors) fall

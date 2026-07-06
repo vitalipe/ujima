@@ -34,13 +34,19 @@
   "until curl -sf http://127.0.0.1:1337/app/catalog; do sleep 1; done; echo; exec sleep infinity")
 
 
-;; --- top: one full-width "tab" — focused app's title + ✕ (closes the FOCUSED
-;; --- WINDOW, not the app). The idcell shows the focused app's icon in a tinted
-;; --- chip; `current` doubles as the icon name (catalog defaults :icon to :id —
-;; --- an app that overrides :icon needs the icon name in /ui/apps first). On the
-;; --- launcher (nothing focused) the tab blanks to a quiet strip ("bar off").
-;; --- The dynamic class lives on the INNER box: eww evaluates a window-root
-;; --- widget's :class once at open and never again (HW-observed).
+;; --- top: the 15b "Peek" bar — [idcell][calm current doc + "+1" badge, hover
+;; --- reveals the doc chips][✕ in its own cell]. The ✕ closes the FOCUSED WINDOW
+;; --- (not the app). idcell shows the focused app's icon; `current` doubles as the
+;; --- icon name (catalog defaults :icon to :id — an app overriding :icon needs the
+;; --- icon name in /ui/apps first). On the launcher (nothing focused) the bar goes
+;; --- to a quiet strip ("bar off"). eww evaluates a window-root widget's :class
+;; --- once at open, so the dynamic class lives on the INNER box (HW-observed).
+;;
+;; STAGE 1 (this session): the chrome + the hover-reveal animation, wired to today's
+;; single-doc /ui/apps. STAGE 2 (tab session): a real per-app doc list drives the
+;; chips (the `for` seam below) and `docCount` drives the badge; chips become live
+;; switchers. `th` = peek-hover, flipped by the eventbox.
+(defvar th false)
 (defwidget topbar []
   (box :class "topbar"
     (box :class {(apps.current ?: "") == "" ? "bar off" : "bar"} :space-evenly false
@@ -49,9 +55,24 @@
           :visible {(apps.current ?: "") != ""}
           (image :path "/opt/ujima/desktop/icons/${(apps.current ?: "") == "" ? "launcher" : apps.current}.svg"
                  :image-width 15 :image-height 15)))
-      (box :class "tab" :space-evenly false :hexpand true
-        (label :class "title" :halign "start" :hexpand true :text {apps.currentTitle ?: ""})
-        (button :class "close" :valign "center" :timeout "2s"
+      (eventbox :class "peek" :hexpand true
+        :onhover "${ewwcmd} update th=true" :onhoverlost "${ewwcmd} update th=false"
+        (box :space-evenly false :hexpand true
+          ;; calm: the current doc name + a "+1" badge counting the others (hidden
+          ;; until multi-doc data lands — docCount absent today ⇒ ?:1 ⇒ +0 ⇒ hidden)
+          (revealer :transition "slideright" :duration "180ms" :reveal {!th}
+            (box :class "rest" :space-evenly false :valign "center"
+              (label :class "curname" :text {apps.currentTitle ?: ""})
+              (label :class "badge" :text "+${(apps.docCount ?: 1) - 1}"
+                     :visible {(apps.docCount ?: 1) > 1})))
+          ;; hover: the docs slide in as chips. STAGE 2 replaces this single live
+          ;; chip with (for doc in {apps.docs} ...) once the tab session ships it.
+          (revealer :transition "slideright" :duration "180ms" :reveal {th}
+            (box :class "chips" :space-evenly false :spacing 6 :valign "center"
+              (button :class "chip active"
+                (label :text {apps.currentTitle ?: ""}))))))
+      (box :class "closecell"
+        (button :class "close" :halign "center" :valign "center" :timeout "2s"
           :visible {(apps.current ?: "") != ""}
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
           "✕")))))
@@ -76,15 +97,18 @@
 ;; --- tile: run = ensure-open = focus
 (defwidget dock []
   (centerbox :class "dock"
-    (box :halign "start" :space-evenly false
-      (button :class {(apps.current ?: "") == "" ? "home active" : "home"} :timeout "2s"
-        :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
-        (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 21 :image-height 21)))
-    (box :halign "center" :space-evenly false :spacing 4
+    ;; the home affordance is now the big launcher that rises OUT of the dock — its
+    ;; own `homebtn` overlay window (a bar-height window can't overflow; GTK clips it).
+    ;; This slot only reserves the footprint so the centred apps don't shift under it.
+    (box :halign "start" :class "homeslot")
+    (box :halign "center" :valign "end" :space-evenly false :spacing 4
       (for a in {apps.apps}
-        (button :class {a.id == apps.current ? "win active" : "win"} :timeout "2s"
+        (button :class {a.id == apps.current ? "win active" : "win"} :valign "end" :timeout "2s"
+          :tooltip {a.label}
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"
-          (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 21 :image-height 21))))
+          ;; rendered at the HOVER size (40) so librsvg draws it sharp; shrunk at rest
+          ;; by scaling DOWN (crisp), grown back only TO native on hover — never past it
+          (image :class "winicon" :valign "end" :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 40 :image-height 40))))
     (box :class "tray" :halign "end" :space-evenly false :spacing 4
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
       ; the label flips when the push lands
@@ -132,6 +156,19 @@
   :monitor 0 :geometry (geometry :anchor "bottom center" :width "100%" :height "56px")
   :wm-ignore true :stacking "fg"
   (dock))
+
+;; the big launcher — ~2x the dock, rising out of its left. Its own overlay window
+;; (opened after `dock` in desktop.clj's open-many, so it stacks on top): a widget
+;; can't overflow the 56px dock window, so the pop-out lives here. The window is
+;; taller/wider than the button; the transparent margin is the only input dead-zone,
+;; localised to the bottom-left corner instead of a full-width strip.
+(defwindow homebtn
+  :monitor 0 :geometry (geometry :anchor "bottom left" :width "132px" :height "132px")
+  :wm-ignore true :stacking "fg"
+  (box :class "homewrap" :halign "start" :valign "end"
+    (button :class {(apps.current ?: "") == "" ? "homebig active" : "homebig"} :timeout "2s"
+      :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
+      (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 56 :image-height 56))))
 
 ;; the window is larger than the card: the transparent wrapper's padding floats the
 ;; card above the dock and off the screen edge (margins on the ROOT widget won't do —

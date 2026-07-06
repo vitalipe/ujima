@@ -18,9 +18,10 @@
         apps    (mapv (fn [id]
                         (let [app  (get-in catalog [:by-id id])
                               wins (windows/of-class ws (:class app))]
-                          {:id      id
-                           :label   (:label app)
-                           :icon    (:icon app)
+                          {:id       id
+                           :label    (:label app)
+                           :icon     (:icon app)
+                           :category (:category app)
                            :state   (cond
                                       (seq wins)                    :running
                                       (procs/awaiting? registry id) :new

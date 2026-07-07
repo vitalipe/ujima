@@ -134,7 +134,13 @@
    ;; QtWebEngine as a core dep); marble-data ships the offline Atlas/Satellite maps.
    {:id :marble :label "Marble" :icon "marble" :category :learn
     :exec ["marble-qt"]
-    :class "Marble Virtual Globe" :apt ["marble-qt" "marble-data"]}])  ; res_class xprop-verified
+    :class "Marble Virtual Globe" :apt ["marble-qt" "marble-data"]}  ; res_class xprop-verified
+
+   ;; XaoS (real-time fractal zoomer): Mandelbrot/Julia exploration — Qt6, so it follows the Nordic
+   ;; theme dark via qt6-gtk-platformtheme + the session's QT_QPA_PLATFORMTHEME.
+   {:id :xaos :label "XaoS" :icon "xaos" :category :learn
+    :exec ["xaos"]
+    :class "XaoS" :apt ["xaos"]}])                           ; res_class xprop-verified
 
 
 (def ^:private spec-keys [:id :label :icon :category :exec :class])

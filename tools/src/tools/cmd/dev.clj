@@ -73,7 +73,8 @@
 ;; that reads a new asset dir adds one entry here.
 (def ^:private stage-paths ["src" "tools/src" "config" "assets/dev" "assets/tools"
                             "assets/desktop" "assets/eww"
-                            "assets/fonts" "assets/themes" "assets/home" "assets/godot-demo"])  ; desktop.clj reads these
+                            "assets/fonts" "assets/themes" "assets/home" "assets/godot-demo"
+                            "assets/web"])  ; desktop.clj reads these
 
 
 (defn script!

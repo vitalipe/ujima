@@ -78,6 +78,14 @@
             ($! cp -a [demo] "/opt/ujima/baked-apps/godot-demo"))
         (println "desktop: no assets/godot-demo — Godot demo not staged")))
 
+    ;; web apps (Excalidraw): vendored static builds + their launch wrappers → /opt/ujima/web. Each
+    ;; app's stopgap wrapper serves its dir with python3's http.server + opens it as a chromium app.
+    (let [web (str project "/assets/web")]
+      (if (fs/exists? web)
+        (do ($! rm -rf "/opt/ujima/web")
+            ($! cp -a [web] "/opt/ujima/web"))
+        (println "desktop: no assets/web — web apps not staged")))
+
     ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.appcatalog.
     ;; Emitted AFTER the wholesale copy above so the clean-mirror can't clobber it; rides both the
     ;; image build and live `dev push desktop`, so a catalog-only edit ships without a rebuild.

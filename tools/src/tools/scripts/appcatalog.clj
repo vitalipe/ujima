@@ -104,6 +104,15 @@
             :dest   "/opt/ujima/baked-apps/godot"
             :bin    "godot"}}
 
+   ;; Excalidraw (offline whiteboard): a vendored static PWA build (assets/web/excalidraw, staged to
+   ;; /opt/ujima/web) served locally + opened as a chromium app. STOPGAP: excalidraw-launch.sh runs
+   ;; python3's http.server only to give the ES-module app an http origin (file:// is CORS-blocked) and
+   ;; lingers; dark-default is baked into index.html. Collab reaches Excalidraw's public servers (no
+   ;; offline) — a ujima fork will self-host the LAN relay. TODO: real static server + native fork.
+   {:id :excalidraw :label "Excalidraw" :icon "excalidraw" :category :create
+    :exec ["/opt/ujima/web/excalidraw-launch.sh"]
+    :class "ujima-excalidraw" :apt ["python3"]}   ; python3 = stopgap http.server (chromium already a dep)
+
    {:id :tuxtype :label "TuxTyping" :icon "tuxtype" :category :learn
     :exec ["/usr/games/tuxtype"]                            ; /usr/games isn't on the service PATH
     :class "tuxtype" :apt ["tuxtype"]}                       ; xprop-verified

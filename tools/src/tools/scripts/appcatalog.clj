@@ -32,6 +32,13 @@
            "--user-data-dir=/tmp/ujima-wikipedia" "--no-first-run" "--disk-cache-size=1"]
     :class "ujima-wikipedia" :apt ["chromium"]}
 
+   ;; STUB: Kolibri (Learning Equality's offline learning platform) served locally on its default
+   ;; :8080 — the server isn't stood up yet, so the tile opens a placeholder until it is.
+   {:id :kolibri :label "Kolibri" :icon "kolibri" :category :learn
+    :exec ["chromium" "--app=http://localhost:8080" "--class=ujima-kolibri"
+           "--user-data-dir=/tmp/ujima-kolibri" "--no-first-run" "--disk-cache-size=1"]
+    :class "ujima-kolibri" :apt ["chromium"]}
+
    {:id :write :label "Write" :icon "write" :category :office
     :exec ["libreoffice" "--writer"]
     :class "libreoffice-writer" :apt ["libreoffice-writer" "libreoffice-gtk3"]}

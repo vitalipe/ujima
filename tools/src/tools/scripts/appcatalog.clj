@@ -32,11 +32,6 @@
            "--user-data-dir=/tmp/ujima-wikipedia" "--no-first-run" "--disk-cache-size=1"]
     :class "ujima-wikipedia" :apt ["chromium"]}
 
-   {:id :books :label "Books" :icon "books" :category :learn
-    :exec ["chromium" "--app=http://ujima-content.local/books" "--class=ujima-books"
-           "--user-data-dir=/tmp/ujima-books" "--no-first-run" "--disk-cache-size=1"]
-    :class "ujima-books" :apt ["chromium"]}
-
    {:id :write :label "Write" :icon "write" :category :office
     :exec ["libreoffice" "--writer"]
     :class "libreoffice-writer" :apt ["libreoffice-writer" "libreoffice-gtk3"]}

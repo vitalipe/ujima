@@ -33,6 +33,7 @@
         "i3" "xserver-xorg-core" "xserver-xorg-input-libinput" "xinit"
         "xserver-xorg-legacy"
         "libgtk-3-0"
+        "qt6-gtk-platformtheme" "qt5-gtk-platformtheme"  ; Qt/KDE apps (Marble, Stellarium) follow the GTK Nordic theme — QT_QPA_PLATFORMTHEME=gtk3 on ujima.service (tools.scripts.ujimaify)
         "mesa-vulkan-drivers"  ; v3dv Vulkan driver for the Pi 5 V3D — Godot's Vulkan Mobile renderer
         "librsvg2-common"   ; gdk-pixbuf SVG loader — lets eww render the SVG app icons (librsvg2-2 is just the lib)
         "picom"             ; xrender compositor — transparency for floating eww overlays (volume popover)

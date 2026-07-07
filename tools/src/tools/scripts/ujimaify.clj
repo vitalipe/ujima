@@ -28,6 +28,10 @@
        "[Service]\n"
        "User=ujima\n"
        "PAMName=login\n"
+       ;; Qt/KDE apps (Marble, Stellarium) follow the Nordic GTK theme — a session-wide env inherited by
+       ;; startx → Xorg → i3 → agent → every launched app. qt6-gtk-platformtheme (install.clj) is the
+       ;; GTK→Qt bridge; Qt selects its platform theme from the env only (no /etc file like gtk-3.0).
+       "Environment=QT_QPA_PLATFORMTHEME=gtk3\n"
        "StandardOutput=journal\n"
        "Restart=always\n"
        "RestartSec=3\n"

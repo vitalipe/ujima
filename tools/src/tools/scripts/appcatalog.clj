@@ -118,7 +118,14 @@
 
    {:id :stellarium :label "Stellarium" :icon "stellarium" :category :learn
     :exec ["stellarium"]
-    :class "stellarium" :apt ["stellarium"]}])               ; xprop-verified
+    :class "stellarium" :apt ["stellarium"]}                 ; xprop-verified
+
+   ;; Marble (KDE virtual globe): offline Earth/planets atlas. Qt app → dark via qt6-gtk-platformtheme
+   ;; (install.clj) + the session's QT_QPA_PLATFORMTHEME. marble-qt is the Qt-only build (still pulls
+   ;; QtWebEngine as a core dep); marble-data ships the offline Atlas/Satellite maps.
+   {:id :marble :label "Marble" :icon "marble" :category :learn
+    :exec ["marble-qt"]
+    :class "Marble Virtual Globe" :apt ["marble-qt" "marble-data"]}])  ; res_class xprop-verified
 
 
 (def ^:private spec-keys [:id :label :icon :category :exec :class])

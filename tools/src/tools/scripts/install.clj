@@ -3,7 +3,8 @@
    Installs runtime packages and the runtime babashka.
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
-  (:require [lib.shell :refer [$! with-console-out]]))
+  (:require [lib.shell :refer [$! with-console-out]]
+            [tools.scripts.appcatalog :as appcatalog]))
 
 
 (defn run! [{:keys [project]}]
@@ -59,13 +60,11 @@
     ($! apt-get install -y --no-install-recommends
         "pipewire" "pipewire-pulse" "pipewire-alsa" "wireplumber")
 
-    ;; classroom apps the launcher opens (assets/desktop/apps.edn): chromium for the web tiles
-    ;; (Wikipedia/Books, run as --app), libreoffice-writer for Write, tuxpaint for Draw, pcmanfm for
-    ;; Files. Writer-only (not the full suite) to match the catalog + keep the image lean.
-    ;; libreoffice-gtk3 = the GTK3 VCL plugin: without it LO ignores the system GTK theme and
-    ;; draws its own light chrome — the desktop step's Nordic/dark styling never reaches Write.
-    ($! apt-get install -y --no-install-recommends
-        "chromium" "libreoffice-writer" "libreoffice-gtk3" "tuxpaint" "pcmanfm")
+    ;; classroom apps the launcher opens: install recipes live beside their catalog specs in
+    ;; tools.scripts.app-catalog (one entry per app). Runs HERE so the app packages — libreoffice,
+    ;; chromium, inkscape, the fetched TurboWarp, … — bake into the cached vendor base instead of
+    ;; re-downloading every build. `apt-get update` above already primed the lists.
+    (appcatalog/install! {:project project})
 
     ;; runtime babashka: the same vendored aarch64 binary we are running under,
     ;; copied + made executable in one shot

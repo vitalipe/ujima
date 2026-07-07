@@ -27,6 +27,9 @@
 (def ^:private stage-dir  "stage")
 
 
+(declare expand-root!)
+
+
 (defn- git [& args] (apply sh! :git args))
 
 
@@ -55,6 +58,15 @@
   (let [tmp (str vendor ".building")]
     (fs/delete-if-exists tmp)
     (cli/run-and-display! (image/fetch! {:url url :out tmp :sha256 sha256}))
+    ;; grow the rootfs BEFORE the install script runs: the app packages (libreoffice, chromium,
+    ;; inkscape, …) and the fetched TurboWarp payload install into THIS image, and the stock
+    ;; raspios root (~2.4G) can't hold them. HARD CAP at the 10GiB A/B root slot
+    ;; (ujima.device.ab.autoboot.partitions, MiB 10240): `pack` dd's this partition RAW into
+    ;; root.img and `from-pack` writes it into that slot — anything bigger overflows it (broken
+    ;; pipe). 10G here = a ~9.5GiB root partition (the image minus the ~512MiB boot), which fits
+    ;; the slot with margin; the rootfs only uses ~4.4G so there's ample install headroom. A
+    ;; fresh decompress needs no e2fsck gate (-f).
+    (expand-root! tmp "10G")
     (image/script! {:img tmp :script "install"})
     (fs/move tmp vendor {:replace-existing true})))
 
@@ -89,14 +101,11 @@
       (println "vendor cached ->" vendor)
       (build-vendor! url sha256 vendor))
 
-    ;; 2. copy to the working image (override)
+    ;; 2. copy to the working image — sparse (the vendor is a 12G rootfs pre-grown in build-vendor!,
+    ;; so no post-copy expand is needed; --sparse=always keeps the copy from inflating the holes).
     (fs/create-dirs stage-dir)
     (println "copy ->" out)
-    (fs/copy vendor out {:replace-existing true})
-
-    ;; 2b. grow the staged rootfs so the chroot scripts have room (raspios root ~2.4G; desktop fills it)
-    (println "expand ->" out "(8G)")
-    (expand-root! out "8G")
+    ($! cp --sparse=always [vendor] [out])
 
     ;; 3. bake the prebuilt overlayroot initramfs (qemu segfaults building it in-chroot; static-copy)
     (image/initramfs! {:img out})

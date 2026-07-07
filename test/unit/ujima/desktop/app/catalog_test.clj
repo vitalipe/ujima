@@ -23,9 +23,9 @@
 
 
 (deftest listing-projects-in-order-with-icon-default
-  (is (= [{:id :wikipedia :label "Wikipedia" :icon "wikipedia"}
-          {:id :write     :label "Write"     :icon "write"}
-          {:id :draw      :label "Draw"      :icon "draw"}]   ; :icon defaults to the id
+  (is (= [{:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category nil}
+          {:id :write     :label "Write"     :icon "write"     :category nil}
+          {:id :draw      :label "Draw"      :icon "draw"      :category nil}] ; :icon defaults to id, :category to nil
          (catalog/listing cat))))
 
 

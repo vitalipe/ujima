@@ -11,7 +11,8 @@
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
-            [babashka.fs :as fs]))
+            [babashka.fs :as fs]
+            [tools.scripts.appcatalog :as appcatalog]))
 
 
 (defn run! [{:keys [project]}]
@@ -55,4 +56,9 @@
                        "gtk-theme-name=Nordic\n"
                        "gtk-application-prefer-dark-theme=1\n"
                        "gtk-font-name=Public Sans 10\n")))
-        (println "desktop: no assets/themes/Nordic — app theme not staged")))))
+        (println "desktop: no assets/themes/Nordic — app theme not staged")))
+
+    ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.app-catalog.
+    ;; Emitted AFTER the wholesale copy above so the clean-mirror can't clobber it; rides both the
+    ;; image build and live `dev push desktop`, so a catalog-only edit ships without a rebuild.
+    (appcatalog/write-catalog! {:dest "/opt/ujima/desktop/apps.edn"})))

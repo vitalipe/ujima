@@ -49,7 +49,7 @@
 
 
 (deftest snapshot-is-the-wire-shape
-  (is (= {:apps [{:id :wikipedia :label "Wikipedia" :icon "wikipedia"
+  (is (= {:apps [{:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category nil
                   :state :running :title "Wikipedia"}]
           :current :wikipedia
           :current-title "Wikipedia"}

@@ -41,6 +41,14 @@
     :exec ["libreoffice" "--writer"]
     :class "libreoffice-writer" :apt ["libreoffice-writer" "libreoffice-gtk3"]}
 
+   {:id :calc :label "Calc" :icon "calc" :category :office
+    :exec ["libreoffice" "--calc"]
+    :class "libreoffice-calc" :apt ["libreoffice-calc"]}         ; xprop-verified
+
+   {:id :impress :label "Impress" :icon "impress" :category :office
+    :exec ["libreoffice" "--impress"]
+    :class "libreoffice-impress" :apt ["libreoffice-impress"]}   ; xprop-verified
+
    {:id :draw :label "Draw" :icon "draw" :category :create
     :exec ["tuxpaint"]
     :class "TuxPaint.TuxPaint" :apt ["tuxpaint"]}
@@ -48,6 +56,10 @@
    {:id :files :label "Files" :icon "files" :category :web-files
     :exec ["pcmanfm" "/home/ujima/Files"]
     :class "pcmanfm" :apt ["pcmanfm"]}
+
+   {:id :web :label "Web" :icon "web" :category :web-files
+    :exec ["chromium" "--class=ujima-web" "--user-data-dir=/tmp/ujima-web" "--no-first-run"]
+    :class "ujima-web" :apt ["chromium"]}                        ; vanilla full-UI browser (not --app)
 
    {:id :inkscape :label "Inkscape" :icon "inkscape" :category :create
     :exec ["inkscape"]

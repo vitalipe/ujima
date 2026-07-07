@@ -89,6 +89,21 @@
             :sha256 "5909f02d92536c3ee52121dec4f1b7a73261a08ac7e091d15205cbff9893e33a"
             :dest   "/opt/ujima/baked-apps/turbowarp"}}
 
+   ;; Godot 4 (game engine): official arm64 editor, fetched + sha256-pinned like TurboWarp (a .zip
+   ;; carrying one versioned binary → :bin renames it to a stable `godot`). Opens its editor straight
+   ;; into the vendored 2D platformer demo (assets/godot-demo, staged by desktop.clj) — a wow-on-open
+   ;; instead of an empty Project Manager. Forced to Vulkan Mobile: the V3D does Vulkan 1.3 but not the
+   ;; Forward+/Clustered tier (<48 textures/stage), and Mobile is the right renderer for a Pi GPU
+   ;; (needs mesa-vulkan-drivers, install.clj).
+   {:id :godot :label "Godot" :icon "godot" :category :create
+    :exec ["/opt/ujima/baked-apps/godot/godot" "--editor" "--path" "/opt/ujima/baked-apps/godot-demo"
+           "--rendering-driver" "vulkan" "--rendering-method" "mobile"]
+    :class "Godot"                                           ; res_class, xprop-verified
+    :fetch {:url    "https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.arm64.zip"
+            :sha256 "db5aa126353a18fd664818e4f1b9cfffaa77e32d4c9af0ea87e8f028a395a1ed"
+            :dest   "/opt/ujima/baked-apps/godot"
+            :bin    "godot"}}
+
    {:id :tuxtype :label "TuxTyping" :icon "tuxtype" :category :learn
     :exec ["/usr/games/tuxtype"]                            ; /usr/games isn't on the service PATH
     :class "tuxtype" :apt ["tuxtype"]}                       ; xprop-verified
@@ -110,9 +125,11 @@
 
 
 (defn- fetch!
-  "Download a prebuilt payload, verify its sha256, unpack into :dest stripping the tarball's
-   top dir — the git-free equivalent of an apt app (vendored at build, never committed)."
-  [{:keys [url sha256 dest]}]
+  "Download a prebuilt payload, verify its sha256, unpack into :dest. A .tar.gz strips the
+   tarball's top dir (app-dir tarballs like TurboWarp); a .zip unzips flat, and with :bin the one
+   extracted file is renamed to :dest/<bin> for a stable exec path (Godot ships a single versioned
+   binary in a zip). The git-free equivalent of an apt app (vendored at build, never committed)."
+  [{:keys [url sha256 dest bin]}]
   (let [tmp (str "/tmp/" (fs/file-name url))]
     ($! curl -fSL [url] -o [tmp])
     (let [got (first (str/split (sh! :sha256sum tmp) #"\s+"))]
@@ -121,7 +138,13 @@
                         {:url url :expected sha256 :got got}))))
     ($! rm -rf [dest])
     (fs/create-dirs dest)
-    ($! tar -xzf [tmp] -C [dest] "--strip-components=1")
+    (if (str/ends-with? (str url) ".zip")
+      (do ($! unzip -oq [tmp] -d [dest])
+          (when bin                          ; rename the single payload → stable :dest/<bin>
+            (let [f (->> (fs/list-dir dest) (map str) (remove #(= (fs/file-name %) bin)) first)]
+              ($! mv [f] [(str dest "/" bin)])
+              ($! chmod "0755" [(str dest "/" bin)]))))
+      ($! tar -xzf [tmp] -C [dest] "--strip-components=1"))
     (fs/delete-if-exists tmp)))
 
 
@@ -148,6 +171,8 @@
     (apply sh! "apt-get" "install" "-y" "--no-install-recommends" pkgs))
   (when (some #(or (:fetch %) (:deb %)) apps)
     ($! apt-get install -y --no-install-recommends "curl" "ca-certificates")
+    (when (some #(some-> % :fetch :url (str/ends-with? ".zip")) apps)
+      ($! apt-get install -y --no-install-recommends "unzip"))
     (doseq [{:keys [fetch deb]} apps]
       (when fetch (fetch! fetch))
       (when deb (deb! deb)))))

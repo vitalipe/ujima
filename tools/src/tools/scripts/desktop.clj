@@ -67,6 +67,17 @@
             ($! chown -R "ujima:ujima" "/home/ujima"))
         (println "desktop: no assets/home — app home configs not staged")))
 
+    ;; Godot demo project — the launcher opens Godot's editor into this (the "wow" 2D platformer),
+    ;; not an empty Project Manager. Vendored source + editor state (2D main-screen); the import cache
+    ;; is NOT committed, so Godot re-imports at runtime — writes land in the overlay upper. Staged
+    ;; beside the fetched godot binary in baked-apps (survives the desktop/ clean-mirror above).
+    (let [demo (str project "/assets/godot-demo")]
+      (if (fs/exists? demo)
+        (do (fs/create-dirs "/opt/ujima/baked-apps")
+            ($! rm -rf "/opt/ujima/baked-apps/godot-demo")
+            ($! cp -a [demo] "/opt/ujima/baked-apps/godot-demo"))
+        (println "desktop: no assets/godot-demo — Godot demo not staged")))
+
     ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.appcatalog.
     ;; Emitted AFTER the wholesale copy above so the clean-mirror can't clobber it; rides both the
     ;; image build and live `dev push desktop`, so a catalog-only edit ships without a rebuild.

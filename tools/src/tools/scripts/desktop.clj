@@ -58,7 +58,16 @@
                        "gtk-font-name=Public Sans 10\n")))
         (println "desktop: no assets/themes/Nordic — app theme not staged")))
 
-    ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.app-catalog.
+    ;; per-app home config (first-launch suppression + sane defaults) → the ujima user's home.
+    ;; e.g. assets/home/.stellarium/config.ini disables Stellarium's startup online-catalog updates
+    ;; that otherwise hang its window offline. Owned by ujima so the apps can read + rewrite them.
+    (let [home (str project "/assets/home")]
+      (if (fs/exists? home)
+        (do ($! cp -a [(str home "/.")] "/home/ujima/")
+            ($! chown -R "ujima:ujima" "/home/ujima"))
+        (println "desktop: no assets/home — app home configs not staged")))
+
+    ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.appcatalog.
     ;; Emitted AFTER the wholesale copy above so the clean-mirror can't clobber it; rides both the
     ;; image build and live `dev push desktop`, so a catalog-only edit ships without a rebuild.
     (appcatalog/write-catalog! {:dest "/opt/ujima/desktop/apps.edn"})))

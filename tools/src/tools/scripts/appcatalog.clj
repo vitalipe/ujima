@@ -60,10 +60,6 @@
             :sha256 "5909f02d92536c3ee52121dec4f1b7a73261a08ac7e091d15205cbff9893e33a"
             :dest   "/opt/ujima/baked-apps/turbowarp"}}
 
-   {:id :tuxmath :label "TuxMath" :icon "tuxmath" :category :learn
-    :exec ["/usr/games/tuxmath"]                            ; /usr/games isn't on the service PATH
-    :class "tuxmath" :apt ["tuxmath"]}                       ; xprop-verified
-
    {:id :tuxtype :label "TuxTyping" :icon "tuxtype" :category :learn
     :exec ["/usr/games/tuxtype"]                            ; /usr/games isn't on the service PATH
     :class "tuxtype" :apt ["tuxtype"]}                       ; xprop-verified
@@ -74,7 +70,11 @@
 
    {:id :geany :label "Geany" :icon "geany" :category :create
     :exec ["geany"]
-    :class "Geany" :apt ["geany"]}])                         ; xprop-verified
+    :class "Geany" :apt ["geany"]}                           ; xprop-verified
+
+   {:id :stellarium :label "Stellarium" :icon "stellarium" :category :learn
+    :exec ["stellarium"]
+    :class "stellarium" :apt ["stellarium"]}])               ; xprop-verified
 
 
 (def ^:private spec-keys [:id :label :icon :category :exec :class])

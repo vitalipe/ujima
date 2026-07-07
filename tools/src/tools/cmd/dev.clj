@@ -73,7 +73,7 @@
 ;; that reads a new asset dir adds one entry here.
 (def ^:private stage-paths ["src" "tools/src" "config" "assets/dev" "assets/tools"
                             "assets/desktop" "assets/eww"
-                            "assets/fonts" "assets/themes"])  ; desktop.clj reads these
+                            "assets/fonts" "assets/themes" "assets/home"])  ; desktop.clj reads these
 
 
 (defn script!

@@ -51,6 +51,14 @@
     :exec ["libreoffice" "--impress"]
     :class "libreoffice-impress" :apt ["libreoffice-impress"]}   ; xprop-verified
 
+   ;; ONLYOFFICE Desktop Editors (arm64 .deb, offline-first): NOT in Debian, so a pinned :deb
+   ;; fetched+apt-installed at build. Launch via the /usr/bin wrapper (raw binary skips Qt env).
+   {:id :onlyoffice :label "ONLYOFFICE" :icon "onlyoffice" :category :office
+    :exec ["onlyoffice-desktopeditors"]
+    :class "ONLYOFFICE"                                          ; res_class, xprop-verified
+    :deb {:url    "https://github.com/ONLYOFFICE/DesktopEditors/releases/download/v9.4.0/onlyoffice-desktopeditors_arm64.deb"
+          :sha256 "ce141a103051e220a89839dd5dc8511172ae5b989e8de9bda0e07c34b0b7702c"}}
+
    {:id :draw :label "Draw" :icon "draw" :category :create
     :exec ["tuxpaint"]
     :class "TuxPaint.TuxPaint" :apt ["tuxpaint"]}
@@ -110,16 +118,32 @@
     (fs/delete-if-exists tmp)))
 
 
+(defn- deb!
+  "Download a third-party .deb, verify its sha256, and apt-install it (apt resolves the .deb's
+   dependencies from the base repos) — for packages not in Debian, e.g. ONLYOFFICE's arm64 build.
+   Pinned + fetched at build like an apt app, never vendored in git."
+  [{:keys [url sha256]}]
+  (let [tmp (str "/tmp/" (fs/file-name url))]
+    ($! curl -fSL [url] -o [tmp])
+    (let [got (first (str/split (sh! :sha256sum tmp) #"\s+"))]
+      (when-not (= got sha256)
+        (throw (ex-info "app-catalog deb sha256 mismatch"
+                        {:url url :expected sha256 :got got}))))
+    (sh! "apt-get" "install" "-y" tmp)             ; a /path arg installs the local .deb + its deps
+    (fs/delete-if-exists tmp)))
+
+
 (defn install!
-  "apt-install the deduped union of every :apt, then run each :fetch. Assumes apt is already
-   updated (tools.scripts.install runs `apt-get update` once before calling us)."
+  "apt-install the deduped union of every :apt, fetch each :fetch payload, and apt-install each
+   pinned :deb. Assumes apt is already updated (tools.scripts.install runs `apt-get update` once)."
   [_]
   (let [pkgs (->> apps (mapcat :apt) (remove nil?) distinct vec)]
     (apply sh! "apt-get" "install" "-y" "--no-install-recommends" pkgs))
-  (when (some :fetch apps)
+  (when (some #(or (:fetch %) (:deb %)) apps)
     ($! apt-get install -y --no-install-recommends "curl" "ca-certificates")
-    (doseq [{:keys [fetch]} apps :when fetch]
-      (fetch! fetch))))
+    (doseq [{:keys [fetch deb]} apps]
+      (when fetch (fetch! fetch))
+      (when deb (deb! deb)))))
 
 
 (defn write-catalog!

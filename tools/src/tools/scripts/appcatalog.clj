@@ -63,6 +63,13 @@
     :exec ["tuxpaint"]
     :class "TuxPaint.TuxPaint" :apt ["tuxpaint"]}
 
+   ;; GIMP 3.0 (GTK3): full raster editor. Ships its OWN dark theme (default) so it's dark with no
+   ;; Qt/gtk-platformtheme bridge, single-window mode by default, traditional menubar (clean under the
+   ;; eww topbar). First-run "Welcome" dialog to suppress in the app-config pass.
+   {:id :gimp :label "GIMP" :icon "gimp" :category :create
+    :exec ["gimp"]
+    :class "Gimp" :apt ["gimp"]}                             ; xprop-verified (res_class)
+
    {:id :files :label "Files" :icon "files" :category :web-files
     :exec ["pcmanfm" "/home/ujima/Files"]
     :class "pcmanfm" :apt ["pcmanfm"]}

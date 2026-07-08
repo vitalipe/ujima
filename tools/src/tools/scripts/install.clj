@@ -36,9 +36,13 @@
         "libdbusmenu-gtk3-4"  ; eww's systray/dbusmenu runtime lib (pulls libdbusmenu-glib4) — libgtk-3-0 does NOT pull it, so it must be pinned; its absence crash-loops eww on a clean image
         "qt6-gtk-platformtheme" "qt5-gtk-platformtheme"  ; Qt/KDE apps (Marble, Stellarium) follow the GTK Nordic theme — QT_QPA_PLATFORMTHEME=gtk3 on ujima.service (tools.scripts.ujimaify)
         "mesa-vulkan-drivers"  ; v3dv Vulkan driver for the Pi 5 V3D — Godot's Vulkan Mobile renderer
-        "librsvg2-common"   ; gdk-pixbuf SVG loader — lets eww render the SVG app icons (librsvg2-2 is just the lib)
-        "picom"             ; xrender compositor — transparency for floating eww overlays (volume popover)
-        "xdotool")          ; one synthetic tap at startup wakes the override-redirect bars' input (ujima.desktop/wake-bars!)
+        "librsvg2-common"   ; gdk-pixbuf SVG loader (app icons in file dialogs etc.; librsvg2-2 is just the lib)
+        "picom"             ; xrender compositor — transparency for floating dialogs
+        "xdotool"           ; synthetic input (startup focus tap; also the dev relay)
+        ;; webview launcher host (assets/desktop/bin/ujima-launcher): a chromeless WebKitGTK window
+        ;; renders the launcher home surface (served from :1337). python3-gi + the GTK3 / WebKit2-4.1
+        ;; typelibs; libgtk-3-0 above is the shared runtime lib. Compositing + JIT disabled in the host.
+        "python3-gi" "gir1.2-gtk-3.0" "gir1.2-webkit2-4.1")
 
     ;; X-from-systemd: let a non-console user start X via the setuid wrapper. HW-verified — without it
     ;; Xorg dies "Cannot open virtual console (Permission denied)".

@@ -1,11 +1,11 @@
 (ns ujima.desktop
-  "Brings up the static eww shell and holds it. The daemon runs as OUR foreground child
-   (--no-daemonize) with inherited stdio, so everything it prints — including its dying words —
-   lands in the journal instead of a discarded capture pipe. init! blocks on the daemon process;
-   it returning means eww is gone, and the caller tears the session down for a cold rebuild.
-   Also brings up the widget-facing HTTP API + edge before the surfaces open, so their
-   defpolls have something to talk to from the first tick.
-   cfg = {:eww-config <dir> :http {:host <ip> :port <n>}}."
+  "Brings up the shell and holds it. eww — its TOP BAR + DOCK only now — runs as OUR foreground
+   child (--no-daemonize, inherited stdio so its output lands in the journal). The LAUNCHER is a
+   separate chromeless WebKitGTK window (assets/desktop/bin/ujima-launcher) that renders the
+   launcher home surface served from the widget HTTP API; it is spawned fire-and-forget and the
+   app model places it on HOME like the old eww launcher window. init! blocks on the eww daemon;
+   it returning means eww is gone and the caller tears the session down for a cold rebuild.
+   cfg = {:eww-config <dir> :launcher-bin <path> :launcher-url <uri> :http {:host <ip> :port <n>}}."
   (:require [lib.shell :as shell]
             [ujima.log :as log]
             [ujima.desktop.http :as http]))
@@ -32,19 +32,24 @@
 
 
 (defn init!
-  "Start the eww daemon (foreground child), open the surfaces, and BLOCK on the daemon for the
-   session's life."
+  "Start the eww daemon (top bar + dock), the widget HTTP API, and the webview launcher, then
+   BLOCK on the eww daemon for the session's life."
   [cfg]
-  (let [dir    (or (:eww-config cfg) "/opt/ujima/desktop/eww")
+  (let [dir    (or (:eww-config cfg)   "/opt/ujima/desktop/eww")
+        bin    (or (:launcher-bin cfg) "/opt/ujima/desktop/bin/ujima-launcher")
+        url    (or (:launcher-url cfg) "http://127.0.0.1:1337/launcher/")
         daemon (shell/with-spawn (inheriting shell/*spawn*)
                  (shell/sh :eww :--config dir "daemon" :--no-daemonize))]
-    
-    (log/info "opening shell" {:eww dir})
-    (await-daemon! dir)
 
-    (http/start! (:http cfg))
-    
-    (shell/sh! :eww :--config dir "open-many" "topbar" "launcher" "dock")
+    (log/info "opening shell" {:eww dir :launcher url})
+    (await-daemon! dir)
+    (http/start! (:http cfg))                                    ; serves /launcher before the webview loads it
+    (shell/sh! :eww :--config dir "open-many" "topbar" "dock")   ; NOT launcher — the webview is the launcher
+
+    ;; launcher webview: fire-and-forget child. The app model un-floats/places it on HOME (the old
+    ;; eww launcher's slot); i3 tiles it into the mid-section between the top bar and dock.
+    (shell/with-spawn (inheriting shell/*spawn*)
+      (shell/sh {:extra-env {"UJIMA_SHELL_URL" url}} bin))
 
     (let [{:keys [exit]} @daemon]
       (log/error "eww daemon exited — session over" {:exit exit}))))

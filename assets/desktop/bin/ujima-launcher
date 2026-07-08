@@ -1,0 +1,59 @@
+#!/usr/bin/env python3
+"""UjimaOS launcher host — a single chromeless WebKitGTK window that renders the launcher
+home surface (assets/desktop/launcher), served by ujimad on :1337 so it is same-origin with
+the app API. Deliberately lean: no GPU compositing and no JS JIT (the launcher is layout-heavy,
+not JS-heavy) keep the web view ~200 MB instead of ~260 MB. i3 tiles it into the space between
+eww's top bar and dock. Exiting (window closed / web process gone) is the caller's signal."""
+
+import os
+import sys
+
+# Must be set before WebKit initialises: the forked WebProcess inherits this env.
+# JIT off (we don't need fast JS) + no accelerated compositing (drops the GL/LLVM stack).
+os.environ.setdefault("JSC_useJIT", "0")
+os.environ.setdefault("WEBKIT_DISABLE_COMPOSITING_MODE", "1")
+os.environ.setdefault("WEBKIT_USE_SINGLE_WEB_PROCESS", "1")
+
+import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("WebKit2", "4.1")
+from gi.repository import Gtk, Gdk, GLib, WebKit2
+
+URL = os.environ.get("UJIMA_SHELL_URL", "http://127.0.0.1:1337/launcher/")
+BG = Gdk.RGBA()
+BG.parse("#14171b")  # match the launcher background so there is no white first-paint flash
+
+# WM_CLASS = "ujima-launcher" so i3 + the app model recognise the launcher window (placed HOME).
+GLib.set_prgname("ujima-launcher")
+win = Gtk.Window()
+win.set_wmclass("ujima-launcher", "ujima-launcher")
+win.set_title("ujima-launcher")
+win.set_decorated(False)
+win.set_default_size(1280, 800)
+
+ctx = WebKit2.WebContext.get_default()
+ctx.set_cache_model(WebKit2.CacheModel.DOCUMENT_VIEWER)  # minimal cache — one local page
+
+settings = WebKit2.Settings(
+    enable_javascript=True,
+    enable_developer_extras=False,
+    enable_page_cache=False,
+    enable_back_forward_navigation_gestures=False,
+    enable_html5_local_storage=True,
+    hardware_acceleration_policy=WebKit2.HardwareAccelerationPolicy.NEVER,
+)
+
+web = WebKit2.WebView.new_with_context(ctx)
+web.set_settings(settings)
+web.set_background_color(BG)
+web.connect("context-menu", lambda *a: True)  # no right-click menu on the launcher
+web.connect("web-process-terminated", lambda *a: sys.exit(1))
+web.load_uri(URL)
+
+win.add(web)
+win.override_background_color(Gtk.StateFlags.NORMAL, BG)
+win.connect("destroy", Gtk.main_quit)
+win.show_all()
+
+Gtk.main()
+sys.exit(0)

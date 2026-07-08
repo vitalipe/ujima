@@ -10,6 +10,7 @@
      /app/**  the app layer (ujima.desktop.app): the catalog now, start/stop/
               focus when the startup slice lands."
   (:require [clojure.string     :as str]
+            [clojure.java.io    :as io]
             [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json json->edn]]
             [ujima.log          :as log]
@@ -22,6 +23,29 @@
 
 (defn- json [status body]
   {:status status :headers {"content-type" "application/json"} :body (edn->json body)})
+
+
+;; Static assets for the webview launcher: it is served from here (not file://) so it is
+;; same-origin with the app API and its click POSTs / future pulls need no CORS. Only the
+;; launcher + shared icon dirs are exposed, and "../" is refused.
+(def ^:private static-prefixes #{"launcher" "icons"})
+(def ^:private content-types
+  {"html" "text/html; charset=utf-8" "css" "text/css" "js" "text/javascript"
+   "svg" "image/svg+xml" "png" "image/png" "json" "application/json"})
+
+(defn- static-file
+  "GET /launcher/** or /icons/** -> the file under `root`. /launcher -> index.html.
+   nil when it is not a static path, escapes root, or is not a file."
+  [root uri]
+  (let [parts (->> (str/split (str uri) #"/") (remove str/blank?) vec)]
+    (when (and (seq parts) (static-prefixes (first parts)) (not (some #{".."} parts)))
+      (let [parts (if (= 1 (count parts)) (conj parts "index.html") parts)
+            f     (io/file root (str/join "/" parts))
+            ext   (some-> (re-find #"\.([^.]+)$" (.getName f)) second str/lower-case)]
+        (when (.isFile f)
+          {:status 200
+           :headers {"content-type" (get content-types ext "application/octet-stream")}
+           :body f})))))
 
 
 ;; ex-info {:error <kw>} -> status; anything unmapped is a real bug -> 500.
@@ -53,7 +77,7 @@
          [method parts])))
 
 
-(defn- handler [req]
+(defn- handler [static-root req]
   (try
     (let [verb (route (:request-method req) (:uri req))
           body (when (= :post (:request-method req)) (json->edn (:body req)))]
@@ -79,7 +103,8 @@
                                  (json 202 {}))
         :app/home            (do (app/go-home!)
                                  (json 202 {}))
-        (json 404 {:error "not found"})))
+        (or (when (= :get (:request-method req)) (static-file static-root (:uri req)))
+            (json 404 {:error "not found"}))))
     (catch clojure.lang.ExceptionInfo e
       (if-let [status (error-status (:error (ex-data e)))]
         (do (log/warn "desktop http: rejected" {:uri (:uri req) :error (ex-message e)})
@@ -92,8 +117,9 @@
 
 
 (defn start!
-  "Start the loopback API; returns http-kit's stop fn. A taken port throws — the
-   session dies loudly and systemd rebuilds it."
-  [{:keys [host port] :or {host "127.0.0.1" port 1337}}]
-  (log/info "desktop http listening" {:host host :port port})
-  (http/run-server handler {:ip host :port port}))
+  "Start the loopback API (+ static launcher assets from static-root); returns http-kit's stop
+   fn. A taken port throws — the session dies loudly and systemd rebuilds it."
+  [{:keys [host port static-root]
+    :or   {host "127.0.0.1" port 1337 static-root "/opt/ujima/desktop"}}]
+  (log/info "desktop http listening" {:host host :port port :static static-root})
+  (http/run-server (partial handler static-root) {:ip host :port port}))

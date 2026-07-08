@@ -51,12 +51,12 @@
 (defn to-place
   "The placement plan: a catalog app's non-transient window that floats (chromium
    --app trips the pop-up float rule) or sits off its app's workspace (= app id)
-   moves there; the launcher moves to HOME (eww makes it floating AND sticky — it
-   shadows every workspace otherwise). Dialogs float in peace. Self-quieting."
+   moves there; the launcher (the webview home surface, class ujima-launcher) moves to HOME.
+   Dialogs float in peace. Self-quieting."
   [catalog ws home]
   (vec (for [w ws
              :let [target (when (:class w)
-                            (if (= "eww" (str/lower-case (:class w)))
+                            (if (= "ujima-launcher" (str/lower-case (:class w)))
                               home
                               (some-> (get-in catalog [:class->app (str/lower-case (:class w))])
                                       :id

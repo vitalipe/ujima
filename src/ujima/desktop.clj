@@ -31,6 +31,21 @@
         (throw (ex-info "eww daemon never answered ping" {:eww dir}))))))
 
 
+(defn- keep-launcher!
+  "Keep the webview launcher alive on a background thread: spawn it, wait, respawn when it exits.
+   Load-bearing at boot — a cold session races WebKit's web-process startup, so the FIRST launch
+   can die instantly (works on a warm retry); respawning rides that out, and it also brings the
+   launcher back if it ever crashes. The process dies with us on session teardown (JVM exit)."
+  [bin url]
+  (future
+    (loop []
+      (let [{:keys [exit]} @(shell/with-spawn (inheriting shell/*spawn*)
+                              (shell/sh {:extra-env {"UJIMA_SHELL_URL" url}} bin))]
+        (log/warn "webview launcher exited — respawning" {:exit exit})
+        (Thread/sleep 2000)
+        (recur)))))
+
+
 (defn init!
   "Start the eww daemon (top bar + dock), the widget HTTP API, and the webview launcher, then
    BLOCK on the eww daemon for the session's life."
@@ -46,10 +61,10 @@
     (http/start! (:http cfg))                                    ; serves /launcher before the webview loads it
     (shell/sh! :eww :--config dir "open-many" "topbar" "dock")   ; NOT launcher — the webview is the launcher
 
-    ;; launcher webview: fire-and-forget child. The app model un-floats/places it on HOME (the old
-    ;; eww launcher's slot); i3 tiles it into the mid-section between the top bar and dock.
-    (shell/with-spawn (inheriting shell/*spawn*)
-      (shell/sh {:extra-env {"UJIMA_SHELL_URL" url}} bin))
+    ;; launcher webview: kept alive on a background thread (respawn rides out the cold-boot WebKit
+    ;; race + any later crash). The app model un-floats/places it on HOME (the old eww launcher's
+    ;; slot); i3 tiles it into the mid-section between the top bar and dock.
+    (keep-launcher! bin url)
 
     (let [{:keys [exit]} @daemon]
       (log/error "eww daemon exited — session over" {:exit exit}))))

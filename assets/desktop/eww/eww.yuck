@@ -100,14 +100,20 @@
     ;; launcher / home — its dock tile is "selected" (Sand) only when the launcher IS
     ;; the active view (nothing focused); neutral once an app takes over. Same rule as
     ;; the app tiles: exactly one thing selected at a time (home, or the active app).
-    (box :halign "start" :space-evenly false
+    (box :halign "start" :space-evenly false :spacing 6
       (button :class {(apps.current ?: "") == "" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
-        (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 25 :image-height 25)))
+        (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 25 :image-height 25))
+      ;; files: hidden from the launcher (its 'system' category) — pinned here next to home. Glows
+      ;; frost (the active-launcher colour) when it's the focused app, like any active dock tile.
+      (button :class {apps.current == "files" ? "win active cat-system" : "win"} :timeout "2s"
+        :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"files\"}' >/dev/null"
+        (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 26 :image-height 26)))
     ;; running apps — bare 32px vendor logos; the ACTIVE one glows its category color
     (box :halign "center" :space-evenly false :spacing 6
       (for a in {apps.apps}
         (button :class {a.id == apps.current ? "win active cat-" + (a.category ?: "none") : "win"} :timeout "2s"
+          :visible {a.category != "system"}   ; system apps (files) are pinned on the left, not shown here
           :tooltip {a.label}
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"
           (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 32 :image-height 32))))

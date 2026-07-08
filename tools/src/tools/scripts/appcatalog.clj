@@ -70,11 +70,11 @@
     :exec ["gimp"]
     :class "Gimp" :apt ["gimp"]}                             ; xprop-verified (res_class)
 
-   {:id :files :label "Files" :icon "files" :category :web-files
+   {:id :files :label "Files" :icon "files" :category :system
     :exec ["pcmanfm" "/home/ujima/Files"]
     :class "pcmanfm" :apt ["pcmanfm"]}
 
-   {:id :web :label "Web" :icon "web" :category :web-files
+   {:id :web :label "Web" :icon "web" :category :explore
     :exec ["chromium" "--class=ujima-web" "--user-data-dir=/tmp/ujima-web" "--no-first-run"]
     :class "ujima-web" :apt ["chromium"]}                        ; vanilla full-UI browser (not --app)
 
@@ -82,7 +82,7 @@
     :exec ["inkscape"]
     :class "Inkscape" :apt ["inkscape"]}                     ; xprop-verified (res_class)
 
-   {:id :turbowarp :label "TurboWarp" :icon "scratch" :category :create
+   {:id :turbowarp :label "TurboWarp" :icon "scratch" :category :code
     :exec ["/opt/ujima/baked-apps/turbowarp/turbowarp-desktop" "--no-sandbox"]
     :class "turbowarp-desktop"                               ; StartupWMClass (package.json)
     :fetch {:url    "https://github.com/TurboWarp/desktop/releases/download/v1.16.0/TurboWarp-linux-arm64-1.16.0.tar.gz"
@@ -95,7 +95,7 @@
    ;; instead of an empty Project Manager. Forced to Vulkan Mobile: the V3D does Vulkan 1.3 but not the
    ;; Forward+/Clustered tier (<48 textures/stage), and Mobile is the right renderer for a Pi GPU
    ;; (needs mesa-vulkan-drivers, install.clj).
-   {:id :godot :label "Godot" :icon "godot" :category :create
+   {:id :godot :label "Godot" :icon "godot" :category :code
     :exec ["/opt/ujima/baked-apps/godot/godot" "--editor" "--path" "/opt/ujima/baked-apps/godot-demo"
            "--rendering-driver" "vulkan" "--rendering-method" "mobile"]
     :class "Godot"                                           ; res_class, xprop-verified
@@ -117,28 +117,28 @@
     :exec ["/usr/games/tuxtype"]                            ; /usr/games isn't on the service PATH
     :class "tuxtype" :apt ["tuxtype"]}                       ; xprop-verified
 
-   {:id :thonny :label "Thonny" :icon "thonny" :category :create
+   {:id :thonny :label "Thonny" :icon "thonny" :category :code
     :exec ["thonny"]
     :class "Thonny" :apt ["thonny"]}                         ; xprop-verified
 
-   {:id :geany :label "Geany" :icon "geany" :category :create
+   {:id :geany :label "Geany" :icon "geany" :category :code
     :exec ["geany"]
     :class "Geany" :apt ["geany"]}                           ; xprop-verified
 
-   {:id :stellarium :label "Stellarium" :icon "stellarium" :category :learn
+   {:id :stellarium :label "Stellarium" :icon "stellarium" :category :explore
     :exec ["stellarium"]
     :class "stellarium" :apt ["stellarium"]}                 ; xprop-verified
 
    ;; Marble (KDE virtual globe): offline Earth/planets atlas. Qt app → dark via qt6-gtk-platformtheme
    ;; (install.clj) + the session's QT_QPA_PLATFORMTHEME. marble-qt is the Qt-only build (still pulls
    ;; QtWebEngine as a core dep); marble-data ships the offline Atlas/Satellite maps.
-   {:id :marble :label "Marble" :icon "marble" :category :learn
+   {:id :marble :label "Marble" :icon "marble" :category :explore
     :exec ["marble-qt"]
     :class "Marble Virtual Globe" :apt ["marble-qt" "marble-data"]}  ; res_class xprop-verified
 
    ;; XaoS (real-time fractal zoomer): Mandelbrot/Julia exploration — Qt6, so it follows the Nordic
    ;; theme dark via qt6-gtk-platformtheme + the session's QT_QPA_PLATFORMTHEME.
-   {:id :xaos :label "XaoS" :icon "xaos" :category :learn
+   {:id :xaos :label "XaoS" :icon "xaos" :category :explore
     :exec ["xaos"]
     :class "XaoS" :apt ["xaos"]}])                           ; res_class xprop-verified
 

@@ -21,11 +21,13 @@ const el = (html) => { const t = document.createElement('template'); t.innerHTML
 // ── category presentation only: display order + label + colour. The APP membership, icons and
 //    labels come straight from the catalog (nothing about apps is embedded here). Keys/colours
 //    match eww's v0.9 trays (eww.scss / eww.yuck). ──
+//    'system' is deliberately absent -> its apps (files) never render in the launcher.
 const CATEGORIES = [
-  { key:'learn',     label:'LEARN',       color:'203,168,120' },
-  { key:'office',    label:'OFFICE',      color:'168,150,201' },
-  { key:'create',    label:'CREATE',      color:'206,147,166' },
-  { key:'web-files', label:'WEB & FILES', color:'134,184,126' },
+  { key:'learn',   label:'LEARN',   color:'203,168,120' },
+  { key:'explore', label:'EXPLORE', color:'126,158,214' },
+  { key:'office',  label:'OFFICE',  color:'168,150,201' },
+  { key:'create',  label:'CREATE',  color:'206,147,166' },
+  { key:'code',    label:'CODE',    color:'176,184,119' },
 ];
 
 // CATS = await fetchCatalog(): GET /app/catalog, then fold each app into its category (display
@@ -40,7 +42,7 @@ async function fetchCatalog(){
 
 // ── live state — STATIC today; each field maps to a real source (see comments) ──
 const STATE = {
-  hostname : 'Baobab',              // API: GET /ui/state -> hostname (settings plane)
+  hostname : 'UjimaOS',             // API: GET /ui/state -> hostname (settings plane)
   online   : true,                  // API: /ui/state -> network reachable
   wifiBars : 3,                     // API: /ui/state -> wifi strength 0..4 (0 = wired/none)
   room     : { filled:2, total:6 }, // API: "room to work" = free-RAM headroom (lowram policy)

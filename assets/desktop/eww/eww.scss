@@ -37,8 +37,11 @@ $faint: #697180;
 .dock .win { min-width: 52px; min-height: 52px; border-radius: 13px; transition: background-color 150ms ease; }
 .dock .win:hover { background-color: rgba(255, 255, 255, 0.07); }
 .dock .win.cat-learn     { background-color: rgba(203, 168, 120, 0.18); box-shadow: inset 0 0 0 1.5px rgba(203, 168, 120, 0.45); }   // Sand
+.dock .win.cat-explore   { background-color: rgba(126, 158, 214, 0.18); box-shadow: inset 0 0 0 1.5px rgba(126, 158, 214, 0.45); }
 .dock .win.cat-office    { background-color: rgba(168, 150, 201, 0.18); box-shadow: inset 0 0 0 1.5px rgba(168, 150, 201, 0.45); }
 .dock .win.cat-create    { background-color: rgba(206, 147, 166, 0.18); box-shadow: inset 0 0 0 1.5px rgba(206, 147, 166, 0.45); }
+.dock .win.cat-code      { background-color: rgba(176, 184, 119, 0.18); box-shadow: inset 0 0 0 1.5px rgba(176, 184, 119, 0.45); }
+.dock .win.cat-system    { background-color: rgba(136, 192, 208, 0.18); box-shadow: inset 0 0 0 1.5px rgba(136, 192, 208, 0.45); }   // frost (same as the selected launcher)
 .dock .win.cat-web-files { background-color: rgba(134, 184, 126, 0.18); box-shadow: inset 0 0 0 1.5px rgba(134, 184, 126, 0.45); }
 .dock .tray .kbd { padding: 0 10px; border-radius: 11px; color: $dim; font-weight: 500; transition: background-color 150ms ease; }
 .dock .tray .kbd:hover { background-color: rgba(255, 255, 255, 0.07); color: $text; }

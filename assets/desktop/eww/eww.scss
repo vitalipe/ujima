@@ -19,7 +19,7 @@ $faint: #697180;
 // melting into the launcher rather than a distinct strip.
 .topbar { color: $text; }
 .topbar .bar { background-color: $toppane; border-bottom: 1px solid $panel-brd; padding: 0 8px 0 0; }
-.topbar .bar.off { background-color: #171b21; border-bottom-color: transparent; }
+.topbar .bar.off { background-color: $bg; border-bottom-color: transparent; }   // home: match the launcher base so the empty strip disappears
 .topbar .idcell { min-width: 48px; }
 .topbar .title { font-weight: 600; }
 .topbar .close { min-width: 30px; min-height: 30px; border-radius: 8px; color: $dim; font-size: 15px; }

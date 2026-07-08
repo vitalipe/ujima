@@ -75,7 +75,10 @@
       (if (fs/exists? demo)
         (do (fs/create-dirs "/opt/ujima/baked-apps")
             ($! rm -rf "/opt/ujima/baked-apps/godot-demo")
-            ($! cp -a [demo] "/opt/ujima/baked-apps/godot-demo"))
+            ($! cp -a [demo] "/opt/ujima/baked-apps/godot-demo")
+            ;; cp -a kept the build-host uid (1000); runtime user is ujima (1001) → the demo would be
+            ;; unwritable, so Godot can't write res://.godot (caches/saves) → black editor + won't close.
+            ($! chown -R "ujima:ujima" "/opt/ujima/baked-apps/godot-demo"))
         (println "desktop: no assets/godot-demo — Godot demo not staged")))
 
     ;; web apps (Excalidraw): vendored static builds + their launch wrappers → /opt/ujima/web. Each

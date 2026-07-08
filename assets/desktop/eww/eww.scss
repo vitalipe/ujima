@@ -17,9 +17,9 @@ $faint: #697180;
 // bg lives on the inner .bar so home (.bar.off) can drop the top-pane look: it tints
 // to the launcher's top gradient value (#171b21) with no border, so the bar reads as
 // melting into the launcher rather than a distinct strip.
-.topbar { color: $text; }
+.topbar { color: $text; background-color: transparent; }   // window transparent (picom) so home shows the desktop gradient through it
 .topbar .bar { background-color: $toppane; border-bottom: 1px solid $panel-brd; padding: 0 8px 0 0; }
-.topbar .bar.off { background-color: $bg; border-bottom-color: transparent; }   // home: match the launcher base so the empty strip disappears
+.topbar .bar.off { background-color: transparent; border-bottom-color: transparent; }   // home: fully transparent — the continuous desktop background shows through
 .topbar .idcell { min-width: 48px; }
 .topbar .title { font-weight: 600; }
 .topbar .close { min-width: 30px; min-height: 30px; border-radius: 8px; color: $dim; font-size: 15px; }

@@ -27,21 +27,22 @@
 
 ;; Static assets for the webview launcher: it is served from here (not file://) so it is
 ;; same-origin with the app API and its click POSTs / future pulls need no CORS. Only the
-;; launcher + shared icon dirs are exposed, and "../" is refused.
-(def ^:private static-prefixes #{"launcher" "icons"})
+;; launcher + shared icon dirs and the wallpaper (drawn by the launcher too) are exposed,
+;; and "../" is refused.
+(def ^:private static-prefixes #{"launcher" "icons" "wall.png" "wall.svg"})
 (def ^:private content-types
   {"html" "text/html; charset=utf-8" "css" "text/css" "js" "text/javascript"
    "svg" "image/svg+xml" "png" "image/png" "json" "application/json"})
 
 (defn- static-file
-  "GET /launcher/** or /icons/** -> the file under `root`. /launcher -> index.html.
-   nil when it is not a static path, escapes root, or is not a file."
+  "GET /launcher/** , /icons/** , or /wall.{png,svg} -> the file under `root`. /launcher ->
+   index.html. nil when it is not a static path, escapes root, or is not a file."
   [root uri]
-  (let [parts (->> (str/split (str uri) #"/") (remove str/blank?) vec)]
+  (let [parts (->> (str/split (str uri) #"/") (remove str/blank?) vec)
+        parts (if (= parts ["launcher"]) ["launcher" "index.html"] parts)]
     (when (and (seq parts) (static-prefixes (first parts)) (not (some #{".."} parts)))
-      (let [parts (if (= 1 (count parts)) (conj parts "index.html") parts)
-            f     (io/file root (str/join "/" parts))
-            ext   (some-> (re-find #"\.([^.]+)$" (.getName f)) second str/lower-case)]
+      (let [f   (io/file root (str/join "/" parts))
+            ext (some-> (re-find #"\.([^.]+)$" (.getName f)) second str/lower-case)]
         (when (.isFile f)
           {:status 200
            :headers {"content-type" (get content-types ext "application/octet-stream")}

@@ -11,17 +11,18 @@
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{height:100%}
 body{
-  background:var(--bg); color:var(--text); overflow:hidden;
+  color:var(--text); overflow:hidden;
+  /* draw the SAME desktop background (the root wall.png), shifted up by the top bar height (48px)
+     so it lines up exactly with the root bg behind the transparent top bar + on empty workspaces.
+     Opaque (not a see-through window) → correct text AA + no hover-repaint artifact on tiles. */
+  background-color:#14171b;
+  background-image:url("/wall.png");
+  background-repeat:no-repeat;
+  background-position:0 -48px;
+  background-size:100vw calc(100vh + 116px);   /* full screen = launcher (100vh) + top bar 48 + dock 68 */
   font-family:'Public Sans',system-ui,'Noto Sans',sans-serif;
   -webkit-font-smoothing:antialiased;
   user-select:none; -webkit-user-select:none; cursor:default;
-}
-/* soft frost + sand glows, behind everything */
-body::before{
-  content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
-  background:
-    radial-gradient(50% 44% at 22% 10%, rgba(var(--frost),.08), transparent 66%),
-    radial-gradient(46% 40% at 84% 88%, rgba(203,168,120,.07), transparent 68%);
 }
 
 .home{position:relative; z-index:1; height:100vh; display:flex; flex-direction:column}

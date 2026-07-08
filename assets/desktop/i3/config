@@ -32,6 +32,12 @@ gaps bottom 68
 # and the next converge would snap it back.
 bindsym Mod4+space exec --no-startup-id /opt/ujima/desktop/bin/ujima-kbd-next
 
+# desktop background: the launcher's gradient (assets/desktop/wall.svg, rasterized to wall.png by
+# tools.scripts.desktop) set on the X root. i3 draws over it, so empty workspaces show the gradient
+# instead of the black root — and the transparent launcher + top bar show it through, one continuous
+# background under everything.
+exec_always --no-startup-id feh --bg-fill /opt/ujima/desktop/wall.png
+
 # the agent owns the shell now: it reconciles settings, then brings up eww (top bar + dock) and
 # the webview launcher itself once ready — so i3 only launches the agent + the compositor below.
 exec --no-startup-id ujima-agent

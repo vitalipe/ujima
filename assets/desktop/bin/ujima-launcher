@@ -9,7 +9,8 @@ import os
 import sys
 
 # Must be set before WebKit initialises: the forked WebProcess inherits this env.
-# JIT off (we don't need fast JS) + no accelerated compositing (drops the GL/LLVM stack).
+# JIT off (we don't need fast JS) + no GPU compositing (~200 MB). Transparency (RGBA visual +
+# transparent web bg) still paints content over the see-through background via picom.
 os.environ.setdefault("JSC_useJIT", "0")
 os.environ.setdefault("WEBKIT_DISABLE_COMPOSITING_MODE", "1")
 os.environ.setdefault("WEBKIT_USE_SINGLE_WEB_PROCESS", "1")
@@ -21,7 +22,8 @@ from gi.repository import Gtk, Gdk, GLib, WebKit2
 
 URL = os.environ.get("UJIMA_SHELL_URL", "http://127.0.0.1:1337/launcher/")
 BG = Gdk.RGBA()
-BG.parse("#14171b")  # match the launcher background so there is no white first-paint flash
+BG.parse("#14171b")  # opaque base; the launcher draws the desktop gradient itself (aligned), so no
+                     # WebKit transparency is needed (that left a hover-repaint artifact on tiles)
 
 # WM_CLASS = "ujima-launcher" so i3 + the app model recognise the launcher window (placed HOME).
 GLib.set_prgname("ujima-launcher")

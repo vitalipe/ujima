@@ -25,6 +25,15 @@
           ($! cp -a [src] "/opt/ujima/desktop"))
         (println "desktop: no assets/desktop yet — scaffold no-op")))
 
+    ;; desktop background: rasterize the vector wall.svg -> a ≥1080p PNG for feh (the X root can't
+    ;; take an SVG). Uses the librsvg gdk-pixbuf loader via python3-gi — both installed by
+    ;; tools.scripts.install. wall.svg is the editable source; wall.png is what i3's `exec feh` sets.
+    (when (fs/exists? "/opt/ujima/desktop/wall.svg")
+      ($! python3 "-c"
+          (str "import gi; gi.require_version('GdkPixbuf','2.0'); from gi.repository import GdkPixbuf; "
+               "GdkPixbuf.Pixbuf.new_from_file_at_scale('/opt/ujima/desktop/wall.svg',1920,1200,False)"
+               ".savev('/opt/ujima/desktop/wall.png','png',[],[])")))
+
     ;; eww binary: built out-of-band on a Pi (assets/dev/build-eww) and vendored as
     ;; assets/eww/eww-aarch64-latest. Staged here (not install) so a rebuilt eww ships via
     ;; `dev push desktop` without rebuilding the cached vendor base. Warn-not-fail while eww is still

@@ -90,11 +90,29 @@ function pull(state){
   for (let i = 0; i < state.room.total; i++) $('room-' + i).classList.toggle('on', i < state.room.filled);
 }
 
+// ── reveal: fade the finished panel in once its icons + the shell font are painted ──
+// A cold boot otherwise flashes the empty tile borders (CSS) then pops icons in one by one.
+// img.decode() resolves when an image is actually paintable; fonts.ready avoids a text reflow.
+// The 2s race is a guard — a stalled asset can never leave the panel stuck hidden.
+async function reveal(){
+  const home = document.querySelector('.home');
+  const imgs = [...document.querySelectorAll('.home img')];
+  const assets = Promise.all([
+    ...imgs.map(img => img.decode().catch(() => {})),
+    document.fonts ? document.fonts.ready : Promise.resolve(),
+  ]);
+  await Promise.race([assets, new Promise(r => setTimeout(r, 2000))]);
+  home.classList.add('ready');
+}
+
 async function main(){
   buildStatus();
   pull(STATE);
-  try { buildGrid(await fetchCatalog()); }
+  let cats = [];
+  try { cats = await fetchCatalog(); }
   catch (err){ console.error('catalog fetch failed:', err); }
+  buildGrid(cats);            // empty on failure — the header still shows, and reveal() still runs
+  await reveal();
   // live wiring later: an EventSource('/ui/state') / poll loop calls pull(nextState) on each push.
 }
 document.addEventListener('DOMContentLoaded', main);

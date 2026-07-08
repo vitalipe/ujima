@@ -25,7 +25,11 @@ body{
   user-select:none; -webkit-user-select:none; cursor:default;
 }
 
-.home{position:relative; z-index:1; height:100vh; display:flex; flex-direction:column}
+/* hidden until the catalog + all its icons/fonts are ready (js adds .ready) — the background
+   shows throughout, so a cold boot fades the finished panel in instead of flashing empty tiles. */
+.home{position:relative; z-index:1; height:100vh; display:flex; flex-direction:column;
+  opacity:0; transition:opacity .3s ease}
+.home.ready{opacity:1}
 
 /* ── header: identity + status (the mock's y66 header, minus eww's 48px top bar) ─────────── */
 .head{display:flex; flex-direction:column; align-items:center; gap:14px; padding:22px 24px 0}

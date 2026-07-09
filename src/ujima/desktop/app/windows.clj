@@ -7,19 +7,20 @@
 
 (defn from-tree
   "The i3 tree flattened to window facts, with placement context:
-   [{:con-id n :class :title :focused? :workspace :floating? :transient?} ...]."
+   [{:con-id n :class :title :focused? :fullscreen? :workspace :floating? :transient?} ...]."
   [tree]
   (letfn [(walk [node ws floating?]
             (let [ws (if (= "workspace" (:type node)) (:name node) ws)]
               (concat
                 (when (:window node)
-                  [{:con-id     (:id node)
-                    :class      (get-in node [:window_properties :class])
-                    :title      (:name node)
-                    :focused?   (boolean (:focused node))
-                    :workspace  ws
-                    :floating?  floating?
-                    :transient? (some? (get-in node [:window_properties :transient_for]))}])
+                  [{:con-id      (:id node)
+                    :class       (get-in node [:window_properties :class])
+                    :title       (:name node)
+                    :focused?    (boolean (:focused node))
+                    :fullscreen? (pos? (long (or (:fullscreen_mode node) 0)))
+                    :workspace   ws
+                    :floating?   floating?
+                    :transient?  (some? (get-in node [:window_properties :transient_for]))}])
                 (mapcat #(walk % ws floating?) (:nodes node))
                 (mapcat #(walk % ws true) (:floating_nodes node)))))]
     (vec (walk tree nil false))))

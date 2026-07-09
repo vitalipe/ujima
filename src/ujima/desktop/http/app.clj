@@ -12,7 +12,7 @@
 
 (defn- line [snapshot] (str (edn->json snapshot) "\n"))
 
-(def ^:private empty-line (line {:apps [] :current nil :current-title nil}))
+(def ^:private empty-line (line {:apps [] :current nil}))
 
 
 (defn push!

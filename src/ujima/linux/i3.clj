@@ -15,7 +15,7 @@
 
 (defn normalize
   "Raw i3 `window` event (parsed JSON, keyword keys) -> a proc-store event, or nil to
-   ignore (the subscribe reply, fullscreen_mode/move/floating/…). `:class` rides on
+   ignore (the subscribe reply, move/floating/…). `:class` rides on
    `title` too: some apps (LibreOffice) set WM_CLASS *after* mapping, so the class only
    becomes correct on a later title event. `:transient?` flags dialogs (a child window,
    not the app's primary). Pure."
@@ -31,6 +31,9 @@
       "title" {:type :window/title :con-id (:id c)
                :class class :transient? transient? :title (:name c)}
       "focus" {:type :window/focus :con-id (:id c)}
+      ;; a window entering/leaving fullscreen re-drives the converge so the bars reconcile —
+      ;; the only trigger when an app fullscreens itself after mapping (Stellarium; web video)
+      "fullscreen_mode" {:type :window/fullscreen :con-id (:id c)}
       nil)))
 
 

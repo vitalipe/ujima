@@ -13,6 +13,16 @@
 
 (def ^:private ping-tries 40)   ; x 250ms = 10s for the daemon socket to come up
 (def ^:private x-tries    60)   ; x 250ms = ~15s for X to accept an authorized connection
+(def ^:private default-eww-dir "/opt/ujima/desktop/eww")
+
+
+(defn bars-control
+  "A (fn [show?]) the agent uses to hide the top bar + dock while a fullscreen window is focused
+   (false = close, true = re-open). Resolves the eww config dir like init!; non-throwing."
+  [cfg]
+  (let [dir (or (:eww-config cfg) default-eww-dir)]
+    (fn [show?]
+      (shell/sh? :eww :--config dir (if show? "open-many" "close") "topbar" "dock"))))
 
 
 (defn- inheriting
@@ -66,7 +76,7 @@
   "Start the eww daemon (top bar + dock), the widget HTTP API, and the webview launcher, then
    BLOCK on the eww daemon for the session's life."
   [cfg]
-  (let [dir    (or (:eww-config cfg)   "/opt/ujima/desktop/eww")
+  (let [dir    (or (:eww-config cfg)   default-eww-dir)
         bin    (or (:launcher-bin cfg) "/opt/ujima/desktop/bin/ujima-launcher")
         url    (or (:launcher-url cfg) "http://127.0.0.1:1337/launcher/")
         daemon (shell/with-spawn (inheriting shell/*spawn*)

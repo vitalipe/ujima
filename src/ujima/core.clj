@@ -37,6 +37,7 @@
     ;; baseline lands; a missing catalog is a broken image — die loudly here
     (app/load-catalog! (get-in env [:desktop :catalog]))
     (app/set-push!     apps/push!)
+    (app/set-bars!     (desktop/bars-control (get-in env [:desktop] {})))
     (events/init!      (get-in env [:events]  {}))
 
     ;; desktop/init! BLOCKS holding eww; it coming back means the shell died. Exit explicitly —

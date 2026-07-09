@@ -31,13 +31,20 @@
 
 
 (deftest from-tree-flattens-with-placement-context
-  (is (= [{:con-id 42 :class "ujima-wikipedia" :title "Wikipedia" :focused? true
+  (is (= [{:con-id 42 :class "ujima-wikipedia" :title "Wikipedia" :focused? true :fullscreen? false
            :workspace "wikipedia" :floating? false :transient? false}
-          {:con-id 7 :class "libreoffice-writer" :title "Tip of the Day" :focused? false
+          {:con-id 7 :class "libreoffice-writer" :title "Tip of the Day" :focused? false :fullscreen? false
            :workspace "wikipedia" :floating? true :transient? true}
-          {:con-id 9 :class "libreoffice-writer" :title "Essay.odt" :focused? false
+          {:con-id 9 :class "libreoffice-writer" :title "Essay.odt" :focused? false :fullscreen? false
            :workspace "write" :floating? false :transient? false}]
          ws)))
+
+
+(deftest from-tree-marks-fullscreen-windows
+  (let [t {:nodes [{:type "workspace" :name "stellarium"
+                    :nodes [{:id 88 :window 2001 :name "Stellarium" :fullscreen_mode 1
+                             :window_properties {:class "stellarium"}}]}]}]
+    (is (true? (:fullscreen? (first (windows/from-tree t)))))))
 
 
 (deftest of-class-is-case-insensitive

@@ -31,7 +31,7 @@
 
 (deftest focus-resolves-to-the-owning-app
   (let [view (lc/view cat [wiki-win] {})]
-    (is (= :wikipedia (:current view)))
+    (is (= :wikipedia (:id (:current view))) "current is the focused app's entry")
     (is (= 42 (get-in view [:focused :con-id])) "the raw fact rides along for the close verb"))
   (let [eww  {:con-id 3 :class "Eww" :title "Eww - launcher" :focused? true
               :workspace "1" :floating? false :transient? false}
@@ -49,11 +49,17 @@
 
 
 (deftest snapshot-is-the-wire-shape
-  (is (= {:apps [{:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category nil
-                  :state :running :title "Wikipedia"}]
-          :current :wikipedia
-          :current-title "Wikipedia"}
-         (lc/snapshot (lc/view cat [wiki-win] {}))))
-  (is (= {:apps [] :current nil :current-title nil}
+  (let [entry {:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category nil
+               :state :running :title "Wikipedia" :fullscreen false}]
+    (is (= {:apps [entry] :current entry}
+           (lc/snapshot (lc/view cat [wiki-win] {})))
+        "current is the focused app entry; no separate current-title"))
+  (is (= {:apps [] :current nil}
          (lc/snapshot (lc/view cat [] {})))
       ":closed apps stay off the wire"))
+
+
+(deftest snapshot-marks-the-focused-fullscreen-app
+  (let [snap (lc/snapshot (lc/view cat [(assoc wiki-win :fullscreen? true)] {}))]
+    (is (true? (get-in snap [:current :fullscreen])) "the UI is notified via current.fullscreen")
+    (is (true? (:fullscreen (first (:apps snap)))))))

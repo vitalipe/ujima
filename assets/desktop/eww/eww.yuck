@@ -22,7 +22,7 @@
 
 ;; the running apps (derived from the i3 tree) — same push contract as `state`
 (deflisten apps
-  :initial "{\"apps\":[],\"current\":null,\"currentTitle\":null}"
+  :initial "{\"apps\":[],\"current\":null}"
   "while true; do curl -sN http://127.0.0.1:1337/ui/apps; sleep 1; done")
 
 ;; the launchable-app catalog: immutable per session — fetched ONCE (retry until the
@@ -41,14 +41,14 @@
 ;; --- Dynamic class stays on the INNER box (eww evals a window-root :class once).
 (defwidget topbar []
   (box :class "topbar"
-    (box :class {(apps.current ?: "") == "" ? "bar off" : "bar"} :space-evenly false
+    (box :class {(apps.current?.id ?: "") == "" ? "bar off" : "bar"} :space-evenly false
       (box :class "idcell" :valign "center"
-        (image :path "/opt/ujima/desktop/icons/${(apps.current ?: "") == "" ? "launcher" : apps.current}.svg"
+        (image :path "/opt/ujima/desktop/icons/${apps.current?.id ?: "launcher"}.svg"
                :image-width 20 :image-height 20
-               :visible {(apps.current ?: "") != ""}))
-      (label :class "title" :halign "start" :hexpand true :text {apps.currentTitle ?: ""})
+               :visible {(apps.current?.id ?: "") != ""}))
+      (label :class "title" :halign "start" :hexpand true :text {apps.current?.title ?: ""})
       (button :class "close" :valign "center" :timeout "2s"
-        :visible {(apps.current ?: "") != ""}
+        :visible {(apps.current?.id ?: "") != ""}
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null"
         "✕"))))
 
@@ -101,19 +101,19 @@
     ;; the active view (nothing focused); neutral once an app takes over. Same rule as
     ;; the app tiles: exactly one thing selected at a time (home, or the active app).
     (box :halign "start" :space-evenly false :spacing 6
-      (button :class {(apps.current ?: "") == "" ? "home active" : "home"} :timeout "2s"
+      (button :class {(apps.current?.id ?: "") == "" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
         (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 25 :image-height 25))
       ;; files: hidden from the launcher (its 'system' category) — pinned next to home. It's an
       ;; ACTION like the launcher (not an app), so it shares .home: bare at rest, frost when focused.
-      (button :class {apps.current == "files" ? "home active" : "home"} :timeout "2s"
+      (button :class {(apps.current?.id ?: "") == "files" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"files\"}' >/dev/null"
         (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 26 :image-height 26)))
     ;; running apps: every open app carries a very subtle hint of its category; the ACTIVE one
     ;; blooms to the full category fill + ring
     (box :halign "center" :space-evenly false :spacing 6
       (for a in {apps.apps}
-        (button :class {"win cat-" + (a.category ?: "none") + (a.id == apps.current ? " active" : "")} :timeout "2s"
+        (button :class {"win cat-" + (a.category ?: "none") + (a.id == (apps.current?.id ?: "") ? " active" : "")} :timeout "2s"
           :visible {a.category != "system"}   ; system apps (files) are pinned on the left, not shown here
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"
           (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 32 :image-height 32))))

@@ -15,10 +15,13 @@
             [ujima.desktop.app.lifecycle :as lc]))
 
 
-(defonce ^:private catalog*  (atom nil))
-(defonce ^:private wintents* (atom {}))  ; the window plane's state: con-id -> asked-at
-(defonce ^:private procs*    (atom {}))  ; the proc plane's state: the spawn registry
-(defonce ^:private push*     (atom nil)) ; the GUI edge, wired by core (set-push!)
+(defonce ^:private catalog*    (atom nil))
+(defonce ^:private wintents*   (atom {}))   ; the window plane's state: con-id -> asked-at
+(defonce ^:private procs*      (atom {}))   ; the proc plane's state: the spawn registry
+(defonce ^:private push*       (atom nil))  ; the GUI edge, wired by core (set-push!)
+(defonce ^:private bars*           (atom nil)) ; the eww bar control (fn [show?]), wired by core (set-bars!)
+(defonce ^:private bars-hidden-for* (atom nil)) ; app-id the bars are hidden FOR (nil = shown); latched
+                                                ; so an app's own fullscreen flapping can't thrash them
 
 
 (def ^:private staging-workspace "ujima-loading")  ; spawn maps here, not splitting the launcher
@@ -38,6 +41,7 @@
       (reset! catalog* cat)
       (reset! wintents* {})
       (reset! procs* {})
+      (reset! bars-hidden-for* nil)
       cat)))
 
 
@@ -45,6 +49,12 @@
   "Install the GUI edge (wired by core)."
   [f]
   (reset! push* f))
+
+
+(defn set-bars!
+  "Install the eww bar control (wired by core): (fn [show?]) opens/closes the top bar + dock."
+  [f]
+  (reset! bars* f))
 
 
 (defn catalog-listing [] (catalog/listing @catalog*))
@@ -64,6 +74,22 @@
 (defn- publish! [view]
   (when-let [push! @push*]
     (push! (lc/snapshot view))))
+
+
+(defn- reconcile-bars!
+  "Hide the eww bars for a fullscreen app, show them otherwise — eww can't unmap itself, so
+   the agent owns it. LATCHED per focused app: toggling the override-redirect bars perturbs an
+   SDL app's own fullscreen (tuxtype flaps it, which would otherwise feedback-loop the bars), so
+   once hidden for an app we stay hidden through its flapping until focus leaves it (nil = the
+   launcher, or another non-fullscreen app)."
+  [view]
+  (let [cur-app (:id (:current view))
+        hide?   (boolean (and cur-app (or (:fullscreen? (:focused view))
+                                          (= cur-app @bars-hidden-for*))))]
+    (when @bars*
+      (cond
+        (and hide? (nil? @bars-hidden-for*))  (do (@bars* false) (reset! bars-hidden-for* cur-app))
+        (and (not hide?) @bars-hidden-for*)   (do (@bars* true)  (reset! bars-hidden-for* nil))))))
 
 
 ;; --- the act phase (listener thread only; each returns truthy iff it changed the world) ---
@@ -196,12 +222,12 @@
 
 (defn handle-event!
   "The single entry, the only thinking place: look, act, look again when anything
-   changed, publish."
+   changed, reconcile the bars against focus, publish."
   [ev]
-  (let [{:keys [view] :as world} (look!)]
-    (publish! (if (act! ev world)
-                (:view (look!))
-                view))))
+  (let [world (look!)
+        view  (if (act! ev world) (:view (look!)) (:view world))]
+    (reconcile-bars! view)
+    (publish! view)))
 
 
 ;; --- the verbs: resolve what must fail loudly, emit the rest onto the pipe ---

@@ -32,9 +32,14 @@
 
 
 (deftest normalize-ignores-non-window-changes
-  (is (nil? (i3/normalize {:success true})))                                 ; subscribe reply
-  (is (nil? (i3/normalize {:change "fullscreen_mode" :container {:id 7}})))  ; permissive fullscreen
-  (is (nil? (i3/normalize {:change "move" :container {:id 7}}))))
+  (is (nil? (i3/normalize {:success true})))                        ; subscribe reply
+  (is (nil? (i3/normalize {:change "move" :container {:id 7}})))
+  (is (nil? (i3/normalize {:change "floating" :container {:id 7}}))))
+
+
+(deftest normalize-surfaces-fullscreen-so-the-bars-reconcile
+  (is (= {:type :window/fullscreen :con-id 7}
+         (i3/normalize {:change "fullscreen_mode" :container {:id 7}}))))
 
 
 ;; guards the snake_case wire keys (window_properties/class) against the real i3 JSON format

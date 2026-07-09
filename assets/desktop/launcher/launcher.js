@@ -105,6 +105,36 @@ async function reveal(){
   home.classList.add('ready');
 }
 
+// ── open-app state: stream /ui/apps (the same NDJSON source as the dock) and colour EVERY open
+// app's tile with its category (.open) — not just the focused one. Mirrors eww's deflisten:
+// snapshot on connect, a line per change, reconnect after a drop (an agent restart ends the stream).
+function applyOpen(state){
+  const open = new Set((state.apps || []).map(a => a.id));
+  for (const btn of document.querySelectorAll('.tile'))
+    btn.classList.toggle('open', open.has(btn.id.replace(/^tile-/, '')));
+}
+
+async function watchApps(){
+  for (;;){
+    try {
+      const reader = (await fetch('/ui/apps')).body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      for (;;){
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream:true });
+        let nl;
+        while ((nl = buf.indexOf('\n')) >= 0){
+          const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
+          if (line.trim()) applyOpen(JSON.parse(line));
+        }
+      }
+    } catch (err){ console.error('apps stream dropped:', err); }
+    await new Promise(r => setTimeout(r, 1000));   // reconnect (agent restart drops the stream)
+  }
+}
+
 async function main(){
   buildStatus();
   pull(STATE);
@@ -112,7 +142,8 @@ async function main(){
   try { cats = await fetchCatalog(); }
   catch (err){ console.error('catalog fetch failed:', err); }
   buildGrid(cats);            // empty on failure — the header still shows, and reveal() still runs
+  watchApps();                // live open-state — starts before reveal so open tiles fade in coloured
   await reveal();
-  // live wiring later: an EventSource('/ui/state') / poll loop calls pull(nextState) on each push.
+  // live wiring TODO: pull(state) is still STATIC — an EventSource('/ui/state') will feed it later.
 }
 document.addEventListener('DOMContentLoaded', main);

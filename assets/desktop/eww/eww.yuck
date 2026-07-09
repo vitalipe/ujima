@@ -104,9 +104,9 @@
       (button :class {(apps.current ?: "") == "" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/home >/dev/null"
         (image :path "/opt/ujima/desktop/icons/launcher.svg" :image-width 25 :image-height 25))
-      ;; files: hidden from the launcher (its 'system' category) — pinned here next to home. Glows
-      ;; frost (the active-launcher colour) when it's the focused app, like any active dock tile.
-      (button :class {apps.current == "files" ? "win active cat-system" : "win"} :timeout "2s"
+      ;; files: hidden from the launcher (its 'system' category) — pinned next to home. It's an
+      ;; ACTION like the launcher (not an app), so it shares .home: bare at rest, frost when focused.
+      (button :class {apps.current == "files" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"files\"}' >/dev/null"
         (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 26 :image-height 26)))
     ;; running apps — bare 32px vendor logos; the ACTIVE one glows its category color

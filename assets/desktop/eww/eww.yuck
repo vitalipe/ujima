@@ -109,10 +109,11 @@
       (button :class {apps.current == "files" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"files\"}' >/dev/null"
         (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 26 :image-height 26)))
-    ;; running apps — bare 32px vendor logos; the ACTIVE one glows its category color
+    ;; running apps: every open app carries a very subtle hint of its category; the ACTIVE one
+    ;; blooms to the full category fill + ring
     (box :halign "center" :space-evenly false :spacing 6
       (for a in {apps.apps}
-        (button :class {a.id == apps.current ? "win active cat-" + (a.category ?: "none") : "win"} :timeout "2s"
+        (button :class {"win cat-" + (a.category ?: "none") + (a.id == apps.current ? " active" : "")} :timeout "2s"
           :visible {a.category != "system"}   ; system apps (files) are pinned on the left, not shown here
           :tooltip {a.label}
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"

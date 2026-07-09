@@ -136,6 +136,27 @@ async function watchApps(){
   }
 }
 
+// The launcher is UNMAPPED (hidden) whenever you're inside an app, and WebKit suspends its JS there
+// — so watchApps misses the /ui/apps pushes that happen while hidden (open an app, close it, and its
+// tile stays lit). On becoming visible again, pull one fresh snapshot and reapply, so the open-state
+// is always current whenever you're actually looking at the launcher.
+async function syncOpen(){
+  try {
+    const reader = (await fetch('/ui/apps')).body.getReader();
+    const dec = new TextDecoder(); let buf = '';
+    for (;;){
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream:true });
+      const nl = buf.indexOf('\n');
+      if (nl >= 0){ applyOpen(JSON.parse(buf.slice(0, nl))); reader.cancel().catch(() => {}); return; }
+    }
+  } catch (err){ console.error('open-state resync failed:', err); }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') syncOpen();
+});
+
 async function main(){
   buildStatus();
   pull(STATE);

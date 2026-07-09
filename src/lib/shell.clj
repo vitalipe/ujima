@@ -81,6 +81,12 @@
   (fn [opts argv] (spawn (merge capture-opts opts) argv)))
 
 
+(defn inheriting
+  "Spawn decorator: the child writes straight to our stdout/stderr (the journal), nothing captured."
+  [spawn]
+  (fn [opts argv] (spawn (merge {:out :inherit :err :inherit} opts) argv)))
+
+
 ;; ---------------------------------------------------------------------------
 ;; Console output — a spawn decorator that streams a command's output as it runs (build
 ;; scripts). Composes freely; capturing (`$?`) calls stay silent.

@@ -117,7 +117,7 @@
       (json 500 {:error "internal error"}))))
 
 
-(defn start!
+(defn init!
   "Start the loopback API (+ static launcher assets from static-root); returns http-kit's stop
    fn. A taken port throws — the session dies loudly and systemd rebuilds it."
   [{:keys [host port static-root]

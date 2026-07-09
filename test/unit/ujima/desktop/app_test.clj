@@ -46,9 +46,8 @@
   (let [f (str (fs/create-temp-file {:prefix "apps" :suffix ".edn"}))]
     (fs/delete-on-exit f)
     (spit f (pr-str catalog-edn))
-    (app/load-catalog! f))                        ; also resets the intent + spawn ledgers
-  (app/set-push! #(swap! pushed* conj %))
-  (app/set-bars! nil)                            ; each test wires its own bar stub (or none)
+    (app/init! {:catalog          (app/load-catalog f)          ; load the catalog + reset the ledgers
+                :converge-targets [(fn [next _prv] (swap! pushed* conj next))]}))  ; capture the snapshot
   (reset! world* {:wins wins :focused-ws focused-ws})
   (reset! fx* [])
   (reset! pushed* []))
@@ -188,23 +187,6 @@
   (setup! [(win 7 "TuxPaint" "paint") (win 8 "SomethingElse" "paint")] "paint")
   (stubbed #(app/handle-event! {:type :window/focus :con-id 8}))
   (is (= [] (fx-of :switch)) "windows live here — nothing to rescue"))
-
-
-(deftest bars-latch-hidden-through-a-fullscreen-apps-flapping
-  ;; hide once when the focused app goes fullscreen; STAY hidden through the app's own
-  ;; fullscreen flapping (SDL games toggle it — reopening would perturb the app into a
-  ;; feedback loop); reopen only when focus leaves the app (eww launcher = uncataloged = nobody)
-  (setup! [(win 7 "TuxPaint" "paint" :focused? true :fullscreen? true)] "paint")
-  (let [bars (atom [])]
-    (app/set-bars! #(swap! bars conj %))
-    (stubbed #(app/handle-event! {:type :window/fullscreen :con-id 7}))
-    (is (= [false] @bars) "focused fullscreen -> hidden once")
-    (swap! world* assoc :wins [(win 7 "TuxPaint" "paint" :focused? true)])       ; same app flaps to windowed
-    (stubbed #(app/handle-event! {:type :window/fullscreen :con-id 7}))
-    (is (= [false] @bars) "same app, transient windowed -> still hidden (latched)")
-    (reset! world* {:wins [(win 8 "eww" "1" :focused? true)] :focused-ws "1"})    ; focus leaves to the launcher
-    (stubbed #(app/handle-event! {:type :window/focus :con-id 8}))
-    (is (= [false true] @bars) "focus left the app -> bars shown")))
 
 
 (deftest run-resolves-in-the-catalog-or-throws

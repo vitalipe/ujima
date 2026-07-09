@@ -1,8 +1,7 @@
 (ns ujima.desktop.app
-  "The app domain's edge — an actor over the single window stream. Three planes,
-   each owning only its own state: windows (close-intents), procs (the spawn
-   registry), lifecycle (nothing — a pure join). Window events, :recheck/* echoes
-   and the commands the verbs emit! all ride linux.i3's stream into handle-event!."
+  "A contained converging system over the window stream: evt -> look -> act -> look -> converge!,
+   which fans (next prv) out to the converge-targets (installed by init!). Three planes own their
+   state: windows (close-intents), procs (the spawn registry), lifecycle (a pure join)."
   (:require [babashka.fs      :as fs]
             [babashka.process :as p]
             [lib.io    :as io]
@@ -15,46 +14,39 @@
             [ujima.desktop.app.lifecycle :as lc]))
 
 
-(defonce ^:private catalog*    (atom nil))
-(defonce ^:private wintents*   (atom {}))   ; the window plane's state: con-id -> asked-at
-(defonce ^:private procs*      (atom {}))   ; the proc plane's state: the spawn registry
-(defonce ^:private push*       (atom nil))  ; the GUI edge, wired by core (set-push!)
-(defonce ^:private bars*           (atom nil)) ; the eww bar control (fn [show?]), wired by core (set-bars!)
-(defonce ^:private bars-hidden-for* (atom nil)) ; app-id the bars are hidden FOR (nil = shown); latched
-                                                ; so an app's own fullscreen flapping can't thrash them
+(defonce ^:private catalog*  (atom nil))
+(defonce ^:private wintents* (atom {}))   ; the window plane's state: con-id -> asked-at
+(defonce ^:private procs*    (atom {}))   ; the proc plane's state: the spawn registry
+(defonce ^:private prev*    (atom nil))  ; the last snapshot emitted — the prv of (next prv)
+(defonce ^:private targets* (atom []))   ; converge targets [(fn [next prv]) …], installed by init!
 
 
 (def ^:private staging-workspace "ujima-loading")  ; spawn maps here, not splitting the launcher
 (def ^:private home-workspace    "1")              ; where eww's launcher window lives
 
 
-(defn load-catalog!
-  "Load + index apps.edn. Missing or unreadable throws — a broken image, not an
-   empty desktop."
+(defn load-catalog
+  "Load + index apps.edn, returning the catalog. Missing or unreadable throws — a broken image,
+   not an empty desktop. Doesn't touch the plane's state; init! installs the result."
   [path]
   (when-not (and path (fs/exists? (str path)))
     (throw (ex-info "app catalog not found" {:path (str path)})))
   (let [raw (io/slurp-edn path)]
     (when-not (map? raw)
       (throw (ex-info "app catalog unreadable" {:path (str path)})))
-    (let [cat (catalog/->catalog raw)]
-      (reset! catalog* cat)
-      (reset! wintents* {})
-      (reset! procs* {})
-      (reset! bars-hidden-for* nil)
-      cat)))
+    (catalog/->catalog raw)))
 
 
-(defn set-push!
-  "Install the GUI edge (wired by core)."
-  [f]
-  (reset! push* f))
-
-
-(defn set-bars!
-  "Install the eww bar control (wired by core): (fn [show?]) opens/closes the top bar + dock."
-  [f]
-  (reset! bars* f))
+(defn init!
+  "Install the loaded :catalog and the :converge-targets [(fn [next prv]) …] each converge fans
+   out to; reset the plane's ledgers."
+  [{:keys [catalog converge-targets]}]
+  (reset! catalog*  catalog)
+  (reset! wintents* {})
+  (reset! procs*    {})
+  (reset! prev*     nil)
+  (reset! targets*  (vec converge-targets))
+  catalog)
 
 
 (defn catalog-listing [] (catalog/listing @catalog*))
@@ -71,25 +63,13 @@
     {:ws ws :view (lc/view @catalog* ws registry)}))
 
 
-(defn- publish! [view]
-  (when-let [push! @push*]
-    (push! (lc/snapshot view))))
-
-
-(defn- reconcile-bars!
-  "Hide the eww bars for a fullscreen app, show them otherwise — eww can't unmap itself, so
-   the agent owns it. LATCHED per focused app: toggling the override-redirect bars perturbs an
-   SDL app's own fullscreen (tuxtype flaps it, which would otherwise feedback-loop the bars), so
-   once hidden for an app we stay hidden through its flapping until focus leaves it (nil = the
-   launcher, or another non-fullscreen app)."
+(defn- converge!
+  "The pipeline tail: snapshot the view, fan (next prv) out to the targets, remember next as prv."
   [view]
-  (let [cur-app (:id (:current view))
-        hide?   (boolean (and cur-app (or (:fullscreen? (:focused view))
-                                          (= cur-app @bars-hidden-for*))))]
-    (when @bars*
-      (cond
-        (and hide? (nil? @bars-hidden-for*))  (do (@bars* false) (reset! bars-hidden-for* cur-app))
-        (and (not hide?) @bars-hidden-for*)   (do (@bars* true)  (reset! bars-hidden-for* nil))))))
+  (let [next (lc/snapshot view)
+        prv  @prev*]
+    (reset! prev* next)
+    (doseq [target @targets*] (target next prv))))
 
 
 ;; --- the act phase (listener thread only; each returns truthy iff it changed the world) ---
@@ -221,13 +201,11 @@
 
 
 (defn handle-event!
-  "The single entry, the only thinking place: look, act, look again when anything
-   changed, reconcile the bars against focus, publish."
+  "The single entry, the only thinking place: evt -> look -> act -> look -> converge!."
   [ev]
   (let [world (look!)
         view  (if (act! ev world) (:view (look!)) (:view world))]
-    (reconcile-bars! view)
-    (publish! view)))
+    (converge! view)))
 
 
 ;; --- the verbs: resolve what must fail loudly, emit the rest onto the pipe ---

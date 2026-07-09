@@ -66,7 +66,7 @@ function buildGrid(cats){
         <div class="tiles"></div></section>`);
     const tiles = col.querySelector('.tiles');
     for (const app of cat.apps){
-      const b = el(`<button class="tile" id="tile-${app.id}" title="${app.label || app.id}">
+      const b = el(`<button class="tile" id="tile-${app.id}" aria-label="${app.label || app.id}">
           <img src="${ICONS}/${app.icon}.svg" alt="" draggable="false"></button>`);
       b.addEventListener('click', () => launch(app.id));
       tiles.appendChild(b);

@@ -105,18 +105,14 @@ async function reveal(){
   home.classList.add('ready');
 }
 
-// ── app state: stream /ui/apps (the same NDJSON source as the dock). Colour every OPEN app's tile
-// with its category (.open), and mark the ONE focused app (.active, from state.current) with a
-// stronger ring. Matching is by catalog id — stable until user-defined catalogs land in v1. Mirrors
-// eww's deflisten: snapshot on connect, a line per change, reconnect after a drop.
-function applyApps(state){
-  const open    = new Set((state.apps || []).map(a => a.id));
-  const current = state.current;                 // focused app id — null at home (launcher on top)
-  for (const btn of document.querySelectorAll('.tile')){
-    const id = btn.id.replace(/^tile-/, '');
-    btn.classList.toggle('open',   open.has(id));
-    btn.classList.toggle('active', id === current);
-  }
+// ── open-app state: stream /ui/apps (the same NDJSON source as the dock) and colour EVERY open
+// app's tile with its category (.open). Each push carries the FULL open-apps list (apps[] — not a
+// delta, and populated even at home), so we just reapply it. Matching is by catalog id — stable
+// until user-defined catalogs land in v1. Mirrors eww's deflisten: snapshot then a line per change.
+function applyOpen(state){
+  const open = new Set((state.apps || []).map(a => a.id));
+  for (const btn of document.querySelectorAll('.tile'))
+    btn.classList.toggle('open', open.has(btn.id.replace(/^tile-/, '')));
 }
 
 async function watchApps(){
@@ -132,7 +128,7 @@ async function watchApps(){
         let nl;
         while ((nl = buf.indexOf('\n')) >= 0){
           const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
-          if (line.trim()) applyApps(JSON.parse(line));
+          if (line.trim()) applyOpen(JSON.parse(line));
         }
       }
     } catch (err){ console.error('apps stream dropped:', err); }

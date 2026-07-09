@@ -115,7 +115,6 @@
       (for a in {apps.apps}
         (button :class {"win cat-" + (a.category ?: "none") + (a.id == apps.current ? " active" : "")} :timeout "2s"
           :visible {a.category != "system"}   ; system apps (files) are pinned on the left, not shown here
-          :tooltip {a.label}
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"
           (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 32 :image-height 32))))
     (box :class "tray" :halign "end" :space-evenly false :spacing 4

@@ -1,13 +1,16 @@
 (ns ujima.desktop.eww
   "The eww top bar + dock: the daemon lifecycle (init!!) and the bars as a converge target on
-   app's (next prv) edge. show-bar? is a pure fold — the latch, as data."
+   app's (next prv) edge. Debounced so fullscreen churn (F11 spam, an SDL game's flapping)
+   coalesces to the settled state."
   (:require [lib.shell :as shell]
             [ujima.log :as log]))
 
 
-(def ^:private ping-tries 40)                        ; x 250ms = 10s for the daemon socket
-(def ^:private eww-dir*   (atom "/opt/ujima/desktop/eww"))
-(def ^:private shown?     (atom true))               ; bar visibility — the fold's only memory
+(def ^:private ping-tries  40)                       ; x 250ms = 10s for the daemon socket
+(def ^:private eww-dir*    (atom "/opt/ujima/desktop/eww"))
+(def ^:private shown?      (atom true))              ; bar visibility
+(def ^:private gen*        (atom 0))                 ; supersedes a pending debounced flip
+(def ^:private debounce-ms 200)                      ; actuate only after fullscreen settles quiet
 
 
 (defn- actuate! [show?]
@@ -15,25 +18,24 @@
 
 
 (defn show-bar?
-  "Pure: should the bars be shown, given next + prv snapshots and last tick's decision. Hide for
-   a fullscreen focused app; stay hidden through that app's own fullscreen flapping."
-  [next prv prev-shown?]
-  (let [cur (get-in next [:current :id])
-        was (get-in prv  [:current :id])]
-    (cond
-      (nil? cur)                            true    ; launcher / unmanaged -> show
-      (get-in next [:current :fullscreen])  false   ; fullscreen -> hide
-      (and (= cur was) (not prev-shown?))   false   ; same app, were hidden -> stay hidden
-      :else                                 true)))
+  "Pure: bars shown unless the focused window is fullscreen."
+  [snapshot]
+  (or (nil? (get-in snapshot [:current :id]))
+      (not (get-in snapshot [:current :fullscreen]))))
 
 
 (defn converge!
-  "A converge target (fn [next prv]): actuate the bars only when their visibility flips."
-  [next prv]
-  (let [now (show-bar? next prv @shown?)]
-    (when (not= now @shown?)
-      (actuate! now)
-      (reset! shown? now))))
+  "A converge target (fn [next prv]) — DEBOUNCED: each event arms a flip, and only the last one
+   still current after debounce-ms actuates. So F11 spam / an SDL game's flapping coalesces to the
+   settled state, and we never actuate mid-flap (never perturbing the app)."
+  [next _prv]
+  (let [want (show-bar? next)
+        g    (swap! gen* inc)]
+    (future
+      (Thread/sleep debounce-ms)
+      (when (and (= g @gen*) (not= want @shown?))
+        (actuate! want)
+        (reset! shown? want)))))
 
 
 (defn- await-daemon!

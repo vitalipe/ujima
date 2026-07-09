@@ -11,22 +11,21 @@
 (def ^:private tux-win  (snap {:id :tuxtype :fullscreen false}))
 
 
-(deftest show-bar?-is-a-pure-latch-over-next+prv
-  (is (true?  (eww/show-bar? launcher launcher true))  "launcher -> show")
-  (is (true?  (eww/show-bar? tux-win  launcher true))  "windowed app -> show")
-  (is (false? (eww/show-bar? tux-fs   launcher true))  "fullscreen -> hide")
-  (is (false? (eww/show-bar? tux-win  tux-fs   false)) "same app flap, were hidden -> stay hidden")
-  (is (false? (eww/show-bar? tux-fs   tux-win  false)) "flap back to fullscreen -> hidden")
-  (is (true?  (eww/show-bar? launcher tux-fs   false)) "focus left -> show"))
+(deftest show-bar?-is-shown-unless-the-focused-window-is-fullscreen
+  (is (true?  (eww/show-bar? launcher)) "launcher -> show")
+  (is (true?  (eww/show-bar? tux-win))  "windowed app -> show")
+  (is (false? (eww/show-bar? tux-fs))   "fullscreen -> hide"))
 
 
-(deftest converge!-actuates-eww-only-on-a-visibility-flip
+(deftest converge!-debounces-and-coalesces-to-the-settled-state
   (reset! @#'eww/shown? true)
-  (let [calls (atom [])]
-    (with-redefs [shell/sh? (fn [& args] (swap! calls conj (nth (vec args) 3)) {:ok? true})]
-      (eww/converge! tux-fs  launcher)   ; fullscreen -> hide (close)
-      (eww/converge! tux-win tux-fs)     ; same app windowed -> latched, no eww call
-      (eww/converge! tux-fs  tux-win)    ; flap fullscreen -> latched, no eww call
-      (is (= ["close"] @calls) "hidden once; the app's own flapping never re-actuates")
-      (eww/converge! launcher tux-fs)    ; focus leaves -> show (open-many)
-      (is (= ["close" "open-many"] @calls) "reopened only when focus left the app"))))
+  (let [cmds  (atom [])
+        quiet (+ @#'eww/debounce-ms 250)]
+    (with-redefs [shell/sh? (fn [& args] (swap! cmds conj (nth (vec args) 3)) {:ok? true})]
+      (eww/converge! tux-win launcher)   ; show (no-op, already shown)
+      (eww/converge! tux-fs  tux-win)    ; hide
+      (eww/converge! tux-win tux-fs)     ; show
+      (eww/converge! tux-fs  tux-win)    ; final = fullscreen -> hide
+      (is (= [] @cmds) "nothing actuated mid-churn — debouncing")
+      (Thread/sleep quiet)
+      (is (= ["close"] @cmds) "coalesced to the settled state: one actuation"))))

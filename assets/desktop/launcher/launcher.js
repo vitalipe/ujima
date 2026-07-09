@@ -25,7 +25,7 @@ const el = (html) => { const t = document.createElement('template'); t.innerHTML
 const CATEGORIES = [
   { key:'learn',   label:'LEARN',   color:'203,168,120' },
   { key:'explore', label:'EXPLORE', color:'126,158,214' },
-  { key:'office',  label:'OFFICE',  color:'168,150,201' },
+  { key:'office',  label:'OFFICE',  color:'181,143,201' },
   { key:'create',  label:'CREATE',  color:'206,147,166' },
   { key:'code',    label:'CODE',    color:'176,184,119' },
 ];
@@ -105,13 +105,18 @@ async function reveal(){
   home.classList.add('ready');
 }
 
-// ── open-app state: stream /ui/apps (the same NDJSON source as the dock) and colour EVERY open
-// app's tile with its category (.open) — not just the focused one. Mirrors eww's deflisten:
-// snapshot on connect, a line per change, reconnect after a drop (an agent restart ends the stream).
-function applyOpen(state){
-  const open = new Set((state.apps || []).map(a => a.id));
-  for (const btn of document.querySelectorAll('.tile'))
-    btn.classList.toggle('open', open.has(btn.id.replace(/^tile-/, '')));
+// ── app state: stream /ui/apps (the same NDJSON source as the dock). Colour every OPEN app's tile
+// with its category (.open), and mark the ONE focused app (.active, from state.current) with a
+// stronger ring. Matching is by catalog id — stable until user-defined catalogs land in v1. Mirrors
+// eww's deflisten: snapshot on connect, a line per change, reconnect after a drop.
+function applyApps(state){
+  const open    = new Set((state.apps || []).map(a => a.id));
+  const current = state.current;                 // focused app id — null at home (launcher on top)
+  for (const btn of document.querySelectorAll('.tile')){
+    const id = btn.id.replace(/^tile-/, '');
+    btn.classList.toggle('open',   open.has(id));
+    btn.classList.toggle('active', id === current);
+  }
 }
 
 async function watchApps(){
@@ -127,7 +132,7 @@ async function watchApps(){
         let nl;
         while ((nl = buf.indexOf('\n')) >= 0){
           const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
-          if (line.trim()) applyOpen(JSON.parse(line));
+          if (line.trim()) applyApps(JSON.parse(line));
         }
       }
     } catch (err){ console.error('apps stream dropped:', err); }

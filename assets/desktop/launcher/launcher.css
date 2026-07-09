@@ -70,8 +70,9 @@ body{
 .cat-label{font-size:11px; text-transform:uppercase; letter-spacing:1.5px; font-weight:700; color:rgb(var(--cat))}
 
 .tiles{display:flex; flex-wrap:wrap; gap:10px; max-width:302px}
-/* 49b tinted launcher: every tile carries a faint hint of its category (--cat, set per .cat),
-   blooming to a full fill+ring when the app is OPEN (.open, driven live by /ui/apps). */
+/* 49b tinted launcher: every tile carries a faint hint of its category (--cat, set per .cat).
+   OPEN apps bloom to a full fill+ring (.open); the ONE focused app gets a stronger ring
+   (.active) — both driven live by /ui/apps. */
 .tile{
   width:68px; height:68px; border-radius:18px; flex:none;
   display:flex; align-items:center; justify-content:center;
@@ -80,7 +81,8 @@ body{
 }
 .tile:hover{background:rgba(var(--cat),.17); box-shadow:inset 0 0 0 1px rgba(var(--cat),.32)}
 .tile.open{background:rgba(var(--cat),.24); box-shadow:inset 0 0 0 1.5px rgba(var(--cat),.5)}
-.tile:active{transform:scale(.93)}          /* the click effect */
+.tile.active{background:rgba(var(--cat),.30); box-shadow:inset 0 0 0 2px rgba(var(--cat),.9)}   /* focused app — stronger ring than .open */
+.tile:active{transform:scale(.93)}          /* the click effect (press) */
 .tile img{width:39px; height:39px; object-fit:contain; -webkit-user-drag:none; pointer-events:none}
 .tile.glyph{background:rgba(255,255,255,.03); box-shadow:inset 0 0 0 1.5px rgba(var(--cat),.4)}
 .tile.glyph svg{width:29px; height:29px; color:rgb(var(--cat)); pointer-events:none}

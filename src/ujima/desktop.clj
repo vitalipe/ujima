@@ -12,6 +12,7 @@
 
 
 (def ^:private ping-tries 40)   ; x 250ms = 10s for the daemon socket to come up
+(def ^:private x-tries    60)   ; x 250ms = ~15s for X to accept an authorized connection
 
 
 (defn- inheriting
@@ -29,6 +30,21 @@
       (if (pos? n)
         (do (Thread/sleep 250) (recur (dec n)))
         (throw (ex-info "eww daemon never answered ping" {:eww dir}))))))
+
+
+(defn await-x!
+  "Block until X accepts an AUTHORIZED connection, then return. Guards the cold-boot race where the
+   agent's first X call (the initial keyboard converge, then eww's GTK init) beats startx writing
+   its auth cookie into ~/.Xauthority — the client then connects with no cookie ('no authorization
+   protocol specified'), eww's GTK init dies, and the whole session restarts. Probe = `setxkbmap
+   -query`, the one X client guaranteed present (the keyboard converge itself uses it). Caps at
+   ~15s then proceeds with a warning, so a never-ready X can't wedge boot."
+  []
+  (loop [n x-tries]
+    (when-not (:ok? (shell/sh? :setxkbmap "-query"))
+      (if (pos? n)
+        (do (Thread/sleep 250) (recur (dec n)))
+        (log/warn "X never accepted an authorized connection — proceeding" {})))))
 
 
 (defn- keep-launcher!

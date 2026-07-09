@@ -28,6 +28,9 @@
     ;; control drives its converge ports in vector order: linux first, then the GUI.
     (control/init!     (assoc (get-in env [:control] {})
                               :converge-targets [linux/converge! ui/converge!]))
+    ;; cold-boot X-auth guard: wait for X to accept an authorized connection before the first
+    ;; converge (keyboard) or eww touch it — else they race startx's cookie write and the shell dies.
+    (desktop/await-x!)
     (control/converge-fresh!)
 
     ;; the catalog (the window-adoption class index) must exist before the i3 watcher's

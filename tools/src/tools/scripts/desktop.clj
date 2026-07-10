@@ -98,6 +98,14 @@
             ($! cp -a [web] "/opt/ujima/web"))
         (println "desktop: no assets/web — web apps not staged")))
 
+    ;; url handler: xdg-open (via mimeapps.list, staged with assets/home) resolves http/https to
+    ;; this .desktop -> bin/ujima-open -> the Web app.
+    (fs/create-dirs "/usr/share/applications")
+    (spit "/usr/share/applications/ujima-open.desktop"
+          (str "[Desktop Entry]\nType=Application\nName=Ujima URL Handler\n"
+               "Exec=/opt/ujima/desktop/bin/ujima-open %u\n"
+               "MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\nNoDisplay=true\n"))
+
     ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.appcatalog.
     ;; Emitted AFTER the wholesale copy above so the clean-mirror can't clobber it; rides both the
     ;; image build and live `dev push desktop`, so a catalog-only edit ships without a rebuild.

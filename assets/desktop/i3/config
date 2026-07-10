@@ -13,10 +13,16 @@ client.focused_inactive #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
 client.unfocused        #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
 client.urgent           #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
 
-# dialogs/popups float; deliberately NO fullscreen keybind — the eww bars must stay visible
+# real dialogs float; deliberately NO fullscreen keybind — the eww bars must stay visible.
+# chromium --app windows auto-float (fixed size hints) but set class/role only AFTER mapping, so
+# for_window can't catch them here — the agent un-floats app windows instead (settle-floaters!).
 for_window [window_type="dialog"]  floating enable
 for_window [window_type="utility"] floating enable
-for_window [window_role="pop-up"]  floating enable
+# open/save file choosers overflow the bars when floated (buttons hide behind the dock) — TILE them
+# instead: a tiled window fills exactly the band between the top bar and dock at any resolution
+# (i3's gaps handle the fixed 48/68px), so no hardcoded size. Targets the GTK chooser role so small
+# confirm dialogs still float.
+for_window [window_role="GtkFileChooserDialog"] floating disable
 
 # eww topbar/dock are :wm-ignore (override-redirect) in eww.yuck, so i3 doesn't manage them; the
 # launcher (a webview, WM_CLASS ujima-launcher) is a normal window the agent tracks + places on

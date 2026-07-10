@@ -1,10 +1,6 @@
 (ns ujima.linux.i3
-  "i3 as a pure event source over the lib.shell DSL. watch-windows! streams normalized
-   window events from `i3-msg -t subscribe -m` (line-delimited JSON — the binary IPC is
-   deliberately avoided, and the DSL keeps the *spawn* remap seam so dev/test can stub
-   i3-msg). Baseline-encoded like the other watchers: every window already in the tree is
-   emitted as :window/new first, so a consumer folding adoptions needs no separate sync
-   pass. Consumers own all policy."
+  "i3 over the lib.shell DSL: a window/workspace event stream plus the few commands the
+   app layer issues. The binary IPC is avoided so the *spawn* seam can stub i3-msg."
   (:require [cheshire.core      :as json]
             [clojure.core.async :as async]
             [clojure.java.io    :as jio]
@@ -14,142 +10,83 @@
 
 
 (defn normalize
-  "Raw i3 `window` event (parsed JSON, keyword keys) -> a proc-store event, or nil to
-   ignore (the subscribe reply, move/floating/…). `:class` rides on
-   `title` too: some apps (LibreOffice) set WM_CLASS *after* mapping, so the class only
-   becomes correct on a later title event. `:transient?` flags dialogs (a child window,
-   not the app's primary). Pure."
+  "A raw i3 event -> a bare tick the app layer reacts to, or nil to ignore. We carry no
+   window details: every handler re-reads the tree, so the event only says 'something moved'.
+   :window/close is kept distinct because the go-home rule keys on it."
   [ev]
-  (let [c          (:container ev)
-        wp         (:window_properties c)
-        class      (:class wp)
-        transient? (some? (:transient_for wp))]
+  (if-let [c (:container ev)]
     (case (:change ev)
-      "new"   {:type :window/new   :con-id (:id c) :wm-window (:window c)
-               :class class :transient? transient? :title (:name c)}
       "close" {:type :window/close :con-id (:id c)}
-      "title" {:type :window/title :con-id (:id c)
-               :class class :transient? transient? :title (:name c)}
-      "focus" {:type :window/focus :con-id (:id c)}
-      ;; a window entering/leaving fullscreen re-drives the converge so the bars reconcile —
-      ;; the only trigger when an app fullscreens itself after mapping (Stellarium; web video)
-      "fullscreen_mode" {:type :window/fullscreen :con-id (:id c)}
-      nil)))
+      ;; "floating" too: chromium --app floats itself AFTER mapping, so we must re-settle then
+      ("new" "title" "focus" "fullscreen_mode" "floating") {:type :window/change}
+      nil)
+    (when (and (:current ev) (= "focus" (:change ev)))
+      {:type :workspace/focus})))
 
 
 (defn- parse-line [line]
   (try (json/parse-string line true) (catch Exception _ nil)))
 
 
-(defn tree-windows
-  "All real X-window leaf nodes under an i3 get_tree node (those carrying a :window id)."
-  [node]
-  (concat (when (:window node) [node])
-          (mapcat tree-windows (concat (:nodes node) (:floating_nodes node)))))
-
-
-(defn get-tree!
-  "Parse the live i3 layout tree (i3-msg -t get_tree)."
-  []
+(defn get-tree! []
   (json/parse-string (shell/sh! :i3-msg :-t "get_tree") true))
 
 
-(defn command!
-  "Run an i3 command via i3-msg (returns its reply string; throws on failure)."
-  [& args]
-  (apply shell/sh! :i3-msg args))
+(defn window-facts
+  "The tree flattened to [{:con-id :workspace :focused? :floating? :wtype :title}]."
+  [tree]
+  (letfn [(walk [node ws floating?]
+            (let [ws (if (= "workspace" (:type node)) (:name node) ws)]
+              (concat
+                (when (:window node)
+                  [{:con-id (:id node) :workspace ws :focused? (boolean (:focused node))
+                    :floating? floating? :wtype (:window_type node) :title (:name node)}])
+                (mapcat #(walk % ws floating?) (:nodes node))
+                (mapcat #(walk % ws true) (:floating_nodes node)))))]
+    (vec (walk tree nil false))))
 
 
-(defn kill-con!
-  "WM_close the container — polite: an app may answer with a quit-confirm and keep
-   the window (TuxPaint does; the SM's :closing recheck handles it)."
-  [con-id]
-  (command! (format "[con_id=%d]" con-id) "kill"))
-
-
-(defn switch-workspace! [ws]
-  (command! "workspace" ws))
-
-
-(defn focused-workspace
-  "The visible workspace's name (i3-msg -t get_workspaces)."
-  []
+(defn focused-workspace []
   (->> (json/parse-string (shell/sh! :i3-msg :-t "get_workspaces") true)
        (some #(when (:focused %) (:name %)))))
 
 
-(defn place!
-  "Move a container to WORKSPACE, switch to it, and explicitly focus it. Mined from
-   desktop-base: floating disable fills the workspace (chromium --app trips the i3
-   pop-up float rule), sticky disable keeps it off other workspaces (eww marks
-   windows sticky), and the explicit focus matters — a bare workspace switch emits
-   only workspace::focus, which we don't subscribe to."
-  [con-id workspace]
-  (let [c (format "[con_id=%d]" con-id)]
-    (command! c "floating" "disable")
-    (command! c "sticky" "disable")
-    (command! c "move" "to" "workspace" workspace)
-    (command! "workspace" workspace)
-    (command! c "focus")))
+(defn command!  [& args] (apply shell/sh!  :i3-msg args))
+(defn command?  [& args] (apply shell/sh?  :i3-msg args))   ; tolerant: a con can vanish mid-tick
+
+(defn switch-workspace! [ws] (command! "workspace" ws))
+(defn kill-focused!     []   (command? "kill"))
 
 
-(defn baseline-events
-  "Every real window in an i3 TREE as a :window/new event — what a fresh watcher emits
-   so consumers adopt windows that mapped before it was listening. Pure."
-  [tree]
-  (keep #(normalize {:change "new" :container %}) (tree-windows tree)))
-
-
-(defonce ^:private out*
-  ;; the active watch channel — emit-in! delivers synthetic events onto it
-  (atom nil))
-
+(defonce ^:private out* (atom nil))
 
 (defn emit!
-  "Deliver EV onto the window-event stream NOW — commands ride the same pipe as
-   window events, so all handling is queue-ordered on the one listener thread.
-   Dropped loudly when no watch is active or the stream has closed."
+  "Put EV onto the live event stream so verbs ride the same single listener thread as window
+   events. Dropped loudly if no watch is active."
   [ev]
   (let [ch @out*]
     (when-not (and ch (async/>!! ch ev))
       (log/warn "emit!: no active window watch — event dropped" ev))))
 
 
-(defn emit-in!
-  "emit!, delayed by MS — the \"tell me again later\" echo (:recheck/*; the event
-   carries the asker's intent identity). Pure delayed delivery: all handling
-   happens downstream like any window event."
-  [ms ev]
-  (future
-    (Thread/sleep (long ms))
-    (emit! ev)))
-
-
 (defn watch-windows!
-  "Stream the window world on the returned channel: subscribe first, then the
-   baseline (a window mapping in between arrives twice — consumers must tolerate
-   replays), then live normalized events — plus the synthetic events emit-in!
-   echoes back. Blocking puts. The subscription is expected to outlive the session
-   (`i3-msg reload`, never `restart`); if the stream ends anyway it's logged loudly
-   and the channel closes."
+  "Stream window + workspace events on the returned channel (plus verb events from emit!).
+   One initial tick forces a first converge; the subscription outlives the session."
   []
   (let [ch   (async/chan 64)
-        ;; :shutdown — finally never runs when bb itself is killed (session cycle);
-        ;; without it every restart would orphan an i3-msg monitor
         proc (shell/sh {:out :stream :err :stream :shutdown p/destroy-tree}
-                       :i3-msg :-t "subscribe" :-m "[\"window\"]")]
+                       :i3-msg :-t "subscribe" :-m "[\"window\",\"workspace\"]")]
     (reset! out* ch)
     (async/thread
       (try
-        (doseq [ev (baseline-events (get-tree!))]
-          (async/>!! ch ev))
+        (async/>!! ch {:type :tick})
         (with-open [r (jio/reader (:out proc))]
           (doseq [line (line-seq r)]
             (when-let [ev (some-> line parse-line normalize)]
               (async/>!! ch ev))))
-        (log/error "i3 window stream ended")
+        (log/error "i3 event stream ended")
         (catch Throwable e
-          (log/error "i3 window watch died" {:error (ex-message e)}))
+          (log/error "i3 watch died" {:error (ex-message e)}))
         (finally
           (try (p/destroy-tree proc) (catch Throwable _))
           (async/close! ch))))

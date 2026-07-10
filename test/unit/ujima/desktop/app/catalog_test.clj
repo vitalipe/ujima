@@ -5,42 +5,30 @@
 
 (def ^:private raw
   {:apps [{:id :wikipedia :label "Wikipedia" :icon "wikipedia"
-           :exec ["chromium" "--app=https://wikipedia.com" "--class=ujima-wikipedia"]
-           :class "ujima-wikipedia"}
-          {:id :write :label "Write" :icon "write"
-           :exec ["libreoffice" "--writer"] :class "libreoffice-writer"}
-          {:id :draw :label "Draw"
-           :exec ["tuxpaint"] :class "TuxPaint.TuxPaint"}]})
+           :exec ["chromium" "--app=https://wikipedia.com"]}
+          {:id :write :label "Write" :icon "write" :exec ["libreoffice" "--writer"]}
+          {:id :draw :label "Draw" :exec ["tuxpaint"]}]})
 
 (def ^:private cat (catalog/->catalog raw))
 
 
-(deftest indexes-lower-cased-classes-to-app-maps
-  ;; WM_CLASS casing varies by app — the adoption seed is lower-cased, values = full maps
-  (is (= :draw      (get-in cat [:class->app "tuxpaint.tuxpaint" :id])))
-  (is (= :wikipedia (get-in cat [:class->app "ujima-wikipedia" :id])))
-  (is (= ["tuxpaint"] (get-in cat [:class->app "tuxpaint.tuxpaint" :exec]))))
+(deftest indexes-by-id-in-order
+  (is (= [:wikipedia :write :draw] (:order cat)))
+  (is (= ["tuxpaint"] (get-in cat [:by-id :draw :exec]))))
 
 
 (deftest listing-projects-in-order-with-icon-default
   (is (= [{:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category nil}
           {:id :write     :label "Write"     :icon "write"     :category nil}
-          {:id :draw      :label "Draw"      :icon "draw"      :category nil}] ; :icon defaults to id, :category to nil
+          {:id :draw      :label "Draw"      :icon "draw"      :category nil}]
          (catalog/listing cat))))
 
 
 (deftest validates-loudly
   (is (thrown? clojure.lang.ExceptionInfo
-        (catalog/->catalog {:apps [{:id :a :label "A" :class "x"}]}))
+        (catalog/->catalog {:apps [{:id :a :label "A"}]}))
       "missing :exec")
   (is (thrown? clojure.lang.ExceptionInfo
-        (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"]}]}))
-      ":class is required — it is the adoption key")
-  (is (thrown? clojure.lang.ExceptionInfo
-        (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"] :class "x"}
-                                   {:id :a :label "A2" :exec ["y"] :class "y"}]}))
-      "duplicate ids")
-  (is (thrown? clojure.lang.ExceptionInfo
-        (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"] :class "Same"}
-                                   {:id :b :label "B" :exec ["y"] :class "same"}]}))
-      "shared WM_CLASS, case-insensitive"))
+        (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"]}
+                                   {:id :a :label "A2" :exec ["y"]}]}))
+      "duplicate ids"))

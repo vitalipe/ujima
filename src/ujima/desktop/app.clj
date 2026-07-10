@@ -1,34 +1,30 @@
 (ns ujima.desktop.app
-  "A contained converging system over the window stream: evt -> look -> act -> look -> converge!,
-   which fans (next prv) out to the converge-targets (installed by init!). Three planes own their
-   state: windows (close-intents), procs (the spawn registry), lifecycle (a pure join)."
+  "The app layer: a small write side (run / switch / close / home) and a projection.
+   The WORKSPACE is an app's identity — app :write lives on workspace \"write\", home is
+   \"1\" — so we never match on WM_CLASS and never chase a window. Verbs ride the same
+   listener thread as i3 events (i3/emit!); each event re-reads the tree and converges a
+   snapshot to the UI targets. i3 owns placement and focus; we only switch and launch."
   (:require [babashka.fs      :as fs]
             [babashka.process :as p]
             [lib.io    :as io]
             [lib.shell :as shell]
             [ujima.log :as log]
-            [ujima.linux.i3              :as i3]
-            [ujima.desktop.app.catalog   :as catalog]
-            [ujima.desktop.app.windows   :as windows]
-            [ujima.desktop.app.procs     :as procs]
-            [ujima.desktop.app.lifecycle :as lc]))
+            [ujima.linux.i3            :as i3]
+            [ujima.desktop.app.catalog :as catalog]))
 
 
-(defonce ^:private catalog*  (atom nil))
-(defonce ^:private wintents* (atom {}))   ; the window plane's state: con-id -> asked-at
-(defonce ^:private procs*    (atom {}))   ; the proc plane's state: the spawn registry
-(defonce ^:private prev*    (atom nil))  ; the last snapshot emitted — the prv of (next prv)
-(defonce ^:private targets* (atom []))   ; converge targets [(fn [next prv]) …], installed by init!
+(defonce ^:private catalog* (atom nil))
+(defonce ^:private prev*    (atom nil))   ; last snapshot, the prv of (next prv)
+(defonce ^:private targets* (atom []))
+(defonce ^:private ran*     (atom {}))    ; app-id -> launched-at, debounces re-launch
 
 
-(def ^:private staging-workspace "ujima-loading")  ; spawn maps here, not splitting the launcher
-(def ^:private home-workspace    "1")              ; where eww's launcher window lives
+(def ^:private home-ws      "1")
+(def ^:private browser-app  :web)
+(def ^:private run-guard-ms 6000)         ; debounces re-launch while an app is still coming up
 
 
-(defn load-catalog
-  "Load + index apps.edn, returning the catalog. Missing or unreadable throws — a broken image,
-   not an empty desktop. Doesn't touch the plane's state; init! installs the result."
-  [path]
+(defn load-catalog [path]
   (when-not (and path (fs/exists? (str path)))
     (throw (ex-info "app catalog not found" {:path (str path)})))
   (let [raw (io/slurp-edn path)]
@@ -37,198 +33,133 @@
     (catalog/->catalog raw)))
 
 
-(defn init!
-  "Install the loaded :catalog and the :converge-targets [(fn [next prv]) …] each converge fans
-   out to; reset the plane's ledgers."
-  [{:keys [catalog converge-targets]}]
-  (reset! catalog*  catalog)
-  (reset! wintents* {})
-  (reset! procs*    {})
-  (reset! prev*     nil)
-  (reset! targets*  (vec converge-targets))
+(defn init! [{:keys [catalog converge-targets]}]
+  (reset! catalog* catalog)
+  (reset! prev*    nil)
+  (reset! ran*     {})
+  (reset! targets* (vec converge-targets))
   catalog)
 
 
 (defn catalog-listing [] (catalog/listing @catalog*))
 
 
-(defn- look!
-  "Ingest reality: read the tree, settle our ledgers against it (answered
-   close-intents pruned, windowed spawns marked), derive. Touches nothing real —
-   asking for a view cannot move a window."
-  []
-  (let [ws       (windows/from-tree (i3/get-tree!))
-        _        (swap! wintents* windows/resolve-intents ws)
-        registry (swap! procs* procs/mark-windowed (windows/apps-present @catalog* ws))]
-    {:ws ws :view (lc/view @catalog* ws registry)}))
+;; --- observe + projection (the read side) ---
+
+(defn- observe! []
+  {:focused-ws (i3/focused-workspace)
+   :ws->wins   (group-by :workspace (i3/window-facts (i3/get-tree!)))})
 
 
-(defn- converge!
-  "The pipeline tail: snapshot the view, fan (next prv) out to the targets, remember next as prv."
-  [view]
-  (let [next (lc/snapshot view)
-        prv  @prev*]
-    (reset! prev* next)
-    (doseq [target @targets*] (target next prv))))
+(defn- app-of-ws [ws]
+  (when (and ws (not= ws home-ws))
+    (first (filter #(= (name %) ws) (:order @catalog*)))))
 
 
-;; --- the act phase (listener thread only; each returns truthy iff it changed the world) ---
-
-(defn- enforce-placement!
-  "Move strays per the plan."
-  [ws]
-  (let [plan (windows/to-place @catalog* ws home-workspace)]
-    (doseq [{:keys [con-id workspace]} plan]
-      (i3/place! con-id workspace))
-    (boolean (seq plan))))
+(defn- entry [id ws->wins]
+  (let [a    (get-in @catalog* [:by-id id])
+        wins (get ws->wins (name id))]
+    {:id id :label (:label a) :icon (:icon a) :category (:category a)
+     :title (:title (or (first (filter :focused? wins)) (first wins)))
+     :fullscreen (= :fullscreen (:mode a))}))
 
 
-(defn- rescue-stranded!
-  "The focused workspace is DEAD — zero windows, i3 never leaves one by itself ->
-   home. Not \"no managed window focused\": that is also true mid focus-handoff and
-   on unmanaged windows (LO's Start Center), where yanking would be wrong. Staging
-   is the loading wait; the proc recheck owns it."
-  [{:keys [ws view]}]
-  (when (nil? (:current view))                       ; fast path: managed focus = alive
-    (let [fws (i3/focused-workspace)]
-      (when (and (not (#{home-workspace staging-workspace} fws))
-                 (not-any? #(= fws (:workspace %)) ws))
-        (i3/switch-workspace! home-workspace)
-        true))))
-
-(defn- hint-proc!
-  "Echo a proc-plane recheck: did APP-ID's spawn (identified by AT = its
-   :spawned-at) ever produce a window? 25s — LibreOffice needs ~20s on the Pi."
-  [app-id at]
-  (i3/emit-in! 25000 {:type :recheck/proc :app-id app-id :at at}))
+(defn- projection [{:keys [focused-ws ws->wins]}]
+  (let [open (->> (:order @catalog*)
+                  (filter #(seq (get ws->wins (name %))))
+                  (mapv #(entry % ws->wins)))]
+    {:apps    open
+     :current (when-let [id (app-of-ws focused-ws)] (entry id ws->wins))}))
 
 
-(defn- hint-window!
-  "Echo a window-plane recheck: did CON-ID (close asked at AT) actually close?
-   Past 10s a quit-confirm is holding it."
-  [con-id at]
-  (i3/emit-in! 10000 {:type :recheck/window :con-id con-id :at at}))
+(defn- converge! [snapshot]
+  (let [prv @prev*]
+    (reset! prev* snapshot)
+    (doseq [t @targets*] (t snapshot prv))))
+
+
+;; --- act (the write side; listener thread only) ---
+
+(defn- recently-ran? [id]
+  (< (- (System/currentTimeMillis) (get @ran* id 0)) run-guard-ms))
+
+
+(defn- spawn! [exec]
+  (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec))
 
 
 (defn- do-run!
-  "Gate on the derived SM: :running -> focus (ensure-open), :new -> no-op,
-   :closed -> spawn onto staging; placement hands it to its own workspace, and
-   a THROWING spawn rescues straight home."
-  [view {:keys [id exec] :as app}]
-  (case (lc/state-of view id)
-    :running (do (log/info "app already open — focusing" {:app id})
-                 (i3/switch-workspace! (name id))
-                 true)     ; moved focus = acted
-    :new     (do (log/info "run gated — still opening" {:app id})
-                 false)
-    ;; :shutdown — no orphans if the agent dies; :inherit — an unread pipe would fill
-    (do (i3/switch-workspace! staging-workspace)
-        (try
-          (let [proc (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec)
-                pid  (try (.pid (:proc proc)) (catch Throwable _ nil))
-                at   (System/currentTimeMillis)]
-            (swap! procs* assoc id {:handle proc :pid pid :spawned-at at})
-            (hint-proc! id at)
-            (log/info "app spawned" {:app id :pid pid})
-            true)
-          (catch Throwable e
-            ;; nothing registered, no recheck armed — rescue here or nowhere
-            (log/error "app spawn failed" {:app id :error (ex-message e)})
-            (i3/switch-workspace! home-workspace)
-            true)))))
+  "Switch to the app's workspace, then launch it only if that workspace is empty and we
+   didn't just launch it. The window maps onto the focused workspace — it comes to us."
+  [{:keys [ws->wins]} {:keys [id exec]} extra]
+  (let [ws (name id)]
+    (i3/switch-workspace! ws)
+    (when (and (empty? (get ws->wins ws)) (not (recently-ran? id)))
+      (try
+        (spawn! (into (vec exec) extra))
+        (swap! ran* assoc id (System/currentTimeMillis))
+        (log/info "app launched" {:app id})
+        (catch Throwable e
+          (log/error "app launch failed" {:app id :error (ex-message e)})
+          (i3/switch-workspace! home-ws))))))
 
 
-(defn- do-close-focused!
-  "WM_close the FOCUSED window — a window verb: one LibreOffice doc closes, the
-   app stays :running. A pending intent gates a re-close."
-  [view]
-  (let [{:keys [con-id]} (:focused view)]
-    (cond
-      (or (nil? con-id) (nil? (:current view)))
-      (do (log/info "close gated — no managed window focused" {}) false)
-
-      (get @wintents* con-id)
-      (do (log/info "close already pending" {:con con-id}) false)
-
-      :else
-      (let [at (System/currentTimeMillis)]
-        (swap! wintents* assoc con-id at)
-        (i3/kill-con! con-id)
-        (hint-window! con-id at)
-        (log/info "close sent" {:con con-id})
-        true))))
+(defn- do-close! [{:keys [focused-ws]}]
+  (when (app-of-ws focused-ws)                 ; never the launcher
+    (i3/kill-focused!)))
 
 
-(defn- expire-proc!
-  "The spawn never windowed (the look just re-read the tree): kill the leftover,
-   drop the entry, rescue the user from staging."
-  [{:keys [app-id at]}]
-  (let [{:keys [handle spawned-at windowed?]} (get @procs* app-id)]
-    (when (and handle (= at spawned-at) (not windowed?))
-      (log/warn "spawn never windowed — killing it" {:app app-id})
-      (try (p/destroy-tree handle) (catch Throwable _))
-      (swap! procs* dissoc app-id)
-      (when (= staging-workspace (i3/focused-workspace))
-        (i3/switch-workspace! home-workspace))
-      true)))
+(defn- maybe-go-home!
+  "A window closed and left the visible workspace empty -> home. Guarded by recently-ran? so a
+   just-launched app that hasn't mapped its window yet isn't fled."
+  [{:keys [focused-ws ws->wins]}]
+  (when (and focused-ws (not= focused-ws home-ws)
+             (empty? (get ws->wins focused-ws))
+             (not (recently-ran? (keyword focused-ws))))
+    (log/info "workspace emptied — going home" {:ws focused-ws})
+    (i3/switch-workspace! home-ws)))
 
 
-(defn- expire-window-intent!
-  "The close went unanswered — a quit-confirm holds the window. Drop the intent."
-  [{:keys [con-id at]}]
-  (when (= at (get @wintents* con-id))
-    (log/warn "close unanswered — the window kept itself open" {:con con-id})
-    (swap! wintents* dissoc con-id)
-    true))
+(defn- settle-floaters!
+  "chromium --app windows auto-float (fixed size hints) and set class/role only AFTER mapping,
+   so i3's for_window can't catch them. Un-float any floating non-dialog window on an app
+   workspace so it fills the workspace under the bars. Idempotent (acts only on floaters)."
+  [{:keys [ws->wins]}]
+  (doseq [[ws wins] ws->wins
+          {:keys [con-id floating? wtype]} wins
+          :when (and (app-of-ws ws) floating?
+                     (not (#{"dialog" "utility" "splash"} wtype)))]
+    (i3/command? (format "[con_id=%d]" con-id) "floating" "disable")))
 
 
-(defn- act!
-  "ALL world mutations live here: placement, the event's own action, the
-   stranded-rescue. Truthy when anything changed."
-  [ev {:keys [ws view] :as world}]
-  (let [placed?  (enforce-placement! ws)
-        acted?   (case (:type ev)
-                   :app/run           (do-run! view (:app ev))
-                   :app/close-focused (do-close-focused! view)
-                   :recheck/proc      (expire-proc! ev)
-                   :recheck/window    (expire-window-intent! ev)
-                   nil)
-        ;; rescue reacts to WORLD-initiated changes (ticks) only: an act that just
-        ;; moved focus must not be undone by the stale pre-act view
-        rescued? (when-not (or placed? acted?)
-                   (rescue-stranded! world))]
-    (or placed? acted? rescued?)))
+(defn handle-event! [ev]
+  (case (:type ev)
+    :app/run      (do-run! (observe!) (:app ev) (:extra ev []))
+    :app/switch   (i3/switch-workspace! (name (:id (:app ev))))
+    :app/close    (do-close! (observe!))
+    :app/home     (i3/switch-workspace! home-ws)
+    :window/close (maybe-go-home! (observe!))
+    nil)
+
+  (let [w (observe!)]
+    (settle-floaters! w)
+    (-> w projection converge!)))
 
 
-(defn handle-event!
-  "The single entry, the only thinking place: evt -> look -> act -> look -> converge!."
-  [ev]
-  (let [world (look!)
-        view  (if (act! ev world) (:view (look!)) (:view world))]
-    (converge! view)))
+;; --- verbs: validate, then ride the pipe ---
 
+(defn- resolve! [id]
+  (or (get-in @catalog* [:by-id id])
+      (throw (ex-info "unknown app" {:error :app/unknown-app :id id}))))
 
-;; --- the verbs: resolve what must fail loudly, emit the rest onto the pipe ---
+(defn run!           [id] (i3/emit! {:type :app/run    :app (resolve! id)}))
+(defn switch-to!     [id] (i3/emit! {:type :app/switch :app (resolve! id)}))
+(defn close-focused! []   (i3/emit! {:type :app/close}))
+(defn go-home!       []   (i3/emit! {:type :app/home}))
 
-(defn run!
-  "Resolve ID in the catalog and ride the pipe — gating and spawning happen on
-   the listener thread, queue-ordered with the window events. Catalog membership
-   IS the validation: the model adopts by cataloged class, so an uncataloged
-   spawn would never mark windowed and its own recheck would kill it."
-  [id]
-  (let [app (get-in @catalog* [:by-id id])]
-    (when-not app
-      (throw (ex-info "unknown app" {:error :app/unknown-app :id id})))
-    (i3/emit! {:type :app/run :app app})))
+(defn open-url! [url]
+  (when-not (re-matches #"https?://\S+" (str url))
+    (throw (ex-info "not an http url" {:error :app/bad-url :url (str url)})))
+  (i3/emit! {:type :app/run :app (resolve! browser-app) :extra [url]}))
 
-
-(defn close-focused!
-  "Ask the pipe to close the focused window."
-  []
-  (i3/emit! {:type :app/close-focused}))
-
-
-(defn go-home!
-  "Switch to the launcher's workspace (no state — direct)."
-  []
-  (i3/switch-workspace! home-workspace))
+(defn current-apps-state [] (or @prev* {:apps [] :current nil}))

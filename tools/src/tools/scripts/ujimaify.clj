@@ -32,6 +32,8 @@
        ;; startx → Xorg → i3 → agent → every launched app. qt6-gtk-platformtheme (install.clj) is the
        ;; GTK→Qt bridge; Qt selects its platform theme from the env only (no /etc file like gtk-3.0).
        "Environment=QT_QPA_PLATFORMTHEME=gtk3\n"
+       ;; links an app opens go through the agent -> the Web app (with mimeapps.list, assets/home)
+       "Environment=BROWSER=/opt/ujima/desktop/bin/ujima-open\n"
        "StandardOutput=journal\n"
        "Restart=always\n"
        "RestartSec=3\n"

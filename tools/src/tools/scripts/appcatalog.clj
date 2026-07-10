@@ -59,8 +59,10 @@
     :deb {:url    "https://github.com/ONLYOFFICE/DesktopEditors/releases/download/v9.4.0/onlyoffice-desktopeditors_arm64.deb"
           :sha256 "ce141a103051e220a89839dd5dc8511172ae5b989e8de9bda0e07c34b0b7702c"}}
 
+   ;; --nolockfile: TuxPaint otherwise refuses to start within 30s of its last launch, so a
+   ;; close-and-reopen silently does nothing.
    {:id :draw :label "Draw" :icon "draw" :category :create
-    :exec ["tuxpaint"]
+    :exec ["tuxpaint" "--nolockfile"]
     :class "TuxPaint.TuxPaint" :apt ["tuxpaint"]}
 
    ;; GIMP 3.0 (GTK3): full raster editor. Ships its OWN dark theme (default) so it's dark with no
@@ -126,7 +128,7 @@
     :class "Geany" :apt ["geany"]}                           ; xprop-verified
 
    {:id :stellarium :label "Stellarium" :icon "stellarium" :category :explore
-    :exec ["stellarium"]
+    :exec ["stellarium"] :mode :fullscreen
     :class "stellarium" :apt ["stellarium"]}                 ; xprop-verified
 
    ;; Marble (KDE virtual globe): offline Earth/planets atlas. Qt app → dark via qt6-gtk-platformtheme
@@ -143,7 +145,9 @@
     :class "XaoS" :apt ["xaos"]}])                           ; res_class xprop-verified
 
 
-(def ^:private spec-keys [:id :label :icon :category :exec :class])
+;; :class is no longer shipped — the workspace is an app's identity, not its WM_CLASS.
+;; :mode (e.g. :fullscreen) is a projection hint: a fixed-fullscreen app hides the bars.
+(def ^:private spec-keys [:id :label :icon :category :exec :mode])
 
 
 (defn- fetch!

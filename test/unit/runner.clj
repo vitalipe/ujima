@@ -24,9 +24,6 @@
             [ujima.desktop.http-test]
             [ujima.desktop.http.ui-test]
             [ujima.desktop.app.catalog-test]
-            [ujima.desktop.app.windows-test]
-            [ujima.desktop.app.procs-test]
-            [ujima.desktop.app.lifecycle-test]
             [ujima.desktop.app-test]
             [ujima.desktop.eww-test]
             [ujima.events.audio-test]
@@ -58,9 +55,6 @@
     ujima.desktop.http-test
     ujima.desktop.http.ui-test
     ujima.desktop.app.catalog-test
-    ujima.desktop.app.windows-test
-    ujima.desktop.app.procs-test
-    ujima.desktop.app.lifecycle-test
     ujima.desktop.app-test
     ujima.desktop.eww-test
     ujima.events.audio-test

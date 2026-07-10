@@ -54,7 +54,8 @@
   {:request/malformed        400
    :audio/no-output          409
    :keyboard/unknown-layout  409
-   :app/unknown-app          404})
+   :app/unknown-app          404
+   :app/bad-url              400})
 
 
 (defn route
@@ -73,6 +74,8 @@
           [:post ["ui" "volume" "move"]]              :ui/volume
           [:get  ["app" "catalog"]]                   :app/catalog
           [:post ["app" "run"]]                       :app/run
+          [:post ["app" "switch"]]                    :app/switch
+          [:post ["app" "open-url"]]                  :app/open-url
           [:post ["app" "close"]]                     :app/close
           [:post ["app" "home"]]                      :app/home}
          [method parts])))
@@ -99,6 +102,10 @@
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         :app/catalog         (json 200 {:apps (app/catalog-listing)})
         :app/run             (do (app/run! (keyword (:app-id body)))
+                                 (json 202 {}))
+        :app/switch          (do (app/switch-to! (keyword (:app-id body)))
+                                 (json 202 {}))
+        :app/open-url        (do (app/open-url! (:url body))
                                  (json 202 {}))
         :app/close           (do (app/close-focused!)
                                  (json 202 {}))

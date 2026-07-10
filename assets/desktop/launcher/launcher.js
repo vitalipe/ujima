@@ -156,6 +156,9 @@ async function syncOpen(){
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') syncOpen();
 });
+// backstop: the stream reconnect + visibilitychange above can still miss an open→close that
+// happened while hidden (WebKit suspends us) — a slow poll while visible reconverges to truth.
+setInterval(() => { if (document.visibilityState === 'visible') syncOpen(); }, 1500);
 
 async function main(){
   buildStatus();

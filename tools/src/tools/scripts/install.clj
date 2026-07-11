@@ -43,7 +43,10 @@
         ;; webview launcher host (assets/desktop/bin/ujima-launcher): a chromeless WebKitGTK window
         ;; renders the launcher home surface (served from :1337). python3-gi + the GTK3 / WebKit2-4.1
         ;; typelibs; libgtk-3-0 above is the shared runtime lib. Compositing + JIT disabled in the host.
-        "python3-gi" "gir1.2-gtk-3.0" "gir1.2-webkit2-4.1")
+        "python3-gi" "gir1.2-gtk-3.0" "gir1.2-webkit2-4.1"
+        ;; bwrap: opt-in mount isolation for shell-bearing apps (mask the /ujima + /mnt partitions,
+        ;; no_new_privs kills sudo inside). Pinned ahead of the wiring — live deploy can't add packages.
+        "bubblewrap")
 
     ;; X-from-systemd: let a non-console user start X via the setuid wrapper. HW-verified — without it
     ;; Xorg dies "Cannot open virtual console (Permission denied)".

@@ -23,13 +23,13 @@
 (def ^:private pushed* (atom []))
 
 
-(defn- win [ws & {:keys [focused? title floating? wtype con]}]
-  {:ws ws :focused? (boolean focused?) :title (or title ws)
+(defn- win [ws & {:keys [focused? title floating? wtype con full?]}]
+  {:ws ws :focused? (boolean focused?) :title (or title ws) :full? (boolean full?)
    :floating? (boolean floating?) :wtype (or wtype "normal") :con (or con 1)})
 
 (defn- node [w]
   {:id (:con w) :window (+ 1000 (:con w)) :name (:title w)
-   :focused (:focused? w) :window_type (:wtype w)})
+   :focused (:focused? w) :window_type (:wtype w) :fullscreen_mode (if (:full? w) 1 0)})
 
 (defn- tree [wins]
   {:type "root"
@@ -208,11 +208,16 @@
   (is (= :web (current-id)))
   (is (= [:web] (open-ids))))
 
-(deftest fullscreen-mode-is-declared-not-detected
-  (setup! [(win "sky" :focused? true)] "sky" :scopes #{:sky})
+(deftest fullscreen-declared-or-detected
+  (setup! [(win "sky" :focused? true)] "sky" :scopes #{:sky})            ; :sky declares :mode
   (stubbed #(app/handle-event! {:type :tick}))
-  (is (true? (:fullscreen (:current (snap)))))
-  (setup! [(win "web" :focused? true)] "web" :scopes #{:web})
+  (is (true? (:fullscreen (:current (snap)))) "declared hint")
+
+  (setup! [(win "web" :focused? true :full? true)] "web" :scopes #{:web}) ; detected from window
+  (stubbed #(app/handle-event! {:type :tick}))
+  (is (true? (:fullscreen (:current (snap)))) "detected fullscreen window")
+
+  (setup! [(win "web" :focused? true)] "web" :scopes #{:web})             ; neither
   (stubbed #(app/handle-event! {:type :tick}))
   (is (false? (:fullscreen (:current (snap))))))
 

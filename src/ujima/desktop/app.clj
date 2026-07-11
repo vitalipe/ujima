@@ -63,7 +63,9 @@
         wins (get ws->wins (name id))]
     {:id id :label (:label a) :icon (:icon a) :category (:category a)
      :title (:title (or (first (filter :focused? wins)) (first wins)))
-     :fullscreen (= :fullscreen (:mode a))}))
+     ;; detected (the window is really fullscreen) OR declared (:mode) — declared is the escape
+     ;; hatch for an app that draws full-screen without setting the fullscreen state
+     :fullscreen (boolean (or (some :fullscreen? wins) (= :fullscreen (:mode a))))}))
 
 
 (defn- projection [{:keys [focused-ws ws->wins]}]

@@ -130,8 +130,11 @@
     :exec ["geany"]
     :class "Geany" :apt ["geany"]}                           ; xprop-verified
 
+   ;; NO :mode :fullscreen — Stellarium sets the fullscreen state itself, so detection hides the
+   ;; bars only when it's REALLY fullscreen. Declaring it hid the bars whenever Stellarium was
+   ;; focused, trapping the user behind its non-fullscreen dialogs.
    {:id :stellarium :label "Stellarium" :icon "stellarium" :category :explore
-    :exec ["stellarium"] :mode :fullscreen
+    :exec ["stellarium"]
     :class "stellarium" :apt ["stellarium"]}                 ; xprop-verified
 
    ;; Marble (KDE virtual globe): offline Earth/planets atlas. Qt app → dark via qt6-gtk-platformtheme

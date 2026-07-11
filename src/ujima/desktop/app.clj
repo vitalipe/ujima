@@ -158,10 +158,15 @@
     :app/open-url (do-open-url! (:app ev) (:url ev))
     :app/close    (do-close! (observe!))
     :app/home     (i3/switch-workspace! home-ws)
-    :window/close (when-let [rec @close*]                       ; the ✕'d window closed -> home
+    :window/close (when-let [rec @close*]                       ; the window the user ✕'d closed
                     (when (= (:con-id ev) (:con rec))
                       (reset! close* nil)
-                      (go-home-if-empty! (:app rec) (observe!))))
+                      (let [app (:app rec) w (observe!)]
+                        ;; its workspace is now empty -> the user's close took: make sure the app is
+                        ;; really gone (a still-launching process would else re-map a stray window)
+                        (when (empty? (get (:ws->wins w) (name app)))
+                          (systemd/stop! app)
+                          (go-home-if-empty! app w)))))
     :scope/died   (go-home-if-empty! (:app-id ev) (observe!))   ; crash / self-quit backstop
     nil)
 

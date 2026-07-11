@@ -151,14 +151,27 @@
 
 ;; --- go home: con-id (instant) + scope-death (backstop) ---
 
-(deftest con-id-go-home-on-the-closed-window
+(deftest close-last-window-stops-the-scope-and-goes-home
+  ;; the ✕'d window closed and nothing's left -> ensure the app is really gone (a still-launching
+  ;; process, e.g. Stellarium, would else re-map a stray fullscreen window) + home
   (setup! [(win "paint" :focused? true :con 7)] "paint" :scopes #{:paint})
   (stubbed
-    #(do (app/close-focused!)                            ; records con 7
-         (swap! world* assoc :wins [])                   ; the window actually closed
+    #(do (app/close-focused!)                            ; records con 7, WM_DELETE
+         (swap! world* assoc :wins [])                   ; the window closed
          (reset! fx* [])
          (app/handle-event! {:type :window/close :con-id 7})))
-  (is (= [[:switch "1"]] (fx-of :switch)) "the ✕'d window closed -> home"))
+  (is (= [[:stop :paint]] (fx-of :stop)) "scope stopped so it can't reopen")
+  (is (= [[:switch "1"]] (fx-of :switch)) "and home"))
+
+(deftest close-one-of-several-windows-keeps-the-app
+  (setup! [(win "paint" :focused? true :con 7) (win "paint" :con 8)] "paint" :scopes #{:paint})
+  (stubbed
+    #(do (app/close-focused!)                            ; ✕ con 7
+         (swap! world* assoc :wins [(win "paint" :con 8)])  ; con 7 gone, con 8 remains
+         (reset! fx* [])
+         (app/handle-event! {:type :window/close :con-id 7})))
+  (is (= [] (fx-of :stop)) "another window remains — the app stays")
+  (is (= [] (fx-of :switch)) "no go-home"))
 
 (deftest unrelated-window-close-does-not-go-home
   (setup! [(win "paint" :focused? true :con 7)] "paint" :scopes #{:paint})

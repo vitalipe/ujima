@@ -39,16 +39,19 @@
            "--user-data-dir=/tmp/ujima-kolibri" "--no-first-run" "--disk-cache-size=1"]
     :class "ujima-kolibri" :apt ["chromium"]}
 
+   ;; each LibreOffice tile gets its own -env:UserInstallation so it's a SEPARATE soffice process
+   ;; -> its own scope, independently killable. Otherwise all three share one soffice and only the
+   ;; first tile's scope would be real.
    {:id :write :label "Write" :icon "write" :category :office
-    :exec ["libreoffice" "--writer"]
+    :exec ["libreoffice" "-env:UserInstallation=file:///home/ujima/.config/ujima-lo-write" "--writer"]
     :class "libreoffice-writer" :apt ["libreoffice-writer" "libreoffice-gtk3"]}
 
    {:id :calc :label "Calc" :icon "calc" :category :office
-    :exec ["libreoffice" "--calc"]
+    :exec ["libreoffice" "-env:UserInstallation=file:///home/ujima/.config/ujima-lo-calc" "--calc"]
     :class "libreoffice-calc" :apt ["libreoffice-calc"]}         ; xprop-verified
 
    {:id :impress :label "Impress" :icon "impress" :category :office
-    :exec ["libreoffice" "--impress"]
+    :exec ["libreoffice" "-env:UserInstallation=file:///home/ujima/.config/ujima-lo-impress" "--impress"]
     :class "libreoffice-impress" :apt ["libreoffice-impress"]}   ; xprop-verified
 
    ;; ONLYOFFICE Desktop Editors (arm64 .deb, offline-first): NOT in Debian, so a pinned :deb

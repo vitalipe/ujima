@@ -1,27 +1,29 @@
 (ns ujima.desktop.app
   "The app layer: a small write side (run / switch / close / home) and a projection.
-   The WORKSPACE is an app's identity — app :write lives on workspace \"write\", home is
-   \"1\" — so we never match on WM_CLASS and never chase a window. Verbs ride the same
-   listener thread as i3 events (i3/emit!); each event re-reads the tree and converges a
-   snapshot to the UI targets. i3 owns placement and focus; we only switch and launch."
-  (:require [babashka.fs      :as fs]
-            [babashka.process :as p]
+   The WORKSPACE is an app's identity — app :write lives on workspace \"write\", home is \"1\" —
+   so we never match on WM_CLASS. Each launch lands in a systemd --user scope
+   (ujima.linux.systemd), which answers 'is this app alive?' (the launch gate + the go-home
+   backstop) and 'kill it' (force-close). i3 owns placement/focus; the tree owns display.
+   Verbs + i3 events + scope-death events all ride one listener thread (i3/emit!)."
+  (:require [babashka.fs :as fs]
             [lib.io    :as io]
             [lib.shell :as shell]
             [ujima.log :as log]
-            [ujima.linux.i3            :as i3]
+            [ujima.linux.i3      :as i3]
+            [ujima.linux.systemd :as systemd]
             [ujima.desktop.app.catalog :as catalog]))
 
 
 (defonce ^:private catalog* (atom nil))
 (defonce ^:private prev*    (atom nil))   ; last snapshot, the prv of (next prv)
 (defonce ^:private targets* (atom []))
-(defonce ^:private ran*     (atom {}))    ; app-id -> launched-at, debounces re-launch
+(defonce ^:private close*   (atom nil))   ; last ✕: {:con :app :at} — drives con-id go-home + ✕✕
 
 
-(def ^:private home-ws      "1")
-(def ^:private browser-app  :web)
-(def ^:private run-guard-ms 6000)         ; debounces re-launch while an app is still coming up
+(def ^:private home-ws     "1")
+(def ^:private browser-app :web)
+(def force-lo-ms 1000)                     ; a 2nd ✕ sooner = accidental double-click (ignore)
+(def force-hi-ms 3000)                     ; a 2nd ✕ later = a fresh close, not an escalation
 
 
 (defn load-catalog [path]
@@ -36,7 +38,7 @@
 (defn init! [{:keys [catalog converge-targets]}]
   (reset! catalog* catalog)
   (reset! prev*    nil)
-  (reset! ran*     {})
+  (reset! close*   nil)
   (reset! targets* (vec converge-targets))
   catalog)
 
@@ -44,7 +46,7 @@
 (defn catalog-listing [] (catalog/listing @catalog*))
 
 
-;; --- observe + projection (the read side) ---
+;; --- observe + projection (read side; the tree = display) ---
 
 (defn- observe! []
   {:focused-ws (i3/focused-workspace)
@@ -78,52 +80,67 @@
     (doseq [t @targets*] (t snapshot prv))))
 
 
-;; --- act (the write side; listener thread only) ---
-
-(defn- recently-ran? [id]
-  (< (- (System/currentTimeMillis) (get @ran* id 0)) run-guard-ms))
-
-
-(defn- spawn! [exec]
-  (apply shell/sh {:out :inherit :err :inherit :shutdown p/destroy-tree} exec))
-
+;; --- act (write side; listener thread only). scope = lifecycle ---
 
 (defn- do-run!
-  "Switch to the app's workspace, then launch it only if that workspace is empty and we
-   didn't just launch it. The window maps onto the focused workspace — it comes to us."
-  [{:keys [ws->wins]} {:keys [id exec]} extra]
-  (let [ws (name id)]
-    (i3/switch-workspace! ws)
-    (when (and (empty? (get ws->wins ws)) (not (recently-ran? id)))
-      (try
-        (spawn! (into (vec exec) extra))
-        (swap! ran* assoc id (System/currentTimeMillis))
-        (log/info "app launched" {:app id})
-        (catch Throwable e
-          (log/error "app launch failed" {:app id :error (ex-message e)})
-          (i3/switch-workspace! home-ws))))))
+  "Switch to the app's workspace, then launch into a scope only if it isn't already up. The
+   scope is the gate: an app still cold-starting counts as up, so a re-tap never double-spawns."
+  [{:keys [id exec]} extra]
+  (i3/switch-workspace! (name id))
+  (when-not (systemd/active? id)
+    (try
+      (systemd/spawn-scoped! id (into (vec exec) extra))
+      (log/info "app launched" {:app id})
+      (catch Throwable e
+        (log/error "app launch failed" {:app id :error (ex-message e)})
+        (i3/switch-workspace! home-ws)))))
 
 
-(defn- do-close! [{:keys [focused-ws]}]
-  (when (app-of-ws focused-ws)                 ; never the launcher
-    (i3/kill-focused!)))
+(defn- do-open-url!
+  "A link -> the Web app. Warm: a plain messenger joins the running instance (its window lands
+   in the existing scope). Cold: a normal scoped launch with the url. Either way, switch there."
+  [{:keys [id exec] :as app} url]
+  (if (systemd/active? id)
+    (do (apply shell/sh {:out :inherit :err :inherit} (conj (vec exec) url))
+        (i3/switch-workspace! (name id)))
+    (do-run! app [url])))
 
 
-(defn- maybe-go-home!
-  "A window closed and left the visible workspace empty -> home. Guarded by recently-ran? so a
-   just-launched app that hasn't mapped its window yet isn't fled."
+(defn- do-close!
+  "First ✕ = polite WM_DELETE (the app owns save-prompts etc.), arming a record. A deliberate 2nd
+   ✕ on the SAME still-focused window in the 1-3s window = force-kill the scope. No focused window
+   on an app workspace (zombie / launch to abort) = force-kill too."
   [{:keys [focused-ws ws->wins]}]
-  (when (and focused-ws (not= focused-ws home-ws)
-             (empty? (get ws->wins focused-ws))
-             (not (recently-ran? (keyword focused-ws))))
-    (log/info "workspace emptied — going home" {:ws focused-ws})
+  (when-let [app (app-of-ws focused-ws)]
+    (let [con (:con-id (first (filter :focused? (get ws->wins focused-ws))))
+          now (System/currentTimeMillis)
+          rec @close*]
+      (cond
+        (nil? con)
+        (do (systemd/stop! app) (reset! close* nil))
+
+        (and rec (= app (:app rec)) (= con (:con rec))
+             (<= force-lo-ms (- now (:at rec)) force-hi-ms))
+        (do (log/warn "force-close" {:app app})
+            (systemd/stop! app) (reset! close* nil))
+
+        :else
+        (do (i3/kill-focused!)
+            (reset! close* {:con con :app app :at now}))))))
+
+
+(defn- go-home-if-empty!
+  "Go home only if we're looking at APP-ID's now-empty workspace — idempotent across the con-id
+   and scope-death triggers, and never fires for a background app dying elsewhere."
+  [app-id {:keys [focused-ws ws->wins]}]
+  (when (and (= focused-ws (name app-id)) (empty? (get ws->wins focused-ws)))
+    (log/info "empty app workspace — going home" {:ws focused-ws})
     (i3/switch-workspace! home-ws)))
 
 
 (defn- settle-floaters!
-  "chromium --app windows auto-float (fixed size hints) and set class/role only AFTER mapping,
-   so i3's for_window can't catch them. Un-float any floating non-dialog window on an app
-   workspace so it fills the workspace under the bars. Idempotent (acts only on floaters)."
+  "chromium --app auto-floats (fixed size hints) and sets class/role only AFTER mapping, so i3's
+   for_window can't catch it. Un-float floating non-dialog windows on app workspaces. Idempotent."
   [{:keys [ws->wins]}]
   (doseq [[ws wins] ws->wins
           {:keys [con-id floating? wtype]} wins
@@ -134,11 +151,16 @@
 
 (defn handle-event! [ev]
   (case (:type ev)
-    :app/run      (do-run! (observe!) (:app ev) (:extra ev []))
+    :app/run      (do-run! (:app ev) (:extra ev []))
     :app/switch   (i3/switch-workspace! (name (:id (:app ev))))
+    :app/open-url (do-open-url! (:app ev) (:url ev))
     :app/close    (do-close! (observe!))
     :app/home     (i3/switch-workspace! home-ws)
-    :window/close (maybe-go-home! (observe!))
+    :window/close (when-let [rec @close*]                       ; the ✕'d window closed -> home
+                    (when (= (:con-id ev) (:con rec))
+                      (reset! close* nil)
+                      (go-home-if-empty! (:app rec) (observe!))))
+    :scope/died   (go-home-if-empty! (:app-id ev) (observe!))   ; crash / self-quit backstop
     nil)
 
   (let [w (observe!)]
@@ -160,6 +182,6 @@
 (defn open-url! [url]
   (when-not (re-matches #"https?://\S+" (str url))
     (throw (ex-info "not an http url" {:error :app/bad-url :url (str url)})))
-  (i3/emit! {:type :app/run :app (resolve! browser-app) :extra [url]}))
+  (i3/emit! {:type :app/open-url :app (resolve! browser-app) :url url}))
 
 (defn current-apps-state [] (or @prev* {:apps [] :current nil}))

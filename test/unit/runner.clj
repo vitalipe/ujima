@@ -21,6 +21,7 @@
 
             [ujima.linux.audio-test]
             [ujima.linux.i3-test]
+            [ujima.linux.systemd-test]
             [ujima.desktop.http-test]
             [ujima.desktop.http.ui-test]
             [ujima.desktop.app.catalog-test]
@@ -52,6 +53,7 @@
 
     ujima.linux.audio-test
     ujima.linux.i3-test
+    ujima.linux.systemd-test
     ujima.desktop.http-test
     ujima.desktop.http.ui-test
     ujima.desktop.app.catalog-test

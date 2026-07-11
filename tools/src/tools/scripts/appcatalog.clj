@@ -210,6 +210,17 @@
       (when deb (deb! deb)))))
 
 
+(defn assign-block
+  "i3 `assign` rules routing each app's window (matched by WM_CLASS) to its own workspace (= its
+   id), so a launched window lands there even if focus moved during the launch — instead of
+   orphaning on whatever workspace happened to be focused. Generated from the catalog, so a new
+   app needs no config edit. `:class` lives only here (build-time), not in the runtime catalog."
+  []
+  (str/join "\n"
+    (for [{:keys [id class]} apps :when class]
+      (format "assign [class=\"%s\"] \"%s\"" class (name id)))))
+
+
 (defn write-catalog!
   "Emit the launcher catalog (apps.edn) from `apps` — spec fields only, install recipes
    dropped. Pure file write, no root; host-runnable (the `app-catalog` bb task)."

@@ -1,0 +1,317 @@
+#!/usr/bin/env bb
+;; ujima-admin — a remote-control TUI for a UjimaOS device, over its HTTP API (port 1337).
+;;
+;;   usage:  bb admin/ujima-admin <ip> [port]
+;;
+;; Speaks the very same /app, /api and /ui endpoints the on-device shell uses. The live
+;; running-app list rides the /ui/apps NDJSON stream; volume / keyboard state comes back on
+;; each command's reply. Needs only babashka (built-in http-client + cheshire) — nothing to
+;; install. Assumes the device's http is bound to 0.0.0.0 (config/ujimad.edn :desktop :http).
+
+(require '[babashka.http-client :as http]
+         '[babashka.process :as p]
+         '[cheshire.core :as json]
+         '[clojure.java.io :as io]
+         '[clojure.string :as str])
+
+;; ---------------------------------------------------------------------------- config / http
+(def config* (atom {:host "127.0.0.1" :base "http://127.0.0.1:1337"}))
+(defn- u [path] (str (:base @config*) path))
+
+(defn- req
+  "Return {:ok? :status :data :error}. Never throws — connection failures and non-2xx both
+   come back as data so the UI renders them instead of crashing."
+  [method path opts]
+  (try
+    (let [{:keys [status body]} (method (u path) (merge {:timeout 4000 :throw false} opts))
+          text (cond (nil? body) nil (string? body) body :else (slurp body))
+          data (when (and text (seq text))
+                 (try (json/parse-string text true) (catch Exception _ nil)))]
+      {:ok? (boolean (and status (< status 400))) :status status :data data})
+    (catch Exception e {:ok? false :error (or (ex-message e) (str (class e)))})))
+
+(defn- GET  [path]      (req http/get  path {}))
+(defn- POST [path body] (req http/post path {:headers {"content-type" "application/json"}
+                                             :body    (json/generate-string body)}))
+
+;; ---------------------------------------------------------------------------- state
+(def state*
+  (atom {:cols 80 :rows 24 :screen :root :sel 0 :online? false
+         :catalog [] :running {} :current nil :audio {} :keyboard {}
+         :url-buf "https://en.wikipedia.org"
+         :msg "connecting…" :quit? false}))
+
+(def outputs ["usb" "hdmi"])
+(def root-items [{:label "Apps" :hint "open · close · home" :to :apps}
+                 {:label "Volume" :hint "set · mute" :to :volume}
+                 {:label "Keyboard" :hint "switch layout" :to :keyboard}
+                 {:label "Output" :hint "usb / hdmi" :to :output}
+                 {:label "Open URL" :hint "in the Web app" :to :url}])
+(def cat-color {"learn" "34" "office" "36" "create" "35" "explore" "32" "code" "33" "system" "90"})
+(defn- running-ids [] (set (keys (:running @state*))))
+
+;; ---------------------------------------------------------------------------- terminal (raw)
+(def ^:private CSI (str (char 27) "["))          ; ESC[ — computed, so no literal control byte in source
+(defn- csi [& xs] (apply str CSI xs))
+
+(def ^:private stty-orig* (atom nil))
+(defn- stty [& args] (apply p/shell {:out :string :continue true} "stty" args))
+
+(defn- term-size! []
+  (when-let [out (not-empty (:out (stty "size")))]
+    (let [[r c] (map parse-long (str/split (str/trim out) #"\s+"))]
+      (swap! state* assoc :rows (or r 24) :cols (or c 80)))))
+
+(defn- raw-on! []
+  (reset! stty-orig* (str/trim (:out (stty "-g"))))
+  (stty "-icanon" "-echo" "min" "1" "time" "0")   ; ISIG left ON → Ctrl-C = clean SIGINT exit
+  (term-size!)
+  (print (str (csi "?1049h") (csi "?25l"))) (flush))
+
+(def ^:private cleaned* (atom false))
+(defn- cleanup! []
+  (when (compare-and-set! cleaned* false true)
+    (print (str (csi "?25h") (csi "?1049l"))) (flush)
+    (when-let [o @stty-orig*] (stty o))))
+
+(defn- read-key []
+  (let [in System/in b (.read in)]
+    (cond
+      (neg? b)     :eof
+      (= b 27)     (do (when (zero? (.available in)) (Thread/sleep 3))
+                       (if (pos? (.available in))
+                         (if (= 91 (.read in))
+                           (do (when (zero? (.available in)) (Thread/sleep 3))
+                               (case (.read in) 65 :up 66 :down 67 :right 68 :left :esc))
+                           :esc)
+                         :esc))
+      (#{13 10} b) :enter
+      (= b 127)    :backspace
+      :else        (char b))))
+
+;; ---------------------------------------------------------------------------- rendering (framed box)
+(def ^:private W 58)                                          ; inner content width
+(defn- strip [s]  (str/replace (str s) (re-pattern (str (char 27) "\\[[0-9;?]*[A-Za-z]")) ""))
+(defn- vlen [s]   (count (strip s)))
+(defn- pad  [s n] (let [s (str s)] (if (>= (count s) n) s (str s (apply str (repeat (- n (count s)) \space))))))
+(defn- clip [s n] (let [s (str s)] (if (> (count s) n) (subs s 0 n) s)))
+
+(defn- box-top [title] (str "╭─ " title " " (apply str (repeat (max 0 (- W 1 (vlen title))) \─)) "╮"))
+(defn- box-mid []      (str "├" (apply str (repeat (+ W 2) \─)) "┤"))
+(defn- box-bot []      (str "╰" (apply str (repeat (+ W 2) \─)) "╯"))
+(defn- box-line [s]    (str "│ " s (apply str (repeat (max 0 (- W (vlen s))) \space)) " │"))
+
+(defn- menu-row [{:keys [label hint mark color]} selected?]
+  (let [left (str (or mark " ") " " label)
+        right (or hint "")
+        gap  (max 1 (- W (count left) (count right)))
+        txt  (pad (clip (str left (apply str (repeat gap \space)) right) W) W)]
+    (cond selected? (str (csi "7m") txt (csi "0m"))
+          color     (str (csi color "m") txt (csi "0m"))     ; color is a bare SGR number, e.g. "34"
+          :else     txt)))
+
+(defn- menu [title items sel]
+  (cons (str (csi "1m") title (csi "0m"))
+        (map-indexed (fn [i it] (menu-row it (= i sel))) items)))
+
+(defn- app-items [st]
+  (let [run (running-ids) cur (:current st)]
+    (for [{:keys [id label category]} (:catalog st)]
+      (let [fs (:fullscreen (get (:running st) id))]
+        {:label label
+         :color (cat-color category)
+         :mark  (cond (= id cur) "»" (run id) "●" :else " ")
+         :hint  (str (cond (= id cur) "current" (run id) "running" :else category)
+                     (when fs " ⛶"))}))))
+
+(defn- header [st]
+  (let [{:keys [audio keyboard online?]} st
+        dot (if online? (str (csi "32m") "●" (csi "0m")) (str (csi "31m") "●" (csi "0m")))]
+    [(str dot " " (if online? "online" "offline"))
+     :rule
+     (str "vol " (pad (if-let [v (:volume audio)] (str v "%") "–") 5)
+          " mute " (pad (if (:muted audio) "on" "off") 4)
+          " out "  (pad (or (:output audio) "–") 5)
+          " kbd "  (pad (or (:layout keyboard) "–") 4)
+          " apps " (count (:running st)))
+     :rule]))
+
+(defn- body-lines [st]
+  (let [sel (:sel st)]
+    (case (:screen st)
+      :root  (menu "MENU" root-items sel)
+      :apps  (if (seq (:catalog st)) (menu "APPS" (app-items st) sel)
+                 ["(no catalog — device unreachable? press r)"])
+      :volume (let [v (or (:volume (:audio st)) 0) f (quot v 5)]
+                (remove nil?
+                  [(str (csi "1m") "VOLUME" (csi "0m"))
+                   ""
+                   (str (apply str (repeat f "█")) (apply str (repeat (- 20 f) "░")) "  " v "%")
+                   (str "mute: " (if (:muted (:audio st)) "ON" "off"))
+                   (when (nil? (:volume (:audio st)))
+                     (str (csi "2m") "no active output — pick one under Output" (csi "0m")))]))
+      :keyboard (let [cur (:layout (:keyboard st)) ls (:layouts (:keyboard st))]
+                  (if (seq ls)
+                    (menu "KEYBOARD" (for [l ls] {:label l :mark (if (= l cur) "●" " ") :hint (when (= l cur) "current")}) sel)
+                    ["(no layouts reported)"]))
+      :output (let [cur (:output (:audio st))]
+                (menu "OUTPUT" (for [o outputs] {:label o :mark (if (= o cur) "●" " ") :hint (when (= o cur) "active")}) sel))
+      :url   [(str (csi "1m") "OPEN URL" (csi "0m"))
+              ""
+              (str "url> " (clip (:url-buf st) (- W 7)) (csi "7m") " " (csi "0m"))
+              ""
+              (str (csi "2m") "opens in the Web app on the device" (csi "0m"))])))
+
+(defn- help-text [screen]
+  (case screen
+    :root   "enter select · q quit"
+    :apps   "enter open/switch · c close · x close-sel · h home · esc back"
+    :volume "-/+ or ←→ move · m mute · esc back"
+    :url    "type a url · enter open · esc back"
+    "enter set · esc back"))
+
+(def ^:private lock (Object.))
+(defn- render! []
+  (locking lock
+    (when-not (:quit? @state*)
+      (let [st @state*
+            lines (concat (header st) (body-lines st)
+                          [:rule
+                           (str (csi "2m") "msg " (csi "0m") (clip (:msg st) (- W 4)))
+                           (str (csi "2m") (help-text (:screen st)) (csi "0m"))])
+            sb (StringBuilder. (csi "H"))]
+        (.append sb (str (box-top (str "UJIMA REMOTE · " (:host @config*))) (csi "K") "\n"))
+        (doseq [ln lines]
+          (.append sb (str (if (= ln :rule) (box-mid) (box-line ln)) (csi "K") "\n")))
+        (.append sb (str (box-bot) (csi "K") "\n"))
+        (.append sb (csi "J"))
+        (print (.toString sb)) (flush)))))
+
+;; ---------------------------------------------------------------------------- data / actions
+(defn- msg! [s] (when s (swap! state* assoc :msg s)) (render!))
+
+(defn- refresh-audio!    [] (let [r (GET "/api/audio")]          (when (:ok? r) (swap! state* assoc :audio    (:data r)))))
+(defn- refresh-keyboard! [] (let [r (GET "/api/input/keyboard")] (when (:ok? r) (swap! state* assoc :keyboard (:data r)))))
+(defn- refresh-catalog!  [] (let [r (GET "/app/catalog")]        (when (:ok? r) (swap! state* assoc :catalog  (:apps (:data r))))))
+
+(defn- bootstrap! []
+  (refresh-catalog!) (refresh-audio!) (refresh-keyboard!)
+  (let [ok (seq (:catalog @state*))]
+    (swap! state* assoc :online? (boolean ok))
+    (msg! (if ok (str "connected to " (:host @config*))
+                 (str "cannot reach " (:host @config*) ":1337 — is http on 0.0.0.0?")))))
+
+(defn- act!
+  "POST, fold reply into state, report. flags: {:audio? :kbd?} route the fresh resource."
+  [path body {:keys [audio? kbd?]} on-ok]
+  (let [r (POST path body)]
+    (cond
+      (:ok? r)    (do (when (and audio? (:data r)) (swap! state* assoc :audio    (:data r)))
+                      (when (and kbd?   (:data r)) (swap! state* assoc :keyboard (:data r)))
+                      (msg! on-ok))
+      (:status r) (msg! (str "✗ " (:status r) " " (get-in r [:data :error] "rejected")))
+      :else       (msg! (str "✗ " (:error r))))))
+
+(defn- set-volume! [v]
+  (let [v (-> v (max 0) (min 100))] (act! "/api/audio/volume" {:value v} {:audio? true} (str "volume → " v "%"))))
+(defn- nudge-volume! [d] (set-volume! (+ (or (:volume (:audio @state*)) 0) d)))
+(defn- toggle-mute! []
+  (let [m (not (:muted (:audio @state*)))] (act! "/api/audio/mute" {:muted m} {:audio? true} (str "mute " (if m "on" "off")))))
+
+(defn- open-url! []
+  (let [raw (str/trim (:url-buf @state*))
+        url (if (re-find #"://" raw) raw (str "https://" raw))]
+    (if (str/blank? raw) (msg! "url is empty")
+        (do (act! "/app/open-url" {:url url} {} (str "open → " url)) (swap! state* assoc :screen :root :sel 0)))))
+
+;; ---------------------------------------------------------------------------- live app stream
+(defn- apply-apps! [snap]
+  (swap! state* assoc
+         :running (into {} (map (juxt :id identity) (:apps snap)))
+         :current (get-in snap [:current :id])
+         :online? true)
+  (when (empty? (:catalog @state*)) (refresh-catalog!) (refresh-audio!) (refresh-keyboard!))
+  (render!))
+
+(defn- stream-apps! []
+  (future
+    (while (not (:quit? @state*))
+      (try
+        (let [{:keys [body]} (http/get (u "/ui/apps") {:as :stream :throw false})]
+          (with-open [rdr (io/reader body)]
+            (loop []
+              (when-let [line (and (not (:quit? @state*)) (.readLine rdr))]
+                (when (seq (str/trim line)) (apply-apps! (json/parse-string line true)))
+                (recur)))))
+        (catch Exception _ nil))
+      (when-not (:quit? @state*)
+        (swap! state* assoc :online? false) (render!)
+        (Thread/sleep 1500)))))
+
+;; ---------------------------------------------------------------------------- input
+(defn- items-count []
+  (case (:screen @state*)
+    :root (count root-items) :apps (count (:catalog @state*))
+    :keyboard (count (:layouts (:keyboard @state*))) :output (count outputs) 0))
+
+(defn- move! [d] (let [n (items-count)] (when (pos? n) (swap! state* update :sel #(mod (+ % d) n)))))
+(defn- goto! [screen] (swap! state* assoc :screen screen :sel 0))
+
+(defn- enter-apps! []
+  (when-let [{:keys [id label]} (nth (:catalog @state*) (:sel @state*) nil)]
+    (if ((running-ids) id)
+      (act! "/app/switch" {:appId id} {} (str "switch → " label))
+      (act! "/app/run"    {:appId id} {} (str "launch → " label)))))
+
+(defn- close-selected! []                                    ; switch to the picked app, then close it
+  (when-let [{:keys [id label]} (nth (:catalog @state*) (:sel @state*) nil)]
+    (if ((running-ids) id)
+      (do (POST "/app/switch" {:appId id}) (Thread/sleep 150)
+          (act! "/app/close" {} {} (str "closed " label)))
+      (msg! (str label " not running")))))
+
+(defn- url-key [k]
+  (cond
+    (= k :esc)       (goto! :root)
+    (= k :enter)     (open-url!)
+    (= k :backspace) (swap! state* update :url-buf #(subs % 0 (max 0 (dec (count %)))))
+    (char? k)        (swap! state* update :url-buf str k)))
+
+(defn- handle [k]
+  (if (= :url (:screen @state*))
+    (url-key k)
+    (case k
+      \q    (swap! state* assoc :quit? true)
+      :up   (move! -1)
+      :down (move! 1)
+      :esc  (when-not (= :root (:screen @state*)) (goto! :root))
+      (case (:screen @state*)
+        :root     (when (= k :enter) (goto! (:to (nth root-items (:sel @state*)))))
+        :apps     (case k :enter (enter-apps!) \c (act! "/app/close" {} {} "closed focused")
+                        \x (close-selected!) \h (act! "/app/home" {} {} "home") \r (bootstrap!) nil)
+        :volume   (case k (:right \+ \=) (nudge-volume! 5) (:left \-) (nudge-volume! -5) \m (toggle-mute!) nil)
+        :keyboard (when (= k :enter)
+                    (when-let [l (nth (:layouts (:keyboard @state*)) (:sel @state*) nil)]
+                      (act! "/api/input/keyboard/layout" {:layout l} {:kbd? true} (str "layout → " l))))
+        :output   (when (= k :enter)
+                    (act! "/api/audio/output" {:output (nth outputs (:sel @state*))} {:audio? true}
+                          (str "output → " (nth outputs (:sel @state*)))))
+        nil))))
+
+;; ---------------------------------------------------------------------------- main
+(defn -main []
+  (let [args *command-line-args*]
+    (when (or (empty? args) (#{"-h" "--help"} (first args)))
+      (println "usage: bb admin/ujima-admin <ip> [port]") (System/exit (if (seq args) 0 2)))
+    (let [host (first args) port (or (some-> (second args) parse-long) 1337)]
+      (reset! config* {:host host :base (str "http://" host ":" port)}))
+    (.addShutdownHook (Runtime/getRuntime) (Thread. cleanup!))
+    (raw-on!)
+    (try
+      (bootstrap!)
+      (stream-apps!)
+      (render!)
+      (loop [] (handle (read-key)) (render!) (when-not (:quit? @state*) (recur)))
+      (finally (cleanup!)))))
+
+(when-not (System/getenv "UJIMA_ADMIN_SMOKE") (-main))

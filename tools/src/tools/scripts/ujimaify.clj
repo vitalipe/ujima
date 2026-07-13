@@ -38,7 +38,12 @@
        "Restart=always\n"
        "RestartSec=3\n"
        ;; -br = black root, so the 2-4s of session bring-up shows black, not the grey X weave
-       "ExecStart=/usr/bin/startx -- vt1 -br\n"
+       ;; -ac = no X access control: the agent converges [:system :hostname] mid-session, and xauth
+       ;;       cookies are keyed FamilyLocal/<hostname> — the rename strands every later X client
+       ;;       ("Authorization required" cold-boot stall, one dead session per boot). Auth gates
+       ;;       nobody here anyway (single uid owns ~/.Xauthority; physical access = root). Revisit
+       ;;       only if apps ever get their own displays.
+       "ExecStart=/usr/bin/startx -- vt1 -br -ac\n"
        "\n"
        "[Install]\n"
        "WantedBy=multi-user.target\n"))

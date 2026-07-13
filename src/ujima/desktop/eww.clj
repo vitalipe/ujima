@@ -6,7 +6,7 @@
             [ujima.log :as log]))
 
 
-(def ^:private ping-tries  40)                       ; x 250ms = 10s for the daemon socket
+(def ^:private ping-deadline-ms 10000)               ; wall-clock cap for the daemon socket
 (def ^:private eww-dir*    (atom "/opt/ujima/desktop/eww"))
 (def ^:private shown?      (atom true))              ; bar visibility
 (def ^:private gen*        (atom 0))                 ; supersedes a pending debounced flip
@@ -39,13 +39,16 @@
 
 
 (defn- await-daemon!
-  "Poll `eww ping` until the daemon socket answers, or give up loudly."
+  "Poll `eww ping` until the daemon socket answers, or give up loudly. The cap is wall-clock:
+   against a wedged daemon each failed ping itself burns ~1s, so counting tries multiplies the
+   intended wait (40 tries ran ~50s on HW)."
   [dir]
-  (loop [n ping-tries]
-    (when-not (:ok? (shell/sh? :eww :--config dir "ping"))
-      (if (pos? n)
-        (do (Thread/sleep 250) (recur (dec n)))
-        (throw (ex-info "eww daemon never answered ping" {:eww dir}))))))
+  (let [deadline (+ (System/currentTimeMillis) ping-deadline-ms)]
+    (loop []
+      (when-not (:ok? (shell/sh? :eww :--config dir "ping"))
+        (if (< (System/currentTimeMillis) deadline)
+          (do (Thread/sleep 250) (recur))
+          (throw (ex-info "eww daemon never answered ping" {:eww dir})))))))
 
 
 (defn init!!

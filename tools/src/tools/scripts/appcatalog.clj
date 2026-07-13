@@ -4,13 +4,17 @@
    :fetch payload). Packages are never vendored in git — they install like apt at build
    time; only the spec lives here. Adding an app is one entry.
 
-   Two build seams share this one data source:
-     install!        apt-installs every :apt (deduped) + fetches each :fetch. Called from
-                     tools.scripts.install, so it rides the CACHED vendor base (the heavy
-                     app packages download once, not every build).
-     write-catalog!  projects the specs to apps.edn — pure file write, host-runnable for
-                     dev. Called from tools.scripts.desktop (image build + live
-                     `dev push desktop`), so a catalog-only edit ships without a rebuild.
+   Three build seams share this one data source:
+     install!         apt-installs every :apt (deduped) + fetches each :fetch. Called from
+                      tools.scripts.install, so it rides the CACHED vendor base (the heavy
+                      app packages download once, not every build).
+     write-catalog!   projects the specs to apps.edn — pure file write, host-runnable for
+                      dev. Called from tools.scripts.desktop (image build + live
+                      `dev push desktop`), so a catalog-only edit ships without a rebuild.
+     stage-defaults!  overlays each app's assets/apps/<id>/rootfs defaults tree onto / —
+                      first-run config, demo payloads, SPA builds; a path in the tree IS its
+                      destination. Called beside write-catalog!, so a defaults edit ships
+                      without a rebuild too.
 
    Pipeline: install (-> install!) -> base -> agent -> desktop (-> write-catalog!) -> ujimaify.
 
@@ -96,7 +100,7 @@
 
    ;; Godot 4 (game engine): official arm64 editor, fetched + sha256-pinned like TurboWarp (a .zip
    ;; carrying one versioned binary → :bin renames it to a stable `godot`). Opens its editor straight
-   ;; into the vendored 2D platformer demo (assets/godot-demo, staged by desktop.clj) — a wow-on-open
+   ;; into the vendored 2D platformer demo (the assets/apps/godot defaults tree) — a wow-on-open
    ;; instead of an empty Project Manager. Forced to Vulkan Mobile: the V3D does Vulkan 1.3 but not the
    ;; Forward+/Clustered tier (<48 textures/stage), and Mobile is the right renderer for a Pi GPU
    ;; (needs mesa-vulkan-drivers, install.clj).
@@ -109,13 +113,14 @@
             :dest   "/opt/ujima/baked-apps/godot"
             :bin    "godot"}}
 
-   ;; Excalidraw (offline whiteboard): a vendored static PWA build (assets/web/excalidraw, staged to
-   ;; /opt/ujima/web) served locally + opened as a chromium app. STOPGAP: excalidraw-launch.sh runs
-   ;; python3's http.server only to give the ES-module app an http origin (file:// is CORS-blocked) and
-   ;; lingers; dark-default is baked into index.html. Collab reaches Excalidraw's public servers (no
-   ;; offline) — a ujima fork will self-host the LAN relay. TODO: real static server + native fork.
+   ;; Excalidraw (offline whiteboard): a self-contained SPA app dir (assets/apps/excalidraw ->
+   ;; /opt/ujima/apps/excalidraw: run.sh + app/). run.sh is the SPA convention — serve the static
+   ;; build locally (python3 http.server STOPGAP; an ES-module app needs an http origin, file:// is
+   ;; CORS-blocked) and open it as a chromium app; dark-default baked into index.html. Collab
+   ;; reaches Excalidraw's public servers (no offline) — a ujima fork will self-host the LAN relay.
+   ;; TODO: real static server + a first-class SPA app type that generates run.sh.
    {:id :excalidraw :label "Excalidraw" :icon "excalidraw" :category :create
-    :exec ["/opt/ujima/web/excalidraw-launch.sh"]
+    :exec ["/opt/ujima/apps/excalidraw/run.sh"]
     :class "ujima-excalidraw" :apt ["python3"]}   ; python3 = stopgap http.server (chromium already a dep)
 
    {:id :tuxtype :label "TuxTyping" :icon "tuxtype" :category :learn
@@ -224,12 +229,48 @@
     (println "app-catalog: wrote" (count specs) "apps ->" dest)))
 
 
+(defn- ujima-owned
+  "The paths a rootfs stages that must belong to the ujima user: entries directly under
+   home/ujima, and entries one level inside an /opt/ujima area dir (opt/ujima/<area>/<entry>) —
+   never the area itself, so a tree can't seize baked-apps/ or apps/ from payloads beside its own."
+  [rootfs]
+  (let [home (fs/path rootfs "home/ujima")
+        opt  (fs/path rootfs "opt/ujima")]
+    (->> (concat (when (fs/exists? home) (fs/list-dir home))
+                 (when (fs/exists? opt)
+                   (mapcat #(if (fs/directory? %) (fs/list-dir %) [%]) (fs/list-dir opt))))
+         (map #(str "/" (fs/relativize rootfs %))))))
+
+
+(defn stage-defaults!
+  "Overlay each app's assets/apps/<id>/rootfs onto / — a path in the tree IS its destination.
+   Per-app defaults (first-run config, demo payloads, SPA builds) live there, so adding one is a
+   file drop, not a build-script edit. Staged /home/ujima + /opt/ujima paths become ujima-owned
+   (apps rewrite their own config; the repo's uids are the build host's). A dir without a
+   catalog :id or a rootfs/ throws — a typo must never stage nothing, silently."
+  [{:keys [project]}]
+  (let [root (fs/path (str project) "assets/apps")
+        ids  (into #{} (map (comp name :id)) apps)]
+    (doseq [dir (when (fs/exists? root) (sort-by str (fs/list-dir root)))
+            :let [id     (fs/file-name dir)
+                  rootfs (fs/path dir "rootfs")]]
+      (when-not (contains? ids id)
+        (throw (ex-info "assets/apps dir has no catalog entry" {:dir id})))
+      (when-not (fs/exists? rootfs)
+        (throw (ex-info "assets/apps dir has no rootfs/" {:dir id})))
+      ($! cp -a [(str rootfs "/.")] "/")
+      (doseq [p (ujima-owned rootfs)]
+        ($! chown -R "ujima:ujima" [p]))
+      (println "app-defaults:" id "staged"))))
+
+
 (defn run!
-  "Standalone full pass: apt-install + fetch, then write the catalog. The image build reaches
-   install! via tools.scripts.install (cached) and write-catalog! via tools.scripts.desktop;
-   this run! is the manual `tools image script appcatalog` / `tools dev script appcatalog`."
+  "Standalone full pass: apt-install + fetch, then stage defaults + write the catalog. The image
+   build reaches install! via tools.scripts.install (cached) and the other two via
+   tools.scripts.desktop; this run! is the manual `tools image/dev script appcatalog`."
   [opts]
   (with-console-out
     ($! apt-get update)
     (install! opts)
+    (stage-defaults! opts)
     (write-catalog! opts)))

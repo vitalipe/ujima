@@ -67,36 +67,14 @@
                        "gtk-font-name=Public Sans 10\n")))
         (println "desktop: no assets/themes/Nordic — app theme not staged")))
 
-    ;; per-app home config (first-launch suppression + sane defaults) → the ujima user's home.
-    ;; e.g. assets/home/.stellarium/config.ini disables Stellarium's startup online-catalog updates
-    ;; that otherwise hang its window offline. Owned by ujima so the apps can read + rewrite them.
+    ;; session-level home config → the ujima user's home (per-APP home defaults live in their
+    ;; assets/apps trees, staged below). e.g. .config/mimeapps.list routes links to the url
+    ;; handler. Owned by ujima so apps + xdg can read/rewrite.
     (let [home (str project "/assets/home")]
       (if (fs/exists? home)
         (do ($! cp -a [(str home "/.")] "/home/ujima/")
             ($! chown -R "ujima:ujima" "/home/ujima"))
-        (println "desktop: no assets/home — app home configs not staged")))
-
-    ;; Godot demo project — the launcher opens Godot's editor into this (the "wow" 2D platformer),
-    ;; not an empty Project Manager. Vendored source + editor state (2D main-screen); the import cache
-    ;; is NOT committed, so Godot re-imports at runtime — writes land in the overlay upper. Staged
-    ;; beside the fetched godot binary in baked-apps (survives the desktop/ clean-mirror above).
-    (let [demo (str project "/assets/godot-demo")]
-      (if (fs/exists? demo)
-        (do (fs/create-dirs "/opt/ujima/baked-apps")
-            ($! rm -rf "/opt/ujima/baked-apps/godot-demo")
-            ($! cp -a [demo] "/opt/ujima/baked-apps/godot-demo")
-            ;; cp -a kept the build-host uid (1000); runtime user is ujima (1001) → the demo would be
-            ;; unwritable, so Godot can't write res://.godot (caches/saves) → black editor + won't close.
-            ($! chown -R "ujima:ujima" "/opt/ujima/baked-apps/godot-demo"))
-        (println "desktop: no assets/godot-demo — Godot demo not staged")))
-
-    ;; web apps (Excalidraw): vendored static builds + their launch wrappers → /opt/ujima/web. Each
-    ;; app's stopgap wrapper serves its dir with python3's http.server + opens it as a chromium app.
-    (let [web (str project "/assets/web")]
-      (if (fs/exists? web)
-        (do ($! rm -rf "/opt/ujima/web")
-            ($! cp -a [web] "/opt/ujima/web"))
-        (println "desktop: no assets/web — web apps not staged")))
+        (println "desktop: no assets/home — home configs not staged")))
 
     ;; url handler: xdg-open (via mimeapps.list, staged with assets/home) resolves http/https to
     ;; this .desktop -> bin/ujima-open -> the Web app.
@@ -105,6 +83,11 @@
           (str "[Desktop Entry]\nType=Application\nName=Ujima URL Handler\n"
                "Exec=/opt/ujima/desktop/bin/ujima-open %u\n"
                "MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\nNoDisplay=true\n"))
+
+    ;; per-app defaults trees (assets/apps/<id>/rootfs): first-run config, demo payloads, SPA
+    ;; builds — overlaid onto / AFTER the mirrors above so a clean-mirror can't clobber them;
+    ;; rides both the image build and live `dev script desktop` like the catalog below.
+    (appcatalog/stage-defaults! {:project project})
 
     ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.appcatalog.
     ;; Emitted AFTER the wholesale copy above so the clean-mirror can't clobber it; rides both the

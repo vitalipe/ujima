@@ -229,6 +229,20 @@
     (println "app-catalog: wrote" (count specs) "apps ->" dest)))
 
 
+(defn- overlay!
+  "Copy ROOTFS onto / entry-by-entry: a dir is only created when missing — an existing dir's
+   ownership/mode is NEVER touched. (cp -a of the tree root applies the staged tree's attrs to
+   every dir it merges through: it root-owned /home/ujima on HW, and xauth can't lock inside a
+   root-owned home -> no X cookie -> dead session.) Files + symlinks ride cp -a (perms, exec
+   bit); {:hidden true} or the glob silently drops dotfiles like .stellarium."
+  [rootfs]
+  (doseq [p (sort-by str (fs/glob rootfs "**" {:hidden true}))
+          :let [target (str "/" (fs/relativize rootfs p))]]
+    (if (fs/directory? p {:nofollow-links true})
+      (fs/create-dirs target)
+      ($! cp -a [(str p)] [target]))))
+
+
 (defn- ujima-owned
   "The paths a rootfs stages that must belong to the ujima user: entries directly under
    home/ujima, and entries one level inside an /opt/ujima area dir (opt/ujima/<area>/<entry>) —
@@ -258,7 +272,7 @@
         (throw (ex-info "assets/apps dir has no catalog entry" {:dir id})))
       (when-not (fs/exists? rootfs)
         (throw (ex-info "assets/apps dir has no rootfs/" {:dir id})))
-      ($! cp -a [(str rootfs "/.")] "/")
+      (overlay! rootfs)
       (doseq [p (ujima-owned rootfs)]
         ($! chown -R "ujima:ujima" [p]))
       (println "app-defaults:" id "staged"))))

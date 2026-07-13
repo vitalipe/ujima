@@ -106,15 +106,6 @@
                "Exec=/opt/ujima/desktop/bin/ujima-open %u\n"
                "MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\nNoDisplay=true\n"))
 
-    ;; i3 `assign` rules, GENERATED from the catalog and appended to the copied config so a
-    ;; launched window lands on its app's workspace even if focus moved (no orphaned windows).
-    ;; Appended after the clean-mirror; a catalog edit reships the block via `dev push desktop`.
-    (let [cfg "/opt/ujima/desktop/i3/config"]
-      (when (fs/exists? cfg)
-        (spit cfg (str "\n# --- generated app -> workspace assignments (tools.scripts.appcatalog) ---\n"
-                       (appcatalog/assign-block) "\n")
-              :append true)))
-
     ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.appcatalog.
     ;; Emitted AFTER the wholesale copy above so the clean-mirror can't clobber it; rides both the
     ;; image build and live `dev push desktop`, so a catalog-only edit ships without a rebuild.

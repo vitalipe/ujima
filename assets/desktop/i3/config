@@ -16,6 +16,8 @@ client.urgent           #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
 # real dialogs float; deliberately NO fullscreen keybind — the eww bars must stay visible.
 # chromium --app windows auto-float (fixed size hints) but set class/role only AFTER mapping, so
 # for_window can't catch them here — the agent un-floats app windows instead (settle-floaters!).
+# NO `assign` rules: the agent routes each window to its app's workspace by WM_CLASS at runtime
+# (route-windows!), so a new app needs no config edit + reload — just a catalog entry.
 for_window [window_type="dialog"]  floating enable
 for_window [window_type="utility"] floating enable
 # open/save file choosers overflow the bars when floated (buttons hide behind the dock) — TILE them

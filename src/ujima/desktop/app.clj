@@ -151,6 +151,20 @@
     (i3/command? (format "[con_id=%d]" con-id) "floating" "disable")))
 
 
+(defn- route-windows!
+  "The orphan backstop: a window that mapped on the wrong workspace (focus moved away during the
+   launch) is moved to its app's workspace, matched by WM_CLASS. No focus change, so it goes to its
+   place while the kid stays put; dialogs stay with their parent; idempotent (already-home = no-op)."
+  [{:keys [ws->wins]}]
+  (let [by-class (:by-class @catalog*)]
+    (doseq [[ws wins] ws->wins
+            {:keys [con-id class wtype]} wins
+            :let  [target (get by-class class)]
+            :when (and target (not= ws (name target))
+                       (not (#{"dialog" "utility" "splash"} wtype)))]
+      (i3/command? (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" (name target)))))
+
+
 (defn handle-event! [ev]
   (case (:type ev)
     :app/run      (do-run! (:app ev) (:extra ev []))
@@ -172,6 +186,7 @@
 
   (let [w (observe!)]
     (settle-floaters! w)
+    (route-windows! w)
     (-> w projection converge!)))
 
 

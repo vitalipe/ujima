@@ -151,9 +151,11 @@
     :class "XaoS" :apt ["xaos"]}])                           ; res_class xprop-verified
 
 
-;; :class is no longer shipped — the workspace is an app's identity, not its WM_CLASS.
 ;; :mode (e.g. :fullscreen) is a projection hint: a fixed-fullscreen app hides the bars.
-(def ^:private spec-keys [:id :label :icon :category :exec :mode])
+;; :class is the WM_CLASS the agent hands i3 to route an orphaned window to its workspace — a
+;; placement hint, NOT an identity key (identity is still the workspace); the agent never matches
+;; windows by it, it only tells i3 where a matching window belongs.
+(def ^:private spec-keys [:id :label :icon :category :exec :mode :class])
 
 
 (defn- fetch!
@@ -208,17 +210,6 @@
     (doseq [{:keys [fetch deb]} apps]
       (when fetch (fetch! fetch))
       (when deb (deb! deb)))))
-
-
-(defn assign-block
-  "i3 `assign` rules routing each app's window (matched by WM_CLASS) to its own workspace (= its
-   id), so a launched window lands there even if focus moved during the launch — instead of
-   orphaning on whatever workspace happened to be focused. Generated from the catalog, so a new
-   app needs no config edit. `:class` lives only here (build-time), not in the runtime catalog."
-  []
-  (str/join "\n"
-    (for [{:keys [id class]} apps :when class]
-      (format "assign [class=\"%s\"] \"%s\"" class (name id)))))
 
 
 (defn write-catalog!

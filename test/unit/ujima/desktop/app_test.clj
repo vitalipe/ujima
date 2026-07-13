@@ -13,9 +13,9 @@
 
 
 (def ^:private catalog-edn
-  {:apps [{:id :paint :label "Paint" :exec ["tuxpaint" "--nolockfile"]}
-          {:id :web   :label "Web"   :exec ["chromium"]}
-          {:id :sky   :label "Sky"   :exec ["stellarium"] :mode :fullscreen}]})
+  {:apps [{:id :paint :label "Paint" :exec ["tuxpaint" "--nolockfile"] :class "TuxPaint.TuxPaint"}
+          {:id :web   :label "Web"   :exec ["chromium"] :class "ujima-web"}
+          {:id :sky   :label "Sky"   :exec ["stellarium"] :mode :fullscreen :class "stellarium"}]})
 
 
 (def ^:private world*  (atom nil))    ; {:wins [...] :focused-ws "..." :scopes #{app-id}}
@@ -23,13 +23,14 @@
 (def ^:private pushed* (atom []))
 
 
-(defn- win [ws & {:keys [focused? title floating? wtype con full?]}]
+(defn- win [ws & {:keys [focused? title floating? wtype con full? class]}]
   {:ws ws :focused? (boolean focused?) :title (or title ws) :full? (boolean full?)
-   :floating? (boolean floating?) :wtype (or wtype "normal") :con (or con 1)})
+   :floating? (boolean floating?) :wtype (or wtype "normal") :con (or con 1) :class class})
 
 (defn- node [w]
-  {:id (:con w) :window (+ 1000 (:con w)) :name (:title w)
-   :focused (:focused? w) :window_type (:wtype w) :fullscreen_mode (if (:full? w) 1 0)})
+  (cond-> {:id (:con w) :window (+ 1000 (:con w)) :name (:title w)
+           :focused (:focused? w) :window_type (:wtype w) :fullscreen_mode (if (:full? w) 1 0)}
+    (:class w) (assoc :window_properties {:class (:class w)})))
 
 (defn- tree [wins]
   {:type "root"
@@ -54,7 +55,7 @@
                 i3/switch-workspace!  (fn [ws] (swap! world* assoc :focused-ws ws)
                                                (swap! fx* conj [:switch ws]))
                 i3/kill-focused!      (fn [] (swap! fx* conj [:kill]))
-                i3/command?           (fn [crit & _] (swap! fx* conj [:unfloat crit]))
+                i3/command?           (fn [& args] (swap! fx* conj (into [:cmd] args)))
                 i3/emit!              (fn [ev] (app/handle-event! ev))
                 systemd/active?       (fn [id] (contains? (:scopes @world*) id))
                 systemd/spawn-scoped! (fn [id exec] (swap! world* update :scopes conj id)
@@ -237,13 +238,32 @@
 (deftest floating-app-window-gets-tiled
   (setup! [(win "web" :focused? true :floating? true :con 7)] "web" :scopes #{:web})
   (stubbed #(app/handle-event! {:type :window/change}))
-  (is (= [[:unfloat "[con_id=7]"]] (fx-of :unfloat))))
+  (is (= [[:cmd "[con_id=7]" "floating" "disable"]] (fx-of :cmd))))
 
 (deftest tiled-windows-and-dialogs-left-alone
   (setup! [(win "web" :focused? true :con 9)
            (win "web" :floating? true :wtype "dialog" :con 10)] "web" :scopes #{:web})
   (stubbed #(app/handle-event! {:type :window/change}))
-  (is (= [] (fx-of :unfloat))))
+  (is (= [] (fx-of :cmd))))
+
+
+;; --- route: an orphan window lands on its app's workspace by class (no focus steal) ---
+
+(deftest orphan-window-routed-to-its-workspace-by-class
+  ;; the window mapped on home because focus moved during launch -> move it to its app ws by WM_CLASS
+  (setup! [(win "1" :focused? true :con 7 :class "stellarium")] "1" :scopes #{:sky})
+  (stubbed #(app/handle-event! {:type :window/change}))
+  (is (= [[:cmd "[con_id=7]" "move" "container" "to" "workspace" "sky"]] (fx-of :cmd))))
+
+(deftest window-on-its-own-workspace-is-not-moved
+  (setup! [(win "sky" :focused? true :con 7 :class "stellarium")] "sky" :scopes #{:sky})
+  (stubbed #(app/handle-event! {:type :window/change}))
+  (is (= [] (fx-of :cmd)) "already on its workspace — idempotent"))
+
+(deftest dialog-is-not-routed-by-class
+  (setup! [(win "1" :focused? true :con 7 :class "stellarium" :wtype "dialog")] "1" :scopes #{:sky})
+  (stubbed #(app/handle-event! {:type :window/change}))
+  (is (= [] (fx-of :cmd)) "dialogs stay with their parent"))
 
 
 ;; --- verbs validate ---

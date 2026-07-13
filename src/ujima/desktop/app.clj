@@ -153,15 +153,16 @@
 
 (defn- route-windows!
   "The orphan backstop: a window that mapped on the wrong workspace (focus moved away during the
-   launch) is moved to its app's workspace, matched by WM_CLASS. No focus change, so it goes to its
-   place while the kid stays put; dialogs stay with their parent; idempotent (already-home = no-op)."
+   launch) is moved to its app's workspace, matched by WM_CLASS — INCLUDING the app's own dialogs
+   (e.g. Inkscape's startup dialog, which maps before its main window), which must land with their
+   app, not strand on home. Only class-matching windows move, so non-app dialogs are untouched.
+   No focus change, so it goes to its place while the kid stays put; idempotent (home = no-op)."
   [{:keys [ws->wins]}]
   (let [by-class (:by-class @catalog*)]
     (doseq [[ws wins] ws->wins
-            {:keys [con-id class wtype]} wins
+            {:keys [con-id class]} wins
             :let  [target (get by-class class)]
-            :when (and target (not= ws (name target))
-                       (not (#{"dialog" "utility" "splash"} wtype)))]
+            :when (and target (not= ws (name target)))]
       (i3/command? (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" (name target)))))
 
 

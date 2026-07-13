@@ -260,10 +260,13 @@
   (stubbed #(app/handle-event! {:type :window/change}))
   (is (= [] (fx-of :cmd)) "already on its workspace — idempotent"))
 
-(deftest dialog-is-not-routed-by-class
+(deftest app-dialog-is-routed-by-class
+  ;; an app's own dialog (e.g. Inkscape's startup dialog, which maps before its main window) must
+  ;; land on the app's workspace too — skipping it strands the app on home (the original bug)
   (setup! [(win "1" :focused? true :con 7 :class "stellarium" :wtype "dialog")] "1" :scopes #{:sky})
   (stubbed #(app/handle-event! {:type :window/change}))
-  (is (= [] (fx-of :cmd)) "dialogs stay with their parent"))
+  (is (= [[:cmd "[con_id=7]" "move" "container" "to" "workspace" "sky"]] (fx-of :cmd))
+      "the app's own dialog routes to its workspace"))
 
 
 ;; --- verbs validate ---

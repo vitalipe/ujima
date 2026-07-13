@@ -77,7 +77,7 @@
 
    {:id :files :label "Files" :icon "files" :category :system
     :exec ["pcmanfm" "/home/ujima/Files"]
-    :class "pcmanfm" :apt ["pcmanfm"]}
+    :class "Pcmanfm" :apt ["pcmanfm"]}                       ; res_class (xprop-verified: instance pcmanfm / class Pcmanfm)
 
    {:id :web :label "Web" :icon "web" :category :explore
     :exec ["chromium" "--class=ujima-web" "--user-data-dir=/tmp/ujima-web" "--no-first-run"]

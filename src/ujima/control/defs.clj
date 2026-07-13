@@ -21,7 +21,9 @@
 
 (def settings [{:key     [:system :hostname]
                 :doc     "LAN hostname for this machine (single label, not an FQDN)"
-                :default "ujima"
+                ;; must match the baked /etc/hostname (tools base.clj) — a mismatch makes the
+                ;; hostname converge rename every machine on every boot (overlayroot resets /etc)
+                :default "ujimaos"
                 :scopes  #{:device}}
 
                {:key     [:system :timezone]

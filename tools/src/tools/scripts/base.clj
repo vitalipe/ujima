@@ -79,8 +79,11 @@
     (grant-passwordless-sudo!)
     (enable-console-autologin!)
 
-    ;; 4. map the hostname so sudo/X stop warning "unable to resolve host ujima"
-    ($! sh -c "grep -qw ujima /etc/hosts || printf '127.0.1.1\\tujima\\n' >> /etc/hosts")
+    ;; 4. default host identity — /etc/hostname must match the [:system :hostname] settings
+    ;;    default (control/defs.clj), or the agent's converge renames the machine on every boot
+    ;;    (overlayroot resets /etc); the hosts mapping keeps sudo/X from warning "unable to resolve"
+    ($! sh -c "echo ujimaos > /etc/hostname")
+    ($! sh -c "grep -qw ujimaos /etc/hosts || printf '127.0.1.1\\tujimaos\\n' >> /etc/hosts")
 
     ;; 5. A/B disk mount points + bind targets — rootfs layout is build content, so every
     ;;    image carries its own. The per-slot fstab that references them is written at

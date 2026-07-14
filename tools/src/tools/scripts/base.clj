@@ -79,9 +79,8 @@
     (grant-passwordless-sudo!)
     (enable-console-autologin!)
 
-    ;; 4. default host identity — /etc/hostname must match the [:system :hostname] settings
-    ;;    default (control/defs.clj), or the agent's converge renames the machine on every boot
-    ;;    (overlayroot resets /etc); the hosts mapping keeps sudo/X from warning "unable to resolve"
+    ;; 4. default host identity — the baked name IS the default ([:system :hostname] is nil unless
+    ;;    a rename is set); the hosts mapping keeps sudo/X from warning "unable to resolve"
     ($! sh -c "echo ujimaos > /etc/hostname")
     ($! sh -c "grep -qw ujimaos /etc/hosts || printf '127.0.1.1\\tujimaos\\n' >> /etc/hosts")
 

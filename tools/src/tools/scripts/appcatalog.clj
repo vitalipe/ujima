@@ -92,11 +92,11 @@
     :class "Inkscape" :apt ["inkscape"]}                     ; xprop-verified (res_class)
 
    {:id :turbowarp :label "TurboWarp" :icon "scratch" :category :code
-    :exec ["/opt/ujima/baked-apps/turbowarp/turbowarp-desktop" "--no-sandbox"]
+    :exec ["/opt/ujima/apps/turbowarp/turbowarp-desktop" "--no-sandbox"]
     :class "turbowarp-desktop"                               ; StartupWMClass (package.json)
     :fetch {:url    "https://github.com/TurboWarp/desktop/releases/download/v1.16.0/TurboWarp-linux-arm64-1.16.0.tar.gz"
             :sha256 "5909f02d92536c3ee52121dec4f1b7a73261a08ac7e091d15205cbff9893e33a"
-            :dest   "/opt/ujima/baked-apps/turbowarp"}}
+            :dest   "/opt/ujima/apps/turbowarp"}}
 
    ;; Godot 4 (game engine): official arm64 editor, fetched + sha256-pinned like TurboWarp (a .zip
    ;; carrying one versioned binary → :bin renames it to a stable `godot`). Opens its editor straight
@@ -105,12 +105,12 @@
    ;; Forward+/Clustered tier (<48 textures/stage), and Mobile is the right renderer for a Pi GPU
    ;; (needs mesa-vulkan-drivers, install.clj).
    {:id :godot :label "Godot" :icon "godot" :category :code
-    :exec ["/opt/ujima/baked-apps/godot/godot" "--editor" "--path" "/opt/ujima/baked-apps/godot-demo"
+    :exec ["/opt/ujima/apps/godot/godot" "--editor" "--path" "/opt/ujima/apps/godot-demo"
            "--rendering-driver" "vulkan" "--rendering-method" "mobile"]
     :class "Godot"                                           ; res_class, xprop-verified
     :fetch {:url    "https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.arm64.zip"
             :sha256 "db5aa126353a18fd664818e4f1b9cfffaa77e32d4c9af0ea87e8f028a395a1ed"
-            :dest   "/opt/ujima/baked-apps/godot"
+            :dest   "/opt/ujima/apps/godot"
             :bin    "godot"}}
 
    ;; Excalidraw (offline whiteboard): a self-contained SPA app dir (assets/apps/excalidraw ->
@@ -246,7 +246,7 @@
 (defn- ujima-owned
   "The paths a rootfs stages that must belong to the ujima user: entries directly under
    home/ujima, and entries one level inside an /opt/ujima area dir (opt/ujima/<area>/<entry>) —
-   never the area itself, so a tree can't seize baked-apps/ or apps/ from payloads beside its own."
+   never the area itself, so a tree can't seize /opt/ujima/apps from the payloads beside its own."
   [rootfs]
   (let [home (fs/path rootfs "home/ujima")
         opt  (fs/path rootfs "opt/ujima")]

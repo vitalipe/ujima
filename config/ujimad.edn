@@ -5,4 +5,4 @@
  :events  {:audio-poll-ms 1000}
  :desktop {:eww        {:eww-config  "/opt/ujima/desktop/eww"}
            :app        {:catalog "/opt/ujima/desktop/apps.edn"}
-           :http       {:host     "127.0.0.1" :port 1337}}}
+           :http       {:host     "0.0.0.0" :port 1337}}}  ; LAN-reachable for remote admin — no auth, physical-access threat model

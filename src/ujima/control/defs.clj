@@ -21,7 +21,10 @@
 
 (def settings [{:key     [:system :hostname]
                 :doc     "LAN hostname for this machine (single label, not an FQDN)"
-                :default "ujima"
+                ;; nil = keep the baked /etc/hostname (tools base.clj). A set value renames at
+                ;; converge — every boot, overlayroot resets /etc (harmless: X runs -ac); clearing
+                ;; it reverts only on reboot
+                :default nil
                 :scopes  #{:device}}
 
                {:key     [:system :timezone]

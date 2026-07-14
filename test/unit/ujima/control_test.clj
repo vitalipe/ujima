@@ -26,7 +26,7 @@
   (let [s (control/settings)]
     (is (= 40 (get s [:audio :usb :volume])))
     (is (= 70 (get s [:audio :hdmi :volume])))
-    (is (= "ujima" (get s [:system :hostname])))))
+    (is (nil? (get s [:system :hostname])) "nil default = keep the baked /etc/hostname")))
 
 
 (deftest write-stamps-schema-and-round-trips
@@ -52,7 +52,7 @@
 (deftest write-of-non-scope-key-is-pruned
   (fresh!)
   (control/settings! :session [:system :hostname] "nope")   ; :device-only key
-  (is (= "ujima" (get (control/settings) [:system :hostname]))))
+  (is (nil? (get (control/settings) [:system :hostname])) "pruned write leaves the nil default"))
 
 
 (deftest file-with-matching-schema-loads

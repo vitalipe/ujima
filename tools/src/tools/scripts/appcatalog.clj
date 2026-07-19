@@ -32,15 +32,13 @@
    :class is the WM_CLASS res_class i3 adopts on (a wrong one = the window never adopts and the
    app respawns forever); the apt apps' values are xprop-verified on hardware."
   [{:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category :learn
-    :exec ["chromium" "--app=https://wikipedia.com" "--class=ujima-wikipedia"
-           "--user-data-dir=/tmp/ujima-wikipedia" "--no-first-run" "--disk-cache-size=1"]
+    :exec ["/opt/ujima/desktop/bin/ujima-open-web-app" "https://wikipedia.com" "ujima-wikipedia"]
     :class "ujima-wikipedia" :apt ["chromium"]}
 
    ;; STUB: Kolibri (Learning Equality's offline learning platform) served locally on its default
    ;; :8080 — the server isn't stood up yet, so the tile opens a placeholder until it is.
    {:id :kolibri :label "Kolibri" :icon "kolibri" :category :learn
-    :exec ["chromium" "--app=http://localhost:8080" "--class=ujima-kolibri"
-           "--user-data-dir=/tmp/ujima-kolibri" "--no-first-run" "--disk-cache-size=1"]
+    :exec ["/opt/ujima/desktop/bin/ujima-open-web-app" "http://localhost:8080" "ujima-kolibri"]
     :class "ujima-kolibri" :apt ["chromium"]}
 
    ;; each LibreOffice tile gets its own -env:UserInstallation so it's a SEPARATE soffice process

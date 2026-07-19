@@ -1,0 +1,7 @@
+#!/bin/sh
+# Kiosk-style chromium web app: ujima-open-web-app <url> <class>. The class doubles as
+# the per-app profile dir (/tmp/<class>) so each web app is its own chromium instance.
+set -eu
+[ $# -eq 2 ] || { echo "usage: ujima-open-web-app <url> <class>" >&2; exit 2; }
+exec chromium --app="$1" --class="$2" --user-data-dir="/tmp/$2" \
+  --no-first-run --disk-cache-size=1

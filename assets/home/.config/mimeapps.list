@@ -1,4 +1,4 @@
 [Default Applications]
-x-scheme-handler/http=ujima-open.desktop
-x-scheme-handler/https=ujima-open.desktop
-text/html=ujima-open.desktop
+x-scheme-handler/http=ujima-open-url.desktop
+x-scheme-handler/https=ujima-open-url.desktop
+text/html=ujima-open-url.desktop

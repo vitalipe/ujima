@@ -77,11 +77,11 @@
         (println "desktop: no assets/home — home configs not staged")))
 
     ;; url handler: xdg-open (via mimeapps.list, staged with assets/home) resolves http/https to
-    ;; this .desktop -> bin/ujima-open -> the Web app.
+    ;; this .desktop -> bin/ujima-open-url -> the Web app.
     (fs/create-dirs "/usr/share/applications")
-    (spit "/usr/share/applications/ujima-open.desktop"
+    (spit "/usr/share/applications/ujima-open-url.desktop"
           (str "[Desktop Entry]\nType=Application\nName=Ujima URL Handler\n"
-               "Exec=/opt/ujima/desktop/bin/ujima-open %u\n"
+               "Exec=/opt/ujima/desktop/bin/ujima-open-url %u\n"
                "MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\nNoDisplay=true\n"))
 
     ;; per-app defaults trees (assets/apps/<id>/rootfs): first-run config, demo payloads, SPA

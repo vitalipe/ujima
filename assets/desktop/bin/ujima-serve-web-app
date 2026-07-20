@@ -1,0 +1,20 @@
+#!/bin/sh
+# SPA wrapper: serve a static app dir on localhost:<port>, open it as a kiosk web app,
+# stop the server when the app closes. python3 http.server = the stopgap SPA convention
+# (an ES-module app needs an http:// origin; file:// is CORS-blocked).
+set -eu
+[ $# -eq 4 ] || { echo "usage: ujima-serve-web-app <dir> <index.html> <port> <class>" >&2; exit 2; }
+dir="$1"; index="$2"; port="$3"; class="$4"
+
+python3 -m http.server "$port" --bind 127.0.0.1 --directory "$dir" >/dev/null 2>&1 &
+server=$!
+trap 'kill "$server" 2>/dev/null || true' EXIT
+trap 'exit 1' TERM INT
+
+for _ in $(seq 1 50); do   # bounded readiness poll; a dead server fails loudly, not as a blank kiosk
+  if curl -sf -o /dev/null "http://localhost:$port/$index"; then break; fi
+  kill -0 "$server" 2>/dev/null || { echo "ujima-serve-web-app: server died — port $port taken?" >&2; exit 1; }
+  sleep 0.1
+done
+
+/opt/ujima/desktop/bin/ujima-open-web-app "http://localhost:$port/$index" "$class"

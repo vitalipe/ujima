@@ -111,15 +111,16 @@
             :dest   "/opt/ujima/apps/godot"
             :bin    "godot"}}
 
-   ;; Excalidraw (offline whiteboard): a self-contained SPA app dir (assets/apps/excalidraw ->
-   ;; /opt/ujima/apps/excalidraw: run.sh + app/). run.sh is the SPA convention — serve the static
-   ;; build locally (python3 http.server STOPGAP; an ES-module app needs an http origin, file:// is
-   ;; CORS-blocked) and open it as a chromium app; dark-default baked into index.html. Collab
-   ;; reaches Excalidraw's public servers (no offline) — a ujima fork will self-host the LAN relay.
-   ;; TODO: real static server + a first-class SPA app type that generates run.sh.
+   ;; Excalidraw (offline whiteboard): a vendored static SPA build (assets/apps/excalidraw ->
+   ;; /opt/ujima/apps/excalidraw/app), launched via ujima-serve-web-app — the SPA convention:
+   ;; serve the build on localhost (python3 http.server STOPGAP; an ES-module app needs an http
+   ;; origin, file:// is CORS-blocked), open it as a kiosk web app, reap the server on close.
+   ;; dark-default baked into app/index.html. Collab reaches Excalidraw's public servers (no
+   ;; offline) — a ujima fork will self-host the LAN relay. TODO: real static server.
    {:id :excalidraw :label "Excalidraw" :icon "excalidraw" :category :create
-    :exec ["/opt/ujima/apps/excalidraw/run.sh"]
-    :class "ujima-excalidraw" :apt ["python3"]}   ; python3 = stopgap http.server (chromium already a dep)
+    :exec ["/opt/ujima/desktop/bin/ujima-serve-web-app"
+           "/opt/ujima/apps/excalidraw/app" "index.html" "8090" "ujima-excalidraw"]
+    :class "ujima-excalidraw" :apt ["python3"]}   ; python3 = the wrapper's stopgap http.server
 
    {:id :tuxtype :label "TuxTyping" :icon "tuxtype" :category :learn
     :exec ["/usr/games/tuxtype"]                            ; /usr/games isn't on the service PATH

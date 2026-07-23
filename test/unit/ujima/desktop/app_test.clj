@@ -12,10 +12,25 @@
 ;; into handle-event! via the i3/emit! stub.
 
 
-(def ^:private catalog-edn
-  {:apps [{:id :paint :label "Paint" :exec ["tuxpaint" "--nolockfile"] :class "TuxPaint.TuxPaint"}
-          {:id :web   :label "Web"   :exec ["chromium"] :class "ujima-web"}
-          {:id :sky   :label "Sky"   :exec ["stellarium"] :mode :fullscreen :class "stellarium"}]})
+(def ^:private catalog-apps               ; dir name = :id (the scanner's contract)
+  {"paint" {:label "Paint" :exec ["tuxpaint" "--nolockfile"] :class "TuxPaint.TuxPaint"}
+   "web"   {:label "Web"   :exec ["chromium"] :class "ujima-web"}
+   "sky"   {:label "Sky"   :exec ["stellarium"] :mode :fullscreen :class "stellarium"}})
+
+(defn- scan-root!
+  "Materialize {dir-name spec} as a temp scan root: <root>/<dir>/app.edn per entry."
+  [apps]
+  (let [root (fs/create-temp-dir {:prefix "ujima-apps"})]
+    (doseq [[id spec] apps]
+      (fs/create-dirs (fs/path root id))
+      (spit (str (fs/path root id "app.edn")) (pr-str spec)))
+    (str root)))
+
+(def ^:private test-catalog
+  (let [root (scan-root! catalog-apps)
+        c    (app/load-catalog root)]
+    (fs/delete-tree root)
+    c))
 
 
 (def ^:private world*  (atom nil))    ; {:wins [...] :focused-ws "..." :scopes #{app-id}}
@@ -43,11 +58,8 @@
   (reset! world*  {:wins wins :focused-ws focused-ws :scopes scopes})
   (reset! fx*     [])
   (reset! pushed* [])
-  (let [f (str (fs/create-temp-file {:prefix "apps" :suffix ".edn"}))]
-    (fs/delete-on-exit f)
-    (spit f (pr-str catalog-edn))
-    (app/init! {:catalog          (app/load-catalog f)
-                :converge-targets [(fn [next _] (swap! pushed* conj next))]})))
+  (app/init! {:catalog          test-catalog
+              :converge-targets [(fn [next _] (swap! pushed* conj next))]}))
 
 (defn- stubbed [f]
   (with-redefs [i3/get-tree!          (fn [] (tree (:wins @world*)))
@@ -69,6 +81,34 @@
 (defn- snap  [] (last @pushed*))
 (defn- open-ids [] (mapv :id (:apps (snap))))
 (defn- current-id [] (:id (:current (snap))))
+
+
+;; --- catalog scan: dirs with app.edn, abc order, app-OS split (bad content never throws) ---
+
+(deftest scan-ids-from-dir-names-in-abc-order
+  (let [root (scan-root! {"zebra" {:label "Z" :exec ["z"]}
+                          "alpha" {:label "A" :exec ["a"]}
+                          "mango" {:label "M" :exec ["m"]}})]
+    (fs/create-dirs (fs/path root "payload-only"))            ; no app.edn -> not an app
+    (spit (str (fs/path root "stray.txt")) "not a dir")
+    (let [c (app/load-catalog root)]
+      (is (= [:alpha :mango :zebra] (:order c)) "dir name = id, abc = launcher order")
+      (is (= "A" (get-in c [:by-id :alpha :label]))))
+    (fs/delete-tree root)))
+
+(deftest scan-skips-broken-apps-and-keeps-the-rest
+  (let [root (scan-root! {"good" {:label "Good" :exec ["x"]}})]
+    (fs/create-dirs (fs/path root "garbage"))
+    (spit (str (fs/path root "garbage" "app.edn")) "{:label \"oops\"")     ; truncated edn
+    (fs/create-dirs (fs/path root "specless"))
+    (spit (str (fs/path root "specless" "app.edn")) (pr-str {:label "NoExec"}))
+    (let [c (app/load-catalog root)]
+      (is (= [:good] (:order c)) "bad apps skipped loudly; the rest boot"))
+    (fs/delete-tree root)))
+
+(deftest scan-missing-root-is-an-empty-catalog
+  (let [c (app/load-catalog "/nope/missing")]
+    (is (= [] (:order c)) "no app content can stop the session")))
 
 
 ;; --- run: scope-gated switch-then-launch ---

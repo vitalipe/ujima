@@ -1,0 +1,4 @@
+;; Qt app → dark via qt6-gtk-platformtheme + the session's QT_QPA_PLATFORMTHEME
+{:label "Marble" :category :explore
+ :exec ["marble-qt"]
+ :class "Marble Virtual Globe"}  ; res_class xprop-verified

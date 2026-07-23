@@ -1,0 +1,3 @@
+{:label "Thonny" :category :code
+ :exec ["thonny"]
+ :class "Thonny"}  ; xprop-verified

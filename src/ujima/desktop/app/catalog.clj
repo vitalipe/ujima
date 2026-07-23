@@ -1,5 +1,5 @@
 (ns ujima.desktop.app.catalog
-  "apps.edn launch specs indexed by :id, validated loudly. Pure.")
+  "app.edn launch specs indexed by :id, validated loudly. Pure.")
 
 
 (defn- validate! [apps]

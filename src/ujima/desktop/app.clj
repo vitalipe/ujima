@@ -26,13 +26,34 @@
 (def force-hi-ms 3000)                     ; a 2nd ✕ later = a fresh close, not an escalation
 
 
-(defn load-catalog [path]
-  (when-not (and path (fs/exists? (str path)))
-    (throw (ex-info "app catalog not found" {:path (str path)})))
-  (let [raw (io/slurp-edn path)]
-    (when-not (map? raw)
-      (throw (ex-info "app catalog unreadable" {:path (str path)})))
-    (catalog/->catalog raw)))
+(defn- read-app
+  "One scan entry: DIR/app.edn -> spec, :id = the dir name. Bad content (unreadable edn,
+   non-map, missing :label/:exec) logs and returns nil — an app can break itself, never
+   the session."
+  [dir]
+  (try
+    (let [spec (io/slurp-edn (str (fs/path dir "app.edn")))]
+      (if (and (map? spec) (:label spec) (vector? (:exec spec)) (seq (:exec spec)))
+        (assoc spec :id (keyword (fs/file-name dir)))
+        (do (log/error "invalid app.edn — app skipped" {:dir (str dir)}) nil)))
+    (catch Throwable e
+      (log/error "unreadable app.edn — app skipped" {:dir (str dir) :error (ex-message e)})
+      nil)))
+
+
+(defn load-catalog
+  "Build the catalog by scanning ROOT: each subdir directly containing an app.edn is an app
+   (payload-only dirs are invisible), in dir-name order — the stable launcher order. Apps are
+   external data to the OS: a bad entry is skipped loudly, a missing root yields an empty
+   catalog, and the session boots regardless."
+  [root]
+  (let [dirs (if (and root (fs/directory? (str root)))
+               (sort-by fs/file-name (filter fs/directory? (fs/list-dir (str root))))
+               (do (log/error "app root missing — empty catalog" {:root (str root)}) []))
+        apps (into [] (comp (filter #(fs/exists? (fs/path % "app.edn")))
+                            (keep read-app))
+                   dirs)]
+    (catalog/->catalog {:apps apps})))
 
 
 (defn init! [{:keys [catalog converge-targets]}]

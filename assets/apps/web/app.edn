@@ -1,0 +1,4 @@
+;; vanilla full-UI browser (not --app); open-url appends the link to this exec
+{:label "Web" :category :explore
+ :exec ["chromium" "--class=ujima-web" "--user-data-dir=/tmp/ujima-web" "--no-first-run"]
+ :class "ujima-web"}

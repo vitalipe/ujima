@@ -1,0 +1,5 @@
+;; STUB: Kolibri (Learning Equality's offline learning platform) served locally on its default
+;; :8080 — the server isn't stood up yet, so the tile opens a placeholder until it is.
+{:label "Kolibri" :category :learn
+ :exec ["/opt/ujima/desktop/bin/ujima-open-web-app" "http://localhost:8080" "ujima-kolibri"]
+ :class "ujima-kolibri"}

@@ -4,5 +4,5 @@
            :tmp     "/ujima/run/session"}
  :events  {:audio-poll-ms 1000}
  :desktop {:eww        {:eww-config  "/opt/ujima/desktop/eww"}
-           :app        {:catalog "/opt/ujima/desktop/apps.edn"}
+           :app        {:catalog "/opt/ujima/apps"}
            :http       {:host     "0.0.0.0" :port 1337}}}  ; LAN-reachable for remote admin — no auth, physical-access threat model

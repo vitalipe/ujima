@@ -1,0 +1,3 @@
+{:label "Inkscape" :category :create
+ :exec ["inkscape"]
+ :class "Inkscape"}  ; xprop-verified (res_class)

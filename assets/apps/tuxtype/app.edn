@@ -1,0 +1,3 @@
+{:label "TuxTyping" :category :learn
+ :exec ["/usr/games/tuxtype"]   ; /usr/games isn't on the service PATH
+ :class "tuxtype"}  ; xprop-verified

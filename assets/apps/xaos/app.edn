@@ -1,0 +1,3 @@
+{:label "XaoS" :category :explore
+ :exec ["xaos"]
+ :class "XaoS"}  ; res_class xprop-verified

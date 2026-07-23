@@ -84,12 +84,8 @@
                "Exec=/opt/ujima/desktop/bin/ujima-open-url %u\n"
                "MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\nNoDisplay=true\n"))
 
-    ;; per-app defaults trees (assets/apps/<id>/rootfs): first-run config, demo payloads, SPA
-    ;; builds — overlaid onto / AFTER the mirrors above so a clean-mirror can't clobber them;
-    ;; rides both the image build and live `dev script desktop` like the catalog below.
-    (appcatalog/stage-defaults! {:project project})
-
-    ;; the launcher catalog is GENERATED (not a committed asset), from tools.scripts.appcatalog.
-    ;; Emitted AFTER the wholesale copy above so the clean-mirror can't clobber it; rides both the
-    ;; image build and live `dev push desktop`, so a catalog-only edit ships without a rebuild.
-    (appcatalog/write-catalog! {:dest "/opt/ujima/desktop/apps.edn"})))
+    ;; per-app trees (assets/apps/<id>): app.edn specs -> the catalog scan root, rootfs/
+    ;; defaults overlaid onto / — AFTER the mirrors above so a clean-mirror can't clobber
+    ;; them; rides both the image build and live `dev script desktop`, so an app edit ships
+    ;; without a rebuild.
+    (appcatalog/stage-defaults! {:project project})))

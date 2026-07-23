@@ -1,7 +1,7 @@
 {:log     {:level :debug}
  :control {:storage "/tmp/ujima/settings/"
            :tmp     "/tmp/ujima/settings/session"}
- :desktop {:app {:catalog "assets/desktop/apps.edn"}}
+ :desktop {:app {:catalog "assets/apps"}}
 
  ;; Dev stubs: the daemon's whole command surface (linux/system + linux/audio).
  ;; sudo-wrapped setters are remapped on the WRAPPED command (remap skips `sudo -n`),

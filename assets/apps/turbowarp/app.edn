@@ -1,0 +1,3 @@
+{:label "TurboWarp" :icon "scratch" :category :code
+ :exec ["/opt/ujima/apps/turbowarp/turbowarp-desktop" "--no-sandbox"]
+ :class "turbowarp-desktop"}  ; StartupWMClass (package.json)

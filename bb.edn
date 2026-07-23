@@ -21,10 +21,5 @@
 
   test:unit
   {:doc "Run unit tests"
-   :task (shell "bb" "-cp" "src:test/unit" "-m" "runner")}
-
-  app-catalog
-  {:doc "Regenerate the dev app catalog (assets/desktop/apps.edn) from tools.scripts.appcatalog"
-   :requires ([tools.scripts.appcatalog :as appcatalog])
-   :task (appcatalog/write-catalog! {:dest "assets/desktop/apps.edn"})}}}
+   :task (shell "bb" "-cp" "src:test/unit" "-m" "runner")}}}
 

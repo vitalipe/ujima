@@ -1,0 +1,3 @@
+{:label "Files" :category :system
+ :exec ["pcmanfm" "/home/ujima/Files"]
+ :class "Pcmanfm"}  ; res_class (xprop-verified: instance pcmanfm / class Pcmanfm)

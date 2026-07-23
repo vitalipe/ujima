@@ -1,0 +1,3 @@
+{:label "GIMP" :category :create
+ :exec ["gimp"]
+ :class "Gimp"}  ; xprop-verified (res_class)

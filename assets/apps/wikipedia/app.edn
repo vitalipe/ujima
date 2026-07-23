@@ -1,0 +1,3 @@
+{:label "Wikipedia" :category :learn
+ :exec ["/opt/ujima/desktop/bin/ujima-open-web-app" "https://wikipedia.com" "ujima-wikipedia"]
+ :class "ujima-wikipedia"}

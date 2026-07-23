@@ -1,7 +1,7 @@
 // UjimaOS desktop shell — v0.9 color-category skin (design turns 25b/31b/32a/33a).
 // Shell neutrals + Public Sans; apps are grouped into 4 colour categories. The RULE:
 // no colour = at rest · category colour = on/active (bg rgba(c,.18) + ring rgba(c,.45)).
-// Category comes from apps.edn :category → the eww edge; the hex lives here.
+// Category comes from the app.edn :category → the eww edge; the hex lives here.
 $bg: #14171b;         // desktop / launcher base
 $toppane: #1b2027;    // top pane (matches the dock panel)
 $panel: #1b2027;      // dock / popover surface

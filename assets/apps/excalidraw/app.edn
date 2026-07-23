@@ -1,0 +1,7 @@
+;; vendored static SPA served via ujima-serve-web-app (localhost http origin + kiosk chromium,
+;; server reaped on close); dark-default baked into app/index.html. Collab reaches Excalidraw's
+;; public servers (no offline) — a ujima fork will self-host the LAN relay.
+{:label "Excalidraw" :category :create
+ :exec ["/opt/ujima/desktop/bin/ujima-serve-web-app"
+        "/opt/ujima/apps/excalidraw/app" "index.html" "8090" "ujima-excalidraw"]
+ :class "ujima-excalidraw"}

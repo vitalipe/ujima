@@ -1,0 +1,6 @@
+;; NO :mode :fullscreen — Stellarium sets the fullscreen state itself, so detection hides the
+;; bars only when it's REALLY fullscreen. Declaring it hid the bars whenever Stellarium was
+;; focused, trapping the user behind its non-fullscreen dialogs.
+{:label "Stellarium" :category :explore
+ :exec ["stellarium"]
+ :class "stellarium"}  ; xprop-verified

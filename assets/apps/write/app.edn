@@ -1,0 +1,5 @@
+;; own -env:UserInstallation -> a SEPARATE soffice process -> its own scope, independently
+;; killable. Otherwise all three LO tiles share one soffice and only the first tile's scope is real.
+{:label "Write" :category :office
+ :exec ["libreoffice" "-env:UserInstallation=file:///home/ujima/.config/ujima-lo-write" "--writer"]
+ :class "libreoffice-writer"}

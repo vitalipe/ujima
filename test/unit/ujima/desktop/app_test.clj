@@ -70,8 +70,8 @@
                 i3/command?           (fn [& args] (swap! fx* conj (into [:cmd] args)))
                 i3/emit!              (fn [ev] (app/handle-event! ev))
                 systemd/active?       (fn [id] (contains? (:scopes @world*) id))
-                systemd/spawn-scoped! (fn [id exec] (swap! world* update :scopes conj id)
-                                                    (swap! fx* conj [:spawn id (vec exec)]))
+                systemd/spawn-scoped! (fn [id exec _dir] (swap! world* update :scopes conj id)
+                                                         (swap! fx* conj [:spawn id (vec exec)]))
                 systemd/stop!         (fn [id] (swap! world* update :scopes disj id)
                                               (swap! fx* conj [:stop id]))
                 shell/sh              (fn [& args] (swap! fx* conj [:sh (vec (rest args))]))]
@@ -132,6 +132,47 @@
     (let [c (app/load-catalog [base "/mnt/nope/apps"])]
       (is (= [:paint] (:order c)) "fresh storage = normal, baked apps unaffected"))
     (fs/delete-tree base)))
+
+
+;; --- kinds: scan validates + derives identity; app->runnable computes argv at spawn ---
+
+(deftest scan-kinds-derive-class-and-validate
+  (let [root (scan-root! {})]
+    (fs/create-dirs (fs/path root "lib"))                     ; :link — the teacher case
+    (spit (str (fs/path root "lib" "app.edn"))
+          (pr-str {:kind :link :label "Library" :url "http://x.local/"}))
+    (fs/create-dirs (fs/path root "board" "app"))             ; :web-app, entry present
+    (spit (str (fs/path root "board" "app.edn"))
+          (pr-str {:kind :web-app :label "Board" :entry "index.html" :port 8100}))
+    (spit (str (fs/path root "board" "app" "index.html")) "<html/>")
+    (fs/create-dirs (fs/path root "hole"))                    ; :web-app, entry MISSING -> skip
+    (spit (str (fs/path root "hole" "app.edn"))
+          (pr-str {:kind :web-app :label "Hole" :entry "index.html" :port 8101}))
+    (fs/create-dirs (fs/path root "mystery"))                 ; unknown kind -> skip (fwd compat)
+    (spit (str (fs/path root "mystery" "app.edn")) (pr-str {:kind :flatpak :label "M"}))
+    (fs/create-dirs (fs/path root "typo"))                    ; relative argv[0] absent -> skip
+    (spit (str (fs/path root "typo" "app.edn")) (pr-str {:label "T" :exec ["./nope"]}))
+    (fs/create-dirs (fs/path root "payload"))                 ; relative argv[0] present -> in
+    (spit (str (fs/path root "payload" "app.edn")) (pr-str {:label "P" :exec ["./run.sh"]}))
+    (spit (str (fs/path root "payload" "run.sh")) "#!/bin/sh\n")
+    (let [c (app/load-catalog [root])]
+      (is (= [:board :lib :payload] (:order c)) "broken/unknown skipped, valid kinds in")
+      (is (= "ujima-lib"   (get-in c [:by-id :lib :class]))   "link derives its class")
+      (is (= "ujima-board" (get-in c [:by-id :board :class])) "web-app derives its class")
+      (is (= ["./run.sh"]  (get-in c [:by-id :payload :exec])) "exec stays as-authored"))
+    (fs/delete-tree root)))
+
+(deftest app->runnable-computes-argv-per-kind
+  (is (= ["tuxpaint" "--nolockfile"]
+         (app/app->runnable {:kind :exec :exec ["tuxpaint" "--nolockfile"] :dir "/x"})))
+  (is (= ["tuxpaint"] (app/app->runnable {:exec ["tuxpaint"] :dir "/x"}))
+      ":kind defaults to :exec")
+  (is (= ["/opt/ujima/desktop/bin/ujima-open-web-app" "http://x.local/" "ujima-lib"]
+         (app/app->runnable {:kind :link :url "http://x.local/" :class "ujima-lib"})))
+  (is (= ["/opt/ujima/desktop/bin/ujima-serve-web-app" "/apps/board/app" "index.html" "8100" "ujima-board"]
+         (app/app->runnable {:kind :web-app :dir "/apps/board" :entry "index.html"
+                             :port 8100 :class "ujima-board"}))
+      "port coerced to string, serve dir = <dir>/app"))
 
 
 ;; --- run: scope-gated switch-then-launch ---

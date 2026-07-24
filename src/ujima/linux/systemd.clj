@@ -18,11 +18,13 @@
 
 
 (defn spawn-scoped!
-  "Launch EXEC (argv vector) detached into a fresh scope for ID. --scope blocks, so never deref.
-   TimeoutStopSec=3: stop escalates SIGTERM -> 3s -> SIGKILL, so a SIGTERM-catcher (TuxPaint) still
-   dies promptly on force-close instead of riding systemd's 90s default."
-  [id exec]
-  (apply shell/sh {:out :inherit :err :inherit}
+  "Launch EXEC (argv vector) detached into a fresh scope for ID, with DIR as the process cwd
+   (the app dir: relative paths in an app's argv resolve there — plain exec semantics, nil =
+   inherit). --scope blocks, so never deref. TimeoutStopSec=3: stop escalates SIGTERM -> 3s ->
+   SIGKILL, so a SIGTERM-catcher (TuxPaint) still dies promptly on force-close instead of
+   riding systemd's 90s default."
+  [id exec dir]
+  (apply shell/sh {:out :inherit :err :inherit :dir dir}
          :systemd-run :--user :--scope :--collect
          (str "--unit=" prefix (name id) "-" (System/currentTimeMillis))
          "--property=TimeoutStopSec=3"

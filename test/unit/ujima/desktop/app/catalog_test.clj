@@ -27,17 +27,19 @@
 
 (deftest validates-loudly
   (is (thrown? clojure.lang.ExceptionInfo
-        (catalog/->catalog {:apps [{:id :a :label "A"}]}))
-      "missing :exec")
+        (catalog/->catalog {:apps [{:id :a}]}))
+      "missing :label")
   (is (thrown? clojure.lang.ExceptionInfo
         (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"]}
                                    {:id :a :label "A2" :exec ["y"]}]}))
       "duplicate ids"))
 
 
-(deftest validate-app-is-the-per-app-contract
-  (is (= {:id :a :label "A" :exec ["x"]}
-         (catalog/validate-app! {:id :a :label "A" :exec ["x"]})) "valid spec passes through")
+(deftest validate-app-is-the-identity-core
+  ;; kind-specific launchability is the loader's contract (validate-kind!) — the catalog
+  ;; only asserts identity, so a kind-shaped spec without :exec is fine here
+  (is (= {:id :a :label "A" :kind :link :url "http://x"}
+         (catalog/validate-app! {:id :a :label "A" :kind :link :url "http://x"}))
+      "identity-valid spec passes through")
   (is (thrown? clojure.lang.ExceptionInfo (catalog/validate-app! nil)) "non-map")
-  (is (thrown? clojure.lang.ExceptionInfo (catalog/validate-app! {:id :a :label "A" :exec []}))
-      "empty :exec"))
+  (is (thrown? clojure.lang.ExceptionInfo (catalog/validate-app! {:id :a})) "missing :label"))

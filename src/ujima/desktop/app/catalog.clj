@@ -3,15 +3,14 @@
 
 
 (defn validate-app!
-  "Throw (ex-info, naming the offending field) unless APP is a launchable spec: a map with
-   :id, :label and a non-empty :exec vector. The one definition of app validity — the boot
-   scanner calls it per app (log-and-skip), ->catalog re-runs it as a final assertion."
-  [{:keys [id label exec] :as app}]
+  "Throw (ex-info, naming the offending field) unless APP has the catalog's identity core:
+   a map with :id and :label. Kind-specific launchability is the loader's contract
+   (ujima.desktop.app validate-kind!) — the catalog indexes identity, app->runnable computes
+   the process."
+  [{:keys [id label] :as app}]
   (when-not (map? app) (throw (ex-info "app spec is not a map" {:app app})))
   (when-not id    (throw (ex-info "app spec missing :id" {:app app})))
   (when-not label (throw (ex-info "app spec missing :label" {:id id})))
-  (when-not (and (vector? exec) (seq exec))
-    (throw (ex-info "app spec missing :exec" {:id id})))
   app)
 
 

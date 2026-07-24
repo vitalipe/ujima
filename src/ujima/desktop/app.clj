@@ -6,6 +6,7 @@
    backstop) and 'kill it' (force-close). i3 owns placement/focus; the tree owns display.
    Verbs + i3 events + scope-death events all ride one listener thread (i3/emit!)."
   (:require [babashka.fs :as fs]
+            [clojure.string :as str]
             [lib.io    :as io]
             [lib.shell :as shell]
             [ujima.log :as log]
@@ -30,19 +31,56 @@
 ;; front-ends — icon resolution is a loader concern, so the catalog always carries a real path
 (def ^:private fallback-icon "/opt/ujima/desktop/icons/launcher.svg")
 
+;; the desugar targets: :link / :web-app specs become invocations of these at spawn time
+(def ^:private open-web-app-bin  "/opt/ujima/desktop/bin/ujima-open-web-app")
+(def ^:private serve-web-app-bin "/opt/ujima/desktop/bin/ujima-serve-web-app")
+
+
+(defn- validate-kind!
+  "Throw unless SPEC is launchable for its :kind (default :exec) — the loader's half of app
+   validity (catalog/validate-app! keeps the identity core; app->runnable trusts what passes
+   here). Packaging errors fail HERE, at scan: a broken app is absent-and-logged, never a
+   tile that is dead on click. Unknown :kind throws too — a future kind degrades to absent
+   on an OS that doesn't know it."
+  [{:keys [kind exec entry port url dir] :as spec}]
+  (case (or kind :exec)
+    :exec    (do (when-not (and (vector? exec) (seq exec))
+                   (throw (ex-info "app spec missing :exec" {})))
+                 (let [argv0 (first exec)]
+                   ;; slash-relative argv[0] resolves against the app dir (spawn cwd) — verify
+                   ;; it exists; bare commands are PATH lookups and absolute paths are trusted
+                   (when (and (string? argv0)
+                              (str/includes? argv0 "/")
+                              (not (str/starts-with? argv0 "/"))
+                              (not (fs/exists? (fs/path dir argv0))))
+                     (throw (ex-info "relative argv[0] not in app dir" {:argv0 argv0})))))
+    :web-app (do (when-not (and entry port)
+                   (throw (ex-info "web-app needs :entry and :port" {})))
+                 (when-not (fs/exists? (fs/path dir "app" (str entry)))
+                   (throw (ex-info "web-app entry not found under app/" {:entry entry}))))
+    :link    (when-not url (throw (ex-info "link missing :url" {})))
+    (throw (ex-info "unknown app :kind" {:kind kind})))
+  spec)
+
 
 (defn- read-app
-  "One scan entry: DIR/app.edn -> spec, :id = the dir name, :icon = the ABSOLUTE PATH of the
-   dir's icon.svg (the app dir owns its face; fallback glyph when absent). Bad content
-   (unreadable edn, invalid spec per catalog/validate-app!) logs and returns nil — an app can
-   break itself, never the session."
+  "One scan entry: DIR/app.edn -> spec + what scanning resolves: :id = the dir name, :dir =
+   the dir itself (spawn cwd; relative paths in the spec resolve there), :icon = the dir's
+   icon.svg (fallback glyph when absent), and for the web kinds a DERIVED :class ujima-<id>
+   (authored :class ignored — the kind owns window identity). Bad content logs and returns
+   nil — an app can break itself, never the session."
   [dir]
   (try
-    (let [icon (fs/path dir "icon.svg")]
+    (let [icon (fs/path dir "icon.svg")
+          id   (keyword (fs/file-name dir))]
       (-> (io/slurp-edn (str (fs/path dir "app.edn")))
-          (assoc :id (keyword (fs/file-name dir)))
-          (catalog/validate-app!)
-          (assoc :icon (if (fs/exists? icon) (str icon) fallback-icon))))
+          (assoc :id id :dir (str dir)
+                 :icon (if (fs/exists? icon) (str icon) fallback-icon))
+          (as-> spec (if (#{:web-app :link} (:kind spec))
+                       (assoc spec :class (str "ujima-" (name id)))
+                       spec))
+          (validate-kind!)
+          (catalog/validate-app!)))
     (catch Throwable e
       (log/error "bad app.edn — app skipped" {:dir (str dir) :error (ex-message e)})
       nil)))
@@ -135,14 +173,27 @@
 
 ;; --- act (write side; listener thread only). scope = lifecycle ---
 
+(defn app->runnable
+  "SPEC -> argv, computed at spawn time — the one seam where a kind becomes a process
+   (bwrap wrapping, per-user paths etc. hook here later). :exec runs as-authored (cwd = the
+   app dir, so relative paths resolve there; bare commands stay PATH lookups); :web-app
+   serves <dir>/app on :port and opens it kiosk; :link opens :url kiosk. Trusts scan-time
+   validate-kind!."
+  [{:keys [kind exec dir entry port url class]}]
+  (case (or kind :exec)
+    :exec    (vec exec)
+    :web-app [serve-web-app-bin (str (fs/path dir "app")) (str entry) (str port) class]
+    :link    [open-web-app-bin (str url) class]))
+
+
 (defn- do-run!
   "Switch to the app's workspace, then launch into a scope only if it isn't already up. The
    scope is the gate: an app still cold-starting counts as up, so a re-tap never double-spawns."
-  [{:keys [id exec]} extra]
+  [{:keys [id dir] :as app} extra]
   (i3/switch-workspace! (name id))
   (when-not (systemd/active? id)
     (try
-      (systemd/spawn-scoped! id (into (vec exec) extra))
+      (systemd/spawn-scoped! id (into (app->runnable app) extra) dir)
       (log/info "app launched" {:app id})
       (catch Throwable e
         (log/error "app launch failed" {:app id :error (ex-message e)})
@@ -152,9 +203,9 @@
 (defn- do-open-url!
   "A link -> the Web app. Warm: a plain messenger joins the running instance (its window lands
    in the existing scope). Cold: a normal scoped launch with the url. Either way, switch there."
-  [{:keys [id exec] :as app} url]
+  [{:keys [id dir] :as app} url]
   (if (systemd/active? id)
-    (do (apply shell/sh {:out :inherit :err :inherit} (conj (vec exec) url))
+    (do (apply shell/sh {:out :inherit :err :inherit :dir dir} (conj (app->runnable app) url))
         (i3/switch-workspace! (name id)))
     (do-run! app [url])))
 

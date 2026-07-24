@@ -174,7 +174,10 @@
         ($! cp -a [(str app-edn)] [(str "/opt/ujima/apps/" id "/app.edn")])
         (let [icon (fs/path dir "icon.svg")]      ; the app dir owns its face (optional)
           (when (fs/exists? icon)
-            ($! cp -a [(str icon)] [(str "/opt/ujima/apps/" id "/icon.svg")]))))
+            ($! cp -a [(str icon)] [(str "/opt/ujima/apps/" id "/icon.svg")])))
+        (let [payload (fs/path dir "app")]        ; a :web-app's served build (optional)
+          (when (fs/exists? payload)
+            ($! cp -a [(str payload)] [(str "/opt/ujima/apps/" id "/")]))))
       (when (fs/exists? rootfs)
         (overlay! rootfs)
         (doseq [p (ujima-owned rootfs)]

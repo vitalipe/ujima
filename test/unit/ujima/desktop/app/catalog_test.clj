@@ -32,3 +32,11 @@
         (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"]}
                                    {:id :a :label "A2" :exec ["y"]}]}))
       "duplicate ids"))
+
+
+(deftest validate-app-is-the-per-app-contract
+  (is (= {:id :a :label "A" :exec ["x"]}
+         (catalog/validate-app! {:id :a :label "A" :exec ["x"]})) "valid spec passes through")
+  (is (thrown? clojure.lang.ExceptionInfo (catalog/validate-app! nil)) "non-map")
+  (is (thrown? clojure.lang.ExceptionInfo (catalog/validate-app! {:id :a :label "A" :exec []}))
+      "empty :exec"))

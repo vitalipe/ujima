@@ -28,7 +28,7 @@
 
 (def ^:private test-catalog
   (let [root (scan-root! catalog-apps)
-        c    (app/load-catalog root)]
+        c    (app/load-catalog [root])]
     (fs/delete-tree root)
     c))
 
@@ -91,7 +91,7 @@
                           "mango" {:label "M" :exec ["m"]}})]
     (fs/create-dirs (fs/path root "payload-only"))            ; no app.edn -> not an app
     (spit (str (fs/path root "stray.txt")) "not a dir")
-    (let [c (app/load-catalog root)]
+    (let [c (app/load-catalog [root])]
       (is (= [:alpha :mango :zebra] (:order c)) "dir name = id, abc = launcher order")
       (is (= "A" (get-in c [:by-id :alpha :label]))))
     (fs/delete-tree root)))
@@ -102,13 +102,31 @@
     (spit (str (fs/path root "garbage" "app.edn")) "{:label \"oops\"")     ; truncated edn
     (fs/create-dirs (fs/path root "specless"))
     (spit (str (fs/path root "specless" "app.edn")) (pr-str {:label "NoExec"}))
-    (let [c (app/load-catalog root)]
+    (let [c (app/load-catalog [root])]
       (is (= [:good] (:order c)) "bad apps skipped loudly; the rest boot"))
     (fs/delete-tree root)))
 
 (deftest scan-missing-root-is-an-empty-catalog
-  (let [c (app/load-catalog "/nope/missing")]
+  (let [c (app/load-catalog ["/nope/missing"])]
     (is (= [] (:order c)) "no app content can stop the session")))
+
+(deftest scan-merges-roots-later-wins-position-stable
+  (let [base  (scan-root! {"paint" {:label "Paint" :exec ["p"]}
+                           "web"   {:label "Web"   :exec ["w"]}})
+        extra (scan-root! {"paint" {:label "Paint v2" :exec ["p2"]}
+                           "amp"   {:label "Amp"   :exec ["a"]}})]
+    (let [c (app/load-catalog [base extra])]
+      (is (= [:amp :paint :web] (:order c)) "union, abc on id — an override keeps its position")
+      (is (= "Paint v2" (get-in c [:by-id :paint :label])) "later root wins on :id")
+      (is (= ["p2"] (get-in c [:by-id :paint :exec]))))
+    (fs/delete-tree base)
+    (fs/delete-tree extra)))
+
+(deftest scan-missing-second-root-is-not-fatal
+  (let [base (scan-root! {"paint" {:label "Paint" :exec ["p"]}})]
+    (let [c (app/load-catalog [base "/mnt/nope/apps"])]
+      (is (= [:paint] (:order c)) "fresh storage = normal, baked apps unaffected"))
+    (fs/delete-tree base)))
 
 
 ;; --- run: scope-gated switch-then-launch ---

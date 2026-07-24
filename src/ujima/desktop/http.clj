@@ -59,10 +59,13 @@
 
 
 (defn route
-  "Pure: [method uri] -> verb keyword, nil when unrouted (trailing slashes ok)."
+  "Pure: [method uri] -> verb keyword, nil when unrouted (trailing slashes ok).
+   /app/icon/<id> is the one parametrized route — the handler re-reads the id segment."
   [method uri]
   (let [parts (->> (str/split (str uri) #"/") (remove str/blank?) vec)]
-    (get {[:get  ["api" "audio"]]                     :audio/status
+    (or (when (and (= :get method) (= 3 (count parts)) (= ["app" "icon"] (subvec parts 0 2)))
+          :app/icon)
+        (get {[:get  ["api" "audio"]]                     :audio/status
           [:get  ["api" "input" "keyboard"]]          :keyboard/status
           [:post ["api" "audio" "volume"]]            :audio/volume
           [:post ["api" "audio" "mute"]]              :audio/mute
@@ -78,7 +81,7 @@
           [:post ["app" "open-url"]]                  :app/open-url
           [:post ["app" "close"]]                     :app/close
           [:post ["app" "home"]]                      :app/home}
-         [method parts])))
+             [method parts]))))
 
 
 (defn- handler [static-root req]
@@ -101,6 +104,16 @@
         :ui/keyboard-next    (json 200 (ui/keyboard-next))
         :ui/volume           (do (ui/volume-moved! (:value body)) (json 202 {}))
         :app/catalog         (json 200 {:apps (app/catalog-listing)})
+        :app/icon            (let [id   (-> (->> (str/split (str (:uri req)) #"/")
+                                                 (remove str/blank?) vec)
+                                            (nth 2) keyword)
+                                    path (app/icon-path id)
+                                    f    (some-> path io/file)]
+                                (if (and f (.isFile f))
+                                  {:status 200
+                                   :headers {"content-type" "image/svg+xml"}
+                                   :body f}
+                                  (json 404 {:error "unknown app"})))
         :app/run             (do (app/run! (keyword (:app-id body)))
                                  (json 202 {}))
         :app/switch          (do (app/switch-to! (keyword (:app-id body)))

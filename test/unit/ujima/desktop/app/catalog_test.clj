@@ -17,10 +17,11 @@
   (is (= ["tuxpaint"] (get-in cat [:by-id :draw :exec]))))
 
 
-(deftest listing-projects-in-order-with-icon-default
+(deftest listing-projects-in-order-icon-as-resolved
+  ;; :icon is whatever the loader resolved (a path on device) — no name defaulting here
   (is (= [{:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category nil}
           {:id :write     :label "Write"     :icon "write"     :category nil}
-          {:id :draw      :label "Draw"      :icon "draw"      :category nil}]
+          {:id :draw      :label "Draw"      :icon nil         :category nil}]
          (catalog/listing cat))))
 
 

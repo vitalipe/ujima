@@ -91,9 +91,14 @@
                           "mango" {:label "M" :exec ["m"]}})]
     (fs/create-dirs (fs/path root "payload-only"))            ; no app.edn -> not an app
     (spit (str (fs/path root "stray.txt")) "not a dir")
+    (spit (str (fs/path root "alpha" "icon.svg")) "<svg/>")   ; alpha owns its face
     (let [c (app/load-catalog [root])]
       (is (= [:alpha :mango :zebra] (:order c)) "dir name = id, abc = launcher order")
-      (is (= "A" (get-in c [:by-id :alpha :label]))))
+      (is (= "A" (get-in c [:by-id :alpha :label])))
+      (is (= (str (fs/path root "alpha" "icon.svg")) (get-in c [:by-id :alpha :icon]))
+          "the app dir's icon.svg is the icon")
+      (is (clojure.string/ends-with? (get-in c [:by-id :mango :icon]) "launcher.svg")
+          "no icon.svg -> the fallback glyph path"))
     (fs/delete-tree root)))
 
 (deftest scan-skips-broken-apps-and-keeps-the-rest

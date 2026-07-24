@@ -24,11 +24,11 @@
 
 
 (defn ->catalog
-  "Index raw {:apps [...]} edn: creation order, by-id (:icon defaulted to the id), and by-class
-   (WM_CLASS -> id) — the lookup the agent uses to route an orphaned window to its workspace."
+  "Index raw {:apps [...]} edn: creation order, by-id, and by-class (WM_CLASS -> id) — the
+   lookup the agent uses to route an orphaned window to its workspace. :icon is whatever the
+   loader resolved (an absolute path on device); no defaulting here."
   [raw]
-  (let [apps (mapv (fn [a] (update a :icon #(or % (name (:id a)))))
-                   (validate! (vec (:apps raw))))]
+  (let [apps (validate! (vec (:apps raw)))]
     {:order    (mapv :id apps)
      :by-id    (into {} (map (juxt :id identity)) apps)
      :by-class (into {} (keep (fn [a] (when (:class a) [(:class a) (:id a)]))) apps)}))

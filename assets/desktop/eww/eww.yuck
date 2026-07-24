@@ -43,7 +43,7 @@
   (box :class "topbar"
     (box :class {(apps.current?.id ?: "") == "" ? "bar off" : "bar"} :space-evenly false
       (box :class "idcell" :valign "center"
-        (image :path "/opt/ujima/desktop/icons/${apps.current?.id ?: "launcher"}.svg"
+        (image :path "${apps.current?.icon ?: "/opt/ujima/desktop/icons/launcher.svg"}"
                :image-width 20 :image-height 20
                :visible {(apps.current?.id ?: "") != ""}))
       (label :class "title" :halign "start" :hexpand true :text {apps.current?.title ?: ""})
@@ -62,7 +62,7 @@
     :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
     (overlay
       (box :class {"chip" + (jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")") ? " on cat-" + cat : "")} :halign "center" :valign "center"
-        (image :path "/opt/ujima/desktop/icons/${entry.icon}.svg" :image-width 46 :image-height 46))
+        (image :path "${entry.icon}" :image-width 46 :image-height 46))
       (box :class "opendot cat-${cat}" :halign "end" :valign "start"
         :visible {jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")")}))))
 
@@ -108,7 +108,7 @@
       ;; ACTION like the launcher (not an app), so it shares .home: bare at rest, frost when focused.
       (button :class {(apps.current?.id ?: "") == "files" ? "home active" : "home"} :timeout "2s"
         :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"files\"}' >/dev/null"
-        (image :path "/opt/ujima/desktop/icons/files.svg" :image-width 26 :image-height 26)))
+        (image :path "/opt/ujima/apps/files/icon.svg" :image-width 26 :image-height 26)))
     ;; running apps: every open app carries a very subtle hint of its category; the ACTIVE one
     ;; blooms to the full category fill + ring
     (box :halign "center" :space-evenly false :spacing 6
@@ -116,7 +116,7 @@
         (button :class {"win cat-" + (a.category ?: "none") + (a.id == (apps.current?.id ?: "") ? " active" : "")} :timeout "2s"
           :visible {a.category != "system"}   ; system apps (files) are pinned on the left, not shown here
           :onclick "/opt/ujima/desktop/bin/ujima-api POST /app/run '{\"appId\": \"${a.id}\"}' >/dev/null"
-          (image :path "/opt/ujima/desktop/icons/${a.icon}.svg" :image-width 32 :image-height 32))))
+          (image :path "${a.icon}" :image-width 32 :image-height 32))))
     (box :class "tray" :halign "end" :space-evenly false :spacing 4
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
       ; the label flips when the push lands

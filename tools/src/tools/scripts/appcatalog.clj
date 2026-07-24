@@ -151,8 +151,9 @@
 
 
 (defn stage-defaults!
-  "Stage each assets/apps/<id> app onto the device: app.edn -> /opt/ujima/apps/<id>/ (the
-   scan root the agent's boot catalog reads) and the optional rootfs/ tree overlaid onto / —
+  "Stage each assets/apps/<id> app onto the device: app.edn (+ its optional icon.svg) ->
+   /opt/ujima/apps/<id>/ (the scan root the agent's boot catalog reads) and the optional
+   rootfs/ tree overlaid onto / —
    first-run config, demo payloads, SPA builds; a path in the tree IS its destination. Staged
    /home/ujima + /opt/ujima paths become ujima-owned (apps rewrite their own config; the
    repo's uids are the build host's). A dir without a recipe :id, or with neither app.edn nor
@@ -170,7 +171,10 @@
         (throw (ex-info "assets/apps dir has neither app.edn nor rootfs/" {:dir id})))
       (when (fs/exists? app-edn)
         (fs/create-dirs (str "/opt/ujima/apps/" id))
-        ($! cp -a [(str app-edn)] [(str "/opt/ujima/apps/" id "/app.edn")]))
+        ($! cp -a [(str app-edn)] [(str "/opt/ujima/apps/" id "/app.edn")])
+        (let [icon (fs/path dir "icon.svg")]      ; the app dir owns its face (optional)
+          (when (fs/exists? icon)
+            ($! cp -a [(str icon)] [(str "/opt/ujima/apps/" id "/icon.svg")]))))
       (when (fs/exists? rootfs)
         (overlay! rootfs)
         (doseq [p (ujima-owned rootfs)]

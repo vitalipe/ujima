@@ -10,7 +10,8 @@ const $ = (id) => document.getElementById(id);
 const GLYPHS = {
   'monitor-dot': '<circle cx="19" cy="6" r="3"/><path d="M22 12v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/><path d="M12 17v4"/><path d="M8 21h8"/>',
 };
-const ICONS = '../icons';   // real app icons, staged at /opt/ujima/desktop/icons (served at /icons)
+// app icons come from the agent (/app/icon/<id>) — the app dir owns its face, the launcher
+// never knows the filesystem layout
 
 function glyph(name, size){
   return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor"
@@ -67,7 +68,7 @@ function buildGrid(cats){
     const tiles = col.querySelector('.tiles');
     for (const app of cat.apps){
       const b = el(`<button class="tile" id="tile-${app.id}" aria-label="${app.label || app.id}">
-          <img src="${ICONS}/${app.icon}.svg" alt="" draggable="false"></button>`);
+          <img src="/app/icon/${app.id}" alt="" draggable="false"></button>`);
       b.addEventListener('click', () => launch(app.id));
       tiles.appendChild(b);
     }

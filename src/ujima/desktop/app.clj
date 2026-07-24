@@ -26,15 +26,23 @@
 (def force-hi-ms 3000)                     ; a 2nd ✕ later = a fresh close, not an escalation
 
 
+;; the generic app face: an app dir without an icon.svg renders this instead of breaking the
+;; front-ends — icon resolution is a loader concern, so the catalog always carries a real path
+(def ^:private fallback-icon "/opt/ujima/desktop/icons/launcher.svg")
+
+
 (defn- read-app
-  "One scan entry: DIR/app.edn -> spec, :id = the dir name. Bad content (unreadable edn,
-   invalid spec per catalog/validate-app!) logs and returns nil — an app can break itself,
-   never the session."
+  "One scan entry: DIR/app.edn -> spec, :id = the dir name, :icon = the ABSOLUTE PATH of the
+   dir's icon.svg (the app dir owns its face; fallback glyph when absent). Bad content
+   (unreadable edn, invalid spec per catalog/validate-app!) logs and returns nil — an app can
+   break itself, never the session."
   [dir]
   (try
-    (-> (io/slurp-edn (str (fs/path dir "app.edn")))
-        (assoc :id (keyword (fs/file-name dir)))
-        (catalog/validate-app!))
+    (let [icon (fs/path dir "icon.svg")]
+      (-> (io/slurp-edn (str (fs/path dir "app.edn")))
+          (assoc :id (keyword (fs/file-name dir)))
+          (catalog/validate-app!)
+          (assoc :icon (if (fs/exists? icon) (str icon) fallback-icon))))
     (catch Throwable e
       (log/error "bad app.edn — app skipped" {:dir (str dir) :error (ex-message e)})
       nil)))
@@ -81,6 +89,12 @@
 
 
 (defn catalog-listing [] (catalog/listing @catalog*))
+
+(defn icon-path
+  "The catalog-resolved icon path for ID (nil for an unknown app) — the /app/icon/<id> route
+   serves this file, so the webview launcher never touches the filesystem layout."
+  [id]
+  (get-in @catalog* [:by-id id :icon]))
 
 
 ;; --- observe + projection (read side; the tree = display) ---

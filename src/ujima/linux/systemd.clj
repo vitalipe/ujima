@@ -20,15 +20,18 @@
 (defn spawn-scoped!
   "Launch EXEC (argv vector) detached into a fresh scope for ID, with DIR as the process cwd
    (the app dir: relative paths in an app's argv resolve there — plain exec semantics, nil =
-   inherit). --scope blocks, so never deref. TimeoutStopSec=3: stop escalates SIGTERM -> 3s ->
-   SIGKILL, so a SIGTERM-catcher (TuxPaint) still dies promptly on force-close instead of
-   riding systemd's 90s default."
+   inherit). setpriv --no-new-privs: setuid can never elevate again inside the scope or
+   anything it spawns — an IDE terminal can't sudo (accident-belt for the rw partitions;
+   NoNewPrivileges= is an exec property scopes don't have, so the flag is set in the forked
+   process itself). --scope blocks, so never deref. TimeoutStopSec=3: stop escalates
+   SIGTERM -> 3s -> SIGKILL, so a SIGTERM-catcher (TuxPaint) still dies promptly on
+   force-close instead of riding systemd's 90s default."
   [id exec dir]
   (apply shell/sh {:out :inherit :err :inherit :dir dir}
          :systemd-run :--user :--scope :--collect
          (str "--unit=" prefix (name id) "-" (System/currentTimeMillis))
          "--property=TimeoutStopSec=3"
-         "--" exec))
+         "--" :setpriv :--no-new-privs exec))
 
 
 (defn- live-units [pattern]

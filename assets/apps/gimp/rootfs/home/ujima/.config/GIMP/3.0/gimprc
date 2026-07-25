@@ -1,0 +1,4 @@
+# GIMP gimprc — UjimaOS first-run defaults. config-version must match the shipped GIMP or
+# the "You installed X!" welcome fires regardless of show-welcome-dialog — bump together.
+(config-version "3.0.4")
+(show-welcome-dialog no)

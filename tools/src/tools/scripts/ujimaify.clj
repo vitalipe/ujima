@@ -54,6 +54,10 @@
        ;; into the logind scope, which the unit's own kill phase never touches. `+` = run as root
        ;; (signal + loginctl rights); both paths exit 0 on an already-dead session, keeping
        ;; crash-recovery restarts working unchanged.
+       ;; prestart reaps stale /tmp/.X*-lock files (a hard-killed Xorg can't clean its own):
+       ;; without it every hard kill bumps the next session to the next display number and all
+       ;; the :0-assuming dev tooling silently breaks (HW: one test storm crept :0 -> :7).
+       "ExecStartPre=+/usr/local/bin/ujima-session-stop prestart\n"
        "ExecStop=+/usr/local/bin/ujima-session-stop stop\n"
        "ExecStopPost=+/usr/local/bin/ujima-session-stop post\n"
        "TimeoutStopSec=20\n"
@@ -130,10 +134,26 @@
        "  exit 0\n"
        "}\n"
        "\n"
+       ;; a SIGKILLed Xorg (wedged-session escalation, crash) leaves its /tmp/.X<n>-lock behind,
+       ;; and the next server silently starts on :<n+1> — reap locks whose pid is dead before
+       ;; every start so the session always comes back on :0.
+       "prestart() {\n"
+       "  for f in /tmp/.X*-lock; do\n"
+       "    [ -e \"$f\" ] || continue\n"
+       "    pid=$(tr -cd \"0-9\" < \"$f\")\n"
+       "    kill -0 \"$pid\" 2>/dev/null && continue\n"
+       "    n=${f#/tmp/.X}; n=${n%-lock}\n"
+       "    rm -f \"$f\" \"/tmp/.X11-unix/X$n\"\n"
+       "    logger -t ujima-session-stop \"prestart: reaped stale X lock :$n (pid ${pid:-none} dead)\"\n"
+       "  done\n"
+       "  exit 0\n"
+       "}\n"
+       "\n"
        "case \"$1\" in\n"
        "  stop) stop ;;\n"
        "  post) post ;;\n"
-       "  *) echo \"usage: ujima-session-stop stop|post\" >&2; exit 2 ;;\n"
+       "  prestart) prestart ;;\n"
+       "  *) echo \"usage: ujima-session-stop stop|post|prestart\" >&2; exit 2 ;;\n"
        "esac\n"))
 
 

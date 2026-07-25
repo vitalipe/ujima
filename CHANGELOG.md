@@ -14,8 +14,7 @@ payload) discovered by a boot-time catalog scan.
 ### Added
 
 - App kinds — `app.edn` declares `:kind` (`:exec` / `:web-app` / `:link`);
-  spawn resolves it to a runnable (`app->runnable`) and launches with the app
-  dir as cwd.
+  apps launch with their app dir as cwd.
 - Multi-root catalog — `/mnt/storage/apps` is scanned alongside the baked
   `/opt/ujima/apps`; an app dropped onto storage joins the launcher.
 - Per-app icons — the app dir owns `icon.svg`, served at `GET /app/icon/<id>`.
@@ -23,14 +22,11 @@ payload) discovered by a boot-time catalog scan.
   for all web apps) and `ujima-serve-web-app` (serve a vendored SPA, open it,
   reap the server on close).
 - App scopes run under no-new-privs — `sudo` can't elevate from inside an app.
-- First-run app defaults — Thonny and Geany dark (Nord scheme), GIMP and
-  Inkscape welcome popups off, LibreOffice first-run infobar off (per-profile
-  `registrymodifications.xcu` seeds).
-- Shell keyboard shortcuts — Alt+F4 closes the focused app (the top-bar ✕ path,
-  double-press force-close included); Alt+Tab / Alt+Shift+Tab cycle the running
-  apps in dock order, home not a stop (new verbs `POST /app/next` / `/app/prev`);
-  Alt+Escape goes home, leaving the app running — the non-destructive exit. The
-  chords keep working over fullscreen windows, where the bars hide.
+- First-run app defaults — Thonny and Geany dark; GIMP, Inkscape and
+  LibreOffice first-run popups/infobars off.
+- Keyboard chords — Alt+F4 closes (double-press force-kills), Alt+Tab /
+  Alt+Shift+Tab cycle running apps, Alt+Escape goes home leaving the app
+  running.
 
 ### Changed
 
@@ -49,14 +45,8 @@ payload) discovered by a boot-time catalog scan.
 
 ### Fixed
 
-- `systemctl restart ujima` now really cycles the session: `ExecStop` asks the
-  agent to die and blocks until X is actually down (bounded by
-  `TimeoutStopSec`), and a wedged agent that ignores SIGTERM is escalated
-  through logind — the session scope is terminated (TERM-first, so Xorg
-  restores the VT) and stragglers killed, with survivor names logged. A healthy
-  restart converges in ~2s, a wedged one is bounded at ~50s. Before, the
-  PAM/logind session survived the restart (the unit's own cgroup is empty),
-  leaving an orphaned desktop serving old code while the unit crash-looped.
+- `systemctl restart ujima` tears down the whole session, wedged agent included,
+  and the next start reclaims display `:0` — no orphaned desktop serving old code.
 
 ## [0.2.0] - 2026-07-14
 

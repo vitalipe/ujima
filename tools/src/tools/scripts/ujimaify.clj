@@ -48,10 +48,14 @@
        ;; so the unit's OWN cgroup is empty — a plain stop/restart kills only the startx script and
        ;; leaves the whole desktop running as an orphan holding vt1/:0/:1337; the replacement startx
        ;; then crash-loops at exit 1 while the ghost serves OLD code (cost weeks of "flaky Pi").
-       ;; ExecStop rides the designed teardown instead: TERM the agent -> its wrapper runs
-       ;; `i3-msg exit` -> X unwinds in order and the VT frees. `-` tolerates an already-dead
-       ;; session (pkill finds nothing), keeping crash-recovery restarts working unchanged.
-       "ExecStop=-/usr/bin/pkill -TERM -x -u ujima bb\n"
+       ;; ujima-session-stop (below) rides the designed teardown instead: ask the agent to die,
+       ;; then BLOCK on $MAINPID until X is really down — that wait is what TimeoutStopSec bounds.
+       ;; `post` runs even after a stop timeout and is the wedged-agent last resort: it reaches
+       ;; into the logind scope, which the unit's own kill phase never touches. `+` = run as root
+       ;; (signal + loginctl rights); both paths exit 0 on an already-dead session, keeping
+       ;; crash-recovery restarts working unchanged.
+       "ExecStop=+/usr/local/bin/ujima-session-stop stop\n"
+       "ExecStopPost=+/usr/local/bin/ujima-session-stop post\n"
        "TimeoutStopSec=20\n"
        "\n"
        "[Install]\n"
@@ -69,6 +73,68 @@
        ;; systemd's Restart=always rebuilds it cold — no orphaned eww/app zombies, one startup path.
        "/usr/local/bin/bb -cp src -m ujima.core\n"
        "i3-msg exit\n"))
+
+
+;; The stop path for ujima.service (ExecStop=`stop` / ExecStopPost=`post`, both root via `+`).
+;; The unit's kill phase can't end the session (its cgroup is empty — see ujima-service), so stop
+;; does it: stash the logind scope path while $MAINPID (startx) is alive — ExecStop runs BEFORE
+;; systemd signals anyone, and post can't derive it once MainPID is gone — ask the agent to die,
+;; then BLOCK until startx exits naturally (it returns only when xinit is done = X down, VT free),
+;; which gives TimeoutStopSec something real to bound. `post` runs even after a stop timeout and
+;; escalates through logind: TERM first (X restores the VT on TERM; leading with SIGKILL on Xorg
+;; corrupts the VT — HW-learned), then KILL only stragglers that ignored TERM (e.g. a SIGSTOPped
+;; agent still holding :1337) so the next session's agent can bind.
+(def ^:private ujima-session-stop
+  (str "#!/bin/sh\n"
+       "STASH=/run/ujima-session-scope\n"
+       "\n"
+       "stop() {\n"
+       "  logger -t ujima-session-stop \"stop: enter mainpid=${MAINPID:-none}\"\n"
+       "  [ -n \"${MAINPID:-}\" ] || exit 0\n"
+       "  sed -n 's#^0::##p' \"/proc/$MAINPID/cgroup\" 2>/dev/null > \"$STASH\"\n"
+       "  pkill -TERM -x -u ujima bb 2>/dev/null\n"
+       "  while [ -d \"/proc/$MAINPID\" ]; do sleep 0.2; done\n"
+       "  exit 0\n"
+       "}\n"
+       "\n"
+       ;; Survivors = scope members EXCEPT (sd-pam): the PAM helper lives in the scope but exits
+       ;; only when the unit's PAM session closes — AFTER ExecStopPost — so counting it makes every
+       ;; CLEAN stop look survived, burn the full grace loop, and SIGKILL the PAM cleanup
+       ;; (HW-caught: happy-path stop cost 10s instead of ~1s). Occupancy is tested by READING —
+       ;; cgroupfs files always stat as size 0, `[ -s ]` is always false there (HW-caught too).
+       ;; logger, not echo-to-stderr: ExecStopPost stdio is torn down with the unit and messages
+       ;; silently vanish from the journal (HW-caught); logger hits the socket directly.
+       "post() {\n"
+       "  scope=$(cat \"$STASH\" 2>/dev/null)\n"
+       "  logger -t ujima-session-stop \"post: enter scope=${scope:-none}\"\n"
+       "  rm -f \"$STASH\"\n"
+       "  [ -n \"$scope\" ] || exit 0\n"
+       "  procs=\"/sys/fs/cgroup${scope}/cgroup.procs\"\n"
+       "  live() {\n"
+       "    for p in $(cat \"$procs\" 2>/dev/null); do\n"
+       "      [ \"$(cat \"/proc/$p/comm\" 2>/dev/null)\" = \"(sd-pam)\" ] || echo \"$p\"\n"
+       "    done\n"
+       "  }\n"
+       "  [ -n \"$(live)\" ] || exit 0\n"
+       "  sid=${scope##*/session-}; sid=${sid%.scope}\n"
+       "  names=$(for p in $(live); do cat \"/proc/$p/comm\" 2>/dev/null; done | sort -u | tr \"\\n\" \" \")\n"
+       "  logger -t ujima-session-stop \"session $sid: survivors after teardown ($names) - cleaning via logind\"\n"
+       "  loginctl terminate-session \"$sid\" 2>/dev/null\n"
+       ;; the long grace exists ONLY so a live Xorg can honor TERM and restore the VT (SIGKILL on
+       ;; X corrupts it). X already gone = the survivors are stray sleeps/shells: short grace.
+       "  case \" $names \" in *\" Xorg \"*) limit=50 ;; *) limit=5 ;; esac\n"
+       "  i=0\n"
+       "  while [ -n \"$(live)\" ] && [ \"$i\" -lt \"$limit\" ]; do sleep 0.2; i=$((i+1)); done\n"
+       "  pids=$(live)\n"
+       "  [ -n \"$pids\" ] && kill -9 $pids 2>/dev/null\n"
+       "  exit 0\n"
+       "}\n"
+       "\n"
+       "case \"$1\" in\n"
+       "  stop) stop ;;\n"
+       "  post) post ;;\n"
+       "  *) echo \"usage: ujima-session-stop stop|post\" >&2; exit 2 ;;\n"
+       "esac\n"))
 
 
 ;; Persistent, capped journal — backed by the storage partition via slot->fstab's /var/log/journal
@@ -120,6 +186,8 @@
     ;; the in-session agent launcher (i3 execs this) + the staged xinitrc that startx runs
     (spit "/usr/local/bin/ujima-agent" ujima-agent-wrapper)
     ($! chmod "0755" ["/usr/local/bin/ujima-agent"])
+    (spit "/usr/local/bin/ujima-session-stop" ujima-session-stop)
+    ($! chmod "0755" ["/usr/local/bin/ujima-session-stop"])
     (fs/create-dirs "/etc/X11/xinit")
     ($! cp "/opt/ujima/desktop/xinitrc" "/etc/X11/xinit/xinitrc")
 

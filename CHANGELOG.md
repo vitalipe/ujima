@@ -50,7 +50,11 @@ payload) discovered by a boot-time catalog scan.
 ### Fixed
 
 - `systemctl restart ujima` now really cycles the session: `ExecStop` asks the
-  agent to die, so the session unwinds in order and the VT frees. Before, the
+  agent to die and blocks until X is actually down (bounded by
+  `TimeoutStopSec`), and a wedged agent that ignores SIGTERM is escalated
+  through logind — the session scope is terminated (TERM-first, so Xorg
+  restores the VT) and stragglers killed, with survivor names logged. A healthy
+  restart converges in ~2s, a wedged one is bounded at ~50s. Before, the
   PAM/logind session survived the restart (the unit's own cgroup is empty),
   leaving an orphaned desktop serving old code while the unit crash-looped.
 

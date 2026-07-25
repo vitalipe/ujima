@@ -26,6 +26,10 @@ payload) discovered by a boot-time catalog scan.
 - First-run app defaults — Thonny and Geany dark (Nord scheme), GIMP and
   Inkscape welcome popups off, LibreOffice first-run infobar off (per-profile
   `registrymodifications.xcu` seeds).
+- Shell keyboard shortcuts — Alt+F4 closes the focused app (the top-bar ✕ path,
+  double-press force-close included); Alt+Tab / Alt+Shift+Tab cycle the running
+  apps in dock order, home not a stop (new verbs `POST /app/next` / `/app/prev`;
+  the chords keep working over fullscreen windows, where the bars hide).
 
 ### Changed
 

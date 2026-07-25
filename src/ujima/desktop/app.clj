@@ -1,5 +1,5 @@
 (ns ujima.desktop.app
-  "The app layer: a small write side (run / switch / close / home) and a projection.
+  "The app layer: a small write side (run / switch / close / home / cycle) and a projection.
    The WORKSPACE is an app's identity — app :write lives on workspace \"write\", home is \"1\" —
    so we never match on WM_CLASS. Each launch lands in a systemd --user scope
    (ujima.linux.systemd), which answers 'is this app alive?' (the launch gate + the go-home
@@ -147,6 +147,13 @@
     (first (filter #(= (name %) ws) (:order @catalog*)))))
 
 
+(defn- open-apps
+  "App ids with windows on their workspace, in catalog (= dock) order — the one definition
+   of 'open', shared by the projection (dock/launcher) and the Alt+Tab ring."
+  [ws->wins]
+  (filter #(seq (get ws->wins (name %))) (:order @catalog*)))
+
+
 (defn- entry [id ws->wins]
   (let [a    (get-in @catalog* [:by-id id])
         wins (get ws->wins (name id))]
@@ -158,9 +165,7 @@
 
 
 (defn- projection [{:keys [focused-ws ws->wins]}]
-  (let [open (->> (:order @catalog*)
-                  (filter #(seq (get ws->wins (name %))))
-                  (mapv #(entry % ws->wins)))]
+  (let [open (mapv #(entry % ws->wins) (open-apps ws->wins))]
     {:apps    open
      :current (when-let [id (app-of-ws focused-ws)] (entry id ws->wins))}))
 
@@ -233,6 +238,22 @@
             (reset! close* {:con con :app app :at now}))))))
 
 
+(defn- do-cycle!
+  "Alt+Tab: hop the ring of RUNNING apps in catalog order, so the cycle matches the dock
+   left-to-right. HOME is deliberately NOT a stop (HW: passing through the launcher felt
+   weird) — from outside the ring (home, an app ws emptying mid-close) enter at the first
+   app going forward / the last going backward. No apps running = no-op."
+  [{:keys [focused-ws ws->wins]} step]
+  (let [ring (mapv name (open-apps ws->wins))
+        idx  (.indexOf ring focused-ws)]
+    (when (seq ring)
+      (let [target (if (neg? idx)
+                     (if (pos? step) (first ring) (peek ring))
+                     (nth ring (mod (+ idx step) (count ring))))]
+        (when (not= target focused-ws)
+          (i3/switch-workspace! target))))))
+
+
 (defn- go-home-if-empty!
   "Go home only if we're looking at APP-ID's now-empty workspace — idempotent across the con-id
    and scope-death triggers, and never fires for a background app dying elsewhere."
@@ -275,6 +296,7 @@
     :app/open-url (do-open-url! (:app ev) (:url ev))
     :app/close    (do-close! (observe!))
     :app/home     (i3/switch-workspace! home-ws)
+    :app/cycle    (do-cycle! (observe!) (:step ev))
     :window/close (when-let [rec @close*]                       ; the window the user ✕'d closed
                     (when (= (:con-id ev) (:con rec))
                       (reset! close* nil)
@@ -303,6 +325,7 @@
 (defn switch-to!     [id] (i3/emit! {:type :app/switch :app (resolve! id)}))
 (defn close-focused! []   (i3/emit! {:type :app/close}))
 (defn go-home!       []   (i3/emit! {:type :app/home}))
+(defn cycle!         [step] (i3/emit! {:type :app/cycle :step step}))
 
 (defn open-url! [url]
   (when-not (re-matches #"https?://\S+" (str url))

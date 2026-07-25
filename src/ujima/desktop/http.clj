@@ -80,7 +80,9 @@
           [:post ["app" "switch"]]                    :app/switch
           [:post ["app" "open-url"]]                  :app/open-url
           [:post ["app" "close"]]                     :app/close
-          [:post ["app" "home"]]                      :app/home}
+          [:post ["app" "home"]]                      :app/home
+          [:post ["app" "next"]]                      :app/next
+          [:post ["app" "prev"]]                      :app/prev}
              [method parts]))))
 
 
@@ -123,6 +125,10 @@
         :app/close           (do (app/close-focused!)
                                  (json 202 {}))
         :app/home            (do (app/go-home!)
+                                 (json 202 {}))
+        :app/next            (do (app/cycle! 1)
+                                 (json 202 {}))
+        :app/prev            (do (app/cycle! -1)
                                  (json 202 {}))
         (or (when (= :get (:request-method req)) (static-file static-root (:uri req)))
             (json 404 {:error "not found"}))))

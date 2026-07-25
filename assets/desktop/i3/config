@@ -40,6 +40,15 @@ gaps bottom 68
 # and the next converge would snap it back.
 bindsym Mod4+space exec --no-startup-id /opt/ujima/desktop/bin/ujima-kbd-next
 
+# app chords — every chord is a dumb key->agent-verb map (ujima-api), NEVER a raw i3 command:
+# the agent stays the single policy gate (a future lesson-pin refuses keyboard, dock and LAN
+# alike), and the X-level grabs land even over fullscreen windows (where the bars hide) and
+# inside kiosk chromium. Alt+F4 rides the topbar ✕'s exact close path (incl. the 1-3s ✕✕
+# force window); Alt+Tab cycles the RUNNING apps in catalog (= dock) order — home is not a stop.
+bindsym Mod1+F4        exec --no-startup-id /opt/ujima/desktop/bin/ujima-api POST /app/close >/dev/null
+bindsym Mod1+Tab       exec --no-startup-id /opt/ujima/desktop/bin/ujima-api POST /app/next >/dev/null
+bindsym Mod1+Shift+Tab exec --no-startup-id /opt/ujima/desktop/bin/ujima-api POST /app/prev >/dev/null
+
 # desktop background: the launcher's gradient (assets/desktop/wall.svg, rasterized to wall.png by
 # tools.scripts.desktop) set on the X root. i3 draws over it, so empty workspaces show the gradient
 # instead of the black root — and the transparent launcher + top bar show it through, one continuous

@@ -28,8 +28,9 @@ payload) discovered by a boot-time catalog scan.
   `registrymodifications.xcu` seeds).
 - Shell keyboard shortcuts — Alt+F4 closes the focused app (the top-bar ✕ path,
   double-press force-close included); Alt+Tab / Alt+Shift+Tab cycle the running
-  apps in dock order, home not a stop (new verbs `POST /app/next` / `/app/prev`;
-  the chords keep working over fullscreen windows, where the bars hide).
+  apps in dock order, home not a stop (new verbs `POST /app/next` / `/app/prev`);
+  Alt+Escape goes home, leaving the app running — the non-destructive exit. The
+  chords keep working over fullscreen windows, where the bars hide.
 
 ### Changed
 

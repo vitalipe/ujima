@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- LO believes "already ran 25.2" only from the profile's OWN user layer (system layers are
+     ignored for this check), and each LO tile has its own profile — so this seed exists ×3.
+     ooSetupLastVersion is PINNED: on an LO bump, update write/calc/impress seeds TOGETHER. -->
+<oor:items xmlns:oor="http://openoffice.org/2001/registry" xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+ <item oor:path="/org.openoffice.Setup/Product"><prop oor:name="ooSetupLastVersion" oor:op="fuse"><value>25.2</value></prop></item>
+ <item oor:path="/org.openoffice.Office.Common/Misc"><prop oor:name="ShowTipOfTheDay" oor:op="fuse"><value>false</value></prop></item>
+</oor:items>

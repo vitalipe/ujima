@@ -120,15 +120,40 @@
   {"agent" {:script "agent" :service "ujima"}})
 
 
+(defn- agent-pid
+  "The device's running agent pid as a string, nil when none."
+  [transport]
+  (let [{:keys [ok? out]} (remote-sh? transport "pgrep -x bb | head -1")]
+    (when ok? (not-empty (str/trim (str out))))))
+
+
 (defn push!
   "Entry for `dev push <target> <ip>`: stage + run the target's image script (the copy, via
-   script!), then restart its systemd unit so the new code is live. Today only \"agent\"
-   (tools.scripts.agent -> ujima.service); a new target is one entry in push-targets."
+   script!), then restart its systemd unit so the new code is live — and REFUSE to report
+   success until a FRESH agent pid is seen. The PAMName/logind session leak (see ujimaify.clj
+   ujima-service) once let a 'successful' restart leave an orphan session serving OLD code;
+   never trust a push without a new pid. Today only \"agent\" (tools.scripts.agent ->
+   ujima.service); a new target is one entry in push-targets."
   [{:keys [target ip] :as opts}]
   (if-let [{:keys [script service]} (get push-targets target)]
-    (let [result (script! (assoc opts :script script))]
+    (let [result    (script! (assoc opts :script script))
+          transport (ssh-transport opts)
+          old-pid   (agent-pid transport)]
       (println (str "restarting " service " on " ip))
-      (remote-exec! (ssh-transport opts) (str "sudo systemctl restart " service))
+      (remote-exec! transport (str "sudo systemctl restart " service))
+      (println "waiting for a fresh agent...")
+      (loop [tries 0]
+        (let [pid (agent-pid transport)]
+          (cond
+            (and pid (not= pid old-pid))
+            (println (str "agent is fresh (pid " pid ", was " (or old-pid "none") ")"))
+
+            (>= tries 30)
+            (throw (ex-info (str "agent did not cycle on " ip " — the old session survived the "
+                                 "restart; recover with: ssh + `pkill -TERM -x bb`")
+                            {:ip ip :old-pid old-pid}))
+
+            :else (do (Thread/sleep 3000) (recur (inc tries))))))
       (println (str "tail logs:  journalctl -u " service " -f"))
       (assoc result :restarted service))
     (throw (ex-info (str "unknown push target: " target

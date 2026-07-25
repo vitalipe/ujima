@@ -44,6 +44,15 @@
        ;;       nobody here anyway (single uid owns ~/.Xauthority; physical access = root). Revisit
        ;;       only if apps ever get their own displays.
        "ExecStart=/usr/bin/startx -- vt1 -br -ac\n"
+       ;; PAMName migrates the real session (startx→Xorg→i3→agent) into a logind session-N.scope,
+       ;; so the unit's OWN cgroup is empty — a plain stop/restart kills only the startx script and
+       ;; leaves the whole desktop running as an orphan holding vt1/:0/:1337; the replacement startx
+       ;; then crash-loops at exit 1 while the ghost serves OLD code (cost weeks of "flaky Pi").
+       ;; ExecStop rides the designed teardown instead: TERM the agent -> its wrapper runs
+       ;; `i3-msg exit` -> X unwinds in order and the VT frees. `-` tolerates an already-dead
+       ;; session (pkill finds nothing), keeping crash-recovery restarts working unchanged.
+       "ExecStop=-/usr/bin/pkill -TERM -x -u ujima bb\n"
+       "TimeoutStopSec=20\n"
        "\n"
        "[Install]\n"
        "WantedBy=multi-user.target\n"))

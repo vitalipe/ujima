@@ -47,6 +47,13 @@ payload) discovered by a boot-time catalog scan.
   `appcatalog.clj` keeps only the install recipes.
 - Excalidraw's bespoke `run.sh`.
 
+### Fixed
+
+- `systemctl restart ujima` now really cycles the session: `ExecStop` asks the
+  agent to die, so the session unwinds in order and the VT frees. Before, the
+  PAM/logind session survived the restart (the unit's own cgroup is empty),
+  leaving an orphaned desktop serving old code while the unit crash-looped.
+
 ## [0.2.0] - 2026-07-14
 
 The Ujima desktop shell — first tagged release: Raspberry Pi 5 image build,

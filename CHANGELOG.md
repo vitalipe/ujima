@@ -24,8 +24,9 @@ payload) discovered by a boot-time catalog scan.
   for all web apps) and `ujima-serve-web-app` (serve a vendored SPA, open it,
   reap the server on close).
 - App scopes run under no-new-privs — `sudo` can't elevate from inside an app.
-- First-run app defaults — Thonny and Geany dark; GIMP, Inkscape and
-  LibreOffice first-run popups/infobars off.
+- First-run app defaults — Thonny, Geany and GIMP dark (GIMP defers to the
+  system Nordic theme); GIMP, Inkscape and LibreOffice first-run
+  popups/infobars off.
 - Keyboard chords — Alt+F4 closes (double-press force-kills), Alt+Tab /
   Alt+Shift+Tab cycle running apps, Alt+Escape goes home leaving the app
   running.

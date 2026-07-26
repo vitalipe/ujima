@@ -2,3 +2,8 @@
 # the "You installed X!" welcome fires regardless of show-welcome-dialog — bump together.
 (config-version "3.0.4")
 (show-welcome-dialog no)
+# "System" defers to the GTK theme (Nordic) instead of GIMP's bundled skin — dialogs and
+# panels then match every other app. prefer-dark pinned: GIMP resolves it itself, ignoring
+# the session-wide gtk-application-prefer-dark-theme.
+(theme "System")
+(prefer-dark-theme yes)

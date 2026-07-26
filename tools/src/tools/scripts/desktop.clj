@@ -67,6 +67,17 @@
                        "gtk-font-name=Public Sans 10\n")))
         (println "desktop: no assets/themes/Nordic — app theme not staged")))
 
+    ;; GTK chooser label override: "Home" -> "Temporary" (home IS the tmpfs upper — the label
+    ;; states the truth; GTK hardcodes the sidebar entry, gettext is the only config-free
+    ;; lever). REPLACES the distro's en_GB/en_US gtk3 catalogs — other GTK strings fall back
+    ;; to their American msgids, accepted. Regenerate via assets/i18n/make-gtk-mo.py.
+    (let [mo (str project "/assets/i18n/gtk30-ujima.mo")]
+      (if (fs/exists? mo)
+        (doseq [loc ["en_GB" "en_US"]]
+          (fs/create-dirs (str "/usr/share/locale/" loc "/LC_MESSAGES"))
+          ($! cp [mo] [(str "/usr/share/locale/" loc "/LC_MESSAGES/gtk30.mo")]))
+        (println "desktop: no assets/i18n/gtk30-ujima.mo — chooser labels not staged")))
+
     ;; session-level home config → the ujima user's home (per-APP home defaults live in their
     ;; assets/apps trees, staged below). e.g. .config/mimeapps.list routes links to the url
     ;; handler. Owned by ujima so apps + xdg can read/rewrite.

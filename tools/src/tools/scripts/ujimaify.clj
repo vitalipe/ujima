@@ -174,7 +174,11 @@
 (def ^:private tmpfiles-conf
   (str "d /ujima/run         0755 ujima ujima -\n"
        "d /ujima/run/session 0755 ujima ujima -\n"
-       "z /ujima/settings    0755 ujima ujima -\n"))
+       "z /ujima/settings    0755 ujima ujima -\n"
+       ;; the kid-facing Files area on the storage partition (tmpfiles runs after local-fs =
+       ;; after the mount, healing a fresh/reformatted partition each boot; with storage
+       ;; absent — nofail — this lands on the ephemeral upper, degraded but consistent)
+       "d /mnt/storage/files 0755 ujima ujima -\n"))
 
 
 ;; Overlay-safe machine-id. Under the overlay (every image, see cmdline!) systemd can't persist

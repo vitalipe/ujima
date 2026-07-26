@@ -15,6 +15,8 @@ payload) discovered by a boot-time catalog scan.
 
 - App kinds — `app.edn` declares `:kind` (`:exec` / `:web-app` / `:link`);
   apps launch with their app dir as cwd.
+- Persistent Files — the file manager and every save/open dialog center on
+  `/mnt/storage/files` (survives reboots and OS updates); home is "Temporary".
 - Multi-root catalog — `/mnt/storage/apps` is scanned alongside the baked
   `/opt/ujima/apps`; an app dropped onto storage joins the launcher.
 - Per-app icons — the app dir owns `icon.svg`, served at `GET /app/icon/<id>`.

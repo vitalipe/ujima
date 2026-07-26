@@ -74,7 +74,7 @@
 (def ^:private stage-paths ["src" "tools/src" "config" "assets/dev" "assets/tools"
                             "assets/desktop" "assets/eww"
                             "assets/fonts" "assets/themes" "assets/home"
-                            "assets/apps"])  ; desktop.clj + appcatalog/stage-defaults! read these
+                            "assets/apps" "assets/i18n"])  ; desktop.clj + appcatalog/stage-defaults! read these
 
 
 (defn script!

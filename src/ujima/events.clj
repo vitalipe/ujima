@@ -40,7 +40,7 @@
            (audio/watch-sinks! {:interval-ms (:audio-poll-ms cfg 1000)})
            audio-events/on-sinks-changed!)
 
-  ;; admin surface follows the control token on usb storage
+  ;; admin surface follows the admin token on usb storage
   (listen! :usb-storage
            (usb/watch-storage!)
            token-events/on-storage-changed!)

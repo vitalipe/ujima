@@ -11,6 +11,8 @@ version truth; branch names and build labels may disagree.
 ### Changed
 
 - The in-session daemon is `/usr/local/bin/ujimad` (was `ujima-agent`).
+- The USB admin token is the file `.ujima-admin-token` (was
+  `.ujima-control-token`).
 
 ## [0.3.0] - 2026-07-28
 

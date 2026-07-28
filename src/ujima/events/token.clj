@@ -1,5 +1,5 @@
 (ns ujima.events.token
-  "Control-token policy: does any mounted usb storage carry the ujima control
+  "Admin-token policy: does any mounted usb storage carry the ujima admin
    token? Decisions only — the watching is linux.usb/watch-storage!, the
    listener thread is ujima.events. The actions are idempotent ensure-style:
    storage events fire on any mount change, token-relevant or not."
@@ -7,7 +7,7 @@
             [ujima.log   :as log]))
 
 
-(def ^:private token-file ".ujima-control-token")
+(def ^:private token-file ".ujima-admin-token")
 
 
 (defn- find-token
@@ -24,7 +24,7 @@
    Returns the token path (or nil) — the decision, for tests."
   [{:keys [mounts]}]
   (if-let [token (find-token mounts)]
-    (do (log/info "control token present, open admin app!" {:token (str token)})
+    (do (log/info "admin token present, open admin app!" {:token (str token)})
         (str token))
-    (do (log/info "control token missing, close admin app!")
+    (do (log/info "admin token missing, close admin app!")
         nil)))

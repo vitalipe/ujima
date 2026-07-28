@@ -8,8 +8,8 @@
   (let [mount (str (fs/create-temp-dir))]
     (is (nil? (token/on-storage-changed! {:mounts #{mount}}))
         "storage without a token -> absent")
-    (spit (str (fs/path mount ".ujima-control-token")) "")
-    (is (= (str (fs/path mount ".ujima-control-token"))
+    (spit (str (fs/path mount ".ujima-admin-token")) "")
+    (is (= (str (fs/path mount ".ujima-admin-token"))
            (token/on-storage-changed! {:mounts #{mount}}))
         "token found on a mounted stick")
     (is (nil? (token/on-storage-changed! {:mounts #{}}))

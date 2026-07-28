@@ -6,7 +6,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 A release's version is its **git tag** (`vX.Y.Z`) — tags are the only source of
 version truth; branch names and build labels may disagree.
 
-## [0.3.0] - Unreleased
+## [Unreleased]
+
+## [0.3.0] - 2026-07-28
 
 First app support: an app is a self-contained directory (`app.edn` + icon +
 payload) discovered by a boot-time catalog scan.
@@ -38,7 +40,8 @@ payload) discovered by a boot-time catalog scan.
   directory name; a broken app dir is skipped and logged, never killing the
   session.
 - Excalidraw launches through `ujima-serve-web-app`.
-- `ujima-open` renamed to `ujima-open-url`.
+- The Web browser runs in guest mode — each browsing session is ephemeral, with
+  no history or cookies kept; downloads still land in Files.
 
 ### Removed
 
@@ -86,5 +89,6 @@ read-only root, a babashka settings agent, an i3 + eww + WebKitGTK shell, and a
 - **Dev rig** — live `dev push` / `dev script` deploy to a dev Pi, e2e runner,
   screenshot/drive tooling.
 
-[0.3.0]: https://github.com/vitalipe/ujima/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/vitalipe/ujima/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/vitalipe/ujima/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vitalipe/ujima/releases/tag/v0.2.0

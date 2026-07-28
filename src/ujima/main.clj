@@ -1,4 +1,4 @@
-(ns ujima.core
+(ns ujima.main
   (:require [lib.io                  :as io]
             [ujima.log               :as log]
 

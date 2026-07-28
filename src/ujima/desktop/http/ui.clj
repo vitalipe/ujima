@@ -1,6 +1,6 @@
 (ns ujima.desktop.http.ui
   "The settings side of the /ui tier: the GUI converge port, wired into control's
-   :converge-targets by ujima.core next to the OS port. One authoritative NDJSON
+   :converge-targets by ujima.main next to the OS port. One authoritative NDJSON
    state stream feeds eww (deflisten) — a snapshot on connect, then one line per
    converge that actually changed the projection — plus the verbs where
    interaction ≠ state (throttled volume moves). The apps stream is the sibling

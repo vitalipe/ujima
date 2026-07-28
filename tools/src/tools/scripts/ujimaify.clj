@@ -75,7 +75,7 @@
        "cd /opt/ujima\n"
        ;; NOT exec: when ujimad exits (crash/OOM), tear the session down with `i3-msg exit` so
        ;; systemd's Restart=always rebuilds it cold — no orphaned eww/app zombies, one startup path.
-       "/usr/local/bin/bb -cp src -m ujima.core\n"
+       "/usr/local/bin/bb -cp src -m ujima.main\n"
        "i3-msg exit\n"))
 
 

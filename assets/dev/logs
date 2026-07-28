@@ -1,5 +1,5 @@
 #!/bin/sh
-# logs: the ujima session's journal. Everything the session prints — agent (bb),
+# logs: the ujima session's journal. Everything the session prints — ujimad (bb),
 # eww, X — shares one inherited stdout tagged `startx`, and the session escapes
 # the unit cgroup, so `journalctl -u ujima` MISSES most of it. This filters by
 # the identifier + the unit's own lifecycle lines.

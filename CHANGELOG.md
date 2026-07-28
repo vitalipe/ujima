@@ -8,6 +8,10 @@ version truth; branch names and build labels may disagree.
 
 ## [Unreleased]
 
+### Changed
+
+- The in-session daemon is `/usr/local/bin/ujimad` (was `ujima-agent`).
+
 ## [0.3.0] - 2026-07-28
 
 First app support: an app is a self-contained directory (`app.edn` + icon +
@@ -51,13 +55,13 @@ payload) discovered by a boot-time catalog scan.
 
 ### Fixed
 
-- `systemctl restart ujima` tears down the whole session, wedged agent included,
+- `systemctl restart ujima` tears down the whole session, wedged ujimad included,
   and the next start reclaims display `:0` — no orphaned desktop serving old code.
 
 ## [0.2.0] - 2026-07-14
 
 The Ujima desktop shell — first tagged release: Raspberry Pi 5 image build,
-read-only root, a babashka settings agent, an i3 + eww + WebKitGTK shell, and a
+read-only root, a babashka settings daemon (ujimad), an i3 + eww + WebKitGTK shell, and a
 ~20-app catalog.
 
 - **Image build** — `bb tools` builds the flashable Pi image end-to-end: Debian
@@ -66,7 +70,7 @@ read-only root, a babashka settings agent, an i3 + eww + WebKitGTK shell, and a
 - **Read-only OS** — `/` locked via an overlayroot tmpfs overlay (baked
   initramfs, pinned machine-id); journald persists to storage, capped and
   priority-tagged.
-- **Settings agent** — desired-vs-actual converge over path-vector setting
+- **Settings daemon (ujimad)** — desired-vs-actual converge over path-vector setting
   keys; HTTP `/api` + `/ui` on `:1337`; pure event sources (audio, USB storage)
   feeding stateless policies; reads shell out to nothing.
 - **Audio** — PipeWire layer: per-class volumes, machine-wide mute, output

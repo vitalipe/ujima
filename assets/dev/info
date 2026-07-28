@@ -1,5 +1,5 @@
 #!/bin/sh
-# info — quick status snapshot of THIS ujima dev device: overlay state, agent health, network,
+# info — quick status snapshot of THIS ujima dev device: overlay state, ujimad health, network,
 # build + disk. Run as the ujima user; no root needed. Dev convenience, staged to /ujima/dev by
 # tools.scripts.dev.
 set -u
@@ -23,7 +23,7 @@ pu=$(grep -o 'root=PARTUUID=[^ ]*' /proc/cmdline 2>/dev/null | cut -d= -f3)
 case "$pu" in *-05) slot=A ;; *-06) slot=B ;; *) slot='?' ;; esac
 printf '  boot slot: %s (root=%s)\n' "$slot" "${pu:-?}"
 
-sec "agent (ujima.service)"
+sec "ujimad (ujima.service)"
 act=$(systemctl is-active ujima 2>/dev/null || true)
 fail=$(systemctl is-failed ujima 2>/dev/null || true)
 nr=$(systemctl show ujima -p NRestarts --value 2>/dev/null || echo '?')

@@ -7,7 +7,7 @@
 
 
 ;; Audio rides the session PipeWire: wpctl (WirePlumber CLI) for get/set, pw-dump
-;; for state as JSON. The agent runs inside the desktop session, so
+;; for state as JSON. ujimad runs inside the desktop session, so
 ;; XDG_RUNTIME_DIR already points both at the session instance. The surface
 ;; serves the converge flow — `full-topology` (one snapshot in ujima terms),
 ;; `apply-sink!` (drive one sink toward a desired {:volume :muted}),

@@ -3,7 +3,7 @@
    Decisions only — the watching is linux.audio/watch-sinks!, the listener
    thread is ujima.events. Rules: a NEW class wins (plugging headphones means
    you want them); a vanished active falls back by class priority; a baseline
-   event (before = classes) keeps a valid existing choice — an agent restart
+   event (before = classes) keeps a valid existing choice — a ujimad restart
    must not re-decide over a session's pick."
   (:require [clojure.set :as set]
             [ujima.log   :as log]

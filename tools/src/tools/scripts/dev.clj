@@ -5,7 +5,7 @@
    (e.g. `wifi`) staged at /ujima/dev, and a [ujima-dev] shell prompt (tagged with the overlay
    ro/rw state). Not part of the release pipeline — run on dev images only.
 
-   Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup].
+   Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [clojure.string :as str]
@@ -46,7 +46,7 @@
 
 
 ;; Audio test rig: snd-aloop is a REAL ALSA sink (honest volume/mute readback, unlike
-;; suspended null-sinks), and the rename rule makes it classify as :usb for the agent
+;; suspended null-sinks), and the rename rule makes it classify as :usb for ujimad
 ;; (ujima.linux.audio/output-class matches "usb" in node.name) — so the volume glue is
 ;; testable on a dev box with no USB/HDMI audio attached. Matches the exact aloop node
 ;; name so the paired capture source stays untouched.
@@ -101,6 +101,6 @@
     ;; *this* box, not one of the other machines you're logged into.
     (install-dev-prompt!)
 
-    ;; loopback audio sink that classifies as :usb — the agent's volume path is testable
+    ;; loopback audio sink that classifies as :usb — ujimad's volume path is testable
     ;; without real USB audio (takes effect after reboot / wireplumber restart).
     (install-audio-rig!)))

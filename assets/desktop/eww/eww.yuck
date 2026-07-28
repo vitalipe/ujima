@@ -1,4 +1,4 @@
-;; UjimaOS desktop shell — wired to the agent's loopback API (ujima.desktop.http,
+;; UjimaOS desktop shell — wired to ujimad's loopback API (ujima.desktop.http,
 ;; 127.0.0.1:1337): widget state arrives on pushed streams (deflisten — snapshot on
 ;; connect, then a line per real change; settings on /ui/state, running apps on
 ;; /ui/apps), the launcher tiles render the app catalog (/app/catalog — immutable per
@@ -15,7 +15,7 @@
 (defvar wakebars "eval $(xdotool getmouselocation --shell); xdotool mousemove 1279 0 click 1; xdotool mousemove $X $Y")
 
 ;; the authoritative UI state (JSON); the while-loop is the reconnect story — an
-;; agent restart drops the connection, 1s later the snapshot line rehydrates us
+;; ujimad restart drops the connection, 1s later the snapshot line rehydrates us
 (deflisten state
   :initial "{\"audio\":{\"volume\":null,\"muted\":false,\"output\":null},\"keyboard\":{\"layout\":\"--\",\"layouts\":[],\"next\":null}}"
   "while true; do curl -sN http://127.0.0.1:1337/ui/state; sleep 1; done")
@@ -128,12 +128,12 @@
       (label :class "clock" :text {clock}))))
 
 
-;; --- volume overlay: slider moves are fire-and-forget (the agent throttles the
+;; --- volume overlay: slider moves are fire-and-forget (ujimad throttles the
 ;; --- drag); mute posts the DESIRED state; everything reflects back via the
 ;; --- /ui/state push. Greyed when no output classifies (output null).
 ;; `vol` is eww-local interaction state: the number/knob track the finger
 ;; instantly instead of waiting for the push round-trip; -1 = untouched, follow
-;; the agent. Once touched it pins to the last local value — fine while the
+;; ujimad. Once touched it pins to the last local value — fine while the
 ;; widget is the only volume writer.
 (defvar vol -1)
 

@@ -23,10 +23,10 @@
 
    "dev"
    {"push"
-    {:usage "Usage: tools dev push agent <ip> [--user ujima] [--password ujima] [--port 22]"
+    {:usage "Usage: tools dev push ujimad <ip> [--user ujima] [--password ujima] [--port 22]"
      :target dev/push!
      :args [:target :ip]
-     :spec {:target   {:desc "What to push (agent)" :require true}
+     :spec {:target   {:desc "What to push (ujimad)" :require true}
             :ip       {:desc "Target RPI host or IP" :require true}
             :user     {:desc "SSH user"     :default "ujima"}
             :password {:desc "SSH password" :default "ujima"}

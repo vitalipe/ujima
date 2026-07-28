@@ -44,16 +44,16 @@
 
 (defn- slot->fstab
   "Per-slot /etc/fstab for an installed slot: /boot/firmware, the shared settings partition and its
-   per-slot bind onto /ujima/settings (the stable path the agent reads, so it never knows its slot),
+   per-slot bind onto /ujima/settings (the stable path ujimad reads, so it never knows its slot),
    plus the shared storage partition; all by PARTUUID. Root is NOT listed — the kernel mounts it from
    the cmdline and overlayroot overlays it (read-only lower + tmpfs upper) and rewrites this fstab
    itself, so a '/' entry would be pointless (overlayroot just comments it out) and systemd-remount-fs,
    which would act on it, is masked in tools.scripts.ujimaify (overlayfs rejects its remount).
 
-   Settings is a REQUIRED mount (no `nofail`): the agent is meaningless without it, so a
+   Settings is a REQUIRED mount (no `nofail`): ujimad is meaningless without it, so a
    missing/corrupt settings partition must halt boot (emergency) rather than silently fall back to
    the empty rootfs mountpoint and run on defaults. Being required also means systemd's
-   local-fs.target guarantees it is mounted before the agent starts — no mount check in agent code.
+   local-fs.target guarantees it is mounted before ujimad starts — no mount check in ujimad code.
    `nofail` stays on boot-firmware/storage — those missing shouldn't brick an otherwise-correct boot."
   [slot]
   (str "proc                  /proc           proc  defaults         0  0\n"
@@ -128,19 +128,19 @@
 
       ;; per-slot fstab. Its mount points / bind targets are rootfs content baked at build
       ;; time (tools.scripts.base) — a pack is expected to carry them.
-      (let [agent-owner
+      (let [ujimad-owner
             (with-mounted-ext4 [root-mnt root]
               (fs/create-dirs (fs/path root-mnt "etc"))   ; real rootfs has it; a minimal/test root may not
               (spit (str (fs/path root-mnt "etc/fstab")) (slot->fstab slot))
               (rootfs-owner root-mnt "ujima"))]
 
-        ;; this slot's settings subdir, owned by the agent user so it can write the device scope
+        ;; this slot's settings subdir, owned by the ujimad user so it can write the device scope
         ;; through the /ujima/settings bind (a root-owned dir breaks every device-scope write)
         (with-mounted-ext4 [cfg-mnt cfg-blk]
           (let [slot-dir (fs/path cfg-mnt (name slot))]
             (fs/create-dirs slot-dir)
-            (when agent-owner
-              (sudo$! chown [agent-owner] [slot-dir])))))
+            (when ujimad-owner
+              (sudo$! chown [ujimad-owner] [slot-dir])))))
 
       ;; journald logs dir on storage (the /var/log/journal bind source)
       (with-mounted-ext4 [storage-mnt storage-blk]

@@ -1,6 +1,6 @@
 (ns tools.scripts.appcatalog
   "Install recipes for the launcher apps. The catalog SPECS live with the apps themselves —
-   assets/apps/<id>/app.edn, scanned by the agent at boot (ujima.desktop.app/load-catalog) —
+   assets/apps/<id>/app.edn, scanned by ujimad at boot (ujima.desktop.app/load-catalog) —
    so this file holds only what the IMAGE BUILD needs: which packages/payloads to install.
    Packages are never vendored in git — they install like apt at build time. Adding an app =
    drop assets/apps/<id>/ (app.edn [+ rootfs/ defaults]) + one recipe entry here.
@@ -16,7 +16,7 @@
                       its destination. Called from tools.scripts.desktop (image build + live
                       `dev script desktop`), so an app edit ships without a rebuild.
 
-   Pipeline: install (-> install!) -> base -> agent -> desktop (-> stage-defaults!) -> ujimaify.
+   Pipeline: install (-> install!) -> base -> ujimad -> desktop (-> stage-defaults!) -> ujimaify.
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! sh! with-console-out]]
@@ -152,7 +152,7 @@
 
 (defn stage-defaults!
   "Stage each assets/apps/<id> app onto the device: app.edn (+ its optional icon.svg) ->
-   /opt/ujima/apps/<id>/ (the scan root the agent's boot catalog reads) and the optional
+   /opt/ujima/apps/<id>/ (the scan root ujimad's boot catalog reads) and the optional
    rootfs/ tree overlaid onto / —
    first-run config, demo payloads, SPA builds; a path in the tree IS its destination. Staged
    /home/ujima + /opt/ujima paths become ujima-owned (apps rewrite their own config; the

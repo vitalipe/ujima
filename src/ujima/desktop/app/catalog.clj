@@ -24,7 +24,7 @@
 
 (defn ->catalog
   "Index raw {:apps [...]} edn: creation order, by-id, and by-class (WM_CLASS -> id) — the
-   lookup the agent uses to route an orphaned window to its workspace. :icon is whatever the
+   lookup ujimad uses to route an orphaned window to its workspace. :icon is whatever the
    loader resolved (an absolute path on device); no defaulting here."
   [raw]
   (let [apps (validate! (vec (:apps raw)))]

@@ -9,7 +9,7 @@
 
 (defn run! [{:keys [project]}]
   (with-console-out
-    ;; base packages the agent needs at runtime
+    ;; base packages ujimad needs at runtime
     ($! apt-get update)
     ($! apt-get install -y --no-install-recommends "ca-certificates")
 

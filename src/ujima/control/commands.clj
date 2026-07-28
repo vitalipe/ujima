@@ -26,7 +26,7 @@
 
 
 (defn change-active-output!
-  "Select the active output class (nil = none). Written by the agent's device
+  "Select the active output class (nil = none). Written by ujimad's device
    policy on plug/unplug; the console can set it too. Idempotent — re-asserting
    the same class still converges, which is what re-applies state onto a swapped
    device of the same class."

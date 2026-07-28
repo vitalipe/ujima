@@ -15,7 +15,7 @@
   (is (nil?  (events-audio/pick-active #{:usb} #{} :usb))
       "nothing present -> nil (widgets grey out)")
   (is (= :hdmi (events-audio/pick-active #{:usb :hdmi} #{:usb :hdmi} :hdmi))
-      "baseline tick keeps a valid existing choice — agent restart must not re-decide")
+      "baseline tick keeps a valid existing choice — ujimad restart must not re-decide")
   (is (= :usb  (events-audio/pick-active #{:usb :hdmi} #{:usb :hdmi} nil))
       "baseline without a choice -> priority order"))
 

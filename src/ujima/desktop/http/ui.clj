@@ -100,7 +100,7 @@
 (defn stream
   "GET /ui/state: hold the connection open — a fresh snapshot line immediately,
    then one line per real change. eww's deflisten reconnect loop rehydrates from
-   the snapshot after an agent restart."
+   the snapshot after a ujimad restart."
   [req]
   (http/as-channel req
     {:on-open  (fn [ch]

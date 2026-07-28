@@ -2,9 +2,9 @@
   "Runs INSIDE the target chroot as root. Turns a stock raspios rootfs into the ujima *base*:
    strips the first-boot machinery, disables cloud-init, and provisions the login user
    (passwordless console autologin + passwordless sudo) — a clean, bootable, logged-in machine
-   that the agent/desktop layers build on. (fstab + boot units → tools.scripts.ujimaify.)
+   that the ujimad/desktop layers build on. (fstab + boot units → tools.scripts.ujimaify.)
 
-   Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup].
+   Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` (the read-only repo bind) is unused here."
   (:require [lib.shell :refer [$ $! $? with-console-out]]

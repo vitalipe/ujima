@@ -1,6 +1,6 @@
 #!/bin/sh
 # peek: one-line snapshot of the state the desktop shell drives — volume/mute on
-# the default sink (the target of the agent's volume path) + the X keyboard layout.
+# the default sink (the target of ujimad's volume path) + the X keyboard layout.
 # Timestamped for eyeballing apply latency:
 #   watch -n 0.3 /ujima/dev/peek
 export DISPLAY="${DISPLAY:-:0}" XAUTHORITY="${XAUTHORITY:-/home/ujima/.Xauthority}"

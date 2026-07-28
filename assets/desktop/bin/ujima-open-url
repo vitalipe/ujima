@@ -1,5 +1,5 @@
 #!/bin/sh
-# The URL handler: hand every link to the agent, which opens it in the Web app.
+# The URL handler: hand every link to ujimad, which opens it in the Web app.
 url="$1"
 case "$url" in
   http://*|https://*) ;;

@@ -10,7 +10,7 @@ const $ = (id) => document.getElementById(id);
 const GLYPHS = {
   'monitor-dot': '<circle cx="19" cy="6" r="3"/><path d="M22 12v3a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/><path d="M12 17v4"/><path d="M8 21h8"/>',
 };
-// app icons come from the agent (/app/icon/<id>) — the app dir owns its face, the launcher
+// app icons come from ujimad (/app/icon/<id>) — the app dir owns its face, the launcher
 // never knows the filesystem layout
 
 function glyph(name, size){
@@ -133,7 +133,7 @@ async function watchApps(){
         }
       }
     } catch (err){ console.error('apps stream dropped:', err); }
-    await new Promise(r => setTimeout(r, 1000));   // reconnect (agent restart drops the stream)
+    await new Promise(r => setTimeout(r, 1000));   // reconnect (ujimad restart drops the stream)
   }
 }
 

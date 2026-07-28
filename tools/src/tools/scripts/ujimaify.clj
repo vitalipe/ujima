@@ -1,18 +1,18 @@
 (ns tools.scripts.ujimaify
   "Runs INSIDE the target chroot as root. 'ujimaifies' the staged system: writes + enables the
-   systemd units that turn the staged agent (and, later, desktop) into boot services, and stamps
+   systemd units that turn the staged ujimad (and, later, desktop) into boot services, and stamps
    the build. Writing/enabling units lives here (rare); *restarting* them for a live iteration is
    the CLI's job (`dev push`), not this script. (fstab is written per-slot at install time —
    ujima.device.ab/install-into-slot! — not here.)
 
-   Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup]."
+   Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup]."
   (:require [lib.shell :refer [$! with-console-out]]
             [babashka.fs :as fs]))
 
 
-;; The graphical session is the boot service now — NOT the agent. The agent moved INTO the X
+;; The graphical session is the boot service now — NOT ujimad. ujimad moved INTO the X
 ;; session (it owns desktop lifecycle: i3 IPC, eww, app launch, audio — all session-scoped), so it
-;; runs as `ujima` via i3 `exec` (see /opt/ujima/desktop/i3/config) through the `ujima-agent`
+;; runs as `ujima` via i3 `exec` (see /opt/ujima/desktop/i3/config) through the `ujimad`
 ;; wrapper below. `ujima.service` is repurposed to run + SUPERVISE the session: systemd runs startx
 ;; on tty1 as ujima, and Restart=always brings the whole desktop back if i3/X dies — that IS the
 ;; session-recovery a standalone watchdog would otherwise provide. Conflicts=getty@tty1 hands tty1
@@ -29,28 +29,28 @@
        "User=ujima\n"
        "PAMName=login\n"
        ;; Qt/KDE apps (Marble, Stellarium) follow the Nordic GTK theme — a session-wide env inherited by
-       ;; startx → Xorg → i3 → agent → every launched app. qt6-gtk-platformtheme (install.clj) is the
+       ;; startx → Xorg → i3 → ujimad → every launched app. qt6-gtk-platformtheme (install.clj) is the
        ;; GTK→Qt bridge; Qt selects its platform theme from the env only (no /etc file like gtk-3.0).
        "Environment=QT_QPA_PLATFORMTHEME=gtk3\n"
-       ;; links an app opens go through the agent -> the Web app (with mimeapps.list, assets/home)
+       ;; links an app opens go through ujimad -> the Web app (with mimeapps.list, assets/home)
        "Environment=BROWSER=/opt/ujima/desktop/bin/ujima-open-url\n"
        "StandardOutput=journal\n"
        "Restart=always\n"
        "RestartSec=3\n"
        ;; -br = black root, so the 2-4s of session bring-up shows black, not the grey X weave
-       ;; -ac = no X access control: the agent converges [:system :hostname] mid-session, and xauth
+       ;; -ac = no X access control: ujimad converges [:system :hostname] mid-session, and xauth
        ;;       cookies are keyed FamilyLocal/<hostname> — the rename strands every later X client
        ;;       ("Authorization required" cold-boot stall, one dead session per boot). Auth gates
        ;;       nobody here anyway (single uid owns ~/.Xauthority; physical access = root). Revisit
        ;;       only if apps ever get their own displays.
        "ExecStart=/usr/bin/startx -- vt1 -br -ac\n"
-       ;; PAMName migrates the real session (startx→Xorg→i3→agent) into a logind session-N.scope,
+       ;; PAMName migrates the real session (startx→Xorg→i3→ujimad) into a logind session-N.scope,
        ;; so the unit's OWN cgroup is empty — a plain stop/restart kills only the startx script and
        ;; leaves the whole desktop running as an orphan holding vt1/:0/:1337; the replacement startx
        ;; then crash-loops at exit 1 while the ghost serves OLD code (cost weeks of "flaky Pi").
-       ;; ujima-session-stop (below) rides the designed teardown instead: ask the agent to die,
+       ;; ujima-session-stop (below) rides the designed teardown instead: ask ujimad to die,
        ;; then BLOCK on $MAINPID until X is really down — that wait is what TimeoutStopSec bounds.
-       ;; `post` runs even after a stop timeout and is the wedged-agent last resort: it reaches
+       ;; `post` runs even after a stop timeout and is the wedged-ujimad last resort: it reaches
        ;; into the logind scope, which the unit's own kill phase never touches. `+` = run as root
        ;; (signal + loginctl rights); both paths exit 0 on an already-dead session, keeping
        ;; crash-recovery restarts working unchanged.
@@ -66,14 +66,14 @@
        "WantedBy=multi-user.target\n"))
 
 
-;; The in-session agent launcher. i3 execs `ujima-agent` as the session user, so app/window
+;; The in-session ujimad launcher. i3 execs `ujimad` as the session user, so app/window
 ;; lifecycle + the loopback API run with the session env (DISPLAY, XDG_RUNTIME_DIR) — exactly what
 ;; they need and what a root boot service couldn't give. Privileged ops still go through `sudo$`
 ;; (ujima has NOPASSWD), so running as the user costs nothing.
-(def ^:private ujima-agent-wrapper
+(def ^:private ujimad-wrapper
   (str "#!/bin/sh\n"
        "cd /opt/ujima\n"
-       ;; NOT exec: when the agent exits (crash/OOM), tear the session down with `i3-msg exit` so
+       ;; NOT exec: when ujimad exits (crash/OOM), tear the session down with `i3-msg exit` so
        ;; systemd's Restart=always rebuilds it cold — no orphaned eww/app zombies, one startup path.
        "/usr/local/bin/bb -cp src -m ujima.core\n"
        "i3-msg exit\n"))
@@ -82,12 +82,12 @@
 ;; The stop path for ujima.service (ExecStop=`stop` / ExecStopPost=`post`, both root via `+`).
 ;; The unit's kill phase can't end the session (its cgroup is empty — see ujima-service), so stop
 ;; does it: stash the logind scope path while $MAINPID (startx) is alive — ExecStop runs BEFORE
-;; systemd signals anyone, and post can't derive it once MainPID is gone — ask the agent to die,
+;; systemd signals anyone, and post can't derive it once MainPID is gone — ask ujimad to die,
 ;; then BLOCK until startx exits naturally (it returns only when xinit is done = X down, VT free),
 ;; which gives TimeoutStopSec something real to bound. `post` runs even after a stop timeout and
 ;; escalates through logind: TERM first (X restores the VT on TERM; leading with SIGKILL on Xorg
 ;; corrupts the VT — HW-learned), then KILL only stragglers that ignored TERM (e.g. a SIGSTOPped
-;; agent still holding :1337) so the next session's agent can bind.
+;; ujimad still holding :1337) so the next session's ujimad can bind.
 (def ^:private ujima-session-stop
   (str "#!/bin/sh\n"
        "STASH=/run/ujima-session-scope\n"
@@ -165,7 +165,7 @@
        "SystemMaxUse=256M\n"))
 
 
-;; Agent-writable settings storage (the agent runs as ujima, the control plane writes scope
+;; ujimad-writable settings storage (ujimad runs as ujima, the control plane writes scope
 ;; files). /ujima/run holds the ephemeral scopes (session/activity) — under the overlay it
 ;; lands in the tmpfs upper, so it must be recreated each boot. The `z` line fixes ownership
 ;; of the device scope (the per-slot settings bind): the installer chowns it at install time
@@ -207,9 +207,9 @@
     (spit "/etc/systemd/system/ujima.service" ujima-service)
     ($! systemctl enable "ujima")
 
-    ;; the in-session agent launcher (i3 execs this) + the staged xinitrc that startx runs
-    (spit "/usr/local/bin/ujima-agent" ujima-agent-wrapper)
-    ($! chmod "0755" ["/usr/local/bin/ujima-agent"])
+    ;; the in-session ujimad launcher (i3 execs this) + the staged xinitrc that startx runs
+    (spit "/usr/local/bin/ujimad" ujimad-wrapper)
+    ($! chmod "0755" ["/usr/local/bin/ujimad"])
     (spit "/usr/local/bin/ujima-session-stop" ujima-session-stop)
     ($! chmod "0755" ["/usr/local/bin/ujima-session-stop"])
     (fs/create-dirs "/etc/X11/xinit")
@@ -219,7 +219,7 @@
     (fs/create-dirs "/etc/systemd/journald.conf.d")
     (spit "/etc/systemd/journald.conf.d/ujima.conf" journald-conf)
 
-    ;; agent-writable settings dirs: ephemeral scopes each boot + device-scope ownership heal
+    ;; ujimad-writable settings dirs: ephemeral scopes each boot + device-scope ownership heal
     (spit "/etc/tmpfiles.d/ujima.conf" tmpfiles-conf)
 
     ;; overlay-safe machine-id: initramfs hook (the producer bakes it; image initramfs ships it)

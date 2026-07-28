@@ -44,7 +44,7 @@
 
                {:key     [:audio :active]
                 :doc     "Active output class (:usb | :hdmi, nil = none); written by the
-                          device-event policy in the agent, enforced as the default sink"
+                          device-event policy in ujimad, enforced as the default sink"
                 :default nil
                 :scopes  #{:device :session :activity}}
 

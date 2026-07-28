@@ -2,7 +2,7 @@
   "Host-side dev-loop commands against a RUNNING ujima dev device over ssh. Distinct from
    tools.scripts.dev (the in-chroot build script).
 
-     push agent      deploy the agent live: run tools.scripts.agent (= `script agent` — stages
+     push ujimad     deploy ujimad live: run tools.scripts.ujimad (= `script ujimad` — stages
                      src/ + config into /opt/ujima), then restart ujima.service.
      script <name>   run tools.scripts.<name>/run! live on the device — the running-system
                      analog of `tools image script` (which runs the same fn in the build chroot).
@@ -62,7 +62,7 @@
 ;; ---------------------------------------------------------------------------
 
 
-;; The staging dir on the device. NOT /opt/ujima: agent.clj copies <project>/src into
+;; The staging dir on the device. NOT /opt/ujima: ujimad.clj copies <project>/src into
 ;; /opt/ujima/, so if project were /opt/ujima it would copy src into itself. Mirrors the chroot,
 ;; where the read-only repo bind (/ujima-src) is deliberately separate from the install target.
 (def ^:private device-stage "/ujima-src")
@@ -117,11 +117,11 @@
 ;; What `push <target>` knows how to deploy: the image script that stages it (the copy) and the
 ;; systemd unit to restart so the new code takes effect. A new deployable target is one entry.
 (def ^:private push-targets
-  {"agent" {:script "agent" :service "ujima"}})
+  {"ujimad" {:script "ujimad" :service "ujima"}})
 
 
-(defn- agent-pid
-  "The device's running agent pid as a string, nil when none."
+(defn- ujimad-pid
+  "The device's running ujimad pid as a string, nil when none."
   [transport]
   (let [{:keys [ok? out]} (remote-sh? transport "pgrep -x bb | head -1")]
     (when ok? (not-empty (str/trim (str out))))))
@@ -130,26 +130,26 @@
 (defn push!
   "Entry for `dev push <target> <ip>`: stage + run the target's image script (the copy, via
    script!), then restart its systemd unit so the new code is live — and REFUSE to report
-   success until a FRESH agent pid is seen. The PAMName/logind session leak (see ujimaify.clj
+   success until a FRESH ujimad pid is seen. The PAMName/logind session leak (see ujimaify.clj
    ujima-service) once let a 'successful' restart leave an orphan session serving OLD code;
-   never trust a push without a new pid. Today only \"agent\" (tools.scripts.agent ->
+   never trust a push without a new pid. Today only \"ujimad\" (tools.scripts.ujimad ->
    ujima.service); a new target is one entry in push-targets."
   [{:keys [target ip] :as opts}]
   (if-let [{:keys [script service]} (get push-targets target)]
     (let [result    (script! (assoc opts :script script))
           transport (ssh-transport opts)
-          old-pid   (agent-pid transport)]
+          old-pid   (ujimad-pid transport)]
       (println (str "restarting " service " on " ip))
       (remote-exec! transport (str "sudo systemctl restart " service))
-      (println "waiting for a fresh agent...")
+      (println "waiting for a fresh ujimad...")
       (loop [tries 0]
-        (let [pid (agent-pid transport)]
+        (let [pid (ujimad-pid transport)]
           (cond
             (and pid (not= pid old-pid))
-            (println (str "agent is fresh (pid " pid ", was " (or old-pid "none") ")"))
+            (println (str "ujimad is fresh (pid " pid ", was " (or old-pid "none") ")"))
 
             (>= tries 30)
-            (throw (ex-info (str "agent did not cycle on " ip " — the old session survived the "
+            (throw (ex-info (str "ujimad did not cycle on " ip " — the old session survived the "
                                  "restart; recover with: ssh + `pkill -TERM -x bb`")
                             {:ip ip :old-pid old-pid}))
 

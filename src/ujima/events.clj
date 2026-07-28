@@ -23,9 +23,9 @@
       (if-let [event (async/<!! ch)]
         (do (try (handle! event)
                  (catch Throwable e
-                   (log/error "agent: event handler failed" {:watcher watcher :error (ex-message e)})))
+                   (log/error "ujimad: event handler failed" {:watcher watcher :error (ex-message e)})))
             (recur))
-        (do (log/error "agent: watcher stream ended — dying for a session rebuild" {:watcher watcher})
+        (do (log/error "ujimad: watcher stream ended — dying for a session rebuild" {:watcher watcher})
             (System/exit 1))))))
 
 

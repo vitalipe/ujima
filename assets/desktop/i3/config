@@ -1,5 +1,5 @@
 # UjimaOS — minimal i3 config. No i3bar; eww is the top bar + dock, the launcher is a webview,
-# the agent owns app/window lifecycle.
+# ujimad owns app/window lifecycle.
 # new windows stack as tabs (cover the previous), never tile-split; font 1 + a
 # topbar-matched palette shrink the only surviving decoration — the tab bar — to
 # an invisible ~2px sliver that blends into the topbar above it
@@ -15,8 +15,8 @@ client.urgent           #1b2027 #1b2027 #1b2027 #1b2027 #1b2027
 
 # real dialogs float; deliberately NO fullscreen keybind — the eww bars must stay visible.
 # chromium --app windows auto-float (fixed size hints) but set class/role only AFTER mapping, so
-# for_window can't catch them here — the agent un-floats app windows instead (settle-floaters!).
-# NO `assign` rules: the agent routes each window to its app's workspace by WM_CLASS at runtime
+# for_window can't catch them here — ujimad un-floats app windows instead (settle-floaters!).
+# NO `assign` rules: ujimad routes each window to its app's workspace by WM_CLASS at runtime
 # (route-windows!), so a new app needs no config edit + reload — just a catalog entry.
 for_window [window_type="dialog"]  floating enable
 for_window [window_type="utility"] floating enable
@@ -27,7 +27,7 @@ for_window [window_type="utility"] floating enable
 for_window [window_role="GtkFileChooserDialog"] floating disable
 
 # eww topbar/dock are :wm-ignore (override-redirect) in eww.yuck, so i3 doesn't manage them; the
-# launcher (a webview, WM_CLASS ujima-launcher) is a normal window the agent tracks + places on
+# launcher (a webview, WM_CLASS ujima-launcher) is a normal window ujimad tracks + places on
 # HOME like any app.
 
 # the bars reserve no strut, so reserve their space here — keep in sync with eww.yuck heights
@@ -35,13 +35,13 @@ for_window [window_role="GtkFileChooserDialog"] floating disable
 gaps top 48
 gaps bottom 68
 
-# super+space cycles the keyboard layout — through the agent (concrete-state POST),
+# super+space cycles the keyboard layout — through ujimad (concrete-state POST),
 # NEVER an XKB group toggle: X-side switching would drift from the control plane
 # and the next converge would snap it back.
 bindsym Mod4+space exec --no-startup-id /opt/ujima/desktop/bin/ujima-kbd-next
 
-# app chords — every chord is a dumb key->agent-verb map (ujima-api), NEVER a raw i3 command:
-# the agent stays the single policy gate (a future lesson-pin refuses keyboard, dock and LAN
+# app chords — every chord is a dumb key->ujimad-verb map (ujima-api), NEVER a raw i3 command:
+# ujimad stays the single policy gate (a future lesson-pin refuses keyboard, dock and LAN
 # alike), and the X-level grabs land even over fullscreen windows (where the bars hide) and
 # inside kiosk chromium. Alt+F4 rides the topbar ✕'s exact close path (incl. the 1-3s ✕✕
 # force window); Alt+Tab cycles the RUNNING apps in catalog (= dock) order — home is not a stop;
@@ -58,9 +58,9 @@ bindsym Mod1+Escape    exec --no-startup-id /opt/ujima/desktop/bin/ujima-api POS
 # background under everything.
 exec_always --no-startup-id feh --bg-fill /opt/ujima/desktop/wall.png
 
-# the agent owns the shell now: it reconciles settings, then brings up eww (top bar + dock) and
-# the webview launcher itself once ready — so i3 only launches the agent + the compositor below.
-exec --no-startup-id ujima-agent
+# ujimad owns the shell now: it reconciles settings, then brings up eww (top bar + dock) and
+# the webview launcher itself once ready — so i3 only launches ujimad + the compositor below.
+exec --no-startup-id ujimad
 
 # compositor: picom (xrender — no GL on the Pi) gives real transparency, so floating eww overlays
 # (the volume popover) show the dock/content through them instead of painting a black block.

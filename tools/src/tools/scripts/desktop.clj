@@ -4,10 +4,10 @@
 
    SCAFFOLD: the desktop layer doesn't exist yet. This stages assets/desktop into /opt/ujima/desktop
    when that dir is present, and is otherwise a no-op. The graphical session's systemd unit will
-   live in tools.scripts.ujimaify; runtime desktop *settings* (wallpaper, resolution, …) are the
-   agent's job at runtime, not this build script.
+   live in tools.scripts.ujimaify; runtime desktop *settings* (wallpaper, resolution, …) are
+   ujimad's job at runtime, not this build script.
 
-   Pipeline: install -> base -> agent -> desktop -> ujimaify -> [dev] -> [cleanup].
+   Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]

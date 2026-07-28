@@ -3,7 +3,7 @@
    `*spawn*` for its dynamic extent (the sudo-aware baseline remap still rewrites the WRAPPED
    command, not `sudo`). `sudo$`/`sudo$!`/`sudo$?` and `sudo`/`sudo!`/`sudo?` are sugar over it.
 
-   This is the in-distro agent's per-command elevation. Build tools run the whole process under
+   This is in-distro ujimad's per-command elevation. Build tools run the whole process under
    `sudo bb` and use `lib.shell` directly (+ `lib.shell/require-root!`), so they don't need this."
   (:require [lib.shell :as shell]))
 

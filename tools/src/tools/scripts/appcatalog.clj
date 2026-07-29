@@ -11,7 +11,7 @@
                       CACHED vendor base (the heavy app packages download once, not every
                       build).
      stage-defaults!  stages each app's app.edn into the on-device scan root
-                      (/opt/ujima/apps/<id>/) and overlays its rootfs/ defaults tree onto
+                      (/ujima/apps/<id>/) and overlays its rootfs/ defaults tree onto
                       / — first-run config, demo payloads, SPA builds; a path in the tree IS
                       its destination. Called from tools.scripts.desktop (image build + live
                       `dev script desktop`), so an app edit ships without a rebuild.
@@ -49,7 +49,7 @@
    {:id :turbowarp
     :fetch {:url    "https://github.com/TurboWarp/desktop/releases/download/v1.16.0/TurboWarp-linux-arm64-1.16.0.tar.gz"
             :sha256 "5909f02d92536c3ee52121dec4f1b7a73261a08ac7e091d15205cbff9893e33a"
-            :dest   "/opt/ujima/apps/turbowarp"}}
+            :dest   "/ujima/apps/turbowarp"}}
 
    ;; official arm64 editor, a .zip carrying one versioned binary → :bin renames it to a stable
    ;; `godot`; Vulkan Mobile needs mesa-vulkan-drivers (install.clj). The vendored demo project
@@ -57,7 +57,7 @@
    {:id :godot
     :fetch {:url    "https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.arm64.zip"
             :sha256 "db5aa126353a18fd664818e4f1b9cfffaa77e32d4c9af0ea87e8f028a395a1ed"
-            :dest   "/opt/ujima/apps/godot"
+            :dest   "/ujima/apps/godot"
             :bin    "godot"}}
 
    {:id :excalidraw :apt ["python3"]}        ; the SPA wrapper's stopgap http.server
@@ -139,23 +139,22 @@
 
 (defn- ujima-owned
   "The paths a rootfs stages that must belong to the ujima user: entries directly under
-   home/ujima, and entries one level inside an /opt/ujima area dir (opt/ujima/<area>/<entry>) —
-   never the area itself, so a tree can't seize /opt/ujima/apps from the payloads beside its own."
+   home/ujima, and entries directly inside ujima/apps — never the area itself, so a tree
+   can't seize /ujima/apps. ujima/apps is the only /ujima area a tree may stage into."
   [rootfs]
   (let [home (fs/path rootfs "home/ujima")
-        opt  (fs/path rootfs "opt/ujima")]
+        apps (fs/path rootfs "ujima/apps")]
     (->> (concat (when (fs/exists? home) (fs/list-dir home))
-                 (when (fs/exists? opt)
-                   (mapcat #(if (fs/directory? %) (fs/list-dir %) [%]) (fs/list-dir opt))))
+                 (when (fs/exists? apps) (fs/list-dir apps)))
          (map #(str "/" (fs/relativize rootfs %))))))
 
 
 (defn stage-defaults!
   "Stage each assets/apps/<id> app onto the device: app.edn (+ its optional icon.svg) ->
-   /opt/ujima/apps/<id>/ (the scan root ujimad's boot catalog reads) and the optional
+   /ujima/apps/<id>/ (the scan root ujimad's boot catalog reads) and the optional
    rootfs/ tree overlaid onto / —
    first-run config, demo payloads, SPA builds; a path in the tree IS its destination. Staged
-   /home/ujima + /opt/ujima paths become ujima-owned (apps rewrite their own config; the
+   /home/ujima + /ujima/apps paths become ujima-owned (apps rewrite their own config; the
    repo's uids are the build host's). A dir without a recipe :id, or with neither app.edn nor
    rootfs/, throws — a typo must never stage nothing, silently."
   [{:keys [project]}]
@@ -170,14 +169,14 @@
       (when-not (or (fs/exists? app-edn) (fs/exists? rootfs))
         (throw (ex-info "assets/apps dir has neither app.edn nor rootfs/" {:dir id})))
       (when (fs/exists? app-edn)
-        (fs/create-dirs (str "/opt/ujima/apps/" id))
-        ($! cp -a [(str app-edn)] [(str "/opt/ujima/apps/" id "/app.edn")])
+        (fs/create-dirs (str "/ujima/apps/" id))
+        ($! cp -a [(str app-edn)] [(str "/ujima/apps/" id "/app.edn")])
         (let [icon (fs/path dir "icon.svg")]      ; the app dir owns its face (optional)
           (when (fs/exists? icon)
-            ($! cp -a [(str icon)] [(str "/opt/ujima/apps/" id "/icon.svg")])))
+            ($! cp -a [(str icon)] [(str "/ujima/apps/" id "/icon.svg")])))
         (let [payload (fs/path dir "app")]        ; a :web-app's served build (optional)
           (when (fs/exists? payload)
-            ($! cp -a [(str payload)] [(str "/opt/ujima/apps/" id "/")]))))
+            ($! cp -a [(str payload)] [(str "/ujima/apps/" id "/")]))))
       (when (fs/exists? rootfs)
         (overlay! rootfs)
         (doseq [p (ujima-owned rootfs)]

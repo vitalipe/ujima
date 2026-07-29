@@ -12,7 +12,7 @@
 
 ;; The graphical session is the boot service now — NOT ujimad. ujimad moved INTO the X
 ;; session (it owns desktop lifecycle: i3 IPC, eww, app launch, audio — all session-scoped), so it
-;; runs as `ujima` via i3 `exec` (see /opt/ujima/desktop/i3/config) through the `ujimad`
+;; runs as `ujima` via i3 `exec` (see /ujima/desktop/i3/config) through the `ujimad`
 ;; wrapper below. `ujima.service` is repurposed to run + SUPERVISE the session: systemd runs startx
 ;; on tty1 as ujima, and Restart=always brings the whole desktop back if i3/X dies — that IS the
 ;; session-recovery a standalone watchdog would otherwise provide. Conflicts=getty@tty1 hands tty1
@@ -32,8 +32,10 @@
        ;; startx → Xorg → i3 → ujimad → every launched app. qt6-gtk-platformtheme (install.clj) is the
        ;; GTK→Qt bridge; Qt selects its platform theme from the env only (no /etc file like gtk-3.0).
        "Environment=QT_QPA_PLATFORMTHEME=gtk3\n"
+       ;; /ujima/desktop/bin -> bare ujima-* calls (i3, yuck); /usr/games -> tuxtype
+       "Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/ujima/desktop/bin\n"
        ;; links an app opens go through ujimad -> the Web app (with mimeapps.list, assets/home)
-       "Environment=BROWSER=/opt/ujima/desktop/bin/ujima-open-url\n"
+       "Environment=BROWSER=/ujima/desktop/bin/ujima-open-url\n"
        "StandardOutput=journal\n"
        "Restart=always\n"
        "RestartSec=3\n"
@@ -72,10 +74,10 @@
 ;; (ujima has NOPASSWD), so running as the user costs nothing.
 (def ^:private ujimad-wrapper
   (str "#!/bin/sh\n"
-       "cd /opt/ujima\n"
+       "cd /ujima/ujimad\n"
        ;; NOT exec: when ujimad exits (crash/OOM), tear the session down with `i3-msg exit` so
        ;; systemd's Restart=always rebuilds it cold — no orphaned eww/app zombies, one startup path.
-       "/usr/local/bin/bb -cp src -m ujima.main\n"
+       "bb -cp src -m ujima.main\n"
        "i3-msg exit\n"))
 
 
@@ -172,13 +174,13 @@
 ;; (autoboot/install-into-slot!), but boxes installed before that fix have it root-owned —
 ;; tmpfiles runs after local-fs.target, i.e. after the bind is mounted, and heals it.
 (def ^:private tmpfiles-conf
-  (str "d /ujima/run         0755 ujima ujima -\n"
-       "d /ujima/run/session 0755 ujima ujima -\n"
-       "z /ujima/settings    0755 ujima ujima -\n"
+  (str "d /ujima/run           0755 ujima ujima -\n"
+       "d /ujima/run/session   0755 ujima ujima -\n"
+       "z /ujima/settings      0755 ujima ujima -\n"
        ;; the kid-facing Files area on the storage partition (tmpfiles runs after local-fs =
        ;; after the mount, healing a fresh/reformatted partition each boot; with storage
        ;; absent — nofail — this lands on the ephemeral upper, degraded but consistent)
-       "d /mnt/storage/files 0755 ujima ujima -\n"))
+       "d /ujima/storage/files 0755 ujima ujima -\n"))
 
 
 ;; Overlay-safe machine-id. Under the overlay (every image, see cmdline!) systemd can't persist
@@ -213,7 +215,7 @@
     (spit "/usr/local/bin/ujima-session-stop" ujima-session-stop)
     ($! chmod "0755" ["/usr/local/bin/ujima-session-stop"])
     (fs/create-dirs "/etc/X11/xinit")
-    ($! cp "/opt/ujima/desktop/xinitrc" "/etc/X11/xinit/xinitrc")
+    ($! cp "/ujima/desktop/xinitrc" "/etc/X11/xinit/xinitrc")
 
     ;; persistent capped journal on storage
     (fs/create-dirs "/etc/systemd/journald.conf.d")

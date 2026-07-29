@@ -86,8 +86,9 @@
 
     ;; 5. A/B disk mount points + bind targets — rootfs layout is build content, so every
     ;;    image carries its own. The per-slot fstab that references them is written at
-    ;;    install time (ujima.device.ab.autoboot/slot->fstab).
-    (doseq [dir ["/mnt/settings"   "/mnt/storage"
+    ;;    install time (ujima.device.ab.autoboot/slot->fstab). /mnt/settings is the one
+    ;;    path outside /ujima; never target the /ujima root itself — only named children.
+    (doseq [dir ["/mnt/settings"
                  "/ujima/settings" "/ujima/storage"
                  "/var/log/journal"]]
       (fs/create-dirs dir))))

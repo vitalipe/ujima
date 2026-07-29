@@ -1,3 +1,3 @@
 {:label "Files" :category :system
- :exec ["sh" "app/run.sh"]   ; opens /mnt/storage/files (the persistent tier) + re-pins the no-side-pane conf
+ :exec ["sh" "app/run.sh"]   ; opens /ujima/storage/files (the persistent tier) + re-pins the no-side-pane conf
  :class "Pcmanfm"}  ; res_class (xprop-verified: instance pcmanfm / class Pcmanfm)

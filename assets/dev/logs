@@ -7,6 +7,6 @@
 #   /ujima/dev/logs -b                   everything since boot
 #   /ujima/dev/logs --since "1h ago"     any journalctl args pass through
 # eww CONFIG errors (bad yuck/scss) live inside eww instead:
-#   eww --config /opt/ujima/desktop/eww logs
+#   eww --config /ujima/desktop/eww logs
 [ $# -eq 0 ] && set -- -f -n 50
 exec sudo journalctl --no-hostname "$@" _SYSTEMD_UNIT=ujima.service + SYSLOG_IDENTIFIER=startx

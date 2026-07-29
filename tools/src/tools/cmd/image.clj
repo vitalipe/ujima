@@ -47,7 +47,7 @@
 ;; path *inside* the chroot.
 (def ^:private qemu-src    "assets/tools/qemu-aarch64-static")
 (def ^:private qemu-chroot "/usr/bin/qemu-aarch64-static")
-(def ^:private project-mnt "/ujima-src")  ;; repo bind-mount point inside the chroot
+(def project-mnt "/ujima-src")  ;; repo bind in the chroot = dev rsync stage (tools.cmd.dev)
 
 
 ;; Base image has 2 partitions [boot root]. Mount root, bind kernel fs, bind the repo

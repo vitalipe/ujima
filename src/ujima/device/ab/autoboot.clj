@@ -45,10 +45,12 @@
 (defn- slot->fstab
   "Per-slot /etc/fstab for an installed slot: /boot/firmware, the shared settings partition and its
    per-slot bind onto /ujima/settings (the stable path ujimad reads, so it never knows its slot),
-   plus the shared storage partition; all by PARTUUID. Root is NOT listed — the kernel mounts it from
-   the cmdline and overlayroot overlays it (read-only lower + tmpfs upper) and rewrites this fstab
-   itself, so a '/' entry would be pointless (overlayroot just comments it out) and systemd-remount-fs,
-   which would act on it, is masked in tools.scripts.ujimaify (overlayfs rejects its remount).
+   plus the shared storage partition mounted directly at /ujima/storage; all by PARTUUID.
+   /mnt/settings (the one path outside /ujima) holds both slot dirs — the bind IS slot selection.
+   Root is NOT listed — the kernel mounts it from the cmdline and overlayroot overlays it
+   (read-only lower + tmpfs upper) and rewrites this fstab itself, so a '/' entry would be
+   pointless (overlayroot just comments it out) and systemd-remount-fs, which would act on it,
+   is masked in tools.scripts.ujimaify (overlayfs rejects its remount).
 
    Settings is a REQUIRED mount (no `nofail`): ujimad is meaningless without it, so a
    missing/corrupt settings partition must halt boot (emergency) rather than silently fall back to
@@ -60,11 +62,10 @@
        "PARTUUID=" (slot->boot-uuid slot) "  /boot/firmware  vfat  defaults,nofail  0  2\n"
 
        "PARTUUID=" ujima-config-uuid      "  /mnt/settings   ext4  defaults         0  2\n"
-       "PARTUUID=" ujima-storage-uuid     "  /mnt/storage    ext4  defaults,nofail  0  2\n"
+       "PARTUUID=" ujima-storage-uuid     "  /ujima/storage  ext4  defaults,nofail  0  2\n"
 
        "/mnt/settings/" (name slot)       "  /ujima/settings none  bind             0  0\n"
-       "/mnt/storage/"                    "  /ujima/storage  none  bind             0  0\n"
-       "/mnt/storage/logs"                "  /var/log/journal none  bind,nofail     0  0\n"))
+       "/ujima/storage/logs"              "  /var/log/journal none  bind,nofail     0  0\n"))
 
 
 (defn- rootfs-owner

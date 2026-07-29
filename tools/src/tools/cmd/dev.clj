@@ -3,7 +3,7 @@
    tools.scripts.dev (the in-chroot build script).
 
      push ujimad     deploy ujimad live: run tools.scripts.ujimad (= `script ujimad` — stages
-                     src/ + config into /opt/ujima), then restart ujima.service.
+                     src/ + config into /ujima/ujimad), then restart ujima.service.
      script <name>   run tools.scripts.<name>/run! live on the device — the running-system
                      analog of `tools image script` (which runs the same fn in the build chroot).
      view <ip>       interactive x11vnc mirror of the device's :0 desktop — mouse + keyboard live.
@@ -19,6 +19,7 @@
             [babashka.fs :as fs]
             [babashka.process :as p]
             [lib.shell :refer [sh! sh?]]
+            [tools.cmd.image :as image]
             [tools.script-registry :as registry]))
 
 
@@ -62,10 +63,9 @@
 ;; ---------------------------------------------------------------------------
 
 
-;; The staging dir on the device. NOT /opt/ujima: ujimad.clj copies <project>/src into
-;; /opt/ujima/, so if project were /opt/ujima it would copy src into itself. Mirrors the chroot,
-;; where the read-only repo bind (/ujima-src) is deliberately separate from the install target.
-(def ^:private device-stage "/ujima-src")
+;; staging dir on the device = the chroot repo bind path; NOT the install target —
+;; ujimad.clj copies <project>/src into /ujima/ujimad, staging there would copy src into itself
+(def ^:private device-stage image/project-mnt)
 
 ;; Repo subset staged to the device — the dirs scripts read plus what the bb classpath needs.
 ;; Explicit include-list, NEVER the whole worktree: it holds the 846MB assets/e2e/dummy.pack and

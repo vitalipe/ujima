@@ -17,4 +17,4 @@ for _ in $(seq 1 50); do   # bounded readiness poll; a dead server fails loudly,
   sleep 0.1
 done
 
-/opt/ujima/desktop/bin/ujima-open-web-app "http://localhost:$port/$index" "$class"
+ujima-open-web-app "http://localhost:$port/$index" "$class"

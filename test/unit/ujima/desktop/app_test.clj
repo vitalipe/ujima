@@ -167,9 +167,9 @@
          (app/app->runnable {:kind :exec :exec ["tuxpaint" "--nolockfile"] :dir "/x"})))
   (is (= ["tuxpaint"] (app/app->runnable {:exec ["tuxpaint"] :dir "/x"}))
       ":kind defaults to :exec")
-  (is (= ["/opt/ujima/desktop/bin/ujima-open-web-app" "http://x.local/" "ujima-lib"]
+  (is (= ["/ujima/desktop/bin/ujima-open-web-app" "http://x.local/" "ujima-lib"]
          (app/app->runnable {:kind :link :url "http://x.local/" :class "ujima-lib"})))
-  (is (= ["/opt/ujima/desktop/bin/ujima-serve-web-app" "/apps/board/app" "index.html" "8100" "ujima-board"]
+  (is (= ["/ujima/desktop/bin/ujima-serve-web-app" "/apps/board/app" "index.html" "8100" "ujima-board"]
          (app/app->runnable {:kind :web-app :dir "/apps/board" :entry "index.html"
                              :port 8100 :class "ujima-board"}))
       "port coerced to string, serve dir = <dir>/app"))

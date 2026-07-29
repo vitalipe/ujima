@@ -1,4 +1,4 @@
-XDG_DOCUMENTS_DIR="/mnt/storage/files"
-XDG_DOWNLOAD_DIR="/mnt/storage/files"
-XDG_PICTURES_DIR="/mnt/storage/files"
+XDG_DOCUMENTS_DIR="/ujima/storage/files"
+XDG_DOWNLOAD_DIR="/ujima/storage/files"
+XDG_PICTURES_DIR="/ujima/storage/files"
 XDG_DESKTOP_DIR="$HOME"

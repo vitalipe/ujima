@@ -167,11 +167,14 @@
   (with-mounted-ext4 [s-mnt (:storage info)]
     (assert= "Expected /logs dir on the storage partition"
              true (fs/exists? (fs/path s-mnt "logs"))))
-  ;; the slot's fstab binds /var/log/journal onto storage
+  ;; the slot's fstab: storage partition mounted directly at /ujima/storage (nofail),
+  ;; journald bind-mounted from it
   (with-mounted-ext4 [root-mnt (get-in info [:slots slot :root])]
     (let [fstab (slurp (str (fs/path root-mnt "etc/fstab")))]
-      (assert-some! "fstab should bind /var/log/journal onto /mnt/storage/logs"
-                    (re-find #"/mnt/storage/logs\s+/var/log/journal\s+none\s+bind" fstab)))))
+      (assert-some! "fstab should mount the storage partition at /ujima/storage"
+                    (re-find #"\s/ujima/storage\s+ext4\s+defaults,nofail" fstab))
+      (assert-some! "fstab should bind /var/log/journal onto /ujima/storage/logs"
+                    (re-find #"/ujima/storage/logs\s+/var/log/journal\s+none\s+bind" fstab)))))
 
 
 (defn test-install! [disk* pack-file slot expected-installed-slots]

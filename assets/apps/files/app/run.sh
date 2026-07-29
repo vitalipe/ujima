@@ -6,4 +6,4 @@
 sed -i -e "s/^side_pane_mode=.*/side_pane_mode=places/" \
        -e "s/^splitter_pos=.*/splitter_pos=0/" \
        /home/ujima/.config/pcmanfm/default/pcmanfm.conf 2>/dev/null
-exec pcmanfm /mnt/storage/files
+exec pcmanfm /ujima/storage/files

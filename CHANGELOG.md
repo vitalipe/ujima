@@ -13,6 +13,12 @@ version truth; branch names and build labels may disagree.
 - The in-session daemon is `/usr/local/bin/ujimad` (was `ujima-agent`).
 - The USB admin token is the file `.ujima-admin-token` (was
   `.ujima-control-token`).
+- Everything on-device lives under one root — `/ujima`: code at
+  `/ujima/ujimad`, desktop at `/ujima/desktop`, apps at `/ujima/apps` (was
+  `/opt/ujima`); the desktop helpers and `/usr/games` ride the session `PATH`.
+- The storage partition mounts directly at `/ujima/storage` (was
+  `/mnt/storage`): the Files area is `/ujima/storage/files`, extra apps
+  `/ujima/storage/apps`.
 
 ## [0.3.0] - 2026-07-28
 

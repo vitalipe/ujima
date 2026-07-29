@@ -1,3 +1,3 @@
 #!/bin/sh
 # UjimaOS — startx runs this; i3 (with the staged config) execs ujimad + the eww shell.
-exec i3 -c /opt/ujima/desktop/i3/config
+exec i3 -c /ujima/desktop/i3/config

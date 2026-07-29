@@ -20,6 +20,11 @@ version truth; branch names and build labels may disagree.
   `/mnt/storage`): the Files area is `/ujima/storage/files`, extra apps
   `/ujima/storage/apps`.
 
+### Fixed
+
+- Renaming the machine also updates `/etc/hosts`, so `sudo` no longer warns
+  "unable to resolve host" after a rename.
+
 ## [0.3.0] - 2026-07-28
 
 First app support: an app is a self-contained directory (`app.edn` + icon +

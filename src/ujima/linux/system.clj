@@ -9,6 +9,8 @@
 
 (defn hostname! [hostname]
   (sudo$? hostnamectl set-hostname [hostname])
+  ;; hostnamectl never touches /etc/hosts; base.clj seeds the 127.0.1.1 line in every image
+  (sudo$? sed -i [(str "s/^127.0.1.1.*/127.0.1.1\\t" hostname "/")] "/etc/hosts")
   (:out ($? hostnamectl --static)))
 
 

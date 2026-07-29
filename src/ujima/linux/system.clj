@@ -1,6 +1,6 @@
 (ns ujima.linux.system
-  (:require [lib.shell :refer [$?]]
-            [ujima.linux.sudo :refer [sudo$?]]))
+  (:require [lib.shell :refer [$? $!]]
+            [ujima.linux.sudo :refer [sudo$!]]))
 
 
 (defn hostname []
@@ -8,10 +8,10 @@
 
 
 (defn hostname! [hostname]
-  (sudo$? hostnamectl set-hostname [hostname])
+  (sudo$! hostnamectl set-hostname [hostname])
   ;; hostnamectl never touches /etc/hosts; base.clj seeds the 127.0.1.1 line in every image
-  (sudo$? sed -i [(str "s/^127.0.1.1.*/127.0.1.1\\t" hostname "/")] "/etc/hosts")
-  (:out ($? hostnamectl --static)))
+  (sudo$! sed -i (str "s/^127.0.1.1.*/127.0.1.1\\t" hostname "/") "/etc/hosts")
+  ($! hostnamectl --static))
 
 
 (defn timezone []
@@ -19,13 +19,13 @@
 
 
 (defn timezone! [timezone]
-  (sudo$? timedatectl set-timezone [timezone])
-  (:out ($? timedatectl show -p "Timezone" --value)))
+  (sudo$! timedatectl set-timezone [timezone])
+  ($! timedatectl show -p "Timezone" --value))
 
 
 (defn reboot! []
-  (sudo$? systemctl reboot))
+  (sudo$! systemctl reboot))
 
 
 (defn shutdown! []
-  (sudo$? systemctl poweroff))
+  (sudo$! systemctl poweroff))

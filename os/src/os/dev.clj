@@ -1,4 +1,4 @@
-(ns tools.scripts.dev
+(ns os.dev
   "Runs INSIDE the target chroot as root. Layers DEV-only conveniences onto a configured ujima
    image: an SSH server for headless access, x11vnc + maim + xdotool for the desktop relay
    (`tools dev view` / `dev screenshot` / `dev click|type|key`), the assets/dev helper scripts
@@ -19,7 +19,7 @@
 ;; [rw] (overlay disabled via lock-fs, writable root) — decided once at shell startup, since the
 ;; state only changes across a reboot.
 (def ^:private dev-prompt
-  (str "# ujima dev image prompt (managed by tools.scripts.dev — overwritten each run)\n"
+  (str "# ujima dev image prompt (managed by os.dev — overwritten each run)\n"
        "# overlay state, baked in at shell startup (only changes across a reboot):\n"
        "if [ \"$(findmnt -no FSTYPE / 2>/dev/null)\" = overlay ]; then\n"
        "    PS1='\\[\\e[1;33m\\][ujima-dev]\\[\\e[0m\\] \\[\\e[0;32m\\][ro]\\[\\e[0m\\] \\u@\\h:\\w\\$ '\n"
@@ -51,7 +51,7 @@
 ;; testable on a dev box with no USB/HDMI audio attached. Matches the exact aloop node
 ;; name so the paired capture source stays untouched.
 (def ^:private aloop-usb-rule
-  (str "# DEV RIG (ujima, managed by tools.scripts.dev): loopback sink classifies as :usb.\n"
+  (str "# DEV RIG (ujima, managed by os.dev): loopback sink classifies as :usb.\n"
        "monitor.alsa.rules = [\n"
        "  {\n"
        "    matches = [\n"
@@ -79,7 +79,7 @@
     ;; desktop-relay tools — x11vnc (interactive `dev view`), maim (one-shot `dev screenshot`), and
     ;; xdotool (synthetic input for `dev click|type|key`). DEV-ONLY by design: a VNC server +
     ;; synthetic-input tooling are remote-control surfaces that must never ship in a release image,
-    ;; so they go here (release skips this script), NOT in tools.scripts.install.
+    ;; so they go here (release skips this script), NOT in os.install.
     ($! apt-get update)
     ($! apt-get install -y --no-install-recommends
         "openssh-server" "rsync" "x11vnc" "maim" "xdotool")
@@ -88,7 +88,7 @@
     ;; read-only overlay (assets/dev/lock-fs): sshd then reads them from the ro lower instead of
     ;; regenerating into ephemeral tmpfs every boot (which trips "REMOTE HOST IDENTIFICATION HAS
     ;; CHANGED"). `-A` only fills in missing key types (idempotent); raspios ships none. Release
-    ;; skips this script and tools.scripts.cleanup wipes any keys, so it's a dev-only concern.
+    ;; skips this script and os.cleanup wipes any keys, so it's a dev-only concern.
     ($! ssh-keygen -A)
 
     ;; dev/customization helper scripts (wifi, …): clean-mirror assets/dev -> /ujima/dev (rm

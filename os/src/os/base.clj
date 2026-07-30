@@ -1,8 +1,8 @@
-(ns tools.scripts.base
+(ns os.base
   "Runs INSIDE the target chroot as root. Turns a stock raspios rootfs into the ujima *base*:
    strips the first-boot machinery, disables cloud-init, and provisions the login user
    (passwordless console autologin + passwordless sudo) — a clean, bootable, logged-in machine
-   that the ujimad/desktop layers build on. (fstab + boot units → tools.scripts.ujimaify.)
+   that the ujimad/desktop layers build on. (fstab + boot units → os.ujimaify.)
 
    Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 

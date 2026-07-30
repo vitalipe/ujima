@@ -1,10 +1,10 @@
-(ns tools.scripts.install
+(ns os.install
   "Runs INSIDE the target chroot (aarch64 bb under qemu) as root.
    Installs runtime packages and the runtime babashka.
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
-            [tools.scripts.appcatalog :as appcatalog]))
+            [os.appcatalog :as appcatalog]))
 
 
 (defn run! [{:keys [project]}]
@@ -27,14 +27,14 @@
 
     ;; minimal desktop runtime (cached in the vendor base): i3 + core X + the legacy setuid Xorg.wrap
     ;; (so the systemd session — a non-console user — can open the VT). eww is NOT apt — built from
-    ;; source (assets/dev/build-eww), staged by tools.scripts.desktop; libgtk-3-0 is its runtime lib
+    ;; source (assets/dev/build-eww), staged by os.desktop; libgtk-3-0 is its runtime lib
     ;; (apt pulls the rest of the GTK stack). Pin the exact eww lib set from build-eww's `ldd` dump.
     ($! apt-get install -y --no-install-recommends
         "i3" "xserver-xorg-core" "xserver-xorg-input-libinput" "xinit"
         "xserver-xorg-legacy"
         "libgtk-3-0"
         "libdbusmenu-gtk3-4"  ; eww's systray/dbusmenu runtime lib (pulls libdbusmenu-glib4) — libgtk-3-0 does NOT pull it, so it must be pinned; its absence crash-loops eww on a clean image
-        "qt6-gtk-platformtheme" "qt5-gtk-platformtheme"  ; Qt/KDE apps (Marble, Stellarium) follow the GTK Nordic theme — QT_QPA_PLATFORMTHEME=gtk3 on ujima.service (tools.scripts.ujimaify)
+        "qt6-gtk-platformtheme" "qt5-gtk-platformtheme"  ; Qt/KDE apps (Marble, Stellarium) follow the GTK Nordic theme — QT_QPA_PLATFORMTHEME=gtk3 on ujima.service (os.ujimaify)
         "mesa-vulkan-drivers"  ; v3dv Vulkan driver for the Pi 5 V3D — Godot's Vulkan Mobile renderer
         "librsvg2-common"   ; gdk-pixbuf SVG loader (app icons in file dialogs etc.; librsvg2-2 is just the lib)
         "picom"             ; xrender compositor — transparency for floating dialogs + the transparent shell
@@ -72,7 +72,7 @@
         "pipewire" "pipewire-pulse" "pipewire-alsa" "wireplumber")
 
     ;; classroom apps the launcher opens: install recipes live beside their catalog specs in
-    ;; tools.scripts.app-catalog (one entry per app). Runs HERE so the app packages — libreoffice,
+    ;; os.app-catalog (one entry per app). Runs HERE so the app packages — libreoffice,
     ;; chromium, inkscape, the fetched TurboWarp, … — bake into the cached vendor base instead of
     ;; re-downloading every build. `apt-get update` above already primed the lists.
     (appcatalog/install! {:project project})

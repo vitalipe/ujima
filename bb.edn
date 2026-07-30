@@ -1,4 +1,4 @@
-{:paths ["ujimad/src" "tools/src"]
+{:paths ["ujimad/src" "tools/src" "os/src"]
 
  :deps {http-kit/http-kit {:mvn/version "2.8.0"}
         cheshire/cheshire {:mvn/version "5.13.0"}
@@ -10,14 +10,35 @@
   {:doc "Run an e2e test from e2e/tests"
    :task (apply shell "bb" "-cp" "ujimad/src:ujimad/test" "-m" "e2e.runner" (seq *command-line-args*))}
 
-  tools
-  {:doc "Tools CLI"
+  os
+  {:doc "The OS image: stage | script | chroot | initramfs | fetch"
    :requires ([tools.cli :as cli])
-   :task (apply cli/-main *command-line-args*)}
+   :task (apply cli/-main "os" *command-line-args*)}
+
+  pack
+  {:doc "The .pack artifact: <src> <out> | validate | meta"
+   :requires ([tools.cli :as cli])
+   :task (apply cli/-main "pack" *command-line-args*)}
+
+  disk
+  {:doc "The A/B disk: ab create | slot A|B from-pack/activate | info"
+   :requires ([tools.cli :as cli])
+   :task (apply cli/-main "disk" *command-line-args*)}
 
   dev
+  {:doc "A running device over ssh: push | script | view | screenshot | click | type | key"
+   :requires ([tools.cli :as cli])
+   :task (apply cli/-main "dev" *command-line-args*)}
+
+  loopback
+  {:doc "Loop-device utility: attach | detach | list"
+   :requires ([tools.cli :as cli])
+   :task (apply cli/-main "loopback" *command-line-args*)}
+
+  repl
   {:doc "Start Ujima dev REPL"
-   :task (shell "bb" "-cp" "ujimad/src:tools/src:ujimad/test" "-e" "(require 'tools.repl) (tools.repl/start!)")}
+   :override-builtin true
+   :task (shell "bb" "-cp" "ujimad/src:tools/src:os/src:ujimad/test" "-e" "(require 'tools.repl) (tools.repl/start!)")}
 
   test:unit
   {:doc "Run unit tests"

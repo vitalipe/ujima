@@ -1,4 +1,4 @@
-(ns tools.scripts.cleanup
+(ns os.cleanup
   "Runs INSIDE the target chroot as root. Image hygiene so every flashed card ships
    clean and gets a fresh identity on first boot."
   (:require [lib.shell :refer [$! with-console-out]]

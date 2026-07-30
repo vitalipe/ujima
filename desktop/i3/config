@@ -53,7 +53,7 @@ bindsym Mod1+Shift+Tab exec --no-startup-id ujima-api POST /app/prev >/dev/null
 bindsym Mod1+Escape    exec --no-startup-id ujima-api POST /app/home >/dev/null
 
 # desktop background: the launcher's gradient (desktop/wall.svg, rasterized to wall.png by
-# tools.scripts.desktop) set on the X root. i3 draws over it, so empty workspaces show the gradient
+# os.desktop) set on the X root. i3 draws over it, so empty workspaces show the gradient
 # instead of the black root — and the transparent launcher + top bar show it through, one continuous
 # background under everything.
 exec_always --no-startup-id feh --bg-fill /ujima/desktop/wall.png

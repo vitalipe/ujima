@@ -115,7 +115,7 @@
              (str/join "\n"))]
     (str
       "Usage:\n"
-      "  tools <command> <subcommand> [options]\n"
+      "  <command> <subcommand> [options]\n"
       "\n"
       "Commands:\n"
       command-lines
@@ -219,7 +219,7 @@
         node (get-command-subtree tree dispatch)]
     (println
       (str
-        "Incomplete command: tools "
+        "Incomplete command: "
         (str/join " " dispatch)))
     (println)
 

@@ -1,10 +1,10 @@
 (ns tools.cmd.image
-  "Host-only image build pipeline: fetch -> script -> pack -> from-pack.
+  "Host-only os-image machinery: fetch -> script -> chroot -> initramfs.
 
-   `script` runs a tools.scripts.<name>/run! namespace inside the target chroot (aarch64 bb
+   `script` runs an os.<name>/run! namespace inside the target chroot (aarch64 bb
    under qemu) against a read-only project bind, so the script's file ops / shell-outs land in
    the image. Reuses the e2e-tested ujima.device/pack/loopback fns; this namespace is wiring +
-   the chroot/fetch mechanics."
+   the chroot/fetch mechanics. (The A/B disk verbs live in tools.cmd.disk.)"
   (:require
     [clojure.java.io :as io]
     [clojure.string  :as str]
@@ -15,27 +15,7 @@
     [ujima.linux.disk       :as linux-disk]
     [ujima.linux.disk.loop  :as loopback]
     [ujima.linux.disk.mount :as mount]
-    [ujima.pack             :as pack]
-    [ujima.device.ab        :as ab]
-    [ujima.device.ab.autoboot :as ab-auto]
-    [tools.script-registry  :as registry]))
-
-
-;; ---------------------------------------------------------------------------
-;; Layout registry (tools-side; ujima.device stays untouched)
-;; ---------------------------------------------------------------------------
-
-;; image-bytes is a constant per layout (NOT config). 28 GiB fits a real 32 GB card;
-;; the A/B `storage` partition fills the remaining space.
-(def ^:private layouts
-  {"autoboot" {:->disk      ab-auto/->disk
-               :image-bytes 30064771072}})
-
-
-(defn resolve-layout [layout-name]
-  (or (get layouts layout-name)
-      (throw (ex-info "Unknown --layout"
-                      {:expected (set (keys layouts)) :actual layout-name}))))
+    [os.registry  :as registry]))
 
 
 ;; ---------------------------------------------------------------------------
@@ -129,26 +109,26 @@
 ;; ---------------------------------------------------------------------------
 ;; Image-content scripts
 ;;
-;; A script is tools.scripts.<name>/run!, executed *inside* the chroot by the
+;; A script is os.<name>/run!, executed *inside* the chroot by the
 ;; vendored aarch64 bb (run in place from the read-only project bind). Add a
-;; script by dropping tools/src/tools/scripts/<name>.clj.
+;; script by dropping os/src/os/<name>.clj.
 ;; ---------------------------------------------------------------------------
 
 
 (def ^:private chroot-bb   (str project-mnt "/assets/tools/bb-aarch64"))
-(def ^:private chroot-cp   (str project-mnt "/ujimad/src:" project-mnt "/tools/src"))
+(def ^:private chroot-cp   (str project-mnt "/ujimad/src:" project-mnt "/os/src"))
 
 
 (defn- do-chroot-run-script! [mnt target]
   (p/shell {:inherit true}
            "sudo" "chroot" (str mnt)
            chroot-bb "--classpath" chroot-cp
-           "-x" (str "tools.scripts." (name target) "/run!")
+           "-x" (str "os." (name target) "/run!")
            "--project" project-mnt))
 
 
 (defn script!
-  "Run a single image-content script (tools.scripts.<script>/run!) inside the chroot."
+  "Run a single image-content script (os.<script>/run!) inside the chroot."
   [{:keys [img script]}]
   (registry/require-script! script)
   (require-root!)
@@ -165,30 +145,6 @@
     (with-chrooted-rootfs* dev
       (fn [mnt]
         (p/shell {:inherit true} "sudo" "chroot" (str mnt) "/bin/bash")))))
-
-
-(defn from-pack!
-  "Returns a task that writes a flashable A/B-layout image from a .pack:
-   vanilla rootfs into slot :a, boot slot :a."
-  [{pack-path :pack :keys [out layout]}]
-  (flow :image/from-pack
-    (require-root!)
-    (let [{:keys [->disk image-bytes]} (resolve-layout layout)]
-      (progress! 5 "validating pack")
-      (pack/validate! pack-path)
-      (progress! 15 "preparing image")
-      (fs/delete-if-exists out)                        ; layout refuses a device that already has partitions
-      ($! truncate -s (str image-bytes) (str out)) ; sparse
-      (loopback/with-loopback-device [dev out]
-        (let [disk (->disk {:device dev})]
-          (progress! 25 "writing A/B layout")
-          (ab/write-ujima-layout! disk)
-          (progress! 50 "installing slot :a")
-          (ab/install-into-slot!  disk pack-path :a)
-          (progress! 90 "setting boot slot")
-          (ab/set-boot-slot!      disk :a)))
-      (progress! 100 "done")
-      {:out (str out)})))
 
 
 ;; ---------------------------------------------------------------------------

@@ -1,10 +1,10 @@
-(ns tools.scripts.desktop
+(ns os.desktop
   "Runs INSIDE the target chroot as root (and is the live `dev push desktop` deploy path). Stages
    the ujima *desktop* layer — its config files + assets — onto the base.
 
    SCAFFOLD: the desktop layer doesn't exist yet. This stages desktop/ into /ujima/desktop
    when that dir is present, and is otherwise a no-op. The graphical session's systemd unit will
-   live in tools.scripts.ujimaify; runtime desktop *settings* (wallpaper, resolution, …) are
+   live in os.ujimaify; runtime desktop *settings* (wallpaper, resolution, …) are
    ujimad's job at runtime, not this build script.
 
    Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
@@ -12,7 +12,7 @@
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
             [babashka.fs :as fs]
-            [tools.scripts.appcatalog :as appcatalog]))
+            [os.appcatalog :as appcatalog]))
 
 
 (defn run! [{:keys [project]}]
@@ -27,7 +27,7 @@
 
     ;; desktop background: rasterize the vector wall.svg -> a ≥1080p PNG for feh (the X root can't
     ;; take an SVG). Uses the librsvg gdk-pixbuf loader via python3-gi — both installed by
-    ;; tools.scripts.install. wall.svg is the editable source; wall.png is what i3's `exec feh` sets.
+    ;; os.install. wall.svg is the editable source; wall.png is what i3's `exec feh` sets.
     (when (fs/exists? "/ujima/desktop/wall.svg")
       ($! python3 "-c"
           (str "import gi; gi.require_version('GdkPixbuf','2.0'); from gi.repository import GdkPixbuf; "

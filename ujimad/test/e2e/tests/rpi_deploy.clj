@@ -146,7 +146,7 @@
              true (fs/exists? (fs/path cfg-mnt (name slot)))))
   ;; the slot's fstab: settings partition mounted REQUIRED (no nofail) at /mnt/settings, then
   ;; bind-mounted per-slot onto /ujima/settings. (The mount-point dirs themselves are build
-  ;; content — tools.scripts.base — not part of the install contract.)
+  ;; content — os.base — not part of the install contract.)
   (with-mounted-ext4 [root-mnt (get-in info [:slots slot :root])]
     (let [fstab         (slurp (str (fs/path root-mnt "etc/fstab")))
           settings-line (->> (str/split-lines fstab)

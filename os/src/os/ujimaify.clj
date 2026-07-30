@@ -1,4 +1,4 @@
-(ns tools.scripts.ujimaify
+(ns os.ujimaify
   "Runs INSIDE the target chroot as root. 'ujimaifies' the staged system: writes + enables the
    systemd units that turn the staged ujimad (and, later, desktop) into boot services, and stamps
    the build. Writing/enabling units lives here (rare); *restarting* them for a live iteration is

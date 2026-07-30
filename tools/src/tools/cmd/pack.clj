@@ -1,21 +1,29 @@
 (ns tools.cmd.pack
   (:require
+    [babashka.fs           :as fs]
     [lib.edn               :as edn]
-    [ujima.linux.disk      :refer [require-block-device!]]
+    [ujima.linux.disk      :refer [block-device?]]
     [lib.shell             :refer [require-root!]]
     [ujima.linux.disk.loop :as loopback]
     [ujima.pack            :as pack]))
 
 
-(defn pack-device! [{:keys [device out target arch] :or {target "mock" arch "test"}}]
+(defn make!
+  "Pack an os image into a .pack. `src` is a 2-partition medium — an .img file
+   (loopback-attached) or a block device, detected explicitly."
+  [{:keys [src out target arch] :or {target "mock" arch "test"}}]
   (require-root!)
-  (pack/pack! device out {:target target :arch arch}))
+  (cond
+    (block-device? src)
+    (pack/pack! src out {:target target :arch arch})
 
+    (fs/regular-file? src)
+    (loopback/with-loopback-device [dev src]
+      (pack/pack! dev out {:target target :arch arch}))
 
-(defn pack-image! [{:keys [img out target arch] :or {target "mock" arch "test"}}]
-  (require-root!)
-  (loopback/with-loopback-device [dev img]
-    (pack/pack! dev out {:target target :arch arch})))
+    :else
+    (throw (ex-info "pack source must be an .img file or a block device"
+                    {:src src}))))
 
 
 (defn validate-pack! [{:keys [ujima-pack-path]}]

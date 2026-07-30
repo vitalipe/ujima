@@ -136,7 +136,7 @@
 
 
 (def ^:private chroot-bb   (str project-mnt "/assets/tools/bb-aarch64"))
-(def ^:private chroot-cp   (str project-mnt "/src:" project-mnt "/tools/src"))
+(def ^:private chroot-cp   (str project-mnt "/ujimad/src:" project-mnt "/tools/src"))
 
 
 (defn- do-chroot-run-script! [mnt target]

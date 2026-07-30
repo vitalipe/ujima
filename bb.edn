@@ -1,4 +1,4 @@
-{:paths ["src" "tools/src"]
+{:paths ["ujimad/src" "tools/src"]
 
  :deps {http-kit/http-kit {:mvn/version "2.8.0"}
         cheshire/cheshire {:mvn/version "5.13.0"}
@@ -8,7 +8,7 @@
  :tasks
  {e2e
   {:doc "Run an e2e test from e2e/tests"
-   :task (apply shell "bb" "-cp" "src:test" "-m" "e2e.runner" (seq *command-line-args*))}
+   :task (apply shell "bb" "-cp" "ujimad/src:ujimad/test" "-m" "e2e.runner" (seq *command-line-args*))}
 
   tools
   {:doc "Tools CLI"
@@ -17,9 +17,9 @@
 
   dev
   {:doc "Start Ujima dev REPL"
-   :task (shell "bb" "-cp" "src:tools/src:test" "-e" "(require 'tools.repl) (tools.repl/start!)")}
+   :task (shell "bb" "-cp" "ujimad/src:tools/src:ujimad/test" "-e" "(require 'tools.repl) (tools.repl/start!)")}
 
   test:unit
   {:doc "Run unit tests"
-   :task (shell "bb" "-cp" "src:test/unit" "-m" "runner")}}}
+   :task (shell "bb" "-cp" "ujimad/src:ujimad/test/unit" "-m" "runner")}}}
 

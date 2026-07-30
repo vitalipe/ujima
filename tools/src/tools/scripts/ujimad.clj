@@ -19,5 +19,5 @@
       ;; clean-mirror src ONLY — config is copied, never rm'd, so a hand-dropped
       ;; ujimad.local.edn survives pushes
       ($! rm -rf (str dst "/src"))
-      ($! cp -a (str project "/src")              (str dst "/"))
-      ($! cp -a (str project "/config/ujimad.edn") (str dst "/config/")))))
+      ($! cp -a (str project "/ujimad/src")              (str dst "/"))
+      ($! cp -a (str project "/ujimad/config/ujimad.edn") (str dst "/config/")))))

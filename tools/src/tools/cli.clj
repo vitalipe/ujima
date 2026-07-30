@@ -228,7 +228,7 @@
 (defn -main
   [& args]
 
-  (-> (io/slurp-config "config" "tools")
+  (-> (io/slurp-config "tools/config" "tools")
       (get-in  [:shell :commands] {})
       (shell/install-remap!))
 

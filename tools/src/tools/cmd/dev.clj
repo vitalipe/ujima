@@ -71,10 +71,11 @@
 ;; Explicit include-list, NEVER the whole worktree: it holds the 846MB assets/e2e/dummy.pack and
 ;; other large/private untracked files that must never go over the wire to a Pi. A new script
 ;; that reads a new asset dir adds one entry here.
-(def ^:private stage-paths ["src" "tools/src" "config" "assets/dev" "assets/tools"
-                            "assets/desktop" "assets/eww"
+(def ^:private stage-paths ["ujimad/src" "ujimad/config" "tools/src"
+                            "desktop" "apps"
+                            "assets/dev" "assets/tools" "assets/eww"
                             "assets/fonts" "assets/themes" "assets/home"
-                            "assets/apps" "assets/i18n"])  ; desktop.clj + appcatalog/stage-defaults! read these
+                            "assets/i18n"])  ; desktop.clj + appcatalog/stage-defaults! read these
 
 
 (defn script!
@@ -86,7 +87,7 @@
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (require-host-cmd! "rsync"   "install it (e.g. apt install rsync)")
   (let [{:keys [ssh-e host] :as transport} (ssh-transport opts)
-        cp         (str device-stage "/src:" device-stage "/tools/src")
+        cp         (str device-stage "/ujimad/src:" device-stage "/tools/src")
         ;; resolve bb AS THE LOGIN USER first ($(command -v bb) on its PATH), then sudo the
         ;; absolute path: sudo's secure_path won't include the vendored bb, so a bare `sudo bb`
         ;; would be command-not-found.

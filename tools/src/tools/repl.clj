@@ -93,7 +93,7 @@
 
 (defn start! []
   
-  (-> (io/slurp-config "config" "tools")
+  (-> (io/slurp-config "tools/config" "tools")
       (get-in  [:shell :commands] {})
       (install-remap!))
 

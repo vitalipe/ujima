@@ -1,9 +1,9 @@
 (ns tools.scripts.appcatalog
   "Install recipes for the launcher apps. The catalog SPECS live with the apps themselves —
-   assets/apps/<id>/app.edn, scanned by ujimad at boot (ujima.desktop.app/load-catalog) —
+   apps/<id>/app.edn, scanned by ujimad at boot (ujima.desktop.app/load-catalog) —
    so this file holds only what the IMAGE BUILD needs: which packages/payloads to install.
    Packages are never vendored in git — they install like apt at build time. Adding an app =
-   drop assets/apps/<id>/ (app.edn [+ rootfs/ defaults]) + one recipe entry here.
+   drop apps/<id>/ (app.edn [+ rootfs/ defaults]) + one recipe entry here.
 
    Two build seams share this one data source:
      install!         apt-installs every :apt (deduped) + fetches each :fetch + installs
@@ -25,8 +25,8 @@
 
 
 (def apps
-  "Install recipes, one per app; :id must match its assets/apps/<id>/ dir (launch spec =
-   assets/apps/<id>/app.edn). :apt [pkg …], :fetch {:url :sha256 :dest [:bin]}, or
+  "Install recipes, one per app; :id must match its apps/<id>/ dir (launch spec =
+   apps/<id>/app.edn). :apt [pkg …], :fetch {:url :sha256 :dest [:bin]}, or
    :deb {:url :sha256}."
   [{:id :wikipedia  :apt ["chromium"]}
    {:id :kolibri    :apt ["chromium"]}       ; STUB tile — the local server isn't stood up yet
@@ -53,7 +53,7 @@
 
    ;; official arm64 editor, a .zip carrying one versioned binary → :bin renames it to a stable
    ;; `godot`; Vulkan Mobile needs mesa-vulkan-drivers (install.clj). The vendored demo project
-   ;; rides the assets/apps/godot rootfs tree.
+   ;; rides the apps/godot rootfs tree.
    {:id :godot
     :fetch {:url    "https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.arm64.zip"
             :sha256 "db5aa126353a18fd664818e4f1b9cfffaa77e32d4c9af0ea87e8f028a395a1ed"
@@ -150,7 +150,7 @@
 
 
 (defn stage-defaults!
-  "Stage each assets/apps/<id> app onto the device: app.edn (+ its optional icon.svg) ->
+  "Stage each apps/<id> app onto the device: app.edn (+ its optional icon.svg) ->
    /ujima/apps/<id>/ (the scan root ujimad's boot catalog reads) and the optional
    rootfs/ tree overlaid onto / —
    first-run config, demo payloads, SPA builds; a path in the tree IS its destination. Staged
@@ -158,16 +158,16 @@
    repo's uids are the build host's). A dir without a recipe :id, or with neither app.edn nor
    rootfs/, throws — a typo must never stage nothing, silently."
   [{:keys [project]}]
-  (let [root (fs/path (str project) "assets/apps")
+  (let [root (fs/path (str project) "apps")
         ids  (into #{} (map (comp name :id)) apps)]
     (doseq [dir (when (fs/exists? root) (sort-by str (fs/list-dir root)))
             :let [id      (fs/file-name dir)
                   rootfs  (fs/path dir "rootfs")
                   app-edn (fs/path dir "app.edn")]]
       (when-not (contains? ids id)
-        (throw (ex-info "assets/apps dir has no install recipe" {:dir id})))
+        (throw (ex-info "apps dir has no install recipe" {:dir id})))
       (when-not (or (fs/exists? app-edn) (fs/exists? rootfs))
-        (throw (ex-info "assets/apps dir has neither app.edn nor rootfs/" {:dir id})))
+        (throw (ex-info "apps dir has neither app.edn nor rootfs/" {:dir id})))
       (when (fs/exists? app-edn)
         (fs/create-dirs (str "/ujima/apps/" id))
         ($! cp -a [(str app-edn)] [(str "/ujima/apps/" id "/app.edn")])

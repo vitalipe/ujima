@@ -1,11 +1,8 @@
 pad.md
 /tmp/
 /stage/
-config/*.local.edn
+ujimad/config/*.local.edn
+tools/config/*.local.edn
 
 # personal per-network wifi wrappers (e.g. wifi.home); the `wifi` tool itself stays tracked
 assets/dev/wifi.*
-
-# generated launcher catalog — source of truth is tools/src/tools/scripts/app-catalog.clj
-# (`bb app-catalog` regenerates it for dev; the image build writes it via tools.scripts.desktop)
-assets/desktop/apps.edn

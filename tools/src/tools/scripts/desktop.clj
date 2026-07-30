@@ -2,7 +2,7 @@
   "Runs INSIDE the target chroot as root (and is the live `dev push desktop` deploy path). Stages
    the ujima *desktop* layer — its config files + assets — onto the base.
 
-   SCAFFOLD: the desktop layer doesn't exist yet. This stages assets/desktop into /ujima/desktop
+   SCAFFOLD: the desktop layer doesn't exist yet. This stages desktop/ into /ujima/desktop
    when that dir is present, and is otherwise a no-op. The graphical session's systemd unit will
    live in tools.scripts.ujimaify; runtime desktop *settings* (wallpaper, resolution, …) are
    ujimad's job at runtime, not this build script.
@@ -17,13 +17,13 @@
 
 (defn run! [{:keys [project]}]
   (with-console-out
-    (let [src (str project "/assets/desktop")]
+    (let [src (str project "/desktop")]
       (if (fs/exists? src)
         (do                                   ;; clean-mirror, preserving the exec bit (cp -a)
           (fs/create-dirs "/ujima")
           ($! rm -rf "/ujima/desktop")
           ($! cp -a [src] "/ujima/desktop"))
-        (println "desktop: no assets/desktop yet — scaffold no-op")))
+        (println "desktop: no desktop/ yet — scaffold no-op")))
 
     ;; desktop background: rasterize the vector wall.svg -> a ≥1080p PNG for feh (the X root can't
     ;; take an SVG). Uses the librsvg gdk-pixbuf loader via python3-gi — both installed by
@@ -79,7 +79,7 @@
         (println "desktop: no assets/i18n/gtk30-ujima.mo — chooser labels not staged")))
 
     ;; session-level home config → the ujima user's home (per-APP home defaults live in their
-    ;; assets/apps trees, staged below). e.g. .config/mimeapps.list routes links to the url
+    ;; apps trees, staged below). e.g. .config/mimeapps.list routes links to the url
     ;; handler. Owned by ujima so apps + xdg can read/rewrite.
     (let [home (str project "/assets/home")]
       (if (fs/exists? home)
@@ -95,7 +95,7 @@
                "Exec=/ujima/desktop/bin/ujima-open-url %u\n"
                "MimeType=x-scheme-handler/http;x-scheme-handler/https;text/html;\nNoDisplay=true\n"))
 
-    ;; per-app trees (assets/apps/<id>): app.edn specs -> the catalog scan root, rootfs/
+    ;; per-app trees (apps/<id>): app.edn specs -> the catalog scan root, rootfs/
     ;; defaults overlaid onto / — AFTER the mirrors above so a clean-mirror can't clobber
     ;; them; rides both the image build and live `dev script desktop`, so an app edit ships
     ;; without a rebuild.

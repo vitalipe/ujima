@@ -3,7 +3,7 @@
 
    Vendor base (fetch + `image script install`, cached under stage/vendor/) -> copy to
    stage/ujima-<branch>-<commit>.img. The vendor is built once; rm it to rebuild
-   (e.g. after editing tools.scripts.install or bumping the vendored bb)."
+   (e.g. after editing os.install or bumping the vendored bb)."
   (:require
     [clojure.string :as str]
     [babashka.fs :as fs]
@@ -39,7 +39,7 @@
 (defn- stage-img-name []
   (let [branch (sanitize (git "rev-parse" "--abbrev-ref" "HEAD"))
         commit (git "rev-parse" "--short" "HEAD")
-        dirty  (when-not (str/blank? (git "status" "--porcelain" "--untracked-files=no")) "-dev")]
+        dirty  (when-not (str/blank? (git "status" "--porcelain" "--untracked-files=no")) "-dirty")]
     (str "ujima-" branch "-" commit dirty ".img")))
 
 
@@ -101,7 +101,7 @@
       (println "vendor cached ->" vendor)
       (build-vendor! url sha256 vendor))
 
-    ;; 2. copy to the working image — sparse (the vendor is a 12G rootfs pre-grown in build-vendor!,
+    ;; 2. copy to the working image — sparse (the vendor is a 10G rootfs pre-grown in build-vendor!,
     ;; so no post-copy expand is needed; --sparse=always keeps the copy from inflating the holes).
     (fs/create-dirs stage-dir)
     (println "copy ->" out)

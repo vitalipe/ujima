@@ -10,6 +10,11 @@
   {:doc "Run an e2e test from e2e/tests"
    :task (apply shell "bb" "-cp" "ujimad/src:ujimad/test" "-m" "e2e.runner" (seq *command-line-args*))}
 
+  build
+  {:doc "Whole pipeline: vendor(cached) → os image → pack → A/B disk"
+   :requires ([tools.cli :as cli])
+   :task (apply cli/-main "build" *command-line-args*)}
+
   os
   {:doc "The OS image: stage | script | chroot | initramfs | fetch"
    :requires ([tools.cli :as cli])

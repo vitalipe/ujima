@@ -14,6 +14,7 @@
     [tools.cmd.image    :as image]
     [tools.cmd.disk     :as disk]
     [tools.cmd.stage    :as stage]
+    [tools.cmd.build    :as build]
     [tools.cmd.dev      :as dev]))
 
 
@@ -22,7 +23,16 @@
 
 
 (def command-tree
-  {"os"
+  {"build"
+   {"run"
+    {:usage "Usage: build <target> [--dev]"
+     :target build/build!
+     :args [:target]
+     :spec {:target {:desc "Build target (rpi-os)" :require true}
+            :dev    {:coerce :boolean
+                     :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}}
+
+   "os"
    {"stage"
     {:usage "Usage: os stage <target>"
      :target stage-target!
@@ -231,15 +241,19 @@
     tree))
 
 
-(defn- pack-defaulted
-  "`bb pack <src> <out>` sugar: a first pack argument that is not a known subcommand
-   dispatches to `pack make`. The subcommand set is explicit — anything else is a source."
-  [[noun sub :as args]]
-  (if (and (= "pack" noun)
-           sub
-           (not (contains? #{"make" "validate" "meta" "-h" "--help"} sub)))
-    (into ["pack" "make"] (rest args))
-    args))
+;; bare-noun sugar: `bb pack <src> <out>` / `bb build <target>` — a first argument that
+;; is not a known subcommand dispatches to the noun's make-verb. Subcommand sets are
+;; explicit; anything else is treated as the default verb's first positional.
+(def ^:private default-verbs
+  {"pack"  {:verb "make" :subs #{"make" "validate" "meta"}}
+   "build" {:verb "run"  :subs #{"run"}}})
+
+(defn- with-default-verb [[noun sub :as args]]
+  (let [{:keys [verb subs]} (get default-verbs noun)]
+    (if (and verb sub
+             (not (contains? (into #{"-h" "--help"} subs) sub)))
+      (into [noun verb] (rest args))
+      args)))
 
 
 (defn -main
@@ -250,4 +264,4 @@
       (shell/install-remap!))
 
   (cli/dispatch! (wrap-targets (select-keys command-tree [noun]))
-                 (pack-defaulted (vec args))))
+                 (with-default-verb (vec args))))

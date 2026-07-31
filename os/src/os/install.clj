@@ -39,6 +39,8 @@
         "librsvg2-common"   ; gdk-pixbuf SVG loader (app icons in file dialogs etc.; librsvg2-2 is just the lib)
         "picom"             ; xrender compositor — transparency for floating dialogs + the transparent shell
         "xdotool"           ; synthetic input (startup focus tap; also the dev relay)
+        "x11-xserver-utils" ; xrandr — output/mode inspection + forcing; a display converge needs
+                            ; it at RUNTIME on release images, so it is core, not dev-only
         "feh"               ; sets the desktop background (wall.png) on the X root — i3 `exec feh --bg-fill`
         ;; webview launcher host (desktop/bin/ujima-launcher): a chromeless WebKitGTK window
         ;; renders the launcher home surface (served from :1337). python3-gi + the GTK3 / WebKit2-4.1

@@ -1,6 +1,6 @@
 (ns tools.cmd.disk
   "The full-disk column: create an A/B layout, install packs into slots, activate a slot,
-   inspect. Every verb takes the disk MEDIUM last — an .img file (loopback-attached) or a
+   inspect. Every verb takes the disk TARGET last — an .img file (loopback-attached) or a
    real block device, the same object either way. The installer flow is these verbs in
    order: ab create -> slot A from-pack -> slot A activate."
   (:require
@@ -50,7 +50,7 @@
 
 
 (defn ab-create!
-  "Write an empty A/B layout onto the medium. A missing/existing .img target is
+  "Write an empty A/B layout onto the target. A missing/existing .img target is
    (re)created sparse at the scheme's size; a block device must be partitionless
    (write-ujima-layout! refuses otherwise)."
   [{:keys [scheme target]}]
@@ -73,7 +73,7 @@
 
 
 (defn slot!
-  "Dispatch `disk slot <A|B> <verb> …`: from-pack <pack> <medium> | activate <medium>."
+  "Dispatch `disk slot <A|B> <verb> …`: from-pack <pack> <target> | activate <target>."
   [{:keys [slot verb a b]}]
   (require-root!)
   (let [slot (->slot slot)]
@@ -96,7 +96,7 @@
 
 (defn info!
   "Print the disk's ujima view: slots + installed metadata + boot selection, nil-ish
-   message when the medium carries no ujima A/B layout."
+   message when the target carries no ujima A/B layout."
   [{:keys [target]}]
   (require-root!)
   (let [info (with-disk* target (fn [dev] (ab/ujima-disk-info (->disk dev))))]

@@ -94,7 +94,7 @@
      :args [:verb :scheme :target]
      :spec {:verb   {:desc "A/B verb (create)" :require true}
             :scheme {:desc "Boot scheme (autoboot)" :require true}
-            :target {:desc "Disk medium: .img file or block device" :require true}}}
+            :target {:desc "Disk target: .img file or block device" :require true}}}
 
     "slot"
     {:usage "Usage: disk slot <A|B> from-pack <pack> <img|blockdev>\n       disk slot <A|B> activate <img|blockdev>"
@@ -102,14 +102,14 @@
      :args [:slot :verb :a :b]
      :spec {:slot {:desc "Slot: A or B" :require true}
             :verb {:desc "from-pack | activate" :require true}
-            :a    {:desc "from-pack: the .pack | activate: the disk medium" :require true}
-            :b    {:desc "from-pack: the disk medium"}}}
+            :a    {:desc "from-pack: the .pack | activate: the disk target" :require true}
+            :b    {:desc "from-pack: the disk target"}}}
 
     "info"
     {:usage "Usage: disk info <img|blockdev>"
      :target disk/info!
      :args [:target]
-     :spec {:target {:desc "Disk medium: .img file or block device" :require true}}}}
+     :spec {:target {:desc "Disk target: .img file or block device" :require true}}}}
 
    "dev"
    {"push"

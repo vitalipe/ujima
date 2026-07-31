@@ -14,8 +14,7 @@
     [lib.shell              :refer [$! sh! require-root!]]
     [ujima.linux.disk       :as linux-disk]
     [ujima.linux.disk.loop  :as loopback]
-    [ujima.linux.disk.mount :as mount]
-    [os.registry  :as registry]))
+    [ujima.linux.disk.mount :as mount]))
 
 
 ;; ---------------------------------------------------------------------------
@@ -115,6 +114,23 @@
 ;; ---------------------------------------------------------------------------
 
 
+;; the script set IS the os/src/os dir — one file per script, nothing else. The check
+;; fails a typo BEFORE the expensive part: root+loopback here, a full rsync in cmd/dev.
+(def ^:private os-scripts-dir "os/src/os")
+
+(defn- available-scripts []
+  (->> (fs/glob os-scripts-dir "*.clj")
+       (mapv #(str/replace (str (fs/file-name %)) #"\.clj$" ""))
+       sort vec))
+
+(defn require-script!
+  "Throw (listing what's available) if os.<script> doesn't exist."
+  [script]
+  (when-not (fs/exists? (fs/path os-scripts-dir (str script ".clj")))
+    (throw (ex-info (str "Unknown script: " script)
+                    {:script script :available (available-scripts)}))))
+
+
 (def ^:private chroot-bb   (str project-mnt "/assets/tools/bb-aarch64"))
 (def ^:private chroot-cp   (str project-mnt "/ujimad/src:" project-mnt "/os/src"))
 
@@ -130,7 +146,7 @@
 (defn script!
   "Run a single image-content script (os.<script>/run!) inside the chroot."
   [{:keys [img script]}]
-  (registry/require-script! script)
+  (require-script! script)
   (require-root!)
   (loopback/with-loopback-device [dev img]
     (with-chrooted-rootfs* dev

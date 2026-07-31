@@ -19,8 +19,7 @@
             [babashka.fs :as fs]
             [babashka.process :as p]
             [lib.shell :refer [sh! sh?]]
-            [tools.cmd.image :as image]
-            [os.registry :as registry]))
+            [tools.cmd.image :as image]))
 
 
 (defn- require-host-cmd! [cmd hint]
@@ -83,7 +82,7 @@
    analog of `bb os script`. Stages the repo subset the scripts need to device-stage, then
    runs the device's own bb against it as root. No chroot, no qemu (native aarch64), no host root."
   [{:keys [script ip] :as opts}]
-  (registry/require-script! script)                  ; fail fast, before any ssh/rsync
+  (image/require-script! script)                     ; fail fast, before any ssh/rsync
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (require-host-cmd! "rsync"   "install it (e.g. apt install rsync)")
   (let [{:keys [ssh-e host] :as transport} (ssh-transport opts)

@@ -2,15 +2,18 @@
   "Host-side dev-loop commands against a RUNNING ujima dev device over ssh. Distinct from
    os.dev (the in-chroot build script).
 
-     push ujimad     deploy ujimad live: run os.ujimad (= `script ujimad` — stages
-                     src/ + config into /ujima/ujimad), then restart ujima.service.
-     script <name>   run os.<name>/run! live on the device — the running-system
-                     analog of `bb os script` (which runs the same fn in the build chroot).
-     view <ip>       interactive x11vnc mirror of the device's :0 desktop — mouse + keyboard live.
-     screenshot <ip> pull a one-frame PNG of :0 to the host (a quick look / for Claude to verify).
-     click x y <ip>  synthetic pointer click at (x,y) on :0 (xdotool).
-     type <text> <ip>  type a literal string on :0 (xdotool).
-     key <chord> <ip>  send a key/chord on :0 — e.g. ctrl+f, Return, super+2 (xdotool).
+   Every verb takes the device FIRST (like `ssh <host> <cmd>`), so the payload trails and a
+   re-run only edits the tail:
+
+     push <ip> ujimad    deploy ujimad live: run os.ujimad (= `script ujimad` — stages
+                         src/ + config into /ujima/ujimad), then restart ujima.service.
+     script <ip> <name>  run os.<name>/run! live on the device — the running-system
+                         analog of `bb os script` (which runs the same fn in the build chroot).
+     view <ip>           interactive x11vnc mirror of the device's :0 desktop — mouse + keyboard live.
+     screenshot <ip>     pull a one-frame PNG of :0 to the host (a quick look / for Claude to verify).
+     click <ip> x y      synthetic pointer click at (x,y) on :0 (xdotool).
+     type <ip> <text>    type a literal string on :0 (xdotool).
+     key <ip> <chord>    send a key/chord on :0 — e.g. ctrl+f, Return, super+2 (xdotool).
 
    All talk to the device over sshpass+ssh with default ujima/ujima creds (dev boxes; see the
    public-access threat model). No live-safe gating: `script` runs whatever you name — note
@@ -128,7 +131,7 @@
 
 
 (defn push!
-  "Entry for `dev push <target> <ip>`: stage + run the target's image script (the copy, via
+  "Entry for `dev push <ip> <target>`: stage + run the target's image script (the copy, via
    script!), then restart its systemd unit so the new code is live — and REFUSE to report
    success until a FRESH ujimad pid is seen. The PAMName/logind session leak (see ujimaify.clj
    ujima-service) once let a 'successful' restart leave an orphan session serving OLD code;
@@ -177,8 +180,7 @@
   (let [{:keys [password ssh-opts host] :as transport} (ssh-transport opts)
         outf (or out "ujima-screen.png")]
     (when-not (:ok? (remote-sh? transport "command -v maim >/dev/null"))
-      (throw (ex-info (str "maim missing on " ip " — run `bb dev script dev " ip
-                           "` to bake it (or reflash a dev image that ships it)")
+      (throw (ex-info (str "maim missing on " ip " — run `bb dev script " ip " dev` to bake it (or reflash a dev image that ships it)")
                       {:ip ip :cmd "maim"})))
     (let [remote-cmd (str "DISPLAY=" display " XAUTHORITY=" xauth " maim")
           {:keys [exit]} @(apply p/process {:out :write :out-file (fs/file outf) :err :inherit}
@@ -208,8 +210,7 @@
                                    {:tried vnc-viewers})))
         {:keys [password ssh-opts host] :as transport} (ssh-transport opts)]
     (when-not (:ok? (remote-sh? transport "command -v x11vnc >/dev/null"))
-      (throw (ex-info (str "x11vnc missing on " ip " — run `bb dev script dev " ip
-                           "` to bake it (or reflash a dev image that ships it)")
+      (throw (ex-info (str "x11vnc missing on " ip " — run `bb dev script " ip " dev` to bake it (or reflash a dev image that ships it)")
                       {:ip ip :cmd "x11vnc"})))
     (let [x11vnc (str "x11vnc -display " display " -auth " xauth
                       " -localhost -rfbport " rfbport " -nopw -forever")
@@ -251,8 +252,7 @@
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (let [transport (ssh-transport opts)]
     (when-not (:ok? (remote-sh? transport "command -v xdotool >/dev/null"))
-      (throw (ex-info (str "xdotool missing on " ip " — run `bb dev script dev " ip
-                           "` to bake it (or reflash a dev image that ships it)")
+      (throw (ex-info (str "xdotool missing on " ip " — run `bb dev script " ip " dev` to bake it (or reflash a dev image that ships it)")
                       {:ip ip :cmd "xdotool"})))
     (remote-exec! transport
                   (str "DISPLAY=" display " XAUTHORITY=" xauth " xdotool " xargs))))

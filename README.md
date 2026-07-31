@@ -28,7 +28,7 @@ This mono repo contains the code and tooling needed to build, install, and run U
 bb build <target> [--dev]                             the whole pipeline, one command
 
 bb os stage <target>                                  stage an OS image from the pinned base (vendor-cached)
-bb os script <name> <img>                             run os.<name> inside the image's chroot
+bb os script <img> <name>                             run os.<name> inside the image's chroot
 bb os chroot <img>                                    interactive root shell inside the image
 bb os initramfs <img>                                 bake the prebuilt overlayroot initramfs
 bb os fetch <url> <out-img> [--sha256 <hex>]          download + decompress a base image
@@ -42,13 +42,13 @@ bb disk slot <A|B> from-pack <pack> <img|blockdev>    install a pack into a slot
 bb disk slot <A|B> activate <img|blockdev>            set the boot slot
 bb disk info <img|blockdev>                           slots, installed versions, boot selection
 
-bb dev push ujimad <ip>                               deploy the daemon + restart the session
-bb dev script <name> <ip>                             run os.<name> live on the device
+bb dev push <ip> ujimad                               deploy the daemon + restart the session
+bb dev script <ip> <name>                             run os.<name> live on the device
 bb dev view <ip>                                      interactive VNC mirror of the device's display
 bb dev screenshot <ip>                                one-frame PNG of the device's display
-bb dev click <x> <y> <ip>                             synthetic input on the device
-bb dev type <text> <ip>
-bb dev key <chord> <ip>
+bb dev click <ip> <x> <y>                             synthetic input on the device
+bb dev type <ip> <text>
+bb dev key <ip> <chord>
 
 bb loopback attach <img> [--readonly]                 loop-device utility
 bb loopback detach <img|loopdev>
@@ -59,8 +59,8 @@ bb e2e <test|all>                                     e2e suite (loopback, needs
 bb test:unit                                          unit tests
 ```
 
-The same OS script runs in both harnesses: `bb os script desktop x.img` (build
-chroot) and `bb dev script desktop <ip>` (live device).
+The same OS script runs in both harnesses: `bb os script x.img desktop` (build
+chroot) and `bb dev script <ip> desktop` (live device).
 
 
 ## Building
@@ -98,13 +98,13 @@ pipeline:
 
 ```
 sudo bb os stage rpi-os
-sudo bb os script base stage/ujima-….img       # then ujimad, desktop, ujimaify, …
+sudo bb os script stage/ujima-….img base       # then ujimad, desktop, ujimaify, …
 sudo bb pack stage/ujima-….img stage/u.pack
 sudo bb disk ab create autoboot stage/u-disk.img
 sudo bb disk slot A from-pack stage/u.pack stage/u-disk.img
 sudo bb disk slot A activate stage/u-disk.img
 ```
 
-For the live iteration loop against a running dev device, `bb dev push ujimad
-<ip>` deploys the daemon and restarts the session; `bb dev script <name> <ip>`
-runs any OS script in place.
+For the live iteration loop against a running dev device, `bb dev push <ip> ujimad`
+deploys the daemon and restarts the session; `bb dev script <ip> <name>` runs any
+OS script in place.

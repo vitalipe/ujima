@@ -15,7 +15,7 @@
     [lib.shell :refer [sh! require-root! $!]]
     [ujima.linux.disk :as linux-disk]
     [ujima.linux.disk.loop :as loopback]
-    [tools.cmd.image :as image]))
+    [tools.cmd.os :as os]))
 
 
 (defn- sha256-of [path]
@@ -107,7 +107,7 @@
     ;; the slot with margin; the rootfs only uses ~4.4G so there's ample install headroom. A
     ;; fresh decompress needs no e2fsck gate (-f).
     (expand-root! tmp "10G")
-    (image/script! {:img tmp :script "install"})
+    (os/script! {:img tmp :script "install"})
     (fs/move tmp vendor {:replace-existing true})))
 
 

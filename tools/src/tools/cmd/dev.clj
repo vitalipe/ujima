@@ -22,7 +22,7 @@
             [babashka.fs :as fs]
             [babashka.process :as p]
             [lib.shell :refer [sh! sh?]]
-            [tools.cmd.image :as image]))
+            [tools.cmd.os :as os]))
 
 
 (defn- require-host-cmd! [cmd hint]
@@ -67,7 +67,7 @@
 
 ;; staging dir on the device = the chroot repo bind path; NOT the install target —
 ;; ujimad.clj copies <project>/runtime/src into /ujima/ujimad, staging there would copy it into itself
-(def ^:private device-stage image/project-mnt)
+(def ^:private device-stage os/project-mnt)
 
 ;; Repo subset staged to the device — the dirs scripts read plus what the bb classpath needs.
 ;; Explicit include-list, NEVER the whole worktree: it holds tens of GB of build output under
@@ -85,7 +85,7 @@
    analog of `bb os script`. Stages the repo subset the scripts need to device-stage, then
    runs the device's own bb against it as root. No chroot, no qemu (native aarch64), no host root."
   [{:keys [script ip] :as opts}]
-  (image/require-script! script)                     ; fail fast, before any ssh/rsync
+  (os/require-script! script)                        ; fail fast, before any ssh/rsync
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (require-host-cmd! "rsync"   "install it (e.g. apt install rsync)")
   (let [{:keys [ssh-e host] :as transport} (ssh-transport opts)

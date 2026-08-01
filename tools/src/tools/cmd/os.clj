@@ -1,4 +1,4 @@
-(ns tools.cmd.image
+(ns tools.cmd.os
   "Host-only os-image machinery: script -> chroot.
 
    `script` runs an os.<name>/run! namespace inside the target chroot (aarch64 bb

@@ -187,7 +187,7 @@
 (defn run!
   "Standalone full pass: apt-install + fetch, then stage app.edn specs + defaults. The image
    build reaches install! via os.install (cached) and stage-defaults! via
-   os.desktop; this run! is the manual `tools image/dev script appcatalog`."
+   os.desktop; this run! is the manual `bb os script <img> appcatalog`."
   [opts]
   (with-console-out
     ($! apt-get update)

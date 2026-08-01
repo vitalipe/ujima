@@ -11,7 +11,7 @@
     [babashka.fs :as fs]
     [lib.shell :refer [require-root!]]
     [tools.cmd.stage :as stage]
-    [tools.cmd.image :as image]
+    [tools.cmd.os :as os]
     [tools.cmd.pack  :as pack]
     [tools.cmd.disk  :as disk]))
 
@@ -42,7 +42,7 @@
         pack-out (str/replace os-img #"\.img$" ".pack")
         disk-out (str/replace os-img #"\.img$" "-disk.img")]
 
-    (image/build! {:img os-img :dev dev})
+    (os/build! {:img os-img :dev dev})
 
     (println (str "== pack -> " pack-out))
     (pack/make! {:src os-img :out pack-out :target target :arch arch})

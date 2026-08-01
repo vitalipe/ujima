@@ -163,6 +163,25 @@
       (fn [mnt] (do-chroot-run-script! mnt script)))))
 
 
+;; The ujima script chain, in order — `bb build` is this plus stage/pack/disk, so the sequence
+;; lives here only. boot first: a stash that no longer matches the image's kernel fails in seconds.
+(def ^:private content-scripts ["boot" "base" "ujimad" "desktop" "ujimaify"])
+
+
+(defn build!
+  "Run the whole script chain against an existing staged image.
+   --dev bakes the dev rig and skips cleanup; the default is a release image."
+  [{:keys [img dev]}]
+  (require-root!)
+  (let [scripts (conj content-scripts (if dev "dev" "cleanup"))]
+    (doseq [s scripts]                                  ; whole chain up front, so a typo or a
+      (require-script! s))                              ; missing script never runs half of it
+    (doseq [s scripts]
+      (println (str "== os script " s " -> " img))
+      (script! {:img img :script s}))
+    {:img (str img) :scripts scripts}))
+
+
 (defn chroot-shell!
   "Open an interactive root shell inside the image's rootfs (manual-customize entry point)."
   [{:keys [img]}]

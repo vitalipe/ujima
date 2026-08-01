@@ -28,6 +28,7 @@ This mono repo contains the code and tooling needed to build, install, and run U
 bb build <target> [--dev]                             the whole pipeline, one command
 
 bb os stage <target>                                  stage an OS image from the pinned base (vendor-cached)
+bb os build <img> [--dev]                             run the whole script chain into a staged image
 bb os script <img> <name>                             run os.<name> inside the image's chroot
 bb os chroot <img>                                    interactive root shell inside the image
 bb os fetch <url> <out-img> [--sha256 <hex>]          download + decompress a base image

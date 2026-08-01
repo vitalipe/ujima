@@ -39,6 +39,14 @@
      :args [:target]
      :spec {:target {:desc "Pinned base target (rpi-os)" :require true}}}
 
+    "build"
+    {:usage "Usage: os build <img> [--dev]"
+     :target image/build!
+     :args [:img]
+     :spec {:img {:desc "Staged OS image to build the ujima content into" :require true}
+            :dev {:coerce :boolean
+                  :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}
+
     "script"
     {:usage "Usage: os script <img> <name>"
      :target image/script! :args [:img :script]

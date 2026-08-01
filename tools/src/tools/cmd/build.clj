@@ -39,16 +39,10 @@
                     (fs/move os-img d {:replace-existing true})
                     d)
                   os-img)
-        ;; boot first: a stale initramfs stash fails in seconds, not after the desktop install
-        scripts  (if dev
-                   ["boot" "base" "ujimad" "desktop" "ujimaify" "dev"]
-                   ["boot" "base" "ujimad" "desktop" "ujimaify" "cleanup"])
         pack-out (str/replace os-img #"\.img$" ".pack")
         disk-out (str/replace os-img #"\.img$" "-disk.img")]
 
-    (doseq [s scripts]
-      (println (str "== os script " s " -> " os-img))
-      (image/script! {:img os-img :script s}))
+    (image/build! {:img os-img :dev dev})
 
     (println (str "== pack -> " pack-out))
     (pack/make! {:src os-img :out pack-out :target target :arch arch})

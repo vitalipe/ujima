@@ -29,16 +29,23 @@
 (def project-mnt "/ujima-src")  ;; repo bind in the chroot = dev rsync stage (tools.cmd.dev)
 
 
-;; Base image has 2 partitions [boot root]. Mount root, bind kernel fs, bind the repo
-;; read-only at project-mnt, inject qemu-static + resolv.conf, run f, then (finally) tear
-;; everything down so a no-op run leaves a clean/vanilla rootfs. All binds MUST be unmounted
-;; before with-mounted-ext4 unmounts root.
+;; Base image has 2 partitions [boot root]. Mount root, mount boot at the path the target
+;; itself uses, bind kernel fs, bind the repo read-only at project-mnt, inject qemu-static +
+;; resolv.conf, run f, then (finally) tear everything down so a no-op run leaves a clean/vanilla
+;; rootfs. All binds MUST be unmounted before with-mounted-ext4 unmounts root.
+(def boot-mnt "/boot/firmware")  ;; where raspios' fstab puts the boot vfat — NOT /boot
+
+
 (defn with-chrooted-rootfs* [device f]
-  (let [[_boot root] (linux-disk/device->partitions device)
-        project      (str (fs/cwd))
-        binds        ["/dev" "/proc" "/sys"]]
+  (let [[boot root] (linux-disk/device->partitions device)
+        project     (str (fs/cwd))
+        binds       ["/dev" "/proc" "/sys"]]
     (mount/with-mounted-ext4 [mnt root]
       (try
+        ;; the boot partition is image content too (cmdline.txt, initramfs), so a script sees it
+        ;; exactly where a running device does — the same os.<name>/run! then works unchanged
+        ;; under `bb dev script`, where /boot/firmware is already mounted.
+        (mount/mount! "vfat" boot (str mnt boot-mnt))
         (doseq [b binds]
           ($! mount --bind [b] (str mnt b)))
         ;; repo, read-only: scripts read their source/assets but cannot mutate the tree
@@ -61,7 +68,10 @@
             (when (mount/mount-point? (str mnt b))
               ($! umount (str mnt b))))
           ($! rm -f (str mnt qemu-chroot))                ; -f already no-throws on missing
-          ($! sh -c (str ": > " mnt "/etc/resolv.conf"))))))) ; mnt/etc always exists
+          ($! sh -c (str ": > " mnt "/etc/resolv.conf"))  ; mnt/etc always exists
+          ;; boot last: it is nested under root, so it must come off before with-mounted-ext4
+          (when (mount/mount-point? (str mnt boot-mnt))
+            (mount/umount! (str mnt boot-mnt))))))))
 
 
 ;; ---------------------------------------------------------------------------

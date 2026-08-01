@@ -7,7 +7,8 @@
 
    Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup]."
   (:require [lib.shell :refer [$! with-console-out]]
-            [babashka.fs :as fs]))
+            [babashka.fs :as fs]
+            [ujima.device.ab.autoboot.bootfiles :as bootfiles]))
 
 
 ;; The graphical session is the boot service now — NOT ujimad. ujimad moved INTO the X
@@ -203,6 +204,27 @@
        "printf '%s\\n' \"$mid\" > \"${rootmnt}/etc/machine-id\"\n"))
 
 
+(def ^:private boot-firmware "/boot/firmware")
+
+
+;; cmdline.txt is IMAGE policy, not install policy. The overlay token, the console setup and the
+;; deliberate omissions (no `rw` — the tmpfs upper IS the write layer; no fsck.repair — a ro lower
+;; can't corrupt) are identical for every deployment; only `root=` depends on where the rootfs
+;; landed. So the image writes the whole line around the root= it already carries, and the
+;; installer re-points just that token when it lands the image in a slot. Same builder both sides
+;; (bootfiles/cmdline!), so the two can never drift.
+;;
+;; Until this existed, the image shipped raspios' own cmdline — no overlay AND no `rw` — which with
+;; systemd-remount-fs masked (below) is a permanently read-only root. That is why a plain `dd` of
+;; the image was not bootable. Idempotent: a second run reads back the root= it just wrote.
+(defn- write-cmdline! []
+  (let [root (or (bootfiles/cmdline boot-firmware)
+                 (throw (ex-info "cmdline.txt has no root= — refusing to guess the rootfs"
+                                 {:path (str boot-firmware "/cmdline.txt")})))]
+    (println "cmdline root=" root)
+    (bootfiles/cmdline! boot-firmware root)))
+
+
 (defn run! [_opts]
   (with-console-out
     ;; the desktop session service (write + enable; supervises startx→i3 with Restart=always)
@@ -229,6 +251,11 @@
       (fs/create-dirs (fs/parent hook))
       (spit hook machine-id-hook)
       ($! chmod "0755" [hook]))
+
+    ;; the boot partition's half of the overlay contract — see write-cmdline! above. Must stay
+    ;; paired with the mask below: exactly one of `overlayroot=tmpfs` or `rw` has to be on the
+    ;; cmdline, or / mounts read-only and stays that way.
+    (write-cmdline!)
 
     ;; overlayfs rejects `mount -o remount` via the modern mount API ("No changes allowed in
     ;; reconfigure"), so systemd-remount-fs — which remounts / rw early in boot — fails under the

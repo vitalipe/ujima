@@ -6,11 +6,7 @@
         com.taoensso/timbre {:mvn/version "6.6.1"}}
 
  :tasks
- {e2e
-  {:doc "Run an e2e test from e2e/tests"
-   :task (apply shell "bb" "-cp" "runtime/src:runtime/test" "-m" "e2e.runner" (seq *command-line-args*))}
-
-  build
+ {build
   {:doc "Whole pipeline: vendor(cached) → os image → pack → A/B disk"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "build" *command-line-args*)}
@@ -47,5 +43,9 @@
 
   test:unit
   {:doc "Run unit tests"
-   :task (shell "bb" "-cp" "runtime/src:runtime/test/unit" "-m" "runner")}}}
+   :task (shell "bb" "-cp" "runtime/src:runtime/test/unit" "-m" "runner")}
+
+  test:integration
+  {:doc "Run an integration test from runtime/test/integration/tests"
+   :task (apply shell "bb" "-cp" "runtime/src:runtime/test" "-m" "integration.runner" (seq *command-line-args*))}}}
 

@@ -55,8 +55,8 @@ bb loopback detach <img|loopdev>
 bb loopback list
 
 bb repl                                               dev REPL
-bb e2e <test|all>                                     e2e suite (loopback, needs root)
 bb test:unit                                          unit tests
+bb test:integration <test|all>                        integration suite (loopback, needs root)
 ```
 
 The same OS script runs in both harnesses: `bb os script x.img desktop` (build

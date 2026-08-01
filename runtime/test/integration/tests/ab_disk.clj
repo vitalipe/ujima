@@ -1,4 +1,4 @@
-(ns e2e.tests.rpi-deploy
+(ns integration.tests.ab-disk
   (:require [babashka.fs :as fs]
             [clojure.string :as str]
 

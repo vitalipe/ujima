@@ -1,32 +1,31 @@
-(ns e2e.runner
+(ns integration.runner
   (:require [babashka.fs :as fs]
             [clojure.string :as str]
             [lib.io :as io]
             [lib.shell :as shell]))
 
 
-(def e2e-root "runtime/test/e2e/tests")
+(def tests-root "runtime/test/integration/tests")
 
 
 (defn- usage! []
   (binding [*out* *err*]
     (println "Usage:")
-    (println "  bb e2e <test-name> [args...]")
-    (println "  bb e2e all [args...]")
+    (println "  bb test:integration <test-name> [args...]")
+    (println "  bb test:integration all [args...]")
     (println)
     (println "Examples:")
-    (println "  bb e2e http")
-    (println "  bb e2e http --keep")
-    (println "  bb e2e all"))
+    (println "  bb test:integration ab-disk")
+    (println "  bb test:integration all"))
   (System/exit 2))
 
 
 (defn- test-name->ns [test-name]
-  (symbol (str "e2e.tests." test-name)))
+  (symbol (str "integration.tests." test-name)))
 
 
 (defn- test-name->file [test-name]
-  (fs/path e2e-root
+  (fs/path tests-root
            (str (str/replace test-name "-" "_") ".clj")))
 
 
@@ -37,7 +36,7 @@
 
 
 (defn- all-test-names []
-  (->> (fs/list-dir e2e-root)
+  (->> (fs/list-dir tests-root)
        (filter fs/regular-file?)
        (filter #(str/ends-with? (fs/file-name %) ".clj"))
        (map file->test-name)
@@ -50,7 +49,7 @@
         test-ns   (test-name->ns test-name)]
     (when-not (fs/regular-file? test-file)
       (throw
-        (ex-info "E2E test file not found"
+        (ex-info "Integration test file not found"
                  {:test-name test-name
                   :expected-file (str test-file)})))
 
@@ -61,14 +60,14 @@
 (defn- resolve-test-fn! [test-ns]
   (or (some-> (ns-resolve test-ns 'run!) deref)
       (throw
-        (ex-info "E2E test namespace does not define test!"
+        (ex-info "Integration test namespace does not define run!"
                  {:namespace test-ns
-                  :expected-var (symbol (str test-ns) "test!")}))))
+                  :expected-var (symbol (str test-ns) "run!")}))))
 
 
 (defn- ctx [test-name tmp-dir args]
   {:test-name test-name
-   :test-root e2e-root
+   :test-root tests-root
    :tmp       tmp-dir
    :args      args})
 
@@ -76,33 +75,33 @@
 (defn run-test! [test-name tmp-dir args]
   (let [test-ns (require-test-ns! test-name)
         test!   (resolve-test-fn! test-ns)]
-      
+
       (fs/create-dirs tmp-dir)
       (test! (ctx test-name tmp-dir args))))
-    
+
 
 (defn- run-test-with-tmp! [test-name args]
-  (fs/with-temp-dir [tmp-dir {:prefix (str "e2e-" test-name)}]
+  (fs/with-temp-dir [tmp-dir {:prefix (str "integration-" test-name)}]
     (run-test! test-name tmp-dir args)))
-    
+
 
 (defn- run-one-result [test-name args]
   (try
     (if (run-test-with-tmp! test-name args)
       (do
-        (println) 
-        (println "E2E passed:" test-name) 
+        (println)
+        (println "Integration passed:" test-name)
         {:test-name test-name :ok? true})
-      
+
       (do
         (println)
-        (println "E2E failed:" test-name) 
+        (println "Integration failed:" test-name)
         {:test-name test-name :ok? false}))
 
     (catch Throwable e
       (binding [*out* *err*]
         (println)
-        (println "E2E failed:" test-name)
+        (println "Integration failed:" test-name)
         (println (.getMessage e))
         (when-let [data (ex-data e)]
           (prn data))
@@ -118,8 +117,8 @@
   (let [passed (filter :ok? results)
         failed (remove :ok? results)]
     (println)
-    (println "E2E summary")
-    (println "-----------")
+    (println "Integration summary")
+    (println "-------------------")
     (println "Passed:" (count passed))
     (println "Failed:" (count failed))
 
@@ -134,10 +133,10 @@
   (let [test-names (all-test-names)]
     (when (empty? test-names)
       (throw
-        (ex-info "No e2e tests found"
-                 {:test-root e2e-root})))
+        (ex-info "No integration tests found"
+                 {:test-root tests-root})))
 
-    (println "Running all e2e tests:" (count test-names))
+    (println "Running all integration tests:" (count test-names))
 
     (let [results (mapv #(run-one-result % args) test-names)
           failed? (some (comp not :ok?) results)]
@@ -146,7 +145,7 @@
 
 
 (defn -main [& args]
-  (println "E2E env:")
+  (println "Integration env:")
   (prn (io/slurp-config "runtime/config" "ujimad"))
   (println)
 
@@ -166,7 +165,7 @@
 
       (catch Throwable e
         (binding [*out* *err*]
-          (println "E2E runner failed")
+          (println "Integration runner failed")
           (println (.getMessage e))
           (when-let [data (ex-data e)]
             (prn data))

@@ -1,17 +1,15 @@
 (ns tools.cmd.image
-  "Host-only os-image machinery: fetch -> script -> chroot.
+  "Host-only os-image machinery: script -> chroot.
 
    `script` runs an os.<name>/run! namespace inside the target chroot (aarch64 bb
    under qemu) against a read-only project bind, so the script's file ops / shell-outs land in
    the image. Reuses the e2e-tested ujima.device/pack/loopback fns; this namespace is wiring +
-   the chroot/fetch mechanics. (The A/B disk verbs live in tools.cmd.disk.)"
+   the chroot mechanics. (The A/B disk verbs live in tools.cmd.disk.)"
   (:require
-    [clojure.java.io :as io]
     [clojure.string  :as str]
     [babashka.fs      :as fs]
     [babashka.process :as p]
-    [lib.task.flow    :refer [flow]]
-    [lib.shell              :refer [$! sh! require-root!]]
+    [lib.shell              :refer [$! require-root!]]
     [ujima.linux.disk       :as linux-disk]
     [ujima.linux.disk.loop  :as loopback]
     [ujima.linux.disk.mount :as mount]))
@@ -72,47 +70,6 @@
           ;; boot last: it is nested under root, so it must come off before with-mounted-ext4
           (when (mount/mount-point? (str mnt boot-mnt))
             (mount/umount! (str mnt boot-mnt))))))))
-
-
-;; ---------------------------------------------------------------------------
-;; Commands
-;; ---------------------------------------------------------------------------
-
-
-(defn- sha256-of [path]
-  (-> (sh! :sha256sum (str path)) (str/split #"\s+") first))
-
-
-(defn- decompress! [src out]
-  (let [s   (str src)
-        out (str out)]
-    (cond
-      (str/ends-with? s ".xz")  (p/shell {:out (io/file out)} "xz"   "-dc" s)
-      (str/ends-with? s ".gz")  (p/shell {:out (io/file out)} "gzip" "-dc" s)
-      (str/ends-with? s ".zip") (p/shell {:out (io/file out)} "unzip" "-p" s)
-      (str/ends-with? s ".img") (fs/copy s out {:replace-existing true})
-      :else (throw (ex-info "Unknown image extension (expected .img/.img.xz/.gz/.zip)" {:src s})))))
-
-
-(defn fetch!
-  "Returns a task that downloads `url` -> verifies optional `sha256` (of the compressed
-   file) -> decompresses -> `out`."
-  [{:keys [url out sha256]}]
-  (flow :image/fetch
-    (fs/with-temp-dir [dir {:prefix "ujima-fetch-"}]
-      (let [dl (str (fs/path dir (fs/file-name url)))]
-        (progress! 5 "downloading")
-        ($! curl -fsSL --output [dl] (str url))
-        (progress! 60 "downloaded")
-        (when sha256
-          (progress! 65 "verifying checksum")
-          (let [actual (sha256-of dl)]
-            (when-not (= sha256 actual)
-              (error! :error/sha256-mismatch (str "sha256 mismatch: expected " sha256 " got " actual)))))
-        (progress! 70 "decompressing")
-        (decompress! dl out)
-        (progress! 100 "done")
-        {:out (str out)}))))
 
 
 ;; ---------------------------------------------------------------------------

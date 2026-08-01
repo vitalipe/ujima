@@ -11,8 +11,13 @@
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "build" *command-line-args*)}
 
+  stage
+  {:doc "Stage an image from the pinned base (vendor-cached)"
+   :requires ([tools.cli :as cli])
+   :task (apply cli/-main "stage" *command-line-args*)}
+
   os
-  {:doc "The OS image: stage | script | chroot | initramfs | fetch"
+  {:doc "An OS image: build | script | chroot"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "os" *command-line-args*)}
 

@@ -1,17 +1,57 @@
 (ns tools.cmd.stage
-  "bb tools stage <target>: build a staged image from a pinned base OS.
+  "bb stage <target>: build a staged image from a pinned base OS.
 
-   Vendor base (fetch + `image script install`, cached under stage/vendor/) -> copy to
+   Vendor base (fetch + `os script install`, cached under stage/vendor/) -> copy to
    stage/ujima-<branch>-<commit>.img. The vendor is built once; rm it to rebuild
-   (e.g. after editing os.install or bumping the vendored bb)."
+   (e.g. after editing os.install or bumping the vendored bb). Fetch lives here because
+   the vendor build is its only caller."
   (:require
+    [clojure.java.io :as io]
     [clojure.string :as str]
     [babashka.fs :as fs]
+    [babashka.process :as p]
     [lib.cli :as cli]
+    [lib.task.flow :refer [flow]]
     [lib.shell :refer [sh! require-root! $!]]
     [ujima.linux.disk :as linux-disk]
     [ujima.linux.disk.loop :as loopback]
     [tools.cmd.image :as image]))
+
+
+(defn- sha256-of [path]
+  (-> (sh! :sha256sum (str path)) (str/split #"\s+") first))
+
+
+(defn- decompress! [src out]
+  (let [s   (str src)
+        out (str out)]
+    (cond
+      (str/ends-with? s ".xz")  (p/shell {:out (io/file out)} "xz"   "-dc" s)
+      (str/ends-with? s ".gz")  (p/shell {:out (io/file out)} "gzip" "-dc" s)
+      (str/ends-with? s ".zip") (p/shell {:out (io/file out)} "unzip" "-p" s)
+      (str/ends-with? s ".img") (fs/copy s out {:replace-existing true})
+      :else (throw (ex-info "Unknown image extension (expected .img/.img.xz/.gz/.zip)" {:src s})))))
+
+
+(defn- fetch!
+  "Returns a task that downloads `url` -> verifies optional `sha256` (of the compressed
+   file) -> decompresses -> `out`."
+  [{:keys [url out sha256]}]
+  (flow :stage/fetch
+    (fs/with-temp-dir [dir {:prefix "ujima-fetch-"}]
+      (let [dl (str (fs/path dir (fs/file-name url)))]
+        (progress! 5 "downloading")
+        ($! curl -fsSL --output [dl] (str url))
+        (progress! 60 "downloaded")
+        (when sha256
+          (progress! 65 "verifying checksum")
+          (let [actual (sha256-of dl)]
+            (when-not (= sha256 actual)
+              (error! :error/sha256-mismatch (str "sha256 mismatch: expected " sha256 " got " actual)))))
+        (progress! 70 "decompressing")
+        (decompress! dl out)
+        (progress! 100 "done")
+        {:out (str out)}))))
 
 
 ;; Pinned base images. Keep entries reproducible: dated URL + sha256 of the .xz.
@@ -57,7 +97,7 @@
   (fs/create-dirs vendor-dir)
   (let [tmp (str vendor ".building")]
     (fs/delete-if-exists tmp)
-    (cli/run-and-display! (image/fetch! {:url url :out tmp :sha256 sha256}))
+    (cli/run-and-display! (fetch! {:url url :out tmp :sha256 sha256}))
     ;; grow the rootfs BEFORE the install script runs: the app packages (libreoffice, chromium,
     ;; inkscape, …) and the fetched TurboWarp payload install into THIS image, and the stock
     ;; raspios root (~2.4G) can't hold them. HARD CAP at the 10GiB A/B root slot

@@ -32,14 +32,15 @@
             :dev    {:coerce :boolean
                      :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}}
 
-   "os"
-   {"stage"
-    {:usage "Usage: os stage <target>"
+   "stage"
+   {"run"
+    {:usage "Usage: stage <target>"
      :target stage-target!
      :args [:target]
-     :spec {:target {:desc "Pinned base target (rpi-os)" :require true}}}
+     :spec {:target {:desc "Pinned base target (rpi-os)" :require true}}}}
 
-    "build"
+   "os"
+   {"build"
     {:usage "Usage: os build <img> [--dev]"
      :target image/build!
      :args [:img]
@@ -56,14 +57,7 @@
     "chroot"
     {:usage "Usage: os chroot <img>"
      :target image/chroot-shell! :args [:img]
-     :spec {:img {:desc "OS image to open an interactive chroot into" :require true}}}
-
-    "fetch"
-    {:usage "Usage: os fetch <url> <out-img> [--sha256 <hex>]"
-     :target image/fetch! :args [:url :out]
-     :spec {:url    {:desc "Base image URL" :require true}
-            :out    {:desc "Output .img path" :require true}
-            :sha256 {:desc "Expected sha256 of the downloaded (compressed) file"}}}}
+     :spec {:img {:desc "OS image to open an interactive chroot into" :require true}}}}
 
    "pack"
    {"make"
@@ -251,7 +245,8 @@
 ;; explicit; anything else is treated as the default verb's first positional.
 (def ^:private default-verbs
   {"pack"  {:verb "make" :subs #{"make" "validate" "meta"}}
-   "build" {:verb "run"  :subs #{"run"}}})
+   "build" {:verb "run"  :subs #{"run"}}
+   "stage" {:verb "run"  :subs #{"run"}}})
 
 (defn- with-default-verb [[noun sub :as args]]
   (let [{:keys [verb subs]} (get default-verbs noun)]

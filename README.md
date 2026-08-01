@@ -27,11 +27,11 @@ This mono repo contains the code and tooling needed to build, install, and run U
 ```
 bb build <target> [--dev]                             the whole pipeline, one command
 
-bb os stage <target>                                  stage an OS image from the pinned base (vendor-cached)
+bb stage <target>                                     stage an OS image from the pinned base (vendor-cached)
+
 bb os build <img> [--dev]                             run the whole script chain into a staged image
 bb os script <img> <name>                             run os.<name> inside the image's chroot
 bb os chroot <img>                                    interactive root shell inside the image
-bb os fetch <url> <out-img> [--sha256 <hex>]          download + decompress a base image
 
 bb pack <img|blockdev> <out.pack>                     pack an OS image into a .pack
 bb pack validate <pack>
@@ -97,8 +97,8 @@ The granular verbs compose to the same result when you need only part of the
 pipeline:
 
 ```
-sudo bb os stage rpi-os
-sudo bb os script stage/ujima-….img base       # then ujimad, desktop, ujimaify, …
+sudo bb stage rpi-os
+sudo bb os build stage/ujima-….img             # or one at a time: bb os script <img> base
 sudo bb pack stage/ujima-….img stage/u.pack
 sudo bb disk ab create autoboot stage/u-disk.img
 sudo bb disk slot A from-pack stage/u.pack stage/u-disk.img

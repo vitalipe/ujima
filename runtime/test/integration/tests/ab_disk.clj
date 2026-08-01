@@ -71,13 +71,11 @@
   (let [installed (get-in info [:slots slot :ujima-os])]
     (assert-some! "Expected slot to have installed Ujima metadata"
                   installed)
-    (assert= "Installed metadata should match pack metadata"
+    (assert= "Installed metadata should carry the pack's own metadata"
              expected-metadata
-             (:metadata installed))
-    (assert-some! "Installed metadata should include install details"
-                  (:install installed))
+             (dissoc installed :installed-at))
     (assert-some! "Installed metadata should include :installed-at"
-                  (get-in installed [:install :installed-at]))))
+                  (:installed-at installed))))
 
 
 (defn assert-empty-slot! [info slot]

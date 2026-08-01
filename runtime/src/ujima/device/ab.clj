@@ -14,7 +14,7 @@
       :config  \"/dev/sda7\"
       :slots {:a {:boot \"/dev/sda2\"
                   :root \"/dev/sda5\"
-                  :ujima-os {metadata: {:ujima-version ...} :install {:installed-at ...}}}
+                  :ujima-os {:pack-version 1 :packed-at ... :installed-at ...}}
               :b {:boot \"/dev/sda3\"
                   :root \"/dev/sda6\"
                   :ujima-os nil}}

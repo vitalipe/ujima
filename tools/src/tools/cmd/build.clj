@@ -19,7 +19,7 @@
 ;; per-target build facts; a new target (debian-uefi …) is one entry here + one in
 ;; stage/targets + its scheme in cmd/disk
 (def ^:private target-info
-  {"rpi-os" {:arch "arm64" :scheme "autoboot"}})
+  {"rpi-os" {:scheme "autoboot"}})
 
 
 (defn build!
@@ -27,7 +27,7 @@
    cleanup; the default is a release artifact. Outputs auto-name beside the staged
    image: <name>.img, <name>.pack, <name>-disk.img."
   [{:keys [target dev] :as opts}]
-  (let [{:keys [arch scheme]}
+  (let [{:keys [scheme]}
         (or (get target-info target)
             (throw (ex-info "Unknown build target"
                             {:expected (set (keys target-info)) :actual target})))
@@ -45,7 +45,7 @@
     (os/build! {:img os-img :dev dev})
 
     (println (str "== pack -> " pack-out))
-    (pack/make! {:src os-img :out pack-out :target target :arch arch})
+    (pack/make! {:src os-img :out pack-out})
 
     (println (str "== disk -> " disk-out))
     (disk/ab-create! {:scheme scheme :target disk-out})

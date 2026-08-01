@@ -11,15 +11,15 @@
 (defn make!
   "Pack an os image into a .pack. `src` is a 2-partition medium — an .img file
    (loopback-attached) or a block device, detected explicitly."
-  [{:keys [src out target arch] :or {target "mock" arch "test"}}]
+  [{:keys [src out]}]
   (require-root!)
   (cond
     (block-device? src)
-    (pack/pack! src out {:target target :arch arch})
+    (pack/pack! src out)
 
     (fs/regular-file? src)
     (loopback/with-loopback-device [dev src]
-      (pack/pack! dev out {:target target :arch arch}))
+      (pack/pack! dev out))
 
     :else
     (throw (ex-info "pack source must be an .img file or a block device"

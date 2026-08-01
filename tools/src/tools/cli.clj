@@ -61,13 +61,11 @@
 
    "pack"
    {"make"
-    {:usage "Usage: pack <img|blockdev> <out-pack> [--target <name>] [--arch <name>]"
+    {:usage "Usage: pack <img|blockdev> <out-pack>"
      :target pack/make!
      :args [:src :out]
-     :spec {:src    {:desc "Source OS image file or block device" :require true}
-            :out    {:desc "Output .pack path" :require true}
-            :target {:desc "Target name, e.g. rpi"}
-            :arch   {:desc "Architecture name, e.g. arm64"}}}
+     :spec {:src {:desc "Source OS image file or block device" :require true}
+            :out {:desc "Output .pack path" :require true}}}
 
     "validate"
     {:usage "Usage: pack validate <pack>"

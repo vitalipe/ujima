@@ -18,14 +18,7 @@
 
 
 (def pack-version 1)
-(def base-meta    {:pack-version   pack-version
-                   :ujima-version  "0.0.0"
-                   :target         :mock
-                   :arch           :test})
- 
-
-(def system-metadata-path "ujima/system/metadata.edn")
-(def system-install-path  "ujima/system/install.edn")
+(def installed-metadata-path "ujima/system/pack.edn")
 
 
 (defn metadata [ujima-pack-path]
@@ -39,10 +32,8 @@
 (defn installed-metadata [root-device]
   (try
     (with-mounted-ext4 [mnt root-device]
-      (when (fs/exists? (fs/path mnt system-install-path))
-        (when (fs/exists? (fs/path mnt system-metadata-path))
-          {:metadata (slurp-edn (fs/path mnt system-metadata-path) {})
-           :install  (slurp-edn (fs/path mnt system-install-path)  {})})))
+      (when (fs/exists? (fs/path mnt installed-metadata-path))
+        (slurp-edn (fs/path mnt installed-metadata-path) {})))
     (catch Exception _ nil)))
 
 
@@ -93,60 +84,49 @@
 
 
 (defn pack!
-   ([src-device ujima-pack-path]
-    (pack! src-device ujima-pack-path {}))
-   
-   ([src-device ujima-pack-path pack-metadata]
-   
-    (require-block-device! src-device)
+  [src-device ujima-pack-path]
 
-    (let [[boot-src root-src] (device->partitions src-device)]           
-      (fs/with-temp-dir [work-dir {:prefix "ujima-pack-"}]
-        
-        ;; meta
-        (spit-edn! (fs/path work-dir "metadata.edn") 
-                   (merge base-meta 
-                          pack-metadata 
-                          {:pack-version pack-version}))
+  (require-block-device! src-device)
 
-        (sudo$! dd {:if boot-src :of (fs/path work-dir "boot.img") :bs "4M" :conv "fsync"}) 
-        (sudo$! dd {:if root-src :of (fs/path work-dir "root.img") :bs "4M" :conv "fsync"}) 
-        
+  (let [[boot-src root-src] (device->partitions src-device)]
+    (fs/with-temp-dir [work-dir {:prefix "ujima-pack-"}]
 
-        ($! tar --zstd
-                -cf [ujima-pack-path]
-                -C  [work-dir] "metadata.edn" "boot.img" "root.img")))
+      (spit-edn! (fs/path work-dir "metadata.edn")
+                 {:pack-version pack-version
+                  :packed-at    (str (java.time.Instant/now))})
 
-    (validate! ujima-pack-path)))
-      
+      (sudo$! dd {:if boot-src :of (fs/path work-dir "boot.img") :bs "4M" :conv "fsync"})
+      (sudo$! dd {:if root-src :of (fs/path work-dir "root.img") :bs "4M" :conv "fsync"})
 
-(defn unpack! 
-  ([ujima-pack-path boot-partition-path root-partition-path]
-   (unpack! ujima-pack-path boot-partition-path root-partition-path {}))
 
-  ([ujima-pack-path boot-partition-path root-partition-path install-metadata]
-   (validate! ujima-pack-path)
+      ($! tar --zstd
+              -cf [ujima-pack-path]
+              -C  [work-dir] "metadata.edn" "boot.img" "root.img")))
 
-   (require-block-device! boot-partition-path)
-   (require-block-device! root-partition-path)
-    
-   (unpack-to-partition! ujima-pack-path "boot.img" boot-partition-path)
-   (unpack-to-partition! ujima-pack-path "root.img" root-partition-path)
+  (validate! ujima-pack-path))
 
-   (sudo$! e2fsck    -fn [root-partition-path]) ;; fail on fs errors, don't attempt to fix
-   (sudo$! resize2fs -f  [root-partition-path]) ;; -f: we checked it read-only above; skip resize2fs's own "run e2fsck -f first" gate (s_lastcheck<s_mtime after staging)
-   (sudo$! sync)
 
-   ;;install metadata
-   (with-mounted-ext4 [mnt-root root-partition-path]
-     (fs/with-temp-dir [tmp-dir {:prefix "ujima-install-manifest-"}]
-       (let [pack-meta    (metadata ujima-pack-path)
-             install-meta (merge install-metadata {:installed-at (str (java.time.Instant/now))})]
-         
-         (spit-edn! (fs/path tmp-dir "meta.edn")    pack-meta)
-         (spit-edn! (fs/path tmp-dir "install.edn") install-meta)
+(defn unpack!
+  [ujima-pack-path boot-partition-path root-partition-path]
+  (validate! ujima-pack-path)
 
-         (sudo$! install -D  -m "0644" (fs/path tmp-dir "meta.edn")    (fs/path mnt-root system-metadata-path))
-         (sudo$! install -D  -m "0644" (fs/path tmp-dir "install.edn") (fs/path mnt-root system-install-path)))))
-          
-   nil))
+  (require-block-device! boot-partition-path)
+  (require-block-device! root-partition-path)
+
+  (unpack-to-partition! ujima-pack-path "boot.img" boot-partition-path)
+  (unpack-to-partition! ujima-pack-path "root.img" root-partition-path)
+
+  (sudo$! e2fsck    -fn [root-partition-path]) ;; fail on fs errors, don't attempt to fix
+  (sudo$! resize2fs -f  [root-partition-path]) ;; -f: we checked it read-only above; skip resize2fs's own "run e2fsck -f first" gate (s_lastcheck<s_mtime after staging)
+  (sudo$! sync)
+
+  (with-mounted-ext4 [mnt-root root-partition-path]
+    (fs/with-temp-dir [tmp-dir {:prefix "ujima-install-manifest-"}]
+      (let [installed (assoc (metadata ujima-pack-path)
+                             :installed-at (str (java.time.Instant/now)))]
+        (spit-edn! (fs/path tmp-dir "pack.edn") installed)
+        (sudo$! install -D -m "0644"
+                (fs/path tmp-dir "pack.edn")
+                (fs/path mnt-root installed-metadata-path)))))
+
+  nil)

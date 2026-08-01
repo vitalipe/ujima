@@ -101,7 +101,7 @@
     (with-mounted-vfat [boot-mnt boot-partition]
       (assert= "Slot boot cmdline should point at the matching root partition"
                (expected-root-partuuid slot)
-               (autoboot/cmdline boot-mnt)))))
+               (autoboot/cmdline-get (autoboot/cmdline boot-mnt) "root")))))
 
 
 (defn require-disk-info! [disk*]

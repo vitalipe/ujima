@@ -207,22 +207,24 @@
 (def ^:private boot-firmware "/boot/firmware")
 
 
-;; cmdline.txt is IMAGE policy, not install policy. The overlay token, the console setup and the
-;; deliberate omissions (no `rw` — the tmpfs upper IS the write layer; no fsck.repair — a ro lower
-;; can't corrupt) are identical for every deployment; only `root=` depends on where the rootfs
-;; landed. So the image writes the whole line around the root= it already carries, and the
-;; installer re-points just that token when it lands the image in a slot. Same builder both sides
-;; (bootfiles/cmdline!), so the two can never drift.
-;;
-;; Until this existed, the image shipped raspios' own cmdline — no overlay AND no `rw` — which with
-;; systemd-remount-fs masked (below) is a permanently read-only root. That is why a plain `dd` of
-;; the image was not bootable. Idempotent: a second run reads back the root= it just wrote.
+;; recurse=0 so the fstab submounts punch through instead of being overlaid too. No `rw` — the
+;; tmpfs upper is the write layer. No fsck.repair — the ro lower can't corrupt. `root` is the one
+;; token we don't pick: it stays whatever the image points at, and the installer re-points it.
+(defn- ujima-cmdline [root]
+  [["overlayroot" "tmpfs:recurse=0"]
+   ["console"     "serial0,115200"]
+   ["console"     "tty1"]
+   ["root"        root]
+   ["rootfstype"  "ext4"]
+   ["rootwait"    nil]])
+
+
 (defn- write-cmdline! []
-  (let [root (or (bootfiles/cmdline boot-firmware)
+  (let [root (or (bootfiles/cmdline-get (bootfiles/cmdline boot-firmware) "root")
                  (throw (ex-info "cmdline.txt has no root= — refusing to guess the rootfs"
                                  {:path (str boot-firmware "/cmdline.txt")})))]
     (println "cmdline root=" root)
-    (bootfiles/cmdline! boot-firmware root)))
+    (bootfiles/cmdline! boot-firmware (ujima-cmdline root))))
 
 
 (defn run! [_opts]

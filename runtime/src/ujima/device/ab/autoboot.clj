@@ -124,8 +124,11 @@
 
       (pack/unpack! ujima-pack-path boot root)
 
+      ;; re-point `root` at this slot; the rest of the line is the pack's own
       (with-mounted-vfat [boot-mnt boot]
-        (autoboot/cmdline! boot-mnt (str "PARTUUID=" (slot->root-uuid slot))))
+        (autoboot/cmdline! boot-mnt
+                           (autoboot/cmdline-assoc (autoboot/cmdline boot-mnt)
+                                                   "root" (str "PARTUUID=" (slot->root-uuid slot)))))
 
       ;; per-slot fstab. Its mount points / bind targets are rootfs content baked at build
       ;; time (os.base) — a pack is expected to carry them.

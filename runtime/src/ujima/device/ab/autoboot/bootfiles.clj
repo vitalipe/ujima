@@ -7,7 +7,7 @@
    Examples:
 
      (cmdline \"/mnt/boot-a/\")
-     (cmdline! \"/mnt/boot-a/\" \"/dev/mmcblk0p5\")
+     (cmdline! \"/mnt/boot-a/\" params)
 
      (autoboot \"/mnt/control\")
      (autoboot! \"/mnt/control/\" {:boot 1 :try-boot 2})"
@@ -36,39 +36,40 @@
 
 
 (defn cmdline
-  "Read `cmdline.txt` from `path` and return the configured root block
-   device from the `root=` kernel argument, or nil if no `root=` argument exists.
-   
-   Note: use PARTUUID
-
-   Example return value:
-
-     \"PARTUUID=13371337-05\""
+  "Read `cmdline.txt` from `path` as [key value] pairs, value nil for a bare token.
+   A vector, not a map: `console` legitimately appears twice, and order is preserved."
   [path]
-  
-  (let [content (slurp-text (fs/path path "cmdline.txt"))]
-    (when-let [match (re-find #"(^|\s)root=(\S+)" content)]
-      (nth match 2 nil))))
+
+  (->> (str/split (str/trim (slurp-text (fs/path path "cmdline.txt"))) #"\s+")
+       (remove str/blank?)
+       (mapv (fn [token]
+               (let [[k v] (str/split token #"=" 2)]
+                 [k v])))))
+
+
+(defn cmdline-get
+  "First value for `k`, nil when absent or bare."
+  [params k]
+  (some (fn [[pk pv]] (when (= pk k) pv)) params))
+
+
+(defn cmdline-assoc
+  "Set `k` to `v` (nil = bare token) in place, appending when absent."
+  [params k v]
+  (if (some (fn [[pk _]] (= pk k)) params)
+    (mapv (fn [[pk _ :as p]] (if (= pk k) [k v] p)) params)
+    (conj (vec params) [k v])))
 
 
 (defn cmdline!
-  "Write a Raspberry Pi `cmdline.txt` file at `path` so it boots from `target-block-device`.
-   Prefer PARTUUID over block device paths, device paths might fail with offline installs! 
+  "Write [key value] `params` as `cmdline.txt` at `path`.
+   Prefer PARTUUID over block device paths, device paths might fail with offline installs!
 
    Returns the written commandline state (cmdline) "
-  [path target-block-device]
+  [path params]
 
   (spit-file-atomic! (fs/path path "cmdline.txt")
-                     (str ;; ro-root tmpfs overlay; recurse=0 so our fstab submounts (settings/storage/
-                          ;; journal) punch through as real persistent mounts instead of being overlaid too
-                          "overlayroot=tmpfs:recurse=0 "
-                          "console=serial0,115200 console=tty1"
-                          " root=" target-block-device
-                          ;; no rw: the overlay is live from the first boot (its hook is baked into the
-                          ;; initramfs — tools.cmd.image/initramfs!), so / is writable via the tmpfs upper
-                          ;; while the kernel mounts the lower read-only — truly immutable. No fsck.repair:
-                          ;; the ro lower can't corrupt. quiet/splash off for bring-up.
-                          " rootfstype=ext4 rootwait"))
+                     (str/join " " (map (fn [[k v]] (if v (str k "=" v) k)) params)))
 
   (cmdline path))
 

@@ -30,7 +30,6 @@ bb build <target> [--dev]                             the whole pipeline, one co
 bb os stage <target>                                  stage an OS image from the pinned base (vendor-cached)
 bb os script <img> <name>                             run os.<name> inside the image's chroot
 bb os chroot <img>                                    interactive root shell inside the image
-bb os initramfs <img>                                 bake the prebuilt overlayroot initramfs
 bb os fetch <url> <out-img> [--sha256 <hex>]          download + decompress a base image
 
 bb pack <img|blockdev> <out.pack>                     pack an OS image into a .pack
@@ -77,7 +76,7 @@ sudo bb build rpi-os --dev    # + ssh/vnc/xdotool dev rig, cleanup skipped
 
 The first build fetches the pinned raspios base once into `stage/vendor/` and
 bakes the packages into it (`os.install`).  **no command ever deletes it** — rebuilding it is a manual `rm stage/vendor/<name>.img`. Every later build starts from the cache:
-copy → prebuilt initramfs → content scripts in the chroot → pack → A/B disk.
+copy → content scripts in the chroot → pack → A/B disk.
 
 Outputs land in `stage/` as `ujima-<branch>-<commit>[-dirty][-dev].*`:
 

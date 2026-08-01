@@ -15,7 +15,7 @@
 
     ;; suppress in-chroot initramfs generation: overlayroot's postinst trigger runs update-initramfs,
     ;; which SEGFAULTS under qemu. We bake a prebuilt, kernel-matched initramfs instead
-    ;; (tools.cmd.image/initramfs!, from stage), so the chroot never generates one. `=no` also fits
+    ;; (os.boot), so the chroot never generates one. `=no` also fits
     ;; the immutable model (the initramfs is fixed; a kernel bump is a rebuild, not in-place regen).
     (spit "/etc/initramfs-tools/update-initramfs.conf" "update_initramfs=no\nbackup_initramfs=no\n")
 

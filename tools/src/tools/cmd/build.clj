@@ -1,6 +1,6 @@
 (ns tools.cmd.build
   "The whole pipeline as one command — the executable statement of the build order:
-   vendor (cached) -> stage + initramfs -> base -> ujimad -> desktop -> ujimaify ->
+   vendor (cached) -> stage -> boot -> base -> ujimad -> desktop -> ujimaify ->
    [dev | cleanup] -> pack -> A/B disk (create + slot A from-pack + activate).
 
    The vendor cache (stage/vendor) is READ here and built only when absent
@@ -39,9 +39,10 @@
                     (fs/move os-img d {:replace-existing true})
                     d)
                   os-img)
+        ;; boot first: a stale initramfs stash fails in seconds, not after the desktop install
         scripts  (if dev
-                   ["base" "ujimad" "desktop" "ujimaify" "dev"]
-                   ["base" "ujimad" "desktop" "ujimaify" "cleanup"])
+                   ["boot" "base" "ujimad" "desktop" "ujimaify" "dev"]
+                   ["boot" "base" "ujimad" "desktop" "ujimaify" "cleanup"])
         pack-out (str/replace os-img #"\.img$" ".pack")
         disk-out (str/replace os-img #"\.img$" "-disk.img")]
 

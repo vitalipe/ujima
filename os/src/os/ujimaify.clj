@@ -7,8 +7,7 @@
 
    Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup]."
   (:require [lib.shell :refer [$! with-console-out]]
-            [babashka.fs :as fs]
-            [ujima.device.ab.autoboot.bootfiles :as bootfiles]))
+            [babashka.fs :as fs]))
 
 
 ;; The graphical session is the boot service now — NOT ujimad. ujimad moved INTO the X
@@ -204,29 +203,6 @@
        "printf '%s\\n' \"$mid\" > \"${rootmnt}/etc/machine-id\"\n"))
 
 
-(def ^:private boot-firmware "/boot/firmware")
-
-
-;; recurse=0 so the fstab submounts punch through instead of being overlaid too. No `rw` — the
-;; tmpfs upper is the write layer. No fsck.repair — the ro lower can't corrupt. `root` is the one
-;; token we don't pick: it stays whatever the image points at, and the installer re-points it.
-(defn- ujima-cmdline [root]
-  [["overlayroot" "tmpfs:recurse=0"]
-   ["console"     "serial0,115200"]
-   ["console"     "tty1"]
-   ["root"        root]
-   ["rootfstype"  "ext4"]
-   ["rootwait"    nil]])
-
-
-(defn- write-cmdline! []
-  (let [root (or (bootfiles/cmdline-get (bootfiles/cmdline boot-firmware) "root")
-                 (throw (ex-info "cmdline.txt has no root= — refusing to guess the rootfs"
-                                 {:path (str boot-firmware "/cmdline.txt")})))]
-    (println "cmdline root=" root)
-    (bootfiles/cmdline! boot-firmware (ujima-cmdline root))))
-
-
 (defn run! [_opts]
   (with-console-out
     ;; the desktop session service (write + enable; supervises startx→i3 with Restart=always)
@@ -254,15 +230,11 @@
       (spit hook machine-id-hook)
       ($! chmod "0755" [hook]))
 
-    ;; the boot partition's half of the overlay contract — see write-cmdline! above. Must stay
-    ;; paired with the mask below: exactly one of `overlayroot=tmpfs` or `rw` has to be on the
-    ;; cmdline, or / mounts read-only and stays that way.
-    (write-cmdline!)
-
     ;; overlayfs rejects `mount -o remount` via the modern mount API ("No changes allowed in
     ;; reconfigure"), so systemd-remount-fs — which remounts / rw early in boot — fails under the
     ;; overlay root. The overlay already gives us a writable / (the tmpfs upper), so the service is
-    ;; redundant: mask it. (overlayroot already comments out the fstab / line; this is the rest.)
+    ;; redundant: mask it. Pairs with os.boot's cmdline: without one of `overlayroot=tmpfs` or
+    ;; `rw` there, / mounts read-only and nothing ever remounts it.
     ($! ln -sf "/dev/null" "/etc/systemd/system/systemd-remount-fs.service")
 
     ;; build marker

@@ -50,11 +50,6 @@
      :target image/chroot-shell! :args [:img]
      :spec {:img {:desc "OS image to open an interactive chroot into" :require true}}}
 
-    "initramfs"
-    {:usage "Usage: os initramfs <img>"
-     :target image/initramfs! :args [:img]
-     :spec {:img {:desc "OS image to bake the prebuilt overlayroot initramfs into" :require true}}}
-
     "fetch"
     {:usage "Usage: os fetch <url> <out-img> [--sha256 <hex>]"
      :target image/fetch! :args [:url :out]

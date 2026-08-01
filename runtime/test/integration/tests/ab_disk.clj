@@ -2,6 +2,8 @@
   (:require [babashka.fs :as fs]
             [clojure.string :as str]
 
+            [integration.fixtures :as fixtures]
+
             [ujima.pack :as pack]
             [ujima.device.ab :as ab]
             [ujima.linux.disk :as linux-disk]
@@ -234,7 +236,7 @@
 
 (defn run! [{tmp :tmp [pack-file] :args}]
   (let [sut-img-file (fs/path tmp "test-disk.img")
-        pack-file    (or pack-file "assets/e2e/dummy.pack")]
+        pack-file    (or pack-file (fixtures/pack! (fs/path tmp "fixture.pack")))]
 
     (require-root!)
     (pack/validate! pack-file)

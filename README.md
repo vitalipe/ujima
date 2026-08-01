@@ -25,7 +25,7 @@ This mono repo contains the code and tooling needed to build, install, and run U
 ## CLI
 
 ```
-bb build <target> [--dev]                             the whole pipeline, one command
+bb full-build <target> [--dev]                        the whole pipeline, one command
 
 bb stage <target>                                     stage an OS image from the pinned base (vendor-cached)
 
@@ -41,7 +41,7 @@ bb disk ab create <scheme> <img|blockdev>             write an empty A/B layout 
 bb disk slot <A|B> from-pack <pack> <img|blockdev>    install a pack into a slot
 bb disk slot <A|B> from-image <img> <img|blockdev>    install an OS image into a slot (packs to a temp file)
 bb disk slot <A|B> activate <img|blockdev>            set the boot slot
-bb disk info <img|blockdev>                           slots, installed versions, boot selection
+bb disk info <img|blockdev>                           slots, install metadata, boot selection
 
 bb dev push <ip> ujimad                               deploy the daemon + restart the session
 bb dev script <ip> <name>                             run os.<name> live on the device
@@ -72,8 +72,8 @@ loopback/chroot work, `binfmt_misc` with qemu-aarch64 registered (e.g.
 additionally wants `sshpass` and `rsync`.
 
 ```
-sudo bb build rpi-os          # release image
-sudo bb build rpi-os --dev    # + ssh/vnc/xdotool dev rig, cleanup skipped
+sudo bb full-build rpi-os          # release image
+sudo bb full-build rpi-os --dev    # + ssh/vnc/xdotool dev rig, cleanup skipped
 ```
 
 The first build fetches the pinned raspios base once into `stage/vendor/` and

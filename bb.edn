@@ -6,10 +6,10 @@
         com.taoensso/timbre {:mvn/version "6.6.1"}}
 
  :tasks
- {build
+ {full-build
   {:doc "Whole pipeline: vendor(cached) → os image → pack → A/B disk"
    :requires ([tools.cli :as cli])
-   :task (apply cli/-main "build" *command-line-args*)}
+   :task (apply cli/-main "full-build" *command-line-args*)}
 
   stage
   {:doc "Stage an image from the pinned base (vendor-cached)"
@@ -27,7 +27,7 @@
    :task (apply cli/-main "pack" *command-line-args*)}
 
   disk
-  {:doc "The A/B disk: ab create | slot A|B from-pack/activate | info"
+  {:doc "The A/B disk: ab create | slot A|B from-pack/from-image/activate | info"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "disk" *command-line-args*)}
 

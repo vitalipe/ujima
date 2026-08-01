@@ -120,7 +120,7 @@
       (fn [mnt] (do-chroot-run-script! mnt script)))))
 
 
-;; The ujima script chain, in order — `bb build` is this plus stage/pack/disk, so the sequence
+;; The ujima script chain, in order — `bb full-build` is this plus stage/pack/disk, so the sequence
 ;; lives here only. boot first: a stash that no longer matches the image's kernel fails in seconds.
 (def ^:private content-scripts ["boot" "base" "ujimad" "desktop" "ujimaify"])
 

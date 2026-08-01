@@ -1,8 +1,10 @@
 (ns os.ujimad
   "Runs INSIDE the target chroot as root (and is the live `dev push ujimad` deploy path). Stages
-   ujimad: its source tree + deployment config into /ujima/ujimad. This is the artifact you
-   iterate on most — re-run it (then restart ujimad) to pick up code changes. The systemd unit
-   that runs it lives in os.ujimaify.
+   ujimad: the runtime/ source tree + deployment config into /ujima/ujimad. The deployed
+   artifact keeps the daemon's name (nothing else on the device consumes it); the repo tree is
+   runtime/ because tools+os link it too. This is the artifact you iterate on most — re-run it
+   (then restart ujimad) to pick up code changes. The systemd unit that runs it lives in
+   os.ujimaify.
 
    Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 
@@ -19,5 +21,5 @@
       ;; clean-mirror src ONLY — config is copied, never rm'd, so a hand-dropped
       ;; ujimad.local.edn survives pushes
       ($! rm -rf (str dst "/src"))
-      ($! cp -a (str project "/ujimad/src")              (str dst "/"))
-      ($! cp -a (str project "/ujimad/config/ujimad.edn") (str dst "/config/")))))
+      ($! cp -a (str project "/runtime/src")              (str dst "/"))
+      ($! cp -a (str project "/runtime/config/ujimad.edn") (str dst "/config/")))))

@@ -1,7 +1,7 @@
 (ns ujima.control
   "Control plane for the appliance: a pure settings machine — scopes, merge,
    persistence — that notifies its converge targets (the OS port, the GUI port;
-   passed at init! by ujima.main) after every converge. It knows no port."
+   passed at init! by ujima.ujimad) after every converge. It knows no port."
 
   (:require [lib.util    :refer [index-by map-vals map-kv-vals]]
             [babashka.fs :refer [path]]

@@ -6,7 +6,7 @@
    re-run only edits the tail:
 
      push <ip> ujimad    deploy ujimad live: run os.ujimad (= `script ujimad` — stages
-                         src/ + config into /ujima/ujimad), then restart ujima.service.
+                         runtime/ src + config into /ujima/ujimad), then restart ujima.service.
      script <ip> <name>  run os.<name>/run! live on the device — the running-system
                          analog of `bb os script` (which runs the same fn in the build chroot).
      view <ip>           interactive x11vnc mirror of the device's :0 desktop — mouse + keyboard live.
@@ -66,14 +66,14 @@
 
 
 ;; staging dir on the device = the chroot repo bind path; NOT the install target —
-;; ujimad.clj copies <project>/src into /ujima/ujimad, staging there would copy src into itself
+;; ujimad.clj copies <project>/runtime/src into /ujima/ujimad, staging there would copy it into itself
 (def ^:private device-stage image/project-mnt)
 
 ;; Repo subset staged to the device — the dirs scripts read plus what the bb classpath needs.
 ;; Explicit include-list, NEVER the whole worktree: it holds the 846MB assets/e2e/dummy.pack and
 ;; other large/private untracked files that must never go over the wire to a Pi. A new script
 ;; that reads a new asset dir adds one entry here.
-(def ^:private stage-paths ["ujimad/src" "ujimad/config" "os/src"
+(def ^:private stage-paths ["runtime/src" "runtime/config" "os/src"
                             "desktop" "apps"
                             "assets/dev" "assets/tools" "assets/eww"
                             "assets/fonts" "assets/themes" "assets/home"
@@ -89,7 +89,7 @@
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (require-host-cmd! "rsync"   "install it (e.g. apt install rsync)")
   (let [{:keys [ssh-e host] :as transport} (ssh-transport opts)
-        cp         (str device-stage "/ujimad/src:" device-stage "/os/src")
+        cp         (str device-stage "/runtime/src:" device-stage "/os/src")
         ;; resolve bb AS THE LOGIN USER first ($(command -v bb) on its PATH), then sudo the
         ;; absolute path: sudo's secure_path won't include the vendored bb, so a bare `sudo bb`
         ;; would be command-not-found.
@@ -103,7 +103,7 @@
         (throw (ex-info (str c " missing on " ip
                              " — install it on the device or reflash a dev image that ships it")
                         {:ip ip :cmd c}))))
-    ;; stage the subset (-R recreates the ujimad/src os/src … layout under device-stage). No
+    ;; stage the subset (-R recreates the runtime/src os/src … layout under device-stage). No
     ;; --chmod: preserve source perms so executables (assets/dev/wifi, vendored bb) stay +x.
     ;; root-owned, remote rsync elevated via passwordless sudo.
     (apply sh! :rsync "-aR" "--delete"

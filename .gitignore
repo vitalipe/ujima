@@ -1,7 +1,7 @@
 pad.md
 /tmp/
 /stage/
-ujimad/config/*.local.edn
+runtime/config/*.local.edn
 tools/config/*.local.edn
 
 # personal per-network wifi wrappers (e.g. wifi.home); the `wifi` tool itself stays tracked

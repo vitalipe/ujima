@@ -5,7 +5,7 @@
             [lib.shell :as shell]))
 
 
-(def e2e-root "ujimad/test/e2e/tests")
+(def e2e-root "runtime/test/e2e/tests")
 
 
 (defn- usage! []
@@ -147,7 +147,7 @@
 
 (defn -main [& args]
   (println "E2E env:")
-  (prn (io/slurp-config "ujimad/config" "ujimad"))
+  (prn (io/slurp-config "runtime/config" "ujimad"))
   (println)
 
   ;; host command remaps (e2fsck/resize2fs from tools[.local].edn): the disk ops run on the host,

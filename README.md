@@ -39,6 +39,7 @@ bb pack meta <pack> [--format edn|json]
 
 bb disk ab create <scheme> <img|blockdev>             write an empty A/B layout (scheme: autoboot)
 bb disk slot <A|B> from-pack <pack> <img|blockdev>    install a pack into a slot
+bb disk slot <A|B> from-image <img> <img|blockdev>    install an OS image into a slot (packs to a temp file)
 bb disk slot <A|B> activate <img|blockdev>            set the boot slot
 bb disk info <img|blockdev>                           slots, installed versions, boot selection
 

@@ -11,7 +11,8 @@
     [ujima.linux.disk :refer [block-device?]]
     [ujima.linux.disk.loop :as loopback]
     [ujima.device.ab :as ab]
-    [ujima.device.ab.autoboot :as ab-auto]))
+    [ujima.device.ab.autoboot :as ab-auto]
+    [tools.cmd.pack :as pack]))
 
 
 ;; boot-scheme registry — `bb disk ab create <scheme>`; uefi lands beside autoboot as one
@@ -73,7 +74,8 @@
 
 
 (defn slot!
-  "Dispatch `disk slot <A|B> <verb> …`: from-pack <pack> <target> | activate <target>."
+  "Dispatch `disk slot <A|B> <verb> …`:
+   from-pack <pack> <target> | from-image <img> <target> | activate <target>."
   [{:keys [slot verb a b]}]
   (require-root!)
   (let [slot (->slot slot)]
@@ -84,6 +86,20 @@
           (with-disk* b (fn [dev] (ab/install-into-slot! (->disk dev) a slot)))
           (println "installed" a "-> slot" (name slot) "on" b))
 
+      ;; SLOW: packs to a throwaway file and installs that, because unpack! only reads tar
+      ;; members. Costs a full pack (time + ~1.5x the image in temp space) and stamps the slot
+      ;; with pack/make!'s default metadata. Teaching unpack! to read partitions directly
+      ;; replaces this.
+      "from-image"
+      (do (when-not (and a b)
+            (throw (ex-info "usage: disk slot <A|B> from-image <img> <img|blockdev>" {})))
+          (fs/with-temp-dir [work {:prefix "ujima-from-image-"}]
+            (let [tmp-pack (str (fs/path work "image.pack"))]
+              (println "packing" a "-> temp pack")
+              (pack/make! {:src a :out tmp-pack})
+              (with-disk* b (fn [dev] (ab/install-into-slot! (->disk dev) tmp-pack slot)))))
+          (println "installed" a "-> slot" (name slot) "on" b))
+
       "activate"
       (do (when (or (nil? a) b)
             (throw (ex-info "usage: disk slot <A|B> activate <img|blockdev>" {})))
@@ -91,7 +107,7 @@
           (println "boot slot ->" (name slot) "on" a))
 
       (throw (ex-info (str "unknown slot verb: " verb)
-                      {:expected #{"from-pack" "activate"}})))))
+                      {:expected #{"from-pack" "from-image" "activate"}})))))
 
 
 (defn info!

@@ -94,7 +94,7 @@
             :target {:desc "Disk target: .img file or block device" :require true}}}
 
     "slot"
-    {:usage "Usage: disk slot <A|B> from-pack <pack> <img|blockdev>\n       disk slot <A|B> activate <img|blockdev>"
+    {:usage "Usage: disk slot <A|B> from-pack <pack> <img|blockdev>\n       disk slot <A|B> from-image <img> <img|blockdev>\n       disk slot <A|B> activate <img|blockdev>"
      :target disk/slot!
      :args [:slot :verb :a :b]
      :spec {:slot {:desc "Slot: A or B" :require true}

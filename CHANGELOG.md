@@ -8,6 +8,11 @@ version truth; branch names and build labels may disagree.
 
 ## [Unreleased]
 
+### Added
+
+- The OS image boots as-is — `dd` it to a card for a system without A/B, where
+  settings and storage are not persistent.
+
 ### Changed
 
 - The in-session daemon is `/usr/local/bin/ujimad` (was `ujima-agent`).
@@ -19,6 +24,8 @@ version truth; branch names and build labels may disagree.
 - The storage partition mounts directly at `/ujima/storage` (was
   `/mnt/storage`): the Files area is `/ujima/storage/files`, extra apps
   `/ujima/storage/apps`.
+- An installed system records itself in one file, `/ujima/system/pack.edn` (was
+  `metadata.edn` + `install.edn`): pack version, packed-at, installed-at.
 
 ### Fixed
 

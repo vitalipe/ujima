@@ -73,7 +73,7 @@ additionally wants `sshpass` and `rsync`.
 
 ```
 sudo bb build rpi-os          # release image
-sudo bb build rpi-os --dev    # + ssh/vnc/xdotool dev rig, cleanup skipped
+sudo bb build rpi-os --dev    # dev image (`bb dev` commands require it)
 ```
 
 The first build fetches the pinned raspios base once into `stage/vendor/` and
@@ -95,16 +95,39 @@ sudo dd if=stage/ujima-…-disk.img of=/dev/mmcblk0 bs=4M conv=fsync status=prog
 ```
 
 The granular verbs compose to the same result when you need only part of the
-pipeline:
+pipeline.
+
+### Build an OS image
 
 ```
-sudo bb stage rpi-os
-sudo bb os apply stage/ujima-….img             # or one at a time: bb os script <img> base
-sudo bb pack stage/ujima-….img stage/u.pack
-sudo bb disk ab create autoboot stage/u-disk.img
+sudo bb stage rpi-os                             # vendor (cached) -> stage/ujima-<branch>-<sha>.img
+sudo bb os apply stage/ujima-….img --dev         # the script chain; or one at a time: bb os script <img> base
+```
+
+The image boots on its own — `dd` it to a card for a system with no A/B and no
+settings/storage partitions, so those paths land in the overlay's tmpfs and reset
+every boot.
+
+### Create a disk
+
+```
+sudo bb disk ab create autoboot stage/u-disk.img   # or a real device: /dev/mmcblk0
+```
+
+An empty A/B layout: control, boot A/B, root A/B, settings, storage.
+
+### Apply to a slot
+
+```
+sudo bb pack stage/ujima-….img stage/u.pack                  # the distributable
 sudo bb disk slot A from-pack stage/u.pack stage/u-disk.img
 sudo bb disk slot A activate stage/u-disk.img
+sudo bb disk info stage/u-disk.img                           # what's in each slot
 ```
+
+Install re-points only `root=` in the pack's cmdline; everything else on that line
+is the image's. `bb disk slot A from-image <img> <disk>` skips the pack — **dev
+only**, shipped installs go through a pack.
 
 For the live iteration loop against a running dev device, `bb dev push <ip> ujimad`
 deploys the daemon and restarts the session; `bb dev script <ip> <name>` runs any

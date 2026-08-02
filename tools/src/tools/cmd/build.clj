@@ -1,7 +1,11 @@
 (ns tools.cmd.build
-  "The whole pipeline as one command — the executable statement of the build order:
-   vendor (cached) -> stage -> boot -> base -> ujimad -> desktop -> ujimaify ->
-   [dev | cleanup] -> pack -> A/B disk (create + slot A from-pack + activate).
+  "The whole pipeline as one command — pure composition of the four nouns:
+
+     stage -> os apply -> pack -> disk (ab create + slot A from-pack + activate)
+
+   The script chain inside `os apply` is os.clj's business, not ours. The pack is a
+   deliverable, not an intermediate (it is what installs into a slot later), so it is
+   packed explicitly and kept rather than going through `disk slot from-image`.
 
    The vendor cache (stage/vendor) is READ here and built only when absent
    (tools.cmd.stage, temp-then-atomic-move) — no code path in build deletes or
@@ -42,7 +46,7 @@
         pack-out (str/replace os-img #"\.img$" ".pack")
         disk-out (str/replace os-img #"\.img$" "-disk.img")]
 
-    (os/build! {:img os-img :dev dev})
+    (os/apply! {:img os-img :dev dev})
 
     (println (str "== pack -> " pack-out))
     (pack/make! {:src os-img :out pack-out})

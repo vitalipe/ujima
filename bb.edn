@@ -6,10 +6,10 @@
         com.taoensso/timbre {:mvn/version "6.6.1"}}
 
  :tasks
- {full-build
+ {build
   {:doc "Whole pipeline: vendor(cached) → os image → pack → A/B disk"
    :requires ([tools.cli :as cli])
-   :task (apply cli/-main "full-build" *command-line-args*)}
+   :task (apply cli/-main "build" *command-line-args*)}
 
   stage
   {:doc "Stage an image from the pinned base (vendor-cached)"
@@ -17,7 +17,7 @@
    :task (apply cli/-main "stage" *command-line-args*)}
 
   os
-  {:doc "An OS image: build | script | chroot"
+  {:doc "An OS image: apply | script | chroot"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "os" *command-line-args*)}
 

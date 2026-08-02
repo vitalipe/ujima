@@ -23,9 +23,9 @@
 
 
 (def command-tree
-  {"full-build"
+  {"build"
    {"run"
-    {:usage "Usage: full-build <target> [--dev]"
+    {:usage "Usage: build <target> [--dev]"
      :target build/build!
      :args [:target]
      :spec {:target {:desc "Build target (rpi-os)" :require true}
@@ -40,11 +40,11 @@
      :spec {:target {:desc "Pinned base target (rpi-os)" :require true}}}}
 
    "os"
-   {"build"
-    {:usage "Usage: os build <img> [--dev]"
-     :target os/build!
+   {"apply"
+    {:usage "Usage: os apply <img> [--dev]"
+     :target os/apply!
      :args [:img]
-     :spec {:img {:desc "Staged OS image to build the ujima content into" :require true}
+     :spec {:img {:desc "Staged OS image to apply the ujima content chain into" :require true}
             :dev {:coerce :boolean
                   :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}
 
@@ -238,12 +238,12 @@
     tree))
 
 
-;; bare-noun sugar: `bb pack <src> <out>` / `bb full-build <target>` — a first argument that
+;; bare-noun sugar: `bb pack <src> <out>` / `bb build <target>` — a first argument that
 ;; is not a known subcommand dispatches to the noun's make-verb. Subcommand sets are
 ;; explicit; anything else is treated as the default verb's first positional.
 (def ^:private default-verbs
   {"pack"  {:verb "make" :subs #{"make" "validate" "meta"}}
-   "full-build" {:verb "run" :subs #{"run"}}
+   "build" {:verb "run" :subs #{"run"}}
    "stage" {:verb "run"  :subs #{"run"}}})
 
 (defn- with-default-verb [[noun sub :as args]]

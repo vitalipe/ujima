@@ -48,7 +48,7 @@
 
   test:unit
   {:doc "Run unit tests"
-   :task (shell "bb" "-cp" "runtime/src:os/src:runtime/test/unit" "-m" "runner")}
+   :task (shell "bb" "-cp" "runtime/src:runtime/test/unit" "-m" "runner")}
 
   test:integration
   {:doc "Run an integration test from runtime/test/integration/tests"

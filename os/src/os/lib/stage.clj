@@ -1,10 +1,9 @@
 (ns os.lib.stage
   "Pull-based staging of static device files from the per-script concern dirs:
    os/<script>/<concern>/<file>, staged by an explicit call in src/os/<script>.clj — the
-   source path names the file once, the call site names the destination. Ownership is
-   1:1 (a concern dir belongs to exactly one script) and lint-enforced
-   (os.staging-lint-test). Files land root-owned unless :owner says otherwise — cp -a
-   alone would carry the repo's build-host uids onto the device."
+   source path names the file once, the call site names the destination. A concern dir
+   belongs to exactly one script. Files land root-owned unless :owner says otherwise —
+   cp -a alone would carry the repo's build-host uids onto the device."
   (:require [babashka.fs :as fs]
             [lib.shell :refer [$!]]))
 

@@ -10,7 +10,10 @@
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
             [babashka.fs :as fs]
+            [clojure.edn :as edn]
+            [clojure.java.io :as io]
             [os.appcatalog :as appcatalog]
+            [os.lib.i18n :as i18n]
             [os.lib.stage :as stage]))
 
 
@@ -45,16 +48,15 @@
     (stage/mirror! project "desktop/theme/Nordic" "/usr/share/themes/Nordic")
     (stage/install! project "desktop/theme/settings.ini" "/etc/gtk-3.0/settings.ini")
 
-    ;; GTK chooser label override: "Home" -> "Temporary" (home IS the tmpfs upper — the label
-    ;; states the truth; GTK hardcodes the sidebar entry, gettext is the only config-free
-    ;; lever). REPLACES the distro's en_GB/en_US gtk3 catalogs — other GTK strings fall back
-    ;; to their American msgids, accepted. Regenerate via assets/i18n/make-gtk-mo.py.
-    (let [mo (str project "/assets/i18n/gtk30-ujima.mo")]
-      (if (fs/exists? mo)
-        (doseq [loc ["en_GB" "en_US"]]
-          (fs/create-dirs (str "/usr/share/locale/" loc "/LC_MESSAGES"))
-          ($! cp [mo] [(str "/usr/share/locale/" loc "/LC_MESSAGES/gtk30.mo")]))
-        (println "desktop: no assets/i18n/gtk30-ujima.mo — chooser labels not staged")))
+    ;; GTK chooser label override ("Home" -> "Temporary"; the why lives in the catalog):
+    ;; the .mo is GENERATED here from the catalog — no vendored binary, no gettext in the
+    ;; chroot (os.lib.i18n writes the format directly). One catalog, two locale installs.
+    (let [mo (i18n/mo-bytes (edn/read-string
+                             (slurp (stage/source project "desktop/i18n/catalog.edn"))))]
+      (doseq [loc ["en_GB" "en_US"]]
+        (fs/create-dirs (str "/usr/share/locale/" loc "/LC_MESSAGES"))
+        (with-open [out (io/output-stream (str "/usr/share/locale/" loc "/LC_MESSAGES/gtk30.mo"))]
+          (.write out mo))))
 
     ;; session-level home seeds → the ujima user's home (per-APP home defaults live in their
     ;; apps trees, staged below): links routing + the Files-plane defaults. install! creates

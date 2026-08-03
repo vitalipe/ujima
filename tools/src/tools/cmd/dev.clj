@@ -76,7 +76,7 @@
 (def ^:private stage-paths ["runtime/src" "runtime/config"
                             "os"          ; src + the per-script concern dirs the scripts pull
                             "desktop" "apps"
-                            "assets/dev" "assets/tools" "assets/i18n"])
+                            "assets/tools"])
 
 
 (defn script!
@@ -103,7 +103,7 @@
                              " — install it on the device or reflash a dev image that ships it")
                         {:ip ip :cmd c}))))
     ;; stage the subset (-R recreates the runtime/src os/src … layout under device-stage). No
-    ;; --chmod: preserve source perms so executables (assets/dev/wifi, vendored bb) stay +x.
+    ;; --chmod: preserve source perms so executables (dev-kit wifi, vendored bb) stay +x.
     ;; root-owned, remote rsync elevated via passwordless sudo.
     (apply sh! :rsync "-aR" "--delete"
            "--chown=root:root"

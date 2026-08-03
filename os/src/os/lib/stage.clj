@@ -9,7 +9,11 @@
             [lib.shell :refer [$!]]))
 
 
-(defn- source! [project src]
+(defn source
+  "Absolute path of a concern source file — for call sites that READ a source rather
+   than copy it (e.g. desktop's i18n catalog). Throws on a missing file, like every
+   staging call: a typo must never stage nothing, silently."
+  [project src]
   (let [s (str project "/os/" src)]
     (when-not (fs/exists? s)
       (throw (ex-info "os.lib.stage: missing source file" {:src src :path s})))
@@ -21,7 +25,7 @@
    :mode for the rest (sudoers 0440), :owner when not root:root."
   ([project src dst] (install! project src dst {}))
   ([project src dst {:keys [mode owner]}]
-   (let [s (source! project src)]
+   (let [s (source project src)]
      (fs/create-dirs (fs/parent dst))
      ($! cp -a [s] [dst])
      ($! chown [(or owner "root:root")] [dst])
@@ -35,7 +39,7 @@
    concern disappears from the device on live re-runs."
   ([project src dst] (mirror! project src dst {}))
   ([project src dst {:keys [owner]}]
-   (let [s (source! project src)]
+   (let [s (source project src)]
      ($! rm -rf [dst])
      (fs/create-dirs (fs/parent dst))
      ($! cp -a [s] [dst])
@@ -51,7 +55,7 @@
    is chowned; the area itself never is."
   ([project src dst] (copy-tree! project src dst {}))
   ([project src dst {:keys [owner]}]
-   (let [s (source! project src)]
+   (let [s (source project src)]
      (doseq [p (sort-by str (fs/glob s "**" {:hidden true}))
              :let [target (str dst "/" (fs/relativize s p))]]
        (if (fs/directory? p {:nofollow-links true})

@@ -26,12 +26,12 @@
     ;; overlayroot: the read-only-root tmpfs overlay mechanism (lower=ro-root + upper=tmpfs at boot,
     ;; via the initramfs hook baked above). Installed into every image (the cached vendor base);
     ;; activated via the `overlayroot=tmpfs:recurse=0` cmdline token (autoboot.bootfiles/cmdline!),
-    ;; and toggled off on dev with assets/dev/lock-fs.
+    ;; and toggled off on dev with the dev-kit lock-fs.
     ($! apt-get install -y --no-install-recommends "overlayroot")
 
     ;; minimal desktop runtime (cached in the vendor base): i3 + core X + the legacy setuid Xorg.wrap
     ;; (so the systemd session — a non-console user — can open the VT). eww is NOT apt — built from
-    ;; source (assets/dev/build-eww), staged by os.desktop; libgtk-3-0 is its runtime lib
+    ;; source (build-eww, dev kit), staged by os.desktop; libgtk-3-0 is its runtime lib
     ;; (apt pulls the rest of the GTK stack). Pin the exact eww lib set from build-eww's `ldd` dump.
     ($! apt-get install -y --no-install-recommends
         "i3" "xserver-xorg-core" "xserver-xorg-input-libinput" "xinit"

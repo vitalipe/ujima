@@ -8,7 +8,7 @@
 # from the board serial and writes /etc/machine-id before PID 1 reads it — re-derived
 # identically each boot, so it's stable from the FIRST boot (no orphan, no reboot to
 # settle). PREREQ=overlayroot → runs after the overlay mounts, so ${rootmnt} is the
-# overlay and the write lands in its upper. The producer (assets/dev/build-initramfs)
+# overlay and the write lands in its upper. The producer (build-initramfs, dev kit)
 # bakes it into the stash and image initramfs ships that, so this just needs to be
 # present in the rootfs for the producer's update-initramfs to pick up.
 PREREQ="overlayroot"

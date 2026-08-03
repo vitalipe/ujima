@@ -26,7 +26,7 @@ PAMName=login
 Environment=QT_QPA_PLATFORMTHEME=gtk3
 # /ujima/desktop/bin -> bare ujima-* calls (i3, yuck); /usr/games -> tuxtype
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/ujima/desktop/bin
-# links an app opens go through ujimad -> the Web app (with mimeapps.list, assets/home)
+# links an app opens go through ujimad -> the Web app (with mimeapps.list, desktop's links concern)
 Environment=BROWSER=/ujima/desktop/bin/ujima-open-url
 StandardOutput=journal
 Restart=always

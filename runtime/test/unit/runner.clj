@@ -30,7 +30,8 @@
             [ujima.events.audio-test]
             [ujima.events.token-test]
 
-            [os.staging-lint-test]))
+            [os.staging-lint-test]
+            [os.lib.i18n-test]))
 
 
 (def test-namespaces
@@ -64,7 +65,8 @@
     ujima.events.audio-test
     ujima.events.token-test
 
-    os.staging-lint-test])
+    os.staging-lint-test
+    os.lib.i18n-test])
 
 
 (defn -main [& _]

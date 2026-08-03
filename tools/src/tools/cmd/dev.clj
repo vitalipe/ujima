@@ -73,11 +73,10 @@
 ;; Explicit include-list, NEVER the whole worktree: it holds tens of GB of build output under
 ;; stage/ plus private untracked files, none of which should go over the wire to a Pi. A new
 ;; script that reads a new asset dir adds one entry here.
-(def ^:private stage-paths ["runtime/src" "runtime/config" "os/src"
+(def ^:private stage-paths ["runtime/src" "runtime/config"
+                            "os"          ; src + the per-script concern dirs the scripts pull
                             "desktop" "apps"
-                            "assets/dev" "assets/tools" "assets/eww"
-                            "assets/fonts" "assets/themes" "assets/home"
-                            "assets/i18n"])  ; desktop.clj + appcatalog/stage-defaults! read these
+                            "assets/dev" "assets/tools" "assets/i18n"])
 
 
 (defn script!

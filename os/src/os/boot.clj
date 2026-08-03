@@ -15,6 +15,7 @@
 
 
 (def ^:private boot-firmware   "/boot/firmware")
+(def ^:private initramfs-src   "boot/initramfs")   ;; the concern dir under os/
 (def ^:private initramfs-files ["initramfs8" "initramfs_2712"])
 
 
@@ -56,13 +57,13 @@
 ;; the build loudly instead of shipping a silently overlay-less image
 (defn- bake-initramfs! [project]
   (let [version (kernel-version)
-        src     (str project "/assets/initramfs/" version)]
+        src     (str project "/os/" initramfs-src "/" version)]
 
     (doseq [f initramfs-files]
       (when-not (fs/exists? (str src "/" f))
         (throw (ex-info (str "no prebuilt initramfs for kernel " version
-                             " — regenerate with the assets/dev producer on a Pi and copy into "
-                             "assets/initramfs/" version)
+                             " — regenerate with the build-initramfs producer (dev kit) on a Pi "
+                             "and copy into os/" initramfs-src "/" version)
                         {:version version :missing (str src "/" f)}))))
 
     (doseq [f initramfs-files]

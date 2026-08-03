@@ -28,7 +28,9 @@
             [ujima.desktop.app-test]
             [ujima.desktop.eww-test]
             [ujima.events.audio-test]
-            [ujima.events.token-test]))
+            [ujima.events.token-test]
+
+            [os.staging-lint-test]))
 
 
 (def test-namespaces
@@ -60,7 +62,9 @@
     ujima.desktop.app-test
     ujima.desktop.eww-test
     ujima.events.audio-test
-    ujima.events.token-test])
+    ujima.events.token-test
+
+    os.staging-lint-test])
 
 
 (defn -main [& _]

@@ -1,0 +1,78 @@
+#!/bin/sh
+# managed by the ujima image build — source: os/ujimaify/session/ujima-session-stop
+#
+# The stop path for ujima.service (ExecStop=`stop` / ExecStopPost=`post`, both root via
+# `+`). The unit's kill phase can't end the session (its cgroup is empty — see
+# session/ujima.service), so stop does it: stash the logind scope path while $MAINPID
+# (startx) is alive — ExecStop runs BEFORE systemd signals anyone, and post can't derive
+# it once MainPID is gone — ask ujimad to die, then BLOCK until startx exits naturally
+# (it returns only when xinit is done = X down, VT free), which gives TimeoutStopSec
+# something real to bound. `post` runs even after a stop timeout and escalates through
+# logind: TERM first (X restores the VT on TERM; leading with SIGKILL on Xorg corrupts
+# the VT — HW-learned), then KILL only stragglers that ignored TERM (e.g. a SIGSTOPped
+# ujimad still holding :1337) so the next session's ujimad can bind.
+STASH=/run/ujima-session-scope
+
+stop() {
+  logger -t ujima-session-stop "stop: enter mainpid=${MAINPID:-none}"
+  [ -n "${MAINPID:-}" ] || exit 0
+  sed -n 's#^0::##p' "/proc/$MAINPID/cgroup" 2>/dev/null > "$STASH"
+  pkill -TERM -x -u ujima bb 2>/dev/null
+  while [ -d "/proc/$MAINPID" ]; do sleep 0.2; done
+  exit 0
+}
+
+# Survivors = scope members EXCEPT (sd-pam): the PAM helper lives in the scope but exits
+# only when the unit's PAM session closes — AFTER ExecStopPost — so counting it makes every
+# CLEAN stop look survived, burn the full grace loop, and SIGKILL the PAM cleanup
+# (HW-caught: happy-path stop cost 10s instead of ~1s). Occupancy is tested by READING —
+# cgroupfs files always stat as size 0, `[ -s ]` is always false there (HW-caught too).
+# logger, not echo-to-stderr: ExecStopPost stdio is torn down with the unit and messages
+# silently vanish from the journal (HW-caught); logger hits the socket directly.
+post() {
+  scope=$(cat "$STASH" 2>/dev/null)
+  logger -t ujima-session-stop "post: enter scope=${scope:-none}"
+  rm -f "$STASH"
+  [ -n "$scope" ] || exit 0
+  procs="/sys/fs/cgroup${scope}/cgroup.procs"
+  live() {
+    for p in $(cat "$procs" 2>/dev/null); do
+      [ "$(cat "/proc/$p/comm" 2>/dev/null)" = "(sd-pam)" ] || echo "$p"
+    done
+  }
+  [ -n "$(live)" ] || exit 0
+  sid=${scope##*/session-}; sid=${sid%.scope}
+  names=$(for p in $(live); do cat "/proc/$p/comm" 2>/dev/null; done | sort -u | tr "\n" " ")
+  logger -t ujima-session-stop "session $sid: survivors after teardown ($names) - cleaning via logind"
+  loginctl terminate-session "$sid" 2>/dev/null
+  # the long grace exists ONLY so a live Xorg can honor TERM and restore the VT (SIGKILL on
+  # X corrupts it). X already gone = the survivors are stray sleeps/shells: short grace.
+  case " $names " in *" Xorg "*) limit=50 ;; *) limit=5 ;; esac
+  i=0
+  while [ -n "$(live)" ] && [ "$i" -lt "$limit" ]; do sleep 0.2; i=$((i+1)); done
+  pids=$(live)
+  [ -n "$pids" ] && kill -9 $pids 2>/dev/null
+  exit 0
+}
+
+# a SIGKILLed Xorg (wedged-session escalation, crash) leaves its /tmp/.X<n>-lock behind,
+# and the next server silently starts on :<n+1> — reap locks whose pid is dead before
+# every start so the session always comes back on :0.
+prestart() {
+  for f in /tmp/.X*-lock; do
+    [ -e "$f" ] || continue
+    pid=$(tr -cd "0-9" < "$f")
+    kill -0 "$pid" 2>/dev/null && continue
+    n=${f#/tmp/.X}; n=${n%-lock}
+    rm -f "$f" "/tmp/.X11-unix/X$n"
+    logger -t ujima-session-stop "prestart: reaped stale X lock :$n (pid ${pid:-none} dead)"
+  done
+  exit 0
+}
+
+case "$1" in
+  stop) stop ;;
+  post) post ;;
+  prestart) prestart ;;
+  *) echo "usage: ujima-session-stop stop|post|prestart" >&2; exit 2 ;;
+esac

@@ -25,7 +25,8 @@
      (fs/create-dirs (fs/parent dst))
      ($! cp -a [s] [dst])
      ($! chown [(or owner "root:root")] [dst])
-     (when mode ($! chmod [mode] [dst]))
+     ;; deterministic modes — cp -a alone would ship the build host's umask
+     ($! chmod [(or mode (if (fs/executable? s) "0755" "0644"))] [dst])
      (println "staged" src "->" dst))))
 
 

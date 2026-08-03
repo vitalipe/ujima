@@ -8,7 +8,8 @@
 
    `project` (the read-only repo bind) is unused here."
   (:require [lib.shell :refer [$ $! $? with-console-out]]
-            [babashka.fs :as fs]))
+            [babashka.fs :as fs]
+            [os.lib.stage :as stage]))
 
 
 (defn- mask!
@@ -57,7 +58,7 @@
                "ExecStart=-/sbin/agetty --autologin ujima --noclear %I $TERM\n"))))
 
 
-(defn run! [_opts]
+(defn run! [{:keys [project]}]
   (with-console-out
     ;; 1. disable cloud-init: with no datasource it stalls on first boot and never finishes.
     ;;    This marker file is cloud-init's documented kill-switch. (We create the login user it
@@ -83,6 +84,10 @@
     ;;    a rename is set); the hosts mapping keeps sudo/X from warning "unable to resolve"
     ($! sh -c "echo ujimaos > /etc/hostname")
     ($! sh -c "grep -qw ujimaos /etc/hosts || printf '127.0.1.1\\tujimaos\\n' >> /etc/hosts")
+    ;;    + stable machine-id under the overlay — the initramfs hook derives it from the
+    ;;    board serial (the why lives in the file)
+    (stage/install! project "base/identity/ujima-machine-id"
+                    "/etc/initramfs-tools/scripts/init-bottom/ujima-machine-id")
 
     ;; 5. A/B disk mount points + bind targets — rootfs layout is build content, so every
     ;;    image carries its own. The per-slot fstab that references them is written at

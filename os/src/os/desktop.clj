@@ -12,7 +12,8 @@
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
             [babashka.fs :as fs]
-            [os.appcatalog :as appcatalog]))
+            [os.appcatalog :as appcatalog]
+            [os.lib.stage :as stage]))
 
 
 (defn run! [{:keys [project]}]
@@ -86,6 +87,10 @@
         (do ($! cp -a [(str home "/.")] "/home/ujima/")
             ($! chown -R "ujima:ujima" "/home/ujima"))
         (println "desktop: no assets/home — home configs not staged")))
+
+    ;; the Files-area tmpfiles half (kid-facing /ujima/storage/files) — the files plane is
+    ;; desktop's; the /ujima/run half stays with ujimaify's layout concern
+    (stage/install! project "desktop/files/ujima-files.conf" "/etc/tmpfiles.d/ujima-files.conf")
 
     ;; url handler: xdg-open (via mimeapps.list, staged with assets/home) resolves http/https to
     ;; this .desktop -> bin/ujima-open-url -> the Web app.

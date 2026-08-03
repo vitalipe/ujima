@@ -1,0 +1,7 @@
+# managed by the ujima image build — source: os/base/login/ujima-nopasswd
+#
+# Passwordless sudo for the ujima user. Dropped into /etc/sudoers.d (sudo @includedir's
+# the dir); the file MUST be 0440 + root-owned or sudo silently ignores it — the build
+# installs it :mode 0440 and `visudo -c` fails the build loudly on a malformed rule
+# rather than shipping an image whose sudo is broken.
+ujima ALL=(ALL) NOPASSWD: ALL

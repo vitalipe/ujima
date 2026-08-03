@@ -13,10 +13,14 @@
     ($! apt-get update)
     ($! apt-get install -y --no-install-recommends "ca-certificates")
 
-    ;; suppress in-chroot initramfs generation: overlayroot's postinst trigger runs update-initramfs,
-    ;; which SEGFAULTS under qemu. We bake a prebuilt, kernel-matched initramfs instead
-    ;; (os.boot), so the chroot never generates one. `=no` also fits
-    ;; the immutable model (the initramfs is fixed; a kernel bump is a rebuild, not in-place regen).
+    ;; ESCAPE HATCH — the one static file this script writes, deliberately NOT a concern
+    ;; file: it must exist BEFORE the overlayroot install below (its postinst trigger runs
+    ;; update-initramfs, which SEGFAULTS under qemu), i.e. inside the packages layer. A
+    ;; constant 2-liner, so it can't go stale in the vendor cache — which is keyed by the
+    ;; package payload set alone, the reason install carries NO other config: content
+    ;; written here wouldn't ship until an unrelated package change invalidated the cache.
+    ;; We bake a prebuilt, kernel-matched initramfs instead (os.boot); `=no` also fits the
+    ;; immutable model (the initramfs is fixed; a kernel bump is a rebuild, not in-place regen).
     (spit "/etc/initramfs-tools/update-initramfs.conf" "update_initramfs=no\nbackup_initramfs=no\n")
 
     ;; overlayroot: the read-only-root tmpfs overlay mechanism (lower=ro-root + upper=tmpfs at boot,
@@ -50,20 +54,8 @@
         ;; no_new_privs kills sudo inside). Pinned ahead of the wiring — live deploy can't add packages.
         "bubblewrap")
 
-    ;; X-from-systemd: let a non-console user start X via the setuid wrapper. HW-verified — without it
-    ;; Xorg dies "Cannot open virtual console (Permission denied)".
-    (spit "/etc/X11/Xwrapper.config" "allowed_users=anybody\nneeds_root_rights=yes\n")
-
-    ;; Pi 5 splits the render GPU (card0/v3d) from the display (card1); Xorg's autoconfig latches onto
-    ;; the render node and dies "no screens found". Mark the vc4 KMS device as the primary GPU.
-    ($! mkdir -p "/etc/X11/xorg.conf.d")
-    (spit "/etc/X11/xorg.conf.d/99-vc4.conf"
-          (str "Section \"OutputClass\"\n"
-               "  Identifier \"vc4\"\n"
-               "  MatchDriver \"vc4\"\n"
-               "  Driver \"modesetting\"\n"
-               "  Option \"PrimaryGPU\" \"true\"\n"
-               "EndSection\n"))
+    ;; (the X wrapper + vc4 confs these packages need live in os/base/x11 — base stages
+    ;; them, keeping this script packages-only so the vendor cache can't trap config edits)
 
     ;; audio: per-user PipeWire + WirePlumber (ships wpctl — ujima.linux.audio drives it).
     ;; pipewire-pulse serves the PulseAudio socket (chromium's audio path via libpulse),

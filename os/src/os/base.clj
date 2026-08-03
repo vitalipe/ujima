@@ -2,11 +2,12 @@
   "Runs INSIDE the target chroot as root. Turns a stock raspios rootfs into the ujima *base*:
    strips the first-boot machinery, disables cloud-init, and provisions the login user
    (passwordless console autologin + passwordless sudo) — a clean, bootable, logged-in machine
-   that the ujimad/desktop layers build on. (fstab + boot units → os.ujimaify.)
+   that the ujimad/desktop layers build on. Static files live in os/base/<concern>/ (login,
+   identity, x11); this script is the pulls + the actions. (fstab + boot units → os.ujimaify.)
 
-   Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
+   Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 
-   `project` (the read-only repo bind) is unused here."
+   `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$ $! $? with-console-out]]
             [babashka.fs :as fs]
             [os.lib.stage :as stage]))
@@ -32,32 +33,6 @@
   (-> ($ echo "ujima:ujima") ($! chpasswd)))
 
 
-(defn- grant-passwordless-sudo!
-  "Let ujima run sudo without a password prompt. Dropped into /etc/sudoers.d (sudo @includedir's
-   the dir); the file MUST be 0440 + root-owned or sudo silently ignores it. `visudo -c` fails
-   the build loudly on a malformed rule rather than shipping an image whose sudo is broken."
-  []
-  (let [f "/etc/sudoers.d/ujima-nopasswd"]
-    (spit f "ujima ALL=(ALL) NOPASSWD: ALL\n")
-    ($! chmod "0440" [f])
-    ($! visudo -c -f [f])))
-
-
-(defn- enable-console-autologin!
-  "Log ujima straight into a tty1 console on boot — no password prompt. This is the Lite/console
-   form of 'logged in'; the eventual desktop session supersedes it. Canonical systemd drop-in
-   (the same one raspi-config writes): the empty ExecStart clears the unit's inherited command,
-   then agetty --autologin replaces it. Nothing ships an autologin drop-in on the stripped base
-   (cloud-init + userconfig are off), so this is the only one."
-  []
-  (let [dir "/etc/systemd/system/getty@tty1.service.d"]
-    (fs/create-dirs dir)
-    (spit (str dir "/autologin.conf")
-          (str "[Service]\n"
-               "ExecStart=\n"
-               "ExecStart=-/sbin/agetty --autologin ujima --noclear %I $TERM\n"))))
-
-
 (defn run! [{:keys [project]}]
   (with-console-out
     ;; 1. disable cloud-init: with no datasource it stalls on first boot and never finishes.
@@ -75,21 +50,31 @@
                   "systemd-firstboot.service"]]   ;; systemd "First Boot Wizard"
       (mask! unit))
 
-    ;; 3. login user (cloud-init is off, so nothing else makes one)
+    ;; 3. login user (cloud-init is off, so nothing else makes one) + passwordless sudo
+    ;;    (0440 or sudo silently ignores it; visudo -c fails the build loudly on a bad
+    ;;    rule) + tty1 console autologin
     (create-login-user!)
-    (grant-passwordless-sudo!)
-    (enable-console-autologin!)
+    (stage/install! project "base/login/ujima-nopasswd" "/etc/sudoers.d/ujima-nopasswd"
+                    {:mode "0440"})
+    ($! visudo -c -f "/etc/sudoers.d/ujima-nopasswd")
+    (stage/install! project "base/login/autologin.conf"
+                    "/etc/systemd/system/getty@tty1.service.d/autologin.conf")
 
-    ;; 4. default host identity — the baked name IS the default ([:system :hostname] is nil unless
-    ;;    a rename is set); the hosts mapping keeps sudo/X from warning "unable to resolve"
-    ($! sh -c "echo ujimaos > /etc/hostname")
+    ;; 4. default host identity — the baked name IS the default ([:system :hostname] is nil
+    ;;    unless a rename is set); the hosts mapping keeps sudo/X from warning "unable to
+    ;;    resolve"; the initramfs hook keeps machine-id stable under the overlay (the why
+    ;;    lives in the file)
+    (stage/install! project "base/identity/hostname" "/etc/hostname")
     ($! sh -c "grep -qw ujimaos /etc/hosts || printf '127.0.1.1\\tujimaos\\n' >> /etc/hosts")
-    ;;    + stable machine-id under the overlay — the initramfs hook derives it from the
-    ;;    board serial (the why lives in the file)
     (stage/install! project "base/identity/ujima-machine-id"
                     "/etc/initramfs-tools/scripts/init-bottom/ujima-machine-id")
 
-    ;; 5. A/B disk mount points + bind targets — rootfs layout is build content, so every
+    ;; 5. X bring-up plumbing — the packages ride install's cached layer; the confs live
+    ;;    HERE so an edit ships without a package-set (cache-key) change
+    (stage/install! project "base/x11/Xwrapper.config" "/etc/X11/Xwrapper.config")
+    (stage/install! project "base/x11/99-vc4.conf" "/etc/X11/xorg.conf.d/99-vc4.conf")
+
+    ;; 6. A/B disk mount points + bind targets — rootfs layout is build content, so every
     ;;    image carries its own. The per-slot fstab that references them is written at
     ;;    install time (ujima.device.ab.autoboot/slot->fstab). /mnt/settings is the one
     ;;    path outside /ujima; never target the /ujima root itself — only named children.

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Circle — UjimaOS</title>
+<link rel="stylesheet" href="/circle.css">
+</head>
+<body>
+
+<header class="head">
+  <div class="title">
+    <svg width="27" height="27" viewBox="0 0 24 24" aria-hidden="true">
+      <g fill="#88c0d0">
+        <circle cx="12" cy="3.6" r="1.8"/><circle cx="17.9" cy="6.1" r="1.8"/>
+        <circle cx="20.4" cy="12" r="1.8"/><circle cx="17.9" cy="17.9" r="1.8"/>
+        <circle cx="12" cy="20.4" r="1.8"/><circle cx="6.1" cy="17.9" r="1.8"/>
+        <circle cx="3.6" cy="12" r="1.8"/><circle cx="6.1" cy="6.1" r="1.8"/>
+      </g>
+    </svg>
+    <h1>Circle</h1>
+  </div>
+  <span class="counts" id="counts"></span>
+  <div class="grow"></div>
+  <div class="seg" role="group" aria-label="View">
+    <button id="vring" class="on" onclick="setView('ring')">Ring</button>
+    <button id="vgrid" onclick="setView('grid')">Grid</button>
+  </div>
+  <button class="hbtn choose" id="all">Choose all</button>
+  <button class="hbtn clear" id="none">Clear</button>
+</header>
+
+<main id="stage" aria-label="Machines"></main>
+
+<div class="bar" id="bar">
+  <div class="status" id="status" hidden></div>
+  <div class="verbs" id="verbs"></div>
+</div>
+
+<div class="ovl" id="ovl"><div class="sheet" id="sheet"></div></div>
+
+<script src="/circle.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-{:paths ["runtime/src" "tools/src" "os/src"]
+{:paths ["runtime/src" "tools/src" "os/src" "desktop/circle/src"]
 
  :deps {http-kit/http-kit {:mvn/version "2.8.0"}
         cheshire/cheshire {:mvn/version "5.13.0"}
@@ -40,6 +40,11 @@
   {:doc "Loop-device utility: attach | detach | list"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "loopback" *command-line-args*)}
+
+  circle
+  {:doc "Circle dev server (mock fleet) on :1338"
+   :requires ([circle.main :as circle])
+   :task (circle/-main)}
 
   repl
   {:doc "Start Ujima dev REPL"

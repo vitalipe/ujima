@@ -27,12 +27,10 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .ic{display:inline-flex;flex:none}
 .ic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
-/* ── header ─────────────────────────────────────────────────────────────── */
-.head{display:flex;align-items:center;gap:12px;padding:22px 28px 8px;flex-wrap:wrap}
-.title{display:flex;align-items:center;gap:11px}
-.title h1{font-size:24px;font-weight:700;letter-spacing:-.4px;line-height:1}
-.counts{font-size:13px;color:var(--dim);margin-left:2px}
-.head .grow{flex:1}
+/* ── floating chrome (no header bar) ────────────────────────────────────── */
+.counts{position:fixed;top:20px;left:20px;z-index:15;font-size:13px;color:var(--dim)}
+.fcontrols{position:fixed;top:14px;right:16px;z-index:15;
+  display:flex;align-items:center;gap:10px}
 .txtbtn{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;
   color:var(--dim);padding:8px 10px;border-radius:9px;transition:background .15s,color .15s}
 .txtbtn:hover{background:rgba(255,255,255,.07);color:var(--text)}
@@ -135,11 +133,9 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .nfoot .snd{width:13px;height:13px;color:var(--faint)}
 .selftag{font-size:9.5px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700;
   color:rgba(var(--frost),.9)}
-.node.small .nname{font-size:11.5px;max-width:68px}
-.node.small .napp{font-size:10px;max-width:70px;gap:4px}
-.node.small .nfoot{min-height:13px}
-.node.small .nfoot .snd{width:11px;height:11px}
-.node.small .chip{font-size:8px;padding:1px 6px}
+/* dense rings: icon + name only — the screen already tells the state */
+.node.small .nname{font-size:11.5px;max-width:86px}
+.node.small .napp,.node.small .nfoot{display:none}
 
 .chip{font-size:9px;text-transform:uppercase;letter-spacing:.8px;font-weight:700;
   padding:2px 8px;border-radius:999px;white-space:nowrap;transition:opacity .45s ease}
@@ -154,7 +150,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 
 /* ── GRID view ──────────────────────────────────────────────────────────── */
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));
-  gap:14px;padding:8px 28px 148px}
+  gap:14px;padding:64px 28px 148px}
 @media (max-width:640px){.grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));padding:8px 16px 168px}}
 .card{position:relative;display:flex;flex-direction:column;gap:7px;min-height:118px;
   background:var(--panel);border-radius:18px;padding:14px 14px 12px;

@@ -243,7 +243,7 @@ function renderRing(){
   const self   = M.find(m => m.self);
 
   const W = Math.min(window.innerWidth - 40, 980);
-  const H = Math.max(window.innerHeight - 235, 430);
+  const H = Math.max(window.innerHeight - 160, 430);   // floating chrome + bar
   const cx = W/2, cy = H/2;
   const R  = Math.min(W, H)/2 - 66;
 

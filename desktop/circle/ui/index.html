@@ -8,20 +8,17 @@
 </head>
 <body>
 
-<span class="counts" id="counts"></span>
+<div class="toast" id="toast" aria-live="polite"></div>
 <div class="fcontrols">
   <div class="seg" role="group" aria-label="View">
     <button id="vring" class="on" onclick="setView('ring')">Ring</button>
     <button id="vgrid" onclick="setView('grid')">Grid</button>
   </div>
-  <button class="hbtn choose" id="all">Choose all</button>
-  <button class="hbtn clear" id="none">Clear</button>
 </div>
 
 <main id="stage" aria-label="Machines"></main>
 
 <div class="bar" id="bar">
-  <div class="status" id="status" hidden></div>
   <div class="verbs" id="verbs"></div>
 </div>
 

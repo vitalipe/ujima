@@ -163,19 +163,16 @@ function appRow(m, cls){   /* cls: 'napp' (ring) or 'approw' (grid) */
 function render(){
   if (!S) return;
   run = runView();
-  const online = M.filter(m => m.online).length;
-  $('counts').textContent = `${M.length} machines · ${online} on`;
   $('stage').className = view === 'ring' ? 'ringstage' : '';
-  $('all').disabled = $('none').disabled = busyNow();
   $('vring').classList.toggle('on', view === 'ring');
   $('vgrid').classList.toggle('on', view === 'grid');
 
   view === 'ring' ? renderRing() : renderGrid();
 
   const bar = $('bar');
-  bar.classList.toggle('show', sel.size > 0 || !!run);
+  bar.classList.toggle('show', sel.size > 0);
   bar.classList.toggle('busy', busyNow());
-  renderStatus();
+  renderToast();
   renderVerbs();
 }
 
@@ -233,9 +230,12 @@ function nodeInner(m){
 }
 function centerInner(self){
   if (!self) return '';
+  const targets = M.filter(m => !m.self && m.online);
+  const all     = targets.length > 0 && targets.every(m => sel.has(m.id));
   return `${monSvg()}
     <span class="nname">${esc(self.name)}</span>
-    <span class="selftag">this computer</span>`;
+    <span class="selftag">this computer</span>
+    <span class="hubpill">${all ? 'clear all' : 'choose all'}</span>`;
 }
 function setInner(el, html){ if (el.innerHTML !== html) el.innerHTML = html; }
 
@@ -340,18 +340,22 @@ function card(m){
   </div>`;
 }
 
-/* ── bar ─────────────────────────────────────────────────────────────────── */
-function renderStatus(){
-  const st = $('status');
-  st.classList.toggle('fade', !!(run && run.fading));
-  if (!run){ st.hidden = true; st.innerHTML = ''; return; }
-  st.hidden = false;
+/* ── toast (top-center): counts when idle, progress and results for a run ── */
+function renderToast(){
+  const t      = $('toast');
+  const fading = !!(run && run.fading);
+  if (!run){
+    t.className = 'toast';
+    t.innerHTML = `${M.length} machines · ${M.filter(m => m.online).length} on`;
+    return;
+  }
+  t.className = 'toast panel' + (fading ? ' fade' : '');
   if (!run.finished){
-    st.innerHTML = `<b>${run.label}</b> · ${run.done} of ${run.total}…`;
+    t.innerHTML = `<b>${run.label}</b><span>·</span><span>${run.done} of ${run.total}…</span>`;
   } else {
     const c = {ok:0, accepted:0, fail:0, noreply:0};
     run.res.forEach(v => { if (v in c) c[v]++; });
-    st.innerHTML = `<b>${run.label}</b>
+    t.innerHTML = `<b>${run.label}</b>
       ${c.ok ? `<span class="ok">${c.ok} done</span>` : ''}
       ${c.accepted ? `<span class="ok">${c.accepted} accepted</span>` : ''}
       ${c.fail ? `<span class="fail">${c.fail} failed</span>` : ''}
@@ -385,7 +389,10 @@ function renderVerbs(){
         <button class="verb danger" onclick="confirmRestart()">${ic('boot')}Restart</button>
         <button class="verb danger" onclick="confirmPoweroff()">${ic('pwr')}Power off</button>
       </div>
-    </div>`;
+    </div>
+    <button class="selx" onclick="clearSel()" title="clear selection" aria-label="clear selection">
+      <span class="ic"><svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span>
+    </button>`;
 }
 
 /* ── selection ───────────────────────────────────────────────────────────── */
@@ -417,8 +424,7 @@ function toggleAll(){
   render();
 }
 function setView(v){ view = v; render(); }
-$('all').onclick  = () => { clearSettled(); M.forEach(m => { if (!m.self && m.online) sel.add(m.id); }); render(); };
-$('none').onclick = () => { clearSettled(); sel.clear(); render(); };
+function clearSel(){ clearSettled(); sel.clear(); render(); }
 window.addEventListener('resize', () => { if (view === 'ring') render(); });
 
 /* ── sheets ──────────────────────────────────────────────────────────────── */

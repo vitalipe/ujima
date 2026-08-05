@@ -28,20 +28,22 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .ic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── floating chrome (no header bar) ────────────────────────────────────── */
-.counts{position:fixed;top:20px;left:20px;z-index:15;font-size:13px;color:var(--dim)}
 .fcontrols{position:fixed;top:14px;right:16px;z-index:15;
   display:flex;align-items:center;gap:10px}
+
+/* the toast: counts when idle, one action's progress/results while it runs */
+.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:15;
+  display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);
+  white-space:nowrap;transition:opacity .45s ease}
+.toast b{color:var(--text);font-weight:650}
+.toast.panel{background:var(--panel);border:1px solid var(--panel-brd);border-radius:12px;
+  padding:9px 16px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:12.5px}
+.toast .ok{color:rgb(var(--ok))}
+.toast .fail{color:rgb(var(--danger))}
+.toast.fade{opacity:0}
 .txtbtn{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;
   color:var(--dim);padding:8px 10px;border-radius:9px;transition:background .15s,color .15s}
 .txtbtn:hover{background:rgba(255,255,255,.07);color:var(--text)}
-
-.hbtn{font-size:12.5px;font-weight:650;padding:9px 15px;border-radius:11px;
-  transition:background .15s;white-space:nowrap}
-.hbtn.choose{color:var(--text);background:rgba(var(--sel),.15);box-shadow:inset 0 0 0 1px rgba(var(--sel),.4)}
-.hbtn.choose:hover{background:rgba(var(--sel),.23)}
-.hbtn.clear{color:var(--dim);background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.09)}
-.hbtn.clear:hover{background:rgba(255,255,255,.1);color:var(--text)}
-.hbtn:disabled{opacity:.35;pointer-events:none}
 
 .seg{display:flex;gap:2px;background:rgba(22,26,32,.55);border-radius:11px;padding:3px;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
@@ -138,6 +140,11 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .nfoot .snd{width:13px;height:13px;color:var(--faint)}
 .selftag{font-size:9.5px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700;
   color:rgba(var(--frost),.9)}
+.hubpill{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;
+  color:var(--dim);background:rgba(255,255,255,.06);padding:3px 10px;border-radius:999px;
+  margin-top:3px;transition:background .15s,color .15s}
+.node.center:hover .hubpill{color:var(--text);background:rgba(var(--sel),.2)}
+.ringwrap.lock .hubpill{opacity:.35}
 /* small classes get big machines; the center scales with its peers */
 .node.big .mon{width:76px;height:66px}
 .node.big .nname{font-size:15.5px;max-width:132px}
@@ -202,16 +209,13 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
   padding:10px 14px 11px;display:flex;flex-direction:column;gap:8px;
   box-shadow:0 12px 32px rgba(0,0,0,.45);transition:transform .22s ease}
 .bar.show{transform:translate(-50%,0)}
-.status{display:flex;align-items:center;gap:12px;font-size:12.5px;color:var(--dim);padding:0 4px;
-  transition:opacity .45s ease}
-.status.fade{opacity:0}
-.status[hidden]{display:none}
-.status b{color:var(--text);font-weight:650}
-.status .ok{color:rgb(var(--ok))}
-.status .fail{color:rgb(var(--danger))}
-.status .txtbtn{margin-left:auto;padding:5px 9px}
 /* one line when it fits, a stacked column when it doesn't — never a partial wrap */
 .verbs{display:flex;align-items:flex-end;gap:18px}
+.selx{align-self:flex-end;margin:0 0 3px 4px;width:32px;height:32px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;color:var(--faint);
+  transition:background .15s,color .15s}
+.selx .ic{width:14px;height:14px}
+.selx:hover{background:rgba(255,255,255,.07);color:var(--text)}
 @media (max-width:1239px){
   .verbs{flex-direction:column;align-items:flex-start;gap:8px}
   .count{padding:0 4px}

@@ -54,7 +54,6 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 /* ── RING view ──────────────────────────────────────────────────────────── */
 .ringwrap{position:relative;margin:0 auto}
 .spokes{position:absolute;inset:0;pointer-events:none}
-.orbit{fill:none;stroke:rgba(255,255,255,.07);stroke-width:1.5}
 /* threads are invisible at rest and only exist while a command is in flight:
    a faint guide while pending, a dead red dash for a machine that never
    answered. Answers hand off to the machine frame and the thread fades.

@@ -268,14 +268,11 @@ function renderRing(){
                  ux: Math.cos(a), uy: Math.sin(a)};
   });
 
-  /* the orbit passes through every peer glyph's midpoint (they all sit d*0.24
-     above their box centers, so its center shifts up by the same amount).
-     Each peer gets a thread line plus a packet line: the packet is a short
+  /* each peer gets a thread line plus a packet line: the packet is a short
      dash swept along the same geometry by animating stroke-dashoffset —
      dasharray's gap exceeds the line length so only one dash is ever visible */
   const iconR = d < 96 ? 20 : 26;
   const cix = cx, ciy = cy - centerD*0.13;      // center glyph midpoint
-  const orbit = `<circle class="orbit" cx="${cx}" cy="${cy - d*0.24}" r="${R}"/>`;
   const spokes = others.map((m, i) => {
     const p  = pos[m.id];
     const ix = p.x, iy = p.y - d*0.24;
@@ -296,7 +293,7 @@ function renderRing(){
 
   $('stage').innerHTML = `
     <div class="ringwrap ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
-      <svg class="spokes" width="${W}" height="${H}">${orbit}${spokes}</svg>
+      <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
       <div id="ring-center" class="node center" style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">${centerInner(self)}</div>
       ${nodes}
     </div>`;

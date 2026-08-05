@@ -28,6 +28,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .ic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── floating chrome (no header bar) ────────────────────────────────────── */
+.selfnote{position:fixed;top:22px;left:20px;z-index:15;font-size:11.5px;color:var(--faint)}
 .fcontrols{position:fixed;top:14px;right:16px;z-index:15;
   display:flex;align-items:center;gap:10px}
 
@@ -83,18 +84,18 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 /* the flat computer: screen = state, frame stroke = selection/result */
 .mon{width:46px;height:40px;display:block;flex:none}
 .node.small .mon{width:36px;height:31px}
-.node.center .mon{width:62px;height:54px}
+.node.center .mon{width:76px;height:66px}
 .mon-frame{fill:#20262e;stroke:rgba(255,255,255,.16);stroke-width:1.5;transition:stroke .15s ease}
 .mon-stand{fill:#20262e;stroke:rgba(255,255,255,.1);stroke-width:1}
 
 /* the screen shows state: tint + glyph, both eased by class changes */
 .mon-screen{fill:#12181f;transition:fill .45s ease}
+.node.center .mon-screen{fill:rgba(var(--frost),.12)}
 .node.off .mon-screen{fill:#0a0c0e}
 .node.locked .mon-screen{fill:rgba(var(--warn),.16)}
 .node.busy .mon-screen{fill:rgba(var(--sel),.15)}
 .node.res-ok .mon-screen,.node.res-accepted .mon-screen{fill:rgba(var(--ok),.17)}
 .node.res-fail .mon-screen,.node.res-noreply .mon-screen{fill:rgba(var(--danger),.15)}
-.node.center .mon-screen{fill:rgba(var(--frost),.14)}
 
 .scr{opacity:0;transition:opacity .45s ease}
 .scr rect,.scr path,.scr polyline,.scr line{fill:none;stroke-linecap:round;stroke-linejoin:round}
@@ -114,9 +115,35 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.pickable:hover .mon-frame{stroke:rgba(255,255,255,.4)}
 .node.sel .mon-frame,.node.sel:hover .mon-frame{stroke:rgba(var(--sel),.9);stroke-width:2}
 .node.sel .nname{color:rgb(var(--sel))}
-.node.center{cursor:pointer}
-.node.center .mon-frame{stroke:rgba(var(--frost),.55)}
-.node.center:hover .mon-frame{stroke:rgba(var(--frost),.85)}
+/* the hub is a machine glyph like its peers — its screen carries the run
+   state through the same classes (busy dots / check / X), frost when idle */
+.node.center{cursor:pointer;gap:5px;padding:0 16px}
+.node.center > *{transition:opacity .45s ease}
+.node.center.fading > *{opacity:0}
+.node.center .mon-frame{stroke:rgba(var(--frost),.5)}
+.node.center:hover .mon-frame{stroke:rgba(var(--frost),.8)}
+.hubpills{display:flex;gap:6px;align-items:center}
+.hubdismiss{width:26px;height:26px;border-radius:999px;display:flex;align-items:center;
+  justify-content:center;color:var(--faint);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
+  transition:background .15s,color .15s}
+.hubdismiss:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.hubdismiss .ic{width:11px;height:11px}
+.hubcount{font-size:13px;color:var(--dim)}
+.hubsel{font-size:17px;font-weight:700;color:rgb(var(--sel))}
+.hubverb{font-size:15px;font-weight:700}
+.hubprog{font-size:13px;color:var(--dim)}
+.hubres{display:flex;flex-direction:column;gap:2px;align-items:center;
+  font-size:12.5px;color:var(--dim)}
+.hubres .ok{color:rgb(var(--ok))}
+.hubres .fail{color:rgb(var(--danger))}
+/* per-machine retry, sitting on the broken thread itself */
+.lineretry{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;
+  border-radius:999px;background:var(--panel);color:rgb(var(--danger));
+  box-shadow:inset 0 0 0 1.5px rgba(var(--danger),.55),0 4px 12px rgba(0,0,0,.4);
+  display:none;align-items:center;justify-content:center;z-index:5}
+.lineretry.on{display:flex}
+.lineretry:hover{background:rgba(var(--danger),.18);color:var(--text)}
+.lineretry .ic{width:13px;height:13px}
 /* hovering the hub whispers "these will be chosen" on every eligible machine */
 #ring-center:hover ~ .node:not(.off):not(.sel) .mon-frame{stroke:rgba(var(--sel),.45)}
 /* ring results on the monitor frame (grid keeps chips); after .sel so they win */
@@ -128,7 +155,6 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 
 .nname{font-size:13.5px;font-weight:650;letter-spacing:-.2px;max-width:92px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.node.center .nname{font-size:16px}
 .napp{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;min-height:15px;max-width:94px}
 .napp .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .napp .catdot{width:7px;height:7px;border-radius:2px;flex:none;background:rgb(var(--cat,105,113,128))}
@@ -142,7 +168,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
   color:rgba(var(--frost),.9)}
 .hubpill{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;
   color:var(--dim);background:rgba(255,255,255,.06);padding:3px 10px;border-radius:999px;
-  margin-top:3px;transition:background .15s,color .15s}
+  margin-top:3px;white-space:nowrap;transition:background .15s,color .15s}
 .node.center:hover .hubpill{color:var(--text);background:rgba(var(--sel),.2)}
 .ringwrap.lock .hubpill{opacity:.35}
 /* small classes get big machines; the center scales with its peers */
@@ -151,8 +177,6 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.big .napp{font-size:12.5px;max-width:134px}
 .node.mid .mon{width:56px;height:49px}
 .node.mid .nname{font-size:14px;max-width:106px}
-.ringwrap.tier-big .node.center .mon{width:86px;height:75px}
-.ringwrap.tier-mid .node.center .mon{width:72px;height:63px}
 /* dense rings: icon + name only — the screen already tells the state */
 .node.small .nname{font-size:11.5px;max-width:86px}
 .node.small .napp,.node.small .nfoot{display:none}

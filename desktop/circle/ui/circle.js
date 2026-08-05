@@ -64,11 +64,14 @@ async function poll(){
   render();
 }
 
-function post(verb, extra){
+let lastPost = null;   // {verb, extra} this panel sent — retry needs the args
+
+function post(verb, extra, targets){
+  lastPost = {verb, extra: extra || {}};
   fetch('/circle/' + verb, {
     method: 'POST',
     headers: {'content-type': 'application/json'},
-    body: JSON.stringify(Object.assign({targets: [...sel]}, extra || {}))
+    body: JSON.stringify(Object.assign({targets: targets || [...sel]}, extra || {}))
   }).then(poll);
 }
 
@@ -103,6 +106,23 @@ function clearSettled(){
       render();
     }
   }, FADE_MS);
+}
+
+/* retry the machines that failed or never answered — same verb, same args,
+   fewer targets. Only for an action this panel itself sent (we hold the args) */
+function canRetry(){
+  return !!(lastAction && !lastAction.live && lastPost && lastPost.verb === lastAction.verb);
+}
+function retryOne(e, id){
+  e.stopPropagation();
+  if (busyNow() || !canRetry()) return;
+  post(lastPost.verb, lastPost.extra, [id]);
+  lastAction = null;
+  render();
+}
+function lineRetryOn(m){
+  return !!(run && run.finished && !run.fading && canRetry() &&
+            (run.res.get(m.id) === 'fail' || run.res.get(m.id) === 'noreply'));
 }
 
 function runView(){
@@ -163,6 +183,8 @@ function appRow(m, cls){   /* cls: 'napp' (ring) or 'approw' (grid) */
 function render(){
   if (!S) return;
   run = runView();
+  const self = M.find(m => m.self);
+  $('selfnote').textContent = self ? `this computer · ${self.name}` : '';
   $('stage').className = view === 'ring' ? 'ringstage' : '';
   $('vring').classList.toggle('on', view === 'ring');
   $('vgrid').classList.toggle('on', view === 'grid');
@@ -188,6 +210,9 @@ function spokeCls(m){
 }
 function packetCls(m){
   return 'packet' + ((run && run.pending.has(m.id)) ? ' on' : '');
+}
+function retryCls(m){
+  return 'lineretry' + (lineRetryOn(m) ? ' on' : '');
 }
 function nodeCls(m, tierCls){
   const res = (run && !run.fading && run.res.has(m.id)) && 'res-' + run.res.get(m.id);
@@ -228,28 +253,79 @@ function nodeInner(m){
     ${appRow(m, 'napp')}
     <div class="nfoot">${sndHtml(m)}</div>`;
 }
-function centerInner(self){
-  if (!self) return '';
+/* the hub is mission control: a bigger machine glyph whose screen carries the
+   run state through the SAME classes the peers use (busy dots / check / X),
+   with fleet counts + selection pills when idle and results + dismiss after */
+function dismissResult(e){
+  e.stopPropagation();
+  clearSettled();
+}
+function pillAll(e){
+  e.stopPropagation();
+  if (busyNow()) return;
+  clearSettled();
+  M.forEach(m => { if (!m.self && m.online) sel.add(m.id); });
+  render();
+}
+function pillClear(e){
+  e.stopPropagation();
+  if (busyNow()) return;
+  clearSel();
+}
+
+function hubCls(){
+  const bad = run && run.finished &&
+              [...run.res.values()].some(s => s === 'fail' || s === 'noreply');
+  return ['node center',
+          run && !run.finished && 'busy',
+          run && run.finished && !run.fading && (bad ? 'res-fail' : 'res-ok'),
+          run && run.fading && 'fading'].filter(Boolean).join(' ');
+}
+
+function centerInner(){
+  if (run && !run.finished)
+    return `${monSvg()}<span class="hubverb">${run.label}</span>
+      <span class="hubprog">${run.done} of ${run.total}…</span>`;
+  if (run && run.finished){
+    const c = {ok:0, accepted:0, fail:0, noreply:0};
+    run.res.forEach(v => { if (v in c) c[v]++; });
+    const bad = c.fail + c.noreply;
+    return `${monSvg()}<span class="hubverb">${run.label}</span>
+      <span class="hubres">
+        ${c.ok ? `<span class="ok">${c.ok} done</span>` : ''}
+        ${c.accepted ? `<span class="ok">${c.accepted} accepted</span>` : ''}
+        ${c.fail ? `<span class="fail">${c.fail} failed</span>` : ''}
+        ${c.noreply ? `<span>${c.noreply} no reply</span>` : ''}</span>
+      ${bad ? `<button class="hubdismiss" onclick="dismissResult(event)" title="dismiss" aria-label="dismiss results">
+          <span class="ic"><svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span>
+        </button>` : ''}`;
+  }
+  const online  = M.filter(m => m.online).length;
   const targets = M.filter(m => !m.self && m.online);
   const all     = targets.length > 0 && targets.every(m => sel.has(m.id));
-  return `${monSvg()}
-    <span class="nname">${esc(self.name)}</span>
-    <span class="selftag">this computer</span>
-    <span class="hubpill">${all ? 'clear all' : 'choose all'}</span>`;
+  const pills   = sel.size === 0
+    ? `<button class="hubpill" onclick="pillAll(event)">choose all</button>`
+    : all
+    ? `<button class="hubpill" onclick="pillClear(event)">clear all</button>`
+    : `<span class="hubpills">
+         <button class="hubpill" onclick="pillAll(event)">choose all</button>
+         <button class="hubpill" onclick="pillClear(event)">clear</button></span>`;
+  return `${monSvg()}<span class="hubcount">${M.length} machines · ${online} on</span>
+    ${sel.size ? `<span class="hubsel">${sel.size} chosen</span>` : ''}
+    ${pills}`;
 }
 function setInner(el, html){ if (el.innerHTML !== html) el.innerHTML = html; }
 
 /* size tiers by population: the ring always spans the available space, and
-   the machines grow as the class shrinks (cStart = spoke offset at the hub) */
+   the machines grow as the class shrinks */
 function ringTier(n){
-  if (n <= 8)  return {cls: 'big',   d: 170, iconR: 40, iconOff: 30, cStart: 48};
-  if (n <= 13) return {cls: 'mid',   d: 132, iconR: 30, iconOff: 28, cStart: 44};
-  return       {cls: 'small', d: 76,  iconR: 20, iconOff: 9,  cStart: 40};
+  if (n <= 8)  return {cls: 'big',   d: 170, iconR: 40, iconOff: 30};
+  if (n <= 13) return {cls: 'mid',   d: 132, iconR: 30, iconOff: 28};
+  return       {cls: 'small', d: 76,  iconR: 20, iconOff: 9};
 }
 
 function renderRing(){
   const others = M.filter(m => !m.self);
-  const self   = M.find(m => m.self);
 
   const W = Math.min(window.innerWidth - 40, 980);
   const H = Math.max(window.innerHeight - 160, 430);   // floating chrome + bar
@@ -257,7 +333,7 @@ function renderRing(){
 
   const n    = Math.max(others.length, 1);
   const tier = ringTier(n);
-  const d    = tier.d, centerD = 150, gap = 5;
+  const d    = tier.d, centerD = 176, gap = 5;
   const maxR = Math.min(W, H)/2 - d/2 - 26;
   const minR = centerD/2 + gap + d/2 + 8;
   const R    = Math.max(minR, maxR);
@@ -272,12 +348,15 @@ function renderRing(){
     for (const m of others){
       $('spoke-' + m.id).setAttribute('class', spokeCls(m));
       $('packet-' + m.id).setAttribute('class', packetCls(m));
+      $('retry-' + m.id).setAttribute('class', retryCls(m));
       const node = $('node-' + m.id);
       node.setAttribute('class', nodeCls(m, tier.cls));
       node.setAttribute('aria-checked', sel.has(m.id));
       setInner(node, nodeInner(m));
     }
-    setInner($('ring-center'), centerInner(self));
+    const hub = $('ring-center');
+    hub.setAttribute('class', hubCls());
+    setInner(hub, centerInner());
     return;
   }
 
@@ -292,15 +371,20 @@ function renderRing(){
      dash swept along the same geometry by animating stroke-dashoffset —
      dasharray's gap exceeds the line length so only one dash is ever visible */
   const iconR = tier.iconR;
-  const cix = cx, ciy = cy - centerD*0.13;      // center glyph midpoint
+  const hubR  = centerD/2 + gap;                // threads start at the hub's edge
+  const retryBtns = [];
   const spokes = others.map((m, i) => {
     const p  = pos[m.id];
     const ix = p.x, iy = p.y - tier.iconOff;
-    const vx = ix - cix, vy = iy - ciy, dl = Math.hypot(vx, vy);
+    const vx = ix - cx, vy = iy - cy, dl = Math.hypot(vx, vy);
     const ux = vx/dl, uy = vy/dl;
-    const x1 = cix + ux*tier.cStart,  y1 = ciy + uy*tier.cStart;
+    const x1 = cx + ux*hubR,          y1 = cy + uy*hubR;
     const x2 = ix - ux*(iconR + gap), y2 = iy - uy*(iconR + gap);
     const L  = Math.ceil(Math.hypot(x2 - x1, y2 - y1));
+    retryBtns.push(`<button id="retry-${m.id}" class="${retryCls(m)}"
+      style="left:${(x1 + x2)/2}px;top:${(y1 + y2)/2}px"
+      onclick="retryOne(event, '${m.id}')" title="retry ${esc(m.name)}" aria-label="retry ${esc(m.name)}">
+      <span class="ic"><svg viewBox="0 0 24 24">${I.boot}</svg></span></button>`);
     return `<line id="spoke-${m.id}" class="${spokeCls(m)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>
       <line id="packet-${m.id}" class="${packetCls(m)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
             stroke-dasharray="12 ${L + 24}" style="--end:${-L}px;--delay:${(i % 5) * .15}s"/>`;
@@ -314,10 +398,11 @@ function renderRing(){
   $('stage').innerHTML = `
     <div class="ringwrap tier-${tier.cls} ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
       <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
-      <div id="ring-center" class="node center" role="button" tabindex="0"
+      <div id="ring-center" class="${hubCls()}" role="button" tabindex="0"
            aria-label="choose all or clear"
-           style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">${centerInner(self)}</div>
+           style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">${centerInner()}</div>
       ${nodes}
+      ${retryBtns.join('')}
     </div>`;
 }
 
@@ -340,10 +425,15 @@ function card(m){
   </div>`;
 }
 
-/* ── toast (top-center): counts when idle, progress and results for a run ── */
+/* ── toast (top-center): the grid's info home — the ring shows it in the hub ── */
 function renderToast(){
   const t      = $('toast');
   const fading = !!(run && run.fading);
+  if (view === 'ring'){
+    t.className = 'toast';
+    t.innerHTML = '';
+    return;
+  }
   if (!run){
     t.className = 'toast';
     t.innerHTML = `${M.length} machines · ${M.filter(m => m.online).length} on`;
@@ -403,6 +493,7 @@ $('stage').addEventListener('click', e => {
 });
 $('stage').addEventListener('keydown', e => {
   if (e.key !== ' ' && e.key !== 'Enter') return;
+  if (e.target.closest('.hubpill,.hubdismiss,.lineretry')) return;   // buttons handle their own keys
   if (e.target.closest('#ring-center')){ e.preventDefault(); return toggleAll(); }
   const el = e.target.closest('[data-id]'); if (!el) return;
   e.preventDefault(); toggle(byId(el.dataset.id));

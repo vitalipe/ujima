@@ -180,12 +180,17 @@ function render(){
 }
 
 /* ── RING render ─────────────────────────────────────────────────────────── */
-function spokeCls(m){   /* result colors stay with the labels; both leave on the fade */
+/* threads exist only while a command is in flight; a machine that answered
+   hands its thread off to the frame color, one that never answered keeps a
+   dead red-dashed thread until the results clear. Selection draws no lines. */
+function spokeCls(m){
   let cls = 'spoke';
   if (run && !run.fading && run.pending.has(m.id)) cls += ' pending';
-  else if (run && !run.fading && run.res.has(m.id)) cls += ' ' + run.res.get(m.id);
-  else if (sel.has(m.id)) cls += ' sel';
+  else if (run && !run.fading && run.res.get(m.id) === 'noreply') cls += ' noreply';
   return cls;
+}
+function packetCls(m){
+  return 'packet' + ((run && run.pending.has(m.id)) ? ' on' : '');
 }
 function nodeCls(m, d){
   const res = (run && !run.fading && run.res.has(m.id)) && 'res-' + run.res.get(m.id);
@@ -246,6 +251,7 @@ function renderRing(){
     wrap.classList.toggle('lock', busyNow());
     for (const m of others){
       $('spoke-' + m.id).setAttribute('class', spokeCls(m));
+      $('packet-' + m.id).setAttribute('class', packetCls(m));
       const node = $('node-' + m.id);
       node.setAttribute('class', nodeCls(m, d));
       node.setAttribute('aria-checked', sel.has(m.id));
@@ -263,19 +269,24 @@ function renderRing(){
   });
 
   /* the orbit passes through every peer glyph's midpoint (they all sit d*0.24
-     above their box centers, so its center shifts up by the same amount);
-     spokes are invisible at rest and only light up for selection / runs */
+     above their box centers, so its center shifts up by the same amount).
+     Each peer gets a thread line plus a packet line: the packet is a short
+     dash swept along the same geometry by animating stroke-dashoffset —
+     dasharray's gap exceeds the line length so only one dash is ever visible */
   const iconR = d < 96 ? 20 : 26;
   const cix = cx, ciy = cy - centerD*0.13;      // center glyph midpoint
   const orbit = `<circle class="orbit" cx="${cx}" cy="${cy - d*0.24}" r="${R}"/>`;
-  const spokes = others.map(m => {
+  const spokes = others.map((m, i) => {
     const p  = pos[m.id];
     const ix = p.x, iy = p.y - d*0.24;
-    const vx = ix - cix, vy = iy - ciy, len = Math.hypot(vx, vy);
-    const ux = vx/len, uy = vy/len;
+    const vx = ix - cix, vy = iy - ciy, dl = Math.hypot(vx, vy);
+    const ux = vx/dl, uy = vy/dl;
     const x1 = cix + ux*40,           y1 = ciy + uy*40;
     const x2 = ix - ux*(iconR + gap), y2 = iy - uy*(iconR + gap);
-    return `<line id="spoke-${m.id}" class="${spokeCls(m)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    const L  = Math.ceil(Math.hypot(x2 - x1, y2 - y1));
+    return `<line id="spoke-${m.id}" class="${spokeCls(m)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>
+      <line id="packet-${m.id}" class="${packetCls(m)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
+            stroke-dasharray="12 ${L + 24}" style="--end:${-L}px;--delay:${(i % 5) * .15}s"/>`;
   }).join('');
 
   const nodes = others.map(m => `

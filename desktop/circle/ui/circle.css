@@ -55,16 +55,22 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .ringwrap{position:relative;margin:0 auto}
 .spokes{position:absolute;inset:0;pointer-events:none}
 .orbit{fill:none;stroke:rgba(255,255,255,.07);stroke-width:1.5}
-/* spokes are invisible at rest — they appear for selection and runs.
+/* threads are invisible at rest and only exist while a command is in flight:
+   a faint guide while pending, a dead red dash for a machine that never
+   answered. Answers hand off to the machine frame and the thread fades.
    base dasharray "1 0" = solid, but interpolable — dashes ease into a line */
 .spoke{stroke:transparent;stroke-width:1.5;fill:none;stroke-dasharray:1 0;
   transition:stroke .45s ease,stroke-width .45s ease,stroke-dasharray .45s ease}
-.spoke.sel{stroke:rgba(var(--sel),.55)}
-.spoke.pending{stroke:rgba(var(--sel),.75);stroke-width:2;stroke-dasharray:6 10;animation:flow .7s linear infinite}
-@keyframes flow{to{stroke-dashoffset:-16}}
-.spoke.ok,.spoke.accepted{stroke:rgba(var(--ok),.45);stroke-width:2}
-.spoke.fail{stroke:rgba(var(--danger),.6);stroke-width:2}
+.spoke.pending{stroke:rgba(var(--sel),.22)}
 .spoke.noreply{stroke:rgba(var(--danger),.45);stroke-width:2;stroke-dasharray:3 6}
+
+/* the packet: one short bright dash swept down the line (gap > line length),
+   staggered per target via --delay; --end = -length puts it just past the tip */
+.packet{fill:none;stroke:rgba(var(--sel),.9);stroke-width:2.5;stroke-linecap:round;
+  visibility:hidden}
+.packet.on{visibility:visible;animation:packet 1s linear infinite;
+  animation-delay:var(--delay,0s)}
+@keyframes packet{from{stroke-dashoffset:12}to{stroke-dashoffset:var(--end,-400px)}}
 
 .node{position:absolute;width:116px;height:116px;
   transform:translate(-50%,-50%);

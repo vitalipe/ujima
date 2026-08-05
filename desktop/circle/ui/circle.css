@@ -85,11 +85,30 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.center .mon{width:62px;height:54px}
 .mon-frame{fill:#20262e;stroke:rgba(255,255,255,.16);stroke-width:1.5;transition:stroke .15s ease}
 .mon-stand{fill:#20262e;stroke:rgba(255,255,255,.1);stroke-width:1}
-.mon-screen{fill:#0d1013}
-.mon-screen.locked{fill:rgba(var(--warn),.16)}
-.mon-screen.dead{fill:#0a0c0e}
-.mon-lock rect,.mon-lock path{fill:none;stroke:rgb(var(--warn));stroke-width:1.6;
-  stroke-linecap:round;stroke-linejoin:round}
+
+/* the screen shows state: tint + glyph, both eased by class changes */
+.mon-screen{fill:#12181f;transition:fill .45s ease}
+.node.off .mon-screen{fill:#0a0c0e}
+.node.locked .mon-screen{fill:rgba(var(--warn),.16)}
+.node.busy .mon-screen{fill:rgba(var(--sel),.15)}
+.node.res-ok .mon-screen,.node.res-accepted .mon-screen{fill:rgba(var(--ok),.17)}
+.node.res-fail .mon-screen,.node.res-noreply .mon-screen{fill:rgba(var(--danger),.15)}
+.node.center .mon-screen{fill:rgba(var(--frost),.14)}
+
+.scr{opacity:0;transition:opacity .45s ease}
+.scr rect,.scr path,.scr polyline,.scr line{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.scr-lock rect,.scr-lock path{stroke:rgb(var(--warn));stroke-width:1.6}
+.scr-ok polyline{stroke:rgba(var(--ok),.95);stroke-width:2.2}
+.scr-err line{stroke:rgba(var(--danger),.9);stroke-width:2.2}
+.scr-load circle{fill:rgba(var(--sel),.9)}
+.node.locked .scr-lock{opacity:1}
+.node.busy .scr-load{opacity:1}
+.node.res-ok .scr-ok,.node.res-accepted .scr-ok{opacity:1}
+.node.res-fail .scr-err,.node.res-noreply .scr-err{opacity:1}
+.node.busy .scr-load circle{animation:blink 1.1s ease-in-out infinite}
+.node.busy .scr-load circle:nth-child(2){animation-delay:.18s}
+.node.busy .scr-load circle:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,100%{opacity:.25}40%{opacity:1}}
 
 .node.pickable:hover .mon-frame{stroke:rgba(255,255,255,.4)}
 .node.sel .mon-frame,.node.sel:hover .mon-frame{stroke:rgba(var(--sel),.9);stroke-width:2}

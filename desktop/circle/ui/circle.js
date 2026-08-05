@@ -136,10 +136,9 @@ const ic = k => `<span class="ic"><svg viewBox="0 0 24 24">${I[k]}</svg></span>`
 const $  = id => document.getElementById(id);
 const byId = id => M.find(m => m.id === id);
 
-function slotHtml(m, ring){
+function slotHtml(m){   /* grid only — the ring shows all of this on the screens */
   if (run && run.pending.has(m.id)) return `<span class="spin" title="waiting for reply"></span>`;
   if (run && run.res.has(m.id)){
-    if (ring) return '';   /* the ring shows results as node borders, not chips */
     const r = run.res.get(m.id);
     return {ok:      `<span class="chip ok">Done</span>`,
             accepted:`<span class="chip ok">Accepted</span>`,
@@ -195,35 +194,45 @@ function packetCls(m){
 function nodeCls(m, d){
   const res = (run && !run.fading && run.res.has(m.id)) && 'res-' + run.res.get(m.id);
   return ['node', d < 96 && 'small', !m.online && 'off', sel.has(m.id) && 'sel', res,
+          screenCls(m),
           (run && run.fading) && 'fading',
           (m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
 }
-/* flat computer glyph — the screen carries the machine's state: app category
-   color while running, dark at home, lock when locked, dead when offline */
-function monSvg(m){
-  const cat    = (m.online && !m.locked && m.app) ? (CAT[m.app.c] || '105,113,128') : null;
-  const screen = !m.online ? 'mon-screen dead' : m.locked ? 'mon-screen locked' : 'mon-screen';
-  const fill   = cat ? ` style="fill:rgba(${cat},.5)"` : '';
-  const lock   = (m.online && m.locked)
-    ? `<g class="mon-lock"><rect x="19.5" y="15" width="9" height="7.5" rx="1.5"/>
-         <path d="M21.5 15v-2.6a2.5 2.5 0 0 1 5 0V15"/></g>` : '';
+/* flat computer glyph — the screen shows STATE, not the running app: loading
+   dots in flight, a check on done, an X on error, a lock when locked, dead
+   when offline. Every glyph is always in the markup, hidden by default and
+   revealed by node classes, so the svg never changes and transitions animate */
+function monSvg(){
   return `<svg class="mon" viewBox="0 0 48 42" aria-hidden="true">
     <rect class="mon-frame" x="1.5" y="1.5" width="45" height="31" rx="4.5"/>
-    <rect class="${screen}" x="6" y="6" width="36" height="22" rx="2"${fill}/>
-    ${lock}
+    <rect class="mon-screen" x="6" y="6" width="36" height="22" rx="2"/>
+    <g class="scr scr-lock"><rect x="19.5" y="15" width="9" height="7.5" rx="1.5"/>
+      <path d="M21.5 15v-2.6a2.5 2.5 0 0 1 5 0V15"/></g>
+    <g class="scr scr-load"><circle cx="17" cy="17" r="2.2"/><circle cx="24" cy="17" r="2.2"/><circle cx="31" cy="17" r="2.2"/></g>
+    <g class="scr scr-ok"><polyline points="17.5 17.5 22 22 30.5 12.5"/></g>
+    <g class="scr scr-err"><line x1="19.5" y1="12.5" x2="28.5" y2="21.5"/><line x1="28.5" y1="12.5" x2="19.5" y2="21.5"/></g>
     <path class="mon-stand" d="M19.5 36.5h9l2 4h-13z"/>
   </svg>`;
 }
 
+/* which screen state the machine shows; res-* node classes carry results */
+function screenCls(m){
+  if (!m.online) return '';
+  if (run && run.pending.has(m.id)) return 'busy';
+  if (run && !run.fading && run.res.has(m.id)) return '';
+  if (m.locked) return 'locked';
+  return '';
+}
+
 function nodeInner(m){
-  return `${monSvg(m)}
+  return `${monSvg()}
     <span class="nname">${esc(m.name)}</span>
     ${appRow(m, 'napp')}
-    <div class="nfoot">${sndHtml(m)}${slotHtml(m, true)}</div>`;
+    <div class="nfoot">${sndHtml(m)}</div>`;
 }
 function centerInner(self){
   if (!self) return '';
-  return `${monSvg(self)}
+  return `${monSvg()}
     <span class="nname">${esc(self.name)}</span>
     <span class="selftag">this computer</span>`;
 }

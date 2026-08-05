@@ -84,7 +84,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 /* the flat computer: screen = state, frame stroke = selection/result */
 .mon{width:46px;height:40px;display:block;flex:none}
 .node.small .mon{width:36px;height:31px}
-.node.center .mon{width:76px;height:66px}
+.node.center .mon{width:76px;height:54px}
 .mon-frame{fill:#20262e;stroke:rgba(255,255,255,.16);stroke-width:1.5;transition:stroke .15s ease}
 .mon-stand{fill:#20262e;stroke:rgba(255,255,255,.1);stroke-width:1}
 
@@ -118,24 +118,39 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 /* the hub is a machine glyph like its peers — its screen carries the run
    state through the same classes (busy dots / check / X), frost when idle */
 .node.center{cursor:pointer;gap:5px;padding:0 16px}
-.node.center > *{transition:opacity .45s ease}
-.node.center.fading > *{opacity:0}
 .node.center .mon-frame{stroke:rgba(var(--frost),.5)}
 .node.center:hover .mon-frame{stroke:rgba(var(--frost),.8)}
-.hubpills{display:flex;gap:6px;align-items:center}
-.hubdismiss{width:26px;height:26px;border-radius:999px;display:flex;align-items:center;
-  justify-content:center;color:var(--faint);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
-  transition:background .15s,color .15s}
-.hubdismiss:hover{background:rgba(255,255,255,.07);color:var(--text)}
-.hubdismiss .ic{width:11px;height:11px}
+/* fixed-height slots: content swaps never move the glyph, and text slots fade
+   softly because the elements persist across state changes */
+.hubslot{display:flex;gap:6px;align-items:center;justify-content:center;
+  transition:opacity .45s ease}
+.hubl{min-height:19px}
+.hubmonwrap{position:relative;display:flex}
+/* the hub screen speaks: a slowly turning cog at rest, the armed count when
+   machines are chosen, then the shared busy/check/X language */
+.scr-cog circle,.scr-cog line{stroke:rgba(var(--frost),.75);stroke-width:1.5}
+.node.center.calm .scr-cog{opacity:1;animation:cogturn 24s linear infinite;
+  transform-origin:24px 17px;transform-box:view-box}
+@keyframes cogturn{to{transform:rotate(360deg)}}
+.scr-num{fill:rgb(var(--sel));font-size:13px;font-weight:700}
+.node.center.has-sel .scr-num{opacity:1}
+.node.center.has-sel .mon-screen{fill:rgba(var(--sel),.13)}
+/* the x rides the screen corner and clears whatever the screen is showing */
+.hubx{position:absolute;top:-8px;right:-10px;width:22px;height:22px;border-radius:999px;
+  display:none;align-items:center;justify-content:center;color:var(--faint);
+  background:var(--panel);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);z-index:2;
+  transition:color .15s,background .15s}
+.node.center.has-sel .hubx,.node.center.res-ok .hubx,.node.center.res-fail .hubx{display:flex}
+.hubx:hover{color:var(--text);background:#262d37}
+.hubx .ic{width:10px;height:10px}
+.node.center.fading .hubslot{opacity:0}
+.hubdot{color:var(--faint)}
 .hubcount{font-size:13px;color:var(--dim)}
-.hubsel{font-size:17px;font-weight:700;color:rgb(var(--sel))}
 .hubverb{font-size:15px;font-weight:700}
 .hubprog{font-size:13px;color:var(--dim)}
-.hubres{display:flex;flex-direction:column;gap:2px;align-items:center;
-  font-size:12.5px;color:var(--dim)}
-.hubres .ok{color:rgb(var(--ok))}
-.hubres .fail{color:rgb(var(--danger))}
+.hubl{font-size:12.5px;color:var(--dim)}
+.hubl .ok{color:rgb(var(--ok))}
+.hubl .fail{color:rgb(var(--danger))}
 /* per-machine retry, sitting on the broken thread itself */
 .lineretry{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;
   border-radius:999px;background:var(--panel);color:rgb(var(--danger));
@@ -166,11 +181,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .nfoot .snd{width:13px;height:13px;color:var(--faint)}
 .selftag{font-size:9.5px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700;
   color:rgba(var(--frost),.9)}
-.hubpill{font-size:9.5px;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;
-  color:var(--dim);background:rgba(255,255,255,.06);padding:3px 10px;border-radius:999px;
-  margin-top:3px;white-space:nowrap;transition:background .15s,color .15s}
-.node.center:hover .hubpill{color:var(--text);background:rgba(var(--sel),.2)}
-.ringwrap.lock .hubpill{opacity:.35}
+.ringwrap.lock .hubslot{opacity:.35}
 /* small classes get big machines; the center scales with its peers */
 .node.big .mon{width:76px;height:66px}
 .node.big .nname{font-size:15.5px;max-width:132px}

@@ -147,6 +147,7 @@ const I = {
   boot: '<path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.6 2.6L21 8"/><path d="M21 3v5h-5"/>',
   pwr:  '<path d="M12 2v10"/><path d="M18.4 6.6a9 9 0 1 1-12.8 0"/>',
   check:'<polyline points="20 6 9 17 4 12"/>',
+  x:    '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   unlock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.9-.9"/>',
 };
@@ -225,8 +226,8 @@ function nodeCls(m, tierCls){
    dots in flight, a check on done, an X on error, a lock when locked, dead
    when offline. Every glyph is always in the markup, hidden by default and
    revealed by node classes, so the svg never changes and transitions animate */
-function monSvg(){
-  return `<svg class="mon" viewBox="0 0 48 42" aria-hidden="true">
+function monSvg(hub){
+  return `<svg class="mon" viewBox="0 0 48 ${hub ? 34 : 42}" aria-hidden="true">
     <rect class="mon-frame" x="1.5" y="1.5" width="45" height="31" rx="4.5"/>
     <rect class="mon-screen" x="6" y="6" width="36" height="22" rx="2"/>
     <g class="scr scr-lock"><rect x="19.5" y="15" width="9" height="7.5" rx="1.5"/>
@@ -234,7 +235,15 @@ function monSvg(){
     <g class="scr scr-load"><circle cx="17" cy="17" r="2.2"/><circle cx="24" cy="17" r="2.2"/><circle cx="31" cy="17" r="2.2"/></g>
     <g class="scr scr-ok"><polyline points="17.5 17.5 22 22 30.5 12.5"/></g>
     <g class="scr scr-err"><line x1="19.5" y1="12.5" x2="28.5" y2="21.5"/><line x1="28.5" y1="12.5" x2="19.5" y2="21.5"/></g>
-    <path class="mon-stand" d="M19.5 36.5h9l2 4h-13z"/>
+    ${hub ? `<g class="scr scr-cog">
+        <circle cx="24" cy="17" r="3.1"/>
+        <line x1="30.6" y1="17" x2="28.4" y2="17"/><line x1="17.4" y1="17" x2="19.6" y2="17"/>
+        <line x1="24" y1="10.4" x2="24" y2="12.6"/><line x1="24" y1="23.6" x2="24" y2="21.4"/>
+        <line x1="28.7" y1="12.3" x2="27.1" y2="13.9"/><line x1="28.7" y1="21.7" x2="27.1" y2="20.1"/>
+        <line x1="19.3" y1="12.3" x2="20.9" y2="13.9"/><line x1="19.3" y1="21.7" x2="20.9" y2="20.1"/>
+      </g>
+      <text id="hub-num" class="scr scr-num" x="24" y="21.4" text-anchor="middle">${sel.size || ''}</text>`
+    : '<path class="mon-stand" d="M19.5 36.5h9l2 4h-13z"/>'}
   </svg>`;
 }
 
@@ -256,21 +265,19 @@ function nodeInner(m){
 /* the hub is mission control: a bigger machine glyph whose screen carries the
    run state through the SAME classes the peers use (busy dots / check / X),
    with fleet counts + selection pills when idle and results + dismiss after */
-function dismissResult(e){
-  e.stopPropagation();
-  clearSettled();
-}
-function pillAll(e){
-  e.stopPropagation();
+function selectAll(){
   if (busyNow()) return;
   clearSettled();
   M.forEach(m => { if (!m.self && m.online) sel.add(m.id); });
   render();
 }
-function pillClear(e){
+/* the x on the hub screen's corner clears whatever the screen shows:
+   the armed selection when idle, the settled results after a run */
+function hubX(e){
   e.stopPropagation();
   if (busyNow()) return;
-  clearSel();
+  if (run) clearSettled();
+  else clearSel();
 }
 
 function hubCls(){
@@ -279,40 +286,40 @@ function hubCls(){
   return ['node center',
           run && !run.finished && 'busy',
           run && run.finished && !run.fading && (bad ? 'res-fail' : 'res-ok'),
-          run && run.fading && 'fading'].filter(Boolean).join(' ');
+          run && run.fading && 'fading',
+          !run && (sel.size ? 'has-sel' : 'calm')].filter(Boolean).join(' ');
+}
+
+/* the hub renders into four persistent slots — actions on top, glyph, two
+   text lines — so the svg is never recreated (state transitions stay soft)
+   and content swaps never move the glyph */
+function hubSlots(){
+  if (run && !run.finished)
+    return {l1: `<span class="hubverb">${run.label}</span>`,
+            l2: `<span class="hubprog">${run.done} of ${run.total}…</span>`};
+  if (run){
+    const c = {ok:0, accepted:0, fail:0, noreply:0};
+    run.res.forEach(v => { if (v in c) c[v]++; });
+    return {l1: `<span class="hubverb">${run.label}</span>`,
+            l2: [c.ok ? `<span class="ok">${c.ok} done</span>` : '',
+                 c.accepted ? `<span class="ok">${c.accepted} accepted</span>` : '',
+                 c.fail ? `<span class="fail">${c.fail} failed</span>` : '',
+                 c.noreply ? `<span>${c.noreply} no reply</span>` : '']
+                .filter(Boolean).join('<span class="hubdot">·</span>')};
+  }
+  const online = M.filter(m => m.online).length;
+  return {l1: `<span class="hubcount">${M.length} machines · ${online} on</span>`,
+          l2: ''};
 }
 
 function centerInner(){
-  if (run && !run.finished)
-    return `${monSvg()}<span class="hubverb">${run.label}</span>
-      <span class="hubprog">${run.done} of ${run.total}…</span>`;
-  if (run && run.finished){
-    const c = {ok:0, accepted:0, fail:0, noreply:0};
-    run.res.forEach(v => { if (v in c) c[v]++; });
-    const bad = c.fail + c.noreply;
-    return `${monSvg()}<span class="hubverb">${run.label}</span>
-      <span class="hubres">
-        ${c.ok ? `<span class="ok">${c.ok} done</span>` : ''}
-        ${c.accepted ? `<span class="ok">${c.accepted} accepted</span>` : ''}
-        ${c.fail ? `<span class="fail">${c.fail} failed</span>` : ''}
-        ${c.noreply ? `<span>${c.noreply} no reply</span>` : ''}</span>
-      ${bad ? `<button class="hubdismiss" onclick="dismissResult(event)" title="dismiss" aria-label="dismiss results">
-          <span class="ic"><svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></span>
-        </button>` : ''}`;
-  }
-  const online  = M.filter(m => m.online).length;
-  const targets = M.filter(m => !m.self && m.online);
-  const all     = targets.length > 0 && targets.every(m => sel.has(m.id));
-  const pills   = sel.size === 0
-    ? `<button class="hubpill" onclick="pillAll(event)">choose all</button>`
-    : all
-    ? `<button class="hubpill" onclick="pillClear(event)">clear all</button>`
-    : `<span class="hubpills">
-         <button class="hubpill" onclick="pillAll(event)">choose all</button>
-         <button class="hubpill" onclick="pillClear(event)">clear</button></span>`;
-  return `${monSvg()}<span class="hubcount">${M.length} machines · ${online} on</span>
-    ${sel.size ? `<span class="hubsel">${sel.size} chosen</span>` : ''}
-    ${pills}`;
+  const s = hubSlots();
+  return `<span class="hubmonwrap">${monSvg(true)}
+      <button class="hubx" onclick="hubX(event)" title="clear" aria-label="clear">
+        <span class="ic"><svg viewBox="0 0 24 24">${I.x}</svg></span>
+      </button></span>
+    <span class="hubslot hubl" id="hub-l1">${s.l1}</span>
+    <span class="hubslot hubl" id="hub-l2">${s.l2}</span>`;
 }
 function setInner(el, html){ if (el.innerHTML !== html) el.innerHTML = html; }
 
@@ -356,7 +363,10 @@ function renderRing(){
     }
     const hub = $('ring-center');
     hub.setAttribute('class', hubCls());
-    setInner(hub, centerInner());
+    const s = hubSlots();
+    setInner($('hub-l1'), s.l1);
+    setInner($('hub-l2'), s.l2);
+    $('hub-num').textContent = String(sel.size || '');
     return;
   }
 
@@ -370,15 +380,16 @@ function renderRing(){
   /* each peer gets a thread line plus a packet line: the packet is a short
      dash swept along the same geometry by animating stroke-dashoffset —
      dasharray's gap exceeds the line length so only one dash is ever visible */
-  const iconR = tier.iconR;
-  const hubR  = centerD/2 + gap;                // threads start at the hub's edge
+  const iconR  = tier.iconR;
+  const hubOff = 24, hubIR = 46;                // threads anchor on the hub glyph
+  const hy     = cy - hubOff;
   const retryBtns = [];
   const spokes = others.map((m, i) => {
     const p  = pos[m.id];
     const ix = p.x, iy = p.y - tier.iconOff;
-    const vx = ix - cx, vy = iy - cy, dl = Math.hypot(vx, vy);
+    const vx = ix - cx, vy = iy - hy, dl = Math.hypot(vx, vy);
     const ux = vx/dl, uy = vy/dl;
-    const x1 = cx + ux*hubR,          y1 = cy + uy*hubR;
+    const x1 = cx + ux*hubIR,         y1 = hy + uy*hubIR;
     const x2 = ix - ux*(iconR + gap), y2 = iy - uy*(iconR + gap);
     const L  = Math.ceil(Math.hypot(x2 - x1, y2 - y1));
     retryBtns.push(`<button id="retry-${m.id}" class="${retryCls(m)}"
@@ -487,14 +498,14 @@ function renderVerbs(){
 
 /* ── selection ───────────────────────────────────────────────────────────── */
 $('stage').addEventListener('click', e => {
-  if (e.target.closest('#ring-center')) return toggleAll();
+  if (e.target.closest('#ring-center')) return selectAll();
   const el = e.target.closest('[data-id]'); if (!el) return;
   toggle(byId(el.dataset.id));
 });
 $('stage').addEventListener('keydown', e => {
   if (e.key !== ' ' && e.key !== 'Enter') return;
-  if (e.target.closest('.hubpill,.hubdismiss,.lineretry')) return;   // buttons handle their own keys
-  if (e.target.closest('#ring-center')){ e.preventDefault(); return toggleAll(); }
+  if (e.target.closest('.hubx,.lineretry')) return;   // buttons handle their own keys
+  if (e.target.closest('#ring-center')){ e.preventDefault(); return selectAll(); }
   const el = e.target.closest('[data-id]'); if (!el) return;
   e.preventDefault(); toggle(byId(el.dataset.id));
 });
@@ -502,16 +513,6 @@ function toggle(m){
   if (!m || m.self || !m.online || busyNow()) return;
   clearSettled();
   sel.has(m.id) ? sel.delete(m.id) : sel.add(m.id);
-  render();
-}
-/* the hub is the choose-all switch: select every online machine, or clear
-   when they are all already chosen */
-function toggleAll(){
-  if (busyNow()) return;
-  clearSettled();
-  const targets = M.filter(m => !m.self && m.online);
-  if (targets.every(m => sel.has(m.id))) sel.clear();
-  else targets.forEach(m => sel.add(m.id));
   render();
 }
 function setView(v){ view = v; render(); }

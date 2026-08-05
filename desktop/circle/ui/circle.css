@@ -50,6 +50,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .seg button.on{background:rgba(var(--frost),.14);color:rgb(var(--frost))}
 
 /* ── RING view ──────────────────────────────────────────────────────────── */
+#stage.ringstage{min-height:100vh;display:flex;align-items:center;justify-content:center}
 .ringwrap{position:relative;margin:0 auto}
 .spokes{position:absolute;inset:0;pointer-events:none}
 /* threads are invisible at rest and only exist while a command is in flight:
@@ -111,7 +112,9 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.pickable:hover .mon-frame{stroke:rgba(255,255,255,.4)}
 .node.sel .mon-frame,.node.sel:hover .mon-frame{stroke:rgba(var(--sel),.9);stroke-width:2}
 .node.sel .nname{color:rgb(var(--sel))}
+.node.center{cursor:pointer}
 .node.center .mon-frame{stroke:rgba(var(--frost),.55)}
+.node.center:hover .mon-frame{stroke:rgba(var(--frost),.85)}
 /* ring results on the monitor frame (grid keeps chips); after .sel so they win */
 .node.res-ok .mon-frame,.node.res-accepted .mon-frame{stroke:rgba(var(--ok),.9);stroke-width:2}
 .node.res-fail .mon-frame{stroke:rgba(var(--danger),.95);stroke-width:2}

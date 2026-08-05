@@ -165,6 +165,7 @@ function render(){
   run = runView();
   const online = M.filter(m => m.online).length;
   $('counts').textContent = `${M.length} machines · ${online} on`;
+  $('stage').className = view === 'ring' ? 'ringstage' : '';
   $('all').disabled = $('none').disabled = busyNow();
   $('vring').classList.toggle('on', view === 'ring');
   $('vgrid').classList.toggle('on', view === 'grid');
@@ -303,7 +304,9 @@ function renderRing(){
   $('stage').innerHTML = `
     <div class="ringwrap ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
       <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
-      <div id="ring-center" class="node center" style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">${centerInner(self)}</div>
+      <div id="ring-center" class="node center" role="button" tabindex="0"
+           aria-label="choose all or clear"
+           style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">${centerInner(self)}</div>
       ${nodes}
     </div>`;
 }
@@ -377,11 +380,13 @@ function renderVerbs(){
 
 /* ── selection ───────────────────────────────────────────────────────────── */
 $('stage').addEventListener('click', e => {
+  if (e.target.closest('#ring-center')) return toggleAll();
   const el = e.target.closest('[data-id]'); if (!el) return;
   toggle(byId(el.dataset.id));
 });
 $('stage').addEventListener('keydown', e => {
   if (e.key !== ' ' && e.key !== 'Enter') return;
+  if (e.target.closest('#ring-center')){ e.preventDefault(); return toggleAll(); }
   const el = e.target.closest('[data-id]'); if (!el) return;
   e.preventDefault(); toggle(byId(el.dataset.id));
 });
@@ -389,6 +394,16 @@ function toggle(m){
   if (!m || m.self || !m.online || busyNow()) return;
   clearSettled();
   sel.has(m.id) ? sel.delete(m.id) : sel.add(m.id);
+  render();
+}
+/* the hub is the choose-all switch: select every online machine, or clear
+   when they are all already chosen */
+function toggleAll(){
+  if (busyNow()) return;
+  clearSettled();
+  const targets = M.filter(m => !m.self && m.online);
+  if (targets.every(m => sel.has(m.id))) sel.clear();
+  else targets.forEach(m => sel.add(m.id));
   render();
 }
 function setView(v){ view = v; render(); }

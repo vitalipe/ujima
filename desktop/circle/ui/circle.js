@@ -193,15 +193,34 @@ function nodeCls(m, d){
           (run && run.fading) && 'fading',
           (m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
 }
+/* flat computer glyph — the screen carries the machine's state: app category
+   color while running, dark at home, lock when locked, dead when offline */
+function monSvg(m){
+  const cat    = (m.online && !m.locked && m.app) ? (CAT[m.app.c] || '105,113,128') : null;
+  const screen = !m.online ? 'mon-screen dead' : m.locked ? 'mon-screen locked' : 'mon-screen';
+  const fill   = cat ? ` style="fill:rgba(${cat},.5)"` : '';
+  const lock   = (m.online && m.locked)
+    ? `<g class="mon-lock"><rect x="19.5" y="15" width="9" height="7.5" rx="1.5"/>
+         <path d="M21.5 15v-2.6a2.5 2.5 0 0 1 5 0V15"/></g>` : '';
+  return `<svg class="mon" viewBox="0 0 48 42" aria-hidden="true">
+    <rect class="mon-frame" x="1.5" y="1.5" width="45" height="31" rx="4.5"/>
+    <rect class="${screen}" x="6" y="6" width="36" height="22" rx="2"${fill}/>
+    ${lock}
+    <path class="mon-stand" d="M19.5 36.5h9l2 4h-13z"/>
+  </svg>`;
+}
+
 function nodeInner(m){
-  return `<span class="nname">${esc(m.name)}</span>
+  return `${monSvg(m)}
+    <span class="nname">${esc(m.name)}</span>
     ${appRow(m, 'napp')}
     <div class="nfoot">${sndHtml(m)}${slotHtml(m, true)}</div>`;
 }
 function centerInner(self){
-  return `<span class="nname">${self ? esc(self.name) : ''}</span>
-    <span class="selftag">this computer</span>
-    ${self ? appRow(self, 'napp') : ''}`;
+  if (!self) return '';
+  return `${monSvg(self)}
+    <span class="nname">${esc(self.name)}</span>
+    <span class="selftag">this computer</span>`;
 }
 function setInner(el, html){ if (el.innerHTML !== html) el.innerHTML = html; }
 
@@ -243,11 +262,19 @@ function renderRing(){
                  ux: Math.cos(a), uy: Math.sin(a)};
   });
 
-  /* spokes run rim-to-rim: from the center disc's edge to each node's edge */
+  /* the orbit passes through every peer glyph's midpoint (they all sit d*0.24
+     above their box centers, so its center shifts up by the same amount);
+     spokes are invisible at rest and only light up for selection / runs */
+  const iconR = d < 96 ? 20 : 26;
+  const cix = cx, ciy = cy - centerD*0.13;      // center glyph midpoint
+  const orbit = `<circle class="orbit" cx="${cx}" cy="${cy - d*0.24}" r="${R}"/>`;
   const spokes = others.map(m => {
-    const p = pos[m.id];
-    const x1 = cx + p.ux*(centerD/2 + gap), y1 = cy + p.uy*(centerD/2 + gap);
-    const x2 = p.x - p.ux*(d/2 + gap),      y2 = p.y - p.uy*(d/2 + gap);
+    const p  = pos[m.id];
+    const ix = p.x, iy = p.y - d*0.24;
+    const vx = ix - cix, vy = iy - ciy, len = Math.hypot(vx, vy);
+    const ux = vx/len, uy = vy/len;
+    const x1 = cix + ux*40,           y1 = ciy + uy*40;
+    const x2 = ix - ux*(iconR + gap), y2 = iy - uy*(iconR + gap);
     return `<line id="spoke-${m.id}" class="${spokeCls(m)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
   }).join('');
 
@@ -258,7 +285,7 @@ function renderRing(){
 
   $('stage').innerHTML = `
     <div class="ringwrap ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
-      <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
+      <svg class="spokes" width="${W}" height="${H}">${orbit}${spokes}</svg>
       <div id="ring-center" class="node center" style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">${centerInner(self)}</div>
       ${nodes}
     </div>`;

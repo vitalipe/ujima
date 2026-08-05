@@ -54,32 +54,47 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 /* ── RING view ──────────────────────────────────────────────────────────── */
 .ringwrap{position:relative;margin:0 auto}
 .spokes{position:absolute;inset:0;pointer-events:none}
-/* base dasharray "1 0" = solid, but interpolable — dashes ease into a line */
-.spoke{stroke:rgba(255,255,255,.07);stroke-width:1.5;fill:none;stroke-dasharray:1 0;
+.orbit{fill:none;stroke:rgba(255,255,255,.07);stroke-width:1.5}
+/* spokes are invisible at rest — they appear for selection and runs.
+   base dasharray "1 0" = solid, but interpolable — dashes ease into a line */
+.spoke{stroke:transparent;stroke-width:1.5;fill:none;stroke-dasharray:1 0;
   transition:stroke .45s ease,stroke-width .45s ease,stroke-dasharray .45s ease}
-.spoke.sel{stroke:rgba(var(--sel),.4)}
+.spoke.sel{stroke:rgba(var(--sel),.55)}
 .spoke.pending{stroke:rgba(var(--sel),.75);stroke-width:2;stroke-dasharray:6 10;animation:flow .7s linear infinite}
 @keyframes flow{to{stroke-dashoffset:-16}}
 .spoke.ok,.spoke.accepted{stroke:rgba(var(--ok),.45);stroke-width:2}
 .spoke.fail{stroke:rgba(var(--danger),.6);stroke-width:2}
 .spoke.noreply{stroke:rgba(var(--danger),.45);stroke-width:2;stroke-dasharray:3 6}
 
-.node{position:absolute;width:116px;height:116px;border-radius:999px;
+.node{position:absolute;width:116px;height:116px;
   transform:translate(-50%,-50%);
-  background:var(--panel);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-  text-align:center;transition:box-shadow .15s,background .15s,opacity .3s}
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  text-align:center;transition:opacity .3s}
 .node.pickable{cursor:pointer}
-.node.pickable:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
 .node.pickable:active{transform:translate(-50%,-50%) scale(.95)}
-.node.sel,.node.sel:hover{background:rgba(var(--sel),.12);box-shadow:inset 0 0 0 1.5px rgba(var(--sel),.6)}
 .node.off{opacity:.4}
-.node.center{background:rgba(var(--frost),.07);box-shadow:inset 0 0 0 1.5px rgba(var(--frost),.4)}
-/* ring results live on the node border (grid keeps chips); after .sel so they win */
-.node.res-ok,.node.res-accepted{box-shadow:inset 0 0 0 2px rgba(var(--ok),.75)}
-.node.res-fail{background:rgba(var(--danger),.08);box-shadow:inset 0 0 0 2px rgba(var(--danger),.8)}
-.node.res-noreply{box-shadow:inset 0 0 0 2px rgba(var(--danger),.55)}
-.node.fading{transition:box-shadow .45s ease,background .45s ease,opacity .3s}
+
+/* the flat computer: screen = state, frame stroke = selection/result */
+.mon{width:46px;height:40px;display:block;flex:none}
+.node.small .mon{width:36px;height:31px}
+.node.center .mon{width:62px;height:54px}
+.mon-frame{fill:#20262e;stroke:rgba(255,255,255,.16);stroke-width:1.5;transition:stroke .15s ease}
+.mon-stand{fill:#20262e;stroke:rgba(255,255,255,.1);stroke-width:1}
+.mon-screen{fill:#0d1013}
+.mon-screen.locked{fill:rgba(var(--warn),.16)}
+.mon-screen.dead{fill:#0a0c0e}
+.mon-lock rect,.mon-lock path{fill:none;stroke:rgb(var(--warn));stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+
+.node.pickable:hover .mon-frame{stroke:rgba(255,255,255,.4)}
+.node.sel .mon-frame,.node.sel:hover .mon-frame{stroke:rgba(var(--sel),.9);stroke-width:2}
+.node.sel .nname{color:rgb(var(--sel))}
+.node.center .mon-frame{stroke:rgba(var(--frost),.55)}
+/* ring results on the monitor frame (grid keeps chips); after .sel so they win */
+.node.res-ok .mon-frame,.node.res-accepted .mon-frame{stroke:rgba(var(--ok),.9);stroke-width:2}
+.node.res-fail .mon-frame{stroke:rgba(var(--danger),.95);stroke-width:2}
+.node.res-noreply .mon-frame{stroke:rgba(var(--danger),.6);stroke-width:2}
+.node.fading .mon-frame{transition:stroke .45s ease}
 .ringwrap.lock .node{pointer-events:none}
 
 .nname{font-size:13.5px;font-weight:650;letter-spacing:-.2px;max-width:92px;

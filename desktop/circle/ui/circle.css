@@ -62,7 +62,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 @keyframes flow{to{stroke-dashoffset:-16}}
 .spoke.ok,.spoke.accepted{stroke:rgba(var(--ok),.45);stroke-width:2}
 .spoke.fail{stroke:rgba(var(--danger),.6);stroke-width:2}
-.spoke.noreply{stroke:rgba(255,255,255,.18);stroke-dasharray:3 6}
+.spoke.noreply{stroke:rgba(var(--danger),.45);stroke-width:2;stroke-dasharray:3 6}
 
 .node{position:absolute;width:116px;height:116px;border-radius:999px;
   transform:translate(-50%,-50%);
@@ -75,6 +75,11 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.sel,.node.sel:hover{background:rgba(var(--sel),.12);box-shadow:inset 0 0 0 1.5px rgba(var(--sel),.6)}
 .node.off{opacity:.4}
 .node.center{background:rgba(var(--frost),.07);box-shadow:inset 0 0 0 1.5px rgba(var(--frost),.4)}
+/* ring results live on the node border (grid keeps chips); after .sel so they win */
+.node.res-ok,.node.res-accepted{box-shadow:inset 0 0 0 2px rgba(var(--ok),.75)}
+.node.res-fail{background:rgba(var(--danger),.08);box-shadow:inset 0 0 0 2px rgba(var(--danger),.8)}
+.node.res-noreply{box-shadow:inset 0 0 0 2px rgba(var(--danger),.55)}
+.node.fading{transition:box-shadow .45s ease,background .45s ease,opacity .3s}
 .ringwrap.lock .node{pointer-events:none}
 
 .nname{font-size:13.5px;font-weight:650;letter-spacing:-.2px;max-width:92px;

@@ -136,9 +136,10 @@ const ic = k => `<span class="ic"><svg viewBox="0 0 24 24">${I[k]}</svg></span>`
 const $  = id => document.getElementById(id);
 const byId = id => M.find(m => m.id === id);
 
-function slotHtml(m){
+function slotHtml(m, ring){
   if (run && run.pending.has(m.id)) return `<span class="spin" title="waiting for reply"></span>`;
   if (run && run.res.has(m.id)){
+    if (ring) return '';   /* the ring shows results as node borders, not chips */
     const r = run.res.get(m.id);
     return {ok:      `<span class="chip ok">Done</span>`,
             accepted:`<span class="chip ok">Accepted</span>`,
@@ -187,14 +188,15 @@ function spokeCls(m){   /* result colors stay with the labels; both leave on the
   return cls;
 }
 function nodeCls(m, d){
-  return ['node', d < 96 && 'small', !m.online && 'off', sel.has(m.id) && 'sel',
+  const res = (run && !run.fading && run.res.has(m.id)) && 'res-' + run.res.get(m.id);
+  return ['node', d < 96 && 'small', !m.online && 'off', sel.has(m.id) && 'sel', res,
           (run && run.fading) && 'fading',
           (m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
 }
 function nodeInner(m){
   return `<span class="nname">${esc(m.name)}</span>
     ${appRow(m, 'napp')}
-    <div class="nfoot">${sndHtml(m)}${slotHtml(m)}</div>`;
+    <div class="nfoot">${sndHtml(m)}${slotHtml(m, true)}</div>`;
 }
 function centerInner(self){
   return `<span class="nname">${self ? esc(self.name) : ''}</span>

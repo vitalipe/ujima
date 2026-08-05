@@ -150,6 +150,29 @@ function render(){
 }
 
 /* ── RING render ─────────────────────────────────────────────────────────── */
+function spokeCls(m){   /* result colors only while live; settled runs go back to blue */
+  let cls = 'spoke';
+  if (run && !run.finished && run.pending.has(m.id)) cls += ' pending';
+  else if (run && !run.finished && run.res.has(m.id)) cls += ' ' + run.res.get(m.id);
+  else if (sel.has(m.id)) cls += ' sel';
+  return cls;
+}
+function nodeCls(m, d){
+  return ['node', d < 96 && 'small', !m.online && 'off', sel.has(m.id) && 'sel',
+          (m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
+}
+function nodeInner(m){
+  return `<span class="nname">${esc(m.name)}</span>
+    ${appRow(m, 'napp')}
+    <div class="nfoot">${sndHtml(m)}${slotHtml(m)}</div>`;
+}
+function centerInner(self){
+  return `<span class="nname">${self ? esc(self.name) : ''}</span>
+    <span class="selftag">this computer</span>
+    ${self ? appRow(self, 'napp') : ''}`;
+}
+function setInner(el, html){ if (el.innerHTML !== html) el.innerHTML = html; }
+
 function renderRing(){
   const others = M.filter(m => !m.self);
   const self   = M.find(m => m.self);
@@ -162,6 +185,24 @@ function renderRing(){
   /* node size adapts: full 116px for small circles, shrinking toward 74px near 20 */
   const d = Math.max(74, Math.min(116, (2*Math.PI*R)/(Math.max(others.length,1)*1.45)));
   const centerD = 150, gap = 5;
+  const sig = [W, H, others.map(m => m.id).join(',')].join('|');
+
+  /* same ring already on stage -> patch classes/content on the existing
+     elements, so the spoke CSS transitions actually run (a rebuilt element
+     just appears in its end state) */
+  const wrap = $('stage').firstElementChild;
+  if (wrap && wrap.dataset && wrap.dataset.sig === sig){
+    wrap.classList.toggle('lock', busyNow());
+    for (const m of others){
+      $('spoke-' + m.id).setAttribute('class', spokeCls(m));
+      const node = $('node-' + m.id);
+      node.setAttribute('class', nodeCls(m, d));
+      node.setAttribute('aria-checked', sel.has(m.id));
+      setInner(node, nodeInner(m));
+    }
+    setInner($('ring-center'), centerInner(self));
+    return;
+  }
 
   const pos = {};
   others.forEach((m,i) => {
@@ -173,39 +214,22 @@ function renderRing(){
   /* spokes run rim-to-rim: from the center disc's edge to each node's edge */
   const spokes = others.map(m => {
     const p = pos[m.id];
-    let cls = 'spoke';   /* result colors only while live; settled runs go back to blue */
-    if (run && !run.finished && run.pending.has(m.id)) cls += ' pending';
-    else if (run && !run.finished && run.res.has(m.id)) cls += ' ' + run.res.get(m.id);
-    else if (sel.has(m.id)) cls += ' sel';
     const x1 = cx + p.ux*(centerD/2 + gap), y1 = cy + p.uy*(centerD/2 + gap);
     const x2 = p.x - p.ux*(d/2 + gap),      y2 = p.y - p.uy*(d/2 + gap);
-    return `<line class="${cls}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    return `<line id="spoke-${m.id}" class="${spokeCls(m)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
   }).join('');
 
-  const nodes = others.map(m => ringNode(m, pos[m.id], d)).join('');
+  const nodes = others.map(m => `
+    <div id="node-${m.id}" class="${nodeCls(m, d)}" data-id="${m.id}"
+         style="left:${pos[m.id].x}px;top:${pos[m.id].y}px;width:${d}px;height:${d}px"
+         role="checkbox" aria-checked="${sel.has(m.id)}" tabindex="0">${nodeInner(m)}</div>`).join('');
 
   $('stage').innerHTML = `
-    <div class="ringwrap ${busyNow() ? 'lock' : ''}" style="width:${W}px;height:${H}px">
+    <div class="ringwrap ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
       <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
-      <div class="node center" style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">
-        <span class="nname">${self ? esc(self.name) : ''}</span>
-        <span class="selftag">this computer</span>
-        ${self ? appRow(self, 'napp') : ''}
-      </div>
+      <div id="ring-center" class="node center" style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">${centerInner(self)}</div>
       ${nodes}
     </div>`;
-}
-
-function ringNode(m, p, d){
-  const cls = ['node', d < 96 && 'small', !m.online && 'off', sel.has(m.id) && 'sel',
-               (m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
-  return `<div class="${cls}" data-id="${m.id}"
-              style="left:${p.x}px;top:${p.y}px;width:${d}px;height:${d}px"
-              role="checkbox" aria-checked="${sel.has(m.id)}" tabindex="0">
-    <span class="nname">${esc(m.name)}</span>
-    ${appRow(m, 'napp')}
-    <div class="nfoot">${sndHtml(m)}${slotHtml(m)}</div>
-  </div>`;
 }
 
 /* ── GRID render ─────────────────────────────────────────────────────────── */

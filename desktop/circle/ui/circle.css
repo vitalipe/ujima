@@ -54,7 +54,9 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 /* ── RING view ──────────────────────────────────────────────────────────── */
 .ringwrap{position:relative;margin:0 auto}
 .spokes{position:absolute;inset:0;pointer-events:none}
-.spoke{stroke:rgba(255,255,255,.07);stroke-width:1.5;fill:none}
+/* base dasharray "1 0" = solid, but interpolable — dashes ease into a line */
+.spoke{stroke:rgba(255,255,255,.07);stroke-width:1.5;fill:none;stroke-dasharray:1 0;
+  transition:stroke .45s ease,stroke-width .45s ease,stroke-dasharray .45s ease}
 .spoke.sel{stroke:rgba(var(--sel),.4)}
 .spoke.pending{stroke:rgba(var(--sel),.75);stroke-width:2;stroke-dasharray:6 10;animation:flow .7s linear infinite}
 @keyframes flow{to{stroke-dashoffset:-16}}

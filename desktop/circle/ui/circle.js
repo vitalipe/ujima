@@ -300,6 +300,7 @@ function renderVerbs(){
         <button class="verb" onclick="act('unlock')">${ic('unlock')}Unlock</button>
       </div>
     </div>
+    <div class="grow"></div>
     <div class="vgroup">
       <span class="glabel">Apps</span>
       <div class="vrow">

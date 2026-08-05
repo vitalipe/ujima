@@ -143,7 +143,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 
 /* ── action bar ─────────────────────────────────────────────────────────── */
 .bar{position:fixed;left:50%;bottom:16px;transform:translate(-50%,150%);z-index:20;
-  max-width:min(1100px,calc(100vw - 24px));
+  width:min(1240px,calc(100vw - 24px));
   background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;
   padding:10px 14px 11px;display:flex;flex-direction:column;gap:8px;
   box-shadow:0 12px 32px rgba(0,0,0,.45);transition:transform .22s ease}
@@ -155,6 +155,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .status .fail{color:rgb(var(--danger))}
 .status .txtbtn{margin-left:auto;padding:5px 9px}
 .verbs{display:flex;align-items:flex-end;gap:18px;flex-wrap:wrap}
+.verbs .grow{flex:1}
 .bar.busy .verbs{opacity:.35;pointer-events:none}
 .count{font-size:12.5px;font-weight:650;color:var(--text);padding:0 4px 9px;white-space:nowrap}
 .vgroup{display:flex;flex-direction:column;gap:3px}

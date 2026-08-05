@@ -6,6 +6,7 @@
 
 const POLL_MS       = 2000;
 const RESULT_LINGER = 4000;   // clean runs clear on their own; failures stick
+const FADE_MS       = 450;    // matches the .45s transitions in circle.css
 
 const CAT = {learn:'203,168,120', office:'168,150,201', create:'206,147,166',
              web:'134,184,126', explore:'126,158,214', system:'136,192,208'};
@@ -79,21 +80,29 @@ function act(verb, extra){
 }
 
 /* clean results fade on their own shortly after settling; results with a
-   fail/noreply stick until the teacher's next gesture (selection, new verb) */
+   fail/noreply stick until the teacher's next gesture (selection, new verb).
+   Clearing goes through a short fading phase: spokes ease back to blue while
+   the chips and the status line fade out, on the same clock. */
 function scheduleResultClear(){
   const job    = lastAction.job;
   const sticky = Object.values(lastAction.peers || {})
                        .some(s => s === 'fail' || s === 'noreply');
   if (sticky) return;
   setTimeout(() => {
-    if (lastAction && !lastAction.live && lastAction.job === job){
-      lastAction = null;
-      render();
-    }
+    if (lastAction && !lastAction.live && lastAction.job === job) clearSettled();
   }, RESULT_LINGER);
 }
 function clearSettled(){
-  if (lastAction && !lastAction.live) lastAction = null;
+  if (!lastAction || lastAction.live || lastAction.fading) return;
+  lastAction = Object.assign({}, lastAction, {fading: true});
+  render();
+  const job = lastAction.job;
+  setTimeout(() => {
+    if (lastAction && lastAction.fading && lastAction.job === job){
+      lastAction = null;
+      render();
+    }
+  }, FADE_MS);
 }
 
 function runView(){
@@ -103,7 +112,7 @@ function runView(){
     st === 'pending' ? pending.add(id) : res.set(id, st);
   return {label: VERB_LABEL[lastAction.verb] || lastAction.verb,
           total: pending.size + res.size, done: res.size,
-          pending, res, finished: !lastAction.live};
+          pending, res, finished: !lastAction.live, fading: !!lastAction.fading};
 }
 const busyNow = () => { const r = runView(); return !!r && !r.finished; };
 
@@ -170,15 +179,16 @@ function render(){
 }
 
 /* ── RING render ─────────────────────────────────────────────────────────── */
-function spokeCls(m){   /* result colors only while live; settled runs go back to blue */
+function spokeCls(m){   /* result colors stay with the labels; both leave on the fade */
   let cls = 'spoke';
-  if (run && !run.finished && run.pending.has(m.id)) cls += ' pending';
-  else if (run && !run.finished && run.res.has(m.id)) cls += ' ' + run.res.get(m.id);
+  if (run && !run.fading && run.pending.has(m.id)) cls += ' pending';
+  else if (run && !run.fading && run.res.has(m.id)) cls += ' ' + run.res.get(m.id);
   else if (sel.has(m.id)) cls += ' sel';
   return cls;
 }
 function nodeCls(m, d){
   return ['node', d < 96 && 'small', !m.online && 'off', sel.has(m.id) && 'sel',
+          (run && run.fading) && 'fading',
           (m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
 }
 function nodeInner(m){
@@ -259,6 +269,7 @@ function renderGrid(){
 function card(m){
   const cls = ['card', m.self && 'self', !m.online && 'off',
                sel.has(m.id) && 'sel',
+               (run && run.fading) && 'fading',
                (!m.self && m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
   const mark = m.self
     ? `<span class="selftag">this computer</span>`
@@ -273,6 +284,7 @@ function card(m){
 /* ── bar ─────────────────────────────────────────────────────────────────── */
 function renderStatus(){
   const st = $('status');
+  st.classList.toggle('fade', !!(run && run.fading));
   if (!run){ st.hidden = true; st.innerHTML = ''; return; }
   st.hidden = false;
   if (!run.finished){

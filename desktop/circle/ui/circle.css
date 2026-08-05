@@ -98,7 +98,8 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.small .chip{font-size:8px;padding:1px 6px}
 
 .chip{font-size:9px;text-transform:uppercase;letter-spacing:.8px;font-weight:700;
-  padding:2px 8px;border-radius:999px;white-space:nowrap}
+  padding:2px 8px;border-radius:999px;white-space:nowrap;transition:opacity .45s ease}
+.node.fading .chip,.card.fading .chip{opacity:0}
 .chip.ok{color:rgb(var(--ok));background:rgba(var(--ok),.13)}
 .chip.fail{color:rgb(var(--danger));background:rgba(var(--danger),.13)}
 .chip.noreply{color:var(--dim);background:rgba(255,255,255,.08)}
@@ -148,7 +149,9 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
   padding:10px 14px 11px;display:flex;flex-direction:column;gap:8px;
   box-shadow:0 12px 32px rgba(0,0,0,.45);transition:transform .22s ease}
 .bar.show{transform:translate(-50%,0)}
-.status{display:flex;align-items:center;gap:12px;font-size:12.5px;color:var(--dim);padding:0 4px}
+.status{display:flex;align-items:center;gap:12px;font-size:12.5px;color:var(--dim);padding:0 4px;
+  transition:opacity .45s ease}
+.status.fade{opacity:0}
 .status[hidden]{display:none}
 .status b{color:var(--text);font-weight:650}
 .status .ok{color:rgb(var(--ok))}

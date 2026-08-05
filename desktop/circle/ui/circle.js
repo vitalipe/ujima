@@ -173,9 +173,9 @@ function renderRing(){
   /* spokes run rim-to-rim: from the center disc's edge to each node's edge */
   const spokes = others.map(m => {
     const p = pos[m.id];
-    let cls = 'spoke';
-    if (run && run.pending.has(m.id)) cls += ' pending';
-    else if (run && run.res.has(m.id)) cls += ' ' + run.res.get(m.id);
+    let cls = 'spoke';   /* result colors only while live; settled runs go back to blue */
+    if (run && !run.finished && run.pending.has(m.id)) cls += ' pending';
+    else if (run && !run.finished && run.res.has(m.id)) cls += ' ' + run.res.get(m.id);
     else if (sel.has(m.id)) cls += ' sel';
     const x1 = cx + p.ux*(centerD/2 + gap), y1 = cy + p.uy*(centerD/2 + gap);
     const x2 = p.x - p.ux*(d/2 + gap),      y2 = p.y - p.uy*(d/2 + gap);

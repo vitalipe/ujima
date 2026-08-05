@@ -4,7 +4,8 @@
    Verbs POST /circle/<verb> {targets,...} and re-poll; chips render from the
    action's per-peer statuses (pending / ok / fail / noreply / accepted). */
 
-const POLL_MS = 2000;
+const POLL_MS       = 2000;
+const RESULT_LINGER = 4000;   // clean runs clear on their own; failures stick
 
 const CAT = {learn:'203,168,120', office:'168,150,201', create:'206,147,166',
              web:'134,184,126', explore:'126,158,214', system:'136,192,208'};
@@ -21,8 +22,7 @@ let sel  = new Set();
 let view = 'ring';
 let run  = null;          // computed from lastAction on each render
 
-let lastAction   = null;  // latest action seen, {..., live:bool}
-let dismissedJob = null;
+let lastAction = null;    // latest action seen, {..., live:bool}
 
 /* ── server state ────────────────────────────────────────────────────────── */
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
@@ -53,6 +53,7 @@ async function poll(){
       const j = await (await fetch('/circle/job/' + lastAction.job)).json();
       lastAction = Object.assign({}, j, {live: false});
     } catch (e) { lastAction = Object.assign({}, lastAction, {live: false}); }
+    scheduleResultClear();
   }
 
   for (const id of [...sel]){
@@ -73,11 +74,30 @@ function post(verb, extra){
 function act(verb, extra){
   if (!sel.size || busyNow()) return;
   closeSheet();
+  clearSettled();
   post(verb, extra);
 }
 
+/* clean results fade on their own shortly after settling; results with a
+   fail/noreply stick until the teacher's next gesture (selection, new verb) */
+function scheduleResultClear(){
+  const job    = lastAction.job;
+  const sticky = Object.values(lastAction.peers || {})
+                       .some(s => s === 'fail' || s === 'noreply');
+  if (sticky) return;
+  setTimeout(() => {
+    if (lastAction && !lastAction.live && lastAction.job === job){
+      lastAction = null;
+      render();
+    }
+  }, RESULT_LINGER);
+}
+function clearSettled(){
+  if (lastAction && !lastAction.live) lastAction = null;
+}
+
 function runView(){
-  if (!lastAction || lastAction.job === dismissedJob) return null;
+  if (!lastAction) return null;
   const pending = new Set(), res = new Map();
   for (const [id, st] of Object.entries(lastAction.peers || {}))
     st === 'pending' ? pending.add(id) : res.set(id, st);
@@ -264,8 +284,7 @@ function renderStatus(){
       ${c.ok ? `<span class="ok">${c.ok} done</span>` : ''}
       ${c.accepted ? `<span class="ok">${c.accepted} accepted</span>` : ''}
       ${c.fail ? `<span class="fail">${c.fail} failed</span>` : ''}
-      ${c.noreply ? `<span>${c.noreply} no reply</span>` : ''}
-      <button class="txtbtn" onclick="dismiss()">Dismiss</button>`;
+      ${c.noreply ? `<span>${c.noreply} no reply</span>` : ''}`;
   }
 }
 function renderVerbs(){
@@ -310,18 +329,14 @@ $('stage').addEventListener('keydown', e => {
 });
 function toggle(m){
   if (!m || m.self || !m.online || busyNow()) return;
+  clearSettled();
   sel.has(m.id) ? sel.delete(m.id) : sel.add(m.id);
   render();
 }
 function setView(v){ view = v; render(); }
-$('all').onclick  = () => { M.forEach(m => { if (!m.self && m.online) sel.add(m.id); }); render(); };
-$('none').onclick = () => { sel.clear(); render(); };
+$('all').onclick  = () => { clearSettled(); M.forEach(m => { if (!m.self && m.online) sel.add(m.id); }); render(); };
+$('none').onclick = () => { clearSettled(); sel.clear(); render(); };
 window.addEventListener('resize', () => { if (view === 'ring') render(); });
-
-function dismiss(){
-  if (lastAction) dismissedJob = lastAction.job;
-  render();
-}
 
 /* ── sheets ──────────────────────────────────────────────────────────────── */
 function openSheet(html){ $('sheet').innerHTML = html; $('ovl').classList.add('show'); }

@@ -42,9 +42,14 @@
    :task (apply cli/-main "loopback" *command-line-args*)}
 
   circle
-  {:doc "Circle dev server (mock fleet) on :1338"
-   :requires ([circle.main :as circle])
-   :task (circle/-main)}
+  {:doc "Circle dev: mock (panel server, :1338) | world (mock-world TUI)"
+   :task (case (first *command-line-args*)
+           "mock"  ((requiring-resolve 'circle.main/-main))
+           "world" ((requiring-resolve 'circle.world/-main))
+           (do (println "usage: bb circle <mode>")
+               (println "  mock   panel server on the mock fleet (http://localhost:1338)")
+               (println "  world  TUI driving tmp/circle/world.edn (add/drop, set counts)")
+               (println "  real   (later) panel server against live ujima peers")))}
 
   repl
   {:doc "Start Ujima dev REPL"

@@ -138,6 +138,14 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .nfoot .snd{width:13px;height:13px;color:var(--faint)}
 .selftag{font-size:9.5px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700;
   color:rgba(var(--frost),.9)}
+/* small classes get big machines; the center scales with its peers */
+.node.big .mon{width:76px;height:66px}
+.node.big .nname{font-size:15.5px;max-width:132px}
+.node.big .napp{font-size:12.5px;max-width:134px}
+.node.mid .mon{width:56px;height:49px}
+.node.mid .nname{font-size:14px;max-width:106px}
+.ringwrap.tier-big .node.center .mon{width:86px;height:75px}
+.ringwrap.tier-mid .node.center .mon{width:72px;height:63px}
 /* dense rings: icon + name only — the screen already tells the state */
 .node.small .nname{font-size:11.5px;max-width:86px}
 .node.small .napp,.node.small .nfoot{display:none}

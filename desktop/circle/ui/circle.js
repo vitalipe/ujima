@@ -192,9 +192,9 @@ function spokeCls(m){
 function packetCls(m){
   return 'packet' + ((run && run.pending.has(m.id)) ? ' on' : '');
 }
-function nodeCls(m, d){
+function nodeCls(m, tierCls){
   const res = (run && !run.fading && run.res.has(m.id)) && 'res-' + run.res.get(m.id);
-  return ['node', d < 96 && 'small', !m.online && 'off', sel.has(m.id) && 'sel', res,
+  return ['node', tierCls, !m.online && 'off', sel.has(m.id) && 'sel', res,
           screenCls(m),
           (run && run.fading) && 'fading',
           (m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
@@ -239,6 +239,14 @@ function centerInner(self){
 }
 function setInner(el, html){ if (el.innerHTML !== html) el.innerHTML = html; }
 
+/* size tiers by population: the ring always spans the available space, and
+   the machines grow as the class shrinks (cStart = spoke offset at the hub) */
+function ringTier(n){
+  if (n <= 8)  return {cls: 'big',   d: 170, iconR: 40, iconOff: 30, cStart: 48};
+  if (n <= 13) return {cls: 'mid',   d: 132, iconR: 30, iconOff: 28, cStart: 44};
+  return       {cls: 'small', d: 76,  iconR: 20, iconOff: 9,  cStart: 40};
+}
+
 function renderRing(){
   const others = M.filter(m => !m.self);
   const self   = M.find(m => m.self);
@@ -246,12 +254,14 @@ function renderRing(){
   const W = Math.min(window.innerWidth - 40, 980);
   const H = Math.max(window.innerHeight - 160, 430);   // floating chrome + bar
   const cx = W/2, cy = H/2;
-  const R  = Math.min(W, H)/2 - 66;
 
-  /* node size adapts: full 116px for small circles, shrinking toward 74px near 20 */
-  const d = Math.max(74, Math.min(116, (2*Math.PI*R)/(Math.max(others.length,1)*1.45)));
-  const centerD = 150, gap = 5;
-  const sig = [W, H, others.map(m => m.id).join(',')].join('|');
+  const n    = Math.max(others.length, 1);
+  const tier = ringTier(n);
+  const d    = tier.d, centerD = 150, gap = 5;
+  const maxR = Math.min(W, H)/2 - d/2 - 26;
+  const minR = centerD/2 + gap + d/2 + 8;
+  const R    = Math.max(minR, maxR);
+  const sig  = [W, H, others.map(m => m.id).join(',')].join('|');
 
   /* same ring already on stage -> patch classes/content on the existing
      elements, so the spoke CSS transitions actually run (a rebuilt element
@@ -263,7 +273,7 @@ function renderRing(){
       $('spoke-' + m.id).setAttribute('class', spokeCls(m));
       $('packet-' + m.id).setAttribute('class', packetCls(m));
       const node = $('node-' + m.id);
-      node.setAttribute('class', nodeCls(m, d));
+      node.setAttribute('class', nodeCls(m, tier.cls));
       node.setAttribute('aria-checked', sel.has(m.id));
       setInner(node, nodeInner(m));
     }
@@ -281,14 +291,14 @@ function renderRing(){
   /* each peer gets a thread line plus a packet line: the packet is a short
      dash swept along the same geometry by animating stroke-dashoffset —
      dasharray's gap exceeds the line length so only one dash is ever visible */
-  const iconR = d < 96 ? 20 : 26;
+  const iconR = tier.iconR;
   const cix = cx, ciy = cy - centerD*0.13;      // center glyph midpoint
   const spokes = others.map((m, i) => {
     const p  = pos[m.id];
-    const ix = p.x, iy = p.y - d*0.24;
+    const ix = p.x, iy = p.y - tier.iconOff;
     const vx = ix - cix, vy = iy - ciy, dl = Math.hypot(vx, vy);
     const ux = vx/dl, uy = vy/dl;
-    const x1 = cix + ux*40,           y1 = ciy + uy*40;
+    const x1 = cix + ux*tier.cStart,  y1 = ciy + uy*tier.cStart;
     const x2 = ix - ux*(iconR + gap), y2 = iy - uy*(iconR + gap);
     const L  = Math.ceil(Math.hypot(x2 - x1, y2 - y1));
     return `<line id="spoke-${m.id}" class="${spokeCls(m)}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>
@@ -297,12 +307,12 @@ function renderRing(){
   }).join('');
 
   const nodes = others.map(m => `
-    <div id="node-${m.id}" class="${nodeCls(m, d)}" data-id="${m.id}"
+    <div id="node-${m.id}" class="${nodeCls(m, tier.cls)}" data-id="${m.id}"
          style="left:${pos[m.id].x}px;top:${pos[m.id].y}px;width:${d}px;height:${d}px"
          role="checkbox" aria-checked="${sel.has(m.id)}" tabindex="0">${nodeInner(m)}</div>`).join('');
 
   $('stage').innerHTML = `
-    <div class="ringwrap ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
+    <div class="ringwrap tier-${tier.cls} ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
       <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
       <div id="ring-center" class="node center" role="button" tabindex="0"
            aria-label="choose all or clear"

@@ -26,6 +26,9 @@
   ([project src dst {:keys [mode owner]}]
    (let [s (source project src)]
      (fs/create-dirs (fs/parent dst))
+     ;; unlink first (install(1) semantics): cp onto a RUNNING binary is "text file
+     ;; busy" — the live `dev script desktop` push replaces eww under a live session
+     ($! rm -f [dst])
      ($! cp -a [s] [dst])
      ($! chown [(or owner "root:root")] [dst])
      ;; deterministic modes — cp -a alone would ship the build host's umask

@@ -317,7 +317,7 @@ function hubCls(){
   return ['node center',
           run && !run.finished && 'busy',
           run && run.finished && !run.fading && (bad ? 'res-fail' : 'res-ok'),
-          run && run.fading && 'fading',
+          run && run.fading && !scanning && 'fading',
           !run && (sel.size ? 'has-sel' : 'calm')].filter(Boolean).join(' ');
 }
 
@@ -579,6 +579,7 @@ function toggle(m){
   if (!m || m.self || !m.online || busyNow()) return;
   clearSettled();
   sel.has(m.id) ? sel.delete(m.id) : sel.add(m.id);
+  if (hint) hint = peerHint(m);
   render();
 }
 function clearSel(){ clearSettled(); sel.clear(); render(); }

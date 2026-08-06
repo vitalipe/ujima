@@ -38,6 +38,7 @@ let scanTimer = null;
 
 function rescanNow(){
   if (scanning || busyNow()) return;
+  hint = '';
   clearSettled();
   sel.clear();
   scanning = true;
@@ -97,6 +98,7 @@ async function poll(){
 let lastPost = null;   // {verb, extra} this panel sent — retry needs the args
 
 function post(verb, extra, targets){
+  hint = '';
   lastPost = {verb, extra: extra || {}};
   fetch('/circle/' + verb, {
     method: 'POST',
@@ -362,10 +364,10 @@ function retryBtnClick(e){
 function hubSlots(){
   const top = crownBtns();
   if (scanning) return {top, l1: `<span class="hubprog">looking for machines…</span>`, l2: ''};
-  if (hint) return {top, l1: `<span class="hubhint">${hint}</span>`, l2: ''};
   if (run && !run.finished)
     return {top, l1: `<span class="hubverb">${run.label}</span>`,
             l2: `<span class="hubprog">${run.done} of ${run.total}…</span>`};
+  if (hint) return {top, l1: `<span class="hubhint">${hint}</span>`, l2: ''};
   if (run){
     const c = {ok:0, accepted:0, fail:0, noreply:0};
     run.res.forEach(v => { if (v in c) c[v]++; });

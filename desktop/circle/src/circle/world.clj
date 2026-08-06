@@ -84,7 +84,7 @@
   (println (str/join "  " (map (partial marker world) (:peers world))))
   (println "   * self  ·off offline  ·l locked  ·m muted  ·nr no-reply  ·slow slow")
   (println)
-  (println "[a]dd  [d]rop  [6]  [1]→10  [2]→24  [3]→32  [n] custom  [r]eseed  [q]uit")
+  (println "[a]dd  [d]rop  [0]→6  [1]→10  [2]→24  [3]→32  [n] custom  [r]eseed  [q]uit")
   (flush))
 
 
@@ -111,7 +111,7 @@
           nil nil
           \a (do (write-world! (gen-machine (read-world)))  (recur))
           \d (do (write-world! (drop-machine (read-world))) (recur))
-          \6 (do (write-world! (set-count (read-world) 6))  (recur))
+          \0 (do (write-world! (set-count (read-world) 6))  (recur))
           \1 (do (write-world! (set-count (read-world) 10)) (recur))
           \2 (do (write-world! (set-count (read-world) 24)) (recur))
           \3 (do (write-world! (set-count (read-world) 32)) (recur))

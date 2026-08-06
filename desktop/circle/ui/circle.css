@@ -29,28 +29,11 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 
 /* ── floating chrome (no header bar) ────────────────────────────────────── */
 .selfnote{position:fixed;top:22px;left:20px;z-index:15;font-size:11.5px;color:var(--faint)}
-.fcontrols{position:fixed;top:14px;right:16px;z-index:15;
-  display:flex;align-items:center;gap:10px}
 
-/* the toast: counts when idle, one action's progress/results while it runs */
-.toast{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:15;
-  display:flex;align-items:center;gap:10px;font-size:13px;color:var(--dim);
-  white-space:nowrap;transition:opacity .45s ease}
-.toast b{color:var(--text);font-weight:650}
-.toast.panel{background:var(--panel);border:1px solid var(--panel-brd);border-radius:12px;
-  padding:9px 16px;box-shadow:0 8px 24px rgba(0,0,0,.4);font-size:12.5px}
-.toast .ok{color:rgb(var(--ok))}
-.toast .fail{color:rgb(var(--danger))}
-.toast.fade{opacity:0}
 .txtbtn{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;
   color:var(--dim);padding:8px 10px;border-radius:9px;transition:background .15s,color .15s}
 .txtbtn:hover{background:rgba(255,255,255,.07);color:var(--text)}
 
-.seg{display:flex;gap:2px;background:rgba(22,26,32,.55);border-radius:11px;padding:3px;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
-.seg button{font-size:11px;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;
-  color:var(--dim);padding:6px 12px;border-radius:8px;transition:background .15s,color .15s}
-.seg button.on{background:rgba(var(--frost),.14);color:rgb(var(--frost))}
 
 /* ── RING view ──────────────────────────────────────────────────────────── */
 #stage.ringstage{min-height:100vh;display:flex;align-items:center;justify-content:center}
@@ -157,7 +140,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .lineretry .ic{width:13px;height:13px}
 /* hovering the hub glyph whispers "these will be chosen" on eligible machines */
 .ringwrap.hub-hot .node:not(.off):not(.sel):not(.center) .mon-frame{stroke:rgba(var(--sel),.45)}
-/* ring results on the monitor frame (grid keeps chips); after .sel so they win */
+/* ring results on the monitor frame; after .sel so they win */
 .node.res-ok .mon-frame,.node.res-accepted .mon-frame{stroke:rgba(var(--ok),.9);stroke-width:2}
 .node.res-fail .mon-frame{stroke:rgba(var(--danger),.95);stroke-width:2}
 .node.res-noreply .mon-frame{stroke:rgba(var(--danger),.6);stroke-width:2}
@@ -188,50 +171,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.small .nname{font-size:11.5px;max-width:86px}
 .node.small .napp,.node.small .nfoot{display:none}
 
-.chip{font-size:9px;text-transform:uppercase;letter-spacing:.8px;font-weight:700;
-  padding:2px 8px;border-radius:999px;white-space:nowrap;transition:opacity .45s ease}
-.node.fading .chip,.card.fading .chip{opacity:0}
-.chip.ok{color:rgb(var(--ok));background:rgba(var(--ok),.13)}
-.chip.fail{color:rgb(var(--danger));background:rgba(var(--danger),.13)}
-.chip.noreply{color:var(--dim);background:rgba(255,255,255,.08)}
-.spin{width:13px;height:13px;border-radius:999px;flex:none;
-  border:2px solid rgba(var(--frost),.22);border-top-color:rgb(var(--frost));
-  animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 
-/* ── GRID view ──────────────────────────────────────────────────────────── */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));
-  gap:14px;padding:64px 28px 148px}
-@media (max-width:640px){.grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));padding:8px 16px 168px}}
-.card{position:relative;display:flex;flex-direction:column;gap:7px;min-height:118px;
-  background:var(--panel);border-radius:18px;padding:14px 14px 12px;
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
-  transition:box-shadow .15s,background .15s,opacity .3s,transform .1s}
-.card.pickable{cursor:pointer}
-.card.pickable:hover{box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
-.card.pickable:active{transform:scale(.97)}
-.card.sel,.card.sel:hover{background:rgba(var(--sel),.10);box-shadow:inset 0 0 0 1.5px rgba(var(--sel),.55)}
-.card.self{background:rgba(var(--frost),.06);box-shadow:inset 0 0 0 1.5px rgba(var(--frost),.38)}
-.card.off{opacity:.42}
-.grid.lock .card{pointer-events:none}
-.row1{display:flex;align-items:center;gap:9px}
-.dot{width:8px;height:8px;border-radius:999px;background:rgba(var(--frost),.9);flex:none}
-.card.off .dot{background:var(--faint)}
-.mname{font-size:16px;font-weight:650;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pick{width:19px;height:19px;border-radius:999px;margin-left:auto;flex:none;
-  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.18);
-  display:flex;align-items:center;justify-content:center;color:transparent;transition:background .15s}
-.card.sel .pick{background:rgb(var(--sel));box-shadow:none;color:#14171b}
-.pick .ic{width:11px;height:11px}
-.pick .ic svg{stroke-width:3.5}
-.card .selftag{margin-left:auto;font-size:10px;letter-spacing:1.5px}
-.approw{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500;min-height:18px}
-.catdot{width:8px;height:8px;border-radius:2px;flex:none;background:rgb(var(--cat,105,113,128))}
-.approw .ic{width:12px;height:12px;color:var(--dim)}
-.foot{display:flex;align-items:center;gap:8px;margin-top:auto;min-height:20px}
-.foot .snd{width:16px;height:16px;color:var(--faint)}
-.foot .chip{font-size:10px;margin-left:auto;padding:3px 9px}
-.foot .spin{margin-left:auto;width:14px;height:14px}
 
 /* ── action bar ─────────────────────────────────────────────────────────── */
 .bar{position:fixed;left:50%;bottom:16px;transform:translate(-50%,150%);z-index:20;

@@ -1,8 +1,8 @@
 /* Circle panel — thin client over the circle server.
    Server truth: GET /ui/circle (peers + the active action), polled every 2s.
-   Local truth: selection, ring/grid view, sheets — per-viewer state only.
-   Verbs POST /circle/<verb> {targets,...} and re-poll; chips render from the
-   action's per-peer statuses (pending / ok / fail / noreply / accepted). */
+   Local truth: selection and sheets — per-viewer state only.
+   Verbs POST /circle/<verb> {targets,...} and re-poll; machine screens render
+   the action's per-peer statuses (pending / ok / fail / noreply / accepted). */
 
 const POLL_MS       = 2000;
 const RESULT_LINGER = 4000;   // clean runs clear on their own; failures stick
@@ -11,16 +11,23 @@ const FADE_MS       = 450;    // matches the .45s transitions in circle.css
 const CAT = {learn:'203,168,120', office:'168,150,201', create:'206,147,166',
              web:'134,184,126', explore:'126,158,214', system:'136,192,208'};
 
-const VERB_LABEL = {
-  'mute':'Mute', 'unmute':'Sound on', 'volume':'Volume',
-  'close-app':'Close app', 'open-app':'Open app', 'open-url':'Open page',
-  'lock':'Lock screens', 'unlock':'Unlock screens',
-  'restart':'Restart', 'poweroff':'Power off'};
+/* one voice: btn = the bar's short label, label = the sentence form used by
+   both the hover hints and the running/settled toast */
+const VERBS = {
+  'mute':      {btn: 'Mute',      label: 'Mute'},
+  'unmute':    {btn: 'Sound on',  label: 'Sound on'},
+  'volume':    {btn: 'Volume',    label: 'Set volume'},
+  'lock':      {btn: 'Lock',      label: 'Lock screens'},
+  'unlock':    {btn: 'Unlock',    label: 'Unlock screens'},
+  'open-app':  {btn: 'Open app',  label: 'Open app'},
+  'close-app': {btn: 'Close app', label: 'Close app'},
+  'open-url':  {btn: 'Open page', label: 'Open page'},
+  'restart':   {btn: 'Restart',   label: 'Restart'},
+  'poweroff':  {btn: 'Power off', label: 'Power off'}};
 
 let S    = null;          // last /ui/circle payload
 let M    = [];            // render models of S.peers
 let sel  = new Set();
-let view = 'ring';
 let run  = null;          // computed from lastAction on each render
 
 let lastAction = null;    // latest action seen, {..., live:bool}
@@ -133,7 +140,7 @@ function runView(){
   const pending = new Set(), res = new Map();
   for (const [id, st] of Object.entries(lastAction.peers || {}))
     st === 'pending' ? pending.add(id) : res.set(id, st);
-  return {label: VERB_LABEL[lastAction.verb] || lastAction.verb,
+  return {label: (VERBS[lastAction.verb] || {label: lastAction.verb}).label,
           total: pending.size + res.size, done: res.size,
           pending, res, finished: !lastAction.live, fading: !!lastAction.fading};
 }
@@ -160,17 +167,6 @@ const ic = k => `<span class="ic"><svg viewBox="0 0 24 24">${I[k]}</svg></span>`
 const $  = id => document.getElementById(id);
 const byId = id => M.find(m => m.id === id);
 
-function slotHtml(m){   /* grid only — the ring shows all of this on the screens */
-  if (run && run.pending.has(m.id)) return `<span class="spin" title="waiting for reply"></span>`;
-  if (run && run.res.has(m.id)){
-    const r = run.res.get(m.id);
-    return {ok:      `<span class="chip ok">Done</span>`,
-            accepted:`<span class="chip ok">Accepted</span>`,
-            fail:    `<span class="chip fail">Failed</span>`,
-            noreply: `<span class="chip noreply">No reply</span>`}[r] || '';
-  }
-  return '';
-}
 function sndHtml(m){
   return m.online ? `<span class="ic snd" title="${m.muted?'muted':'sound on'}">
     <svg viewBox="0 0 24 24">${I[m.muted?'mute':'vol']}</svg></span>` : '';
@@ -189,16 +185,11 @@ function render(){
   run = runView();
   const self = M.find(m => m.self);
   $('selfnote').textContent = self ? `this computer · ${self.name}` : '';
-  $('stage').className = view === 'ring' ? 'ringstage' : '';
-  $('vring').classList.toggle('on', view === 'ring');
-  $('vgrid').classList.toggle('on', view === 'grid');
-
-  view === 'ring' ? renderRing() : renderGrid();
+  renderRing();
 
   const bar = $('bar');
   bar.classList.toggle('show', sel.size > 0);
   bar.classList.toggle('busy', busyNow());
-  renderToast();
   renderVerbs();
 }
 
@@ -314,7 +305,6 @@ function setHint(h){
   h = h || '';
   if (h === hint) return;
   hint = h;
-  if (view !== 'ring') return;
   const l1 = $('hub-l1');
   if (!l1) return;
   const s = hubSlots();
@@ -331,7 +321,7 @@ function hubHint(){
     return `Retry ${failedIds().length} machine${failedIds().length === 1 ? '' : 's'}`;
   const targets = M.filter(m => !m.self && m.online);
   if (targets.length && targets.every(m => sel.has(m.id))) return 'Clear selection';
-  return `Choose all ${targets.length}`;
+  return `Select all ${targets.length}`;
 }
 
 function hubSlots(){
@@ -447,85 +437,43 @@ function renderRing(){
     <div class="ringwrap tier-${tier.cls} ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
       <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
       <div id="ring-center" class="${hubCls()}" role="button" tabindex="0"
-           aria-label="choose all or clear"
+           aria-label="select all or clear"
            style="left:${cx}px;top:${cy}px;width:${centerD}px;height:${centerD}px">${centerInner()}</div>
       ${nodes}
       ${retryBtns.join('')}
     </div>`;
 }
 
-/* ── GRID render ─────────────────────────────────────────────────────────── */
-function renderGrid(){
-  $('stage').innerHTML = `<div class="grid ${busyNow() ? 'lock' : ''}">${M.map(card).join('')}</div>`;
-}
-function card(m){
-  const cls = ['card', m.self && 'self', !m.online && 'off',
-               sel.has(m.id) && 'sel',
-               (run && run.fading) && 'fading',
-               (!m.self && m.online && !busyNow()) && 'pickable'].filter(Boolean).join(' ');
-  const mark = m.self
-    ? `<span class="selftag">this computer</span>`
-    : (m.online ? `<span class="pick">${ic('check')}</span>` : '');
-  return `<div class="${cls}" data-id="${m.id}" role="checkbox" aria-checked="${sel.has(m.id)}" tabindex="0">
-    <div class="row1"><span class="dot"></span><span class="mname">${esc(m.name)}</span>${mark}</div>
-    ${appRow(m, 'approw')}
-    <div class="foot">${sndHtml(m)}${slotHtml(m)}</div>
-  </div>`;
-}
-
-/* ── toast (top-center): the grid's info home — the ring shows it in the hub ── */
-function renderToast(){
-  const t      = $('toast');
-  const fading = !!(run && run.fading);
-  if (view === 'ring'){
-    t.className = 'toast';
-    t.innerHTML = '';
-    return;
-  }
-  if (!run){
-    t.className = 'toast';
-    t.innerHTML = `${M.length} machines · ${M.filter(m => m.online).length} on`;
-    return;
-  }
-  t.className = 'toast panel' + (fading ? ' fade' : '');
-  if (!run.finished){
-    t.innerHTML = `<b>${run.label}</b><span>·</span><span>${run.done} of ${run.total}…</span>`;
-  } else {
-    const c = {ok:0, accepted:0, fail:0, noreply:0};
-    run.res.forEach(v => { if (v in c) c[v]++; });
-    t.innerHTML = `<b>${run.label}</b>
-      ${c.ok ? `<span class="ok">${c.ok} done</span>` : ''}
-      ${c.accepted ? `<span class="ok">${c.accepted} accepted</span>` : ''}
-      ${c.fail ? `<span class="fail">${c.fail} failed</span>` : ''}
-      ${c.noreply ? `<span>${c.noreply} no reply</span>` : ''}`;
-  }
-}
+/* ── action bar ─────────────────────────────────────────────────────────── */
 function renderVerbs(){
+  const vbtn = (verb, icon, onclick, danger) =>
+    `<button class="verb${danger ? ' danger' : ''}" data-verb="${verb}"
+       onclick="${onclick || `act('${verb}')`}">${ic(icon)}${VERBS[verb].btn}</button>`;
   $('verbs').innerHTML = `
-    <span class="count">${sel.size} chosen</span>
+    <span class="count">${sel.size} selected</span>
     <div class="vgroup">
       <span class="glabel">Session</span>
       <div class="vrow">
-        <button class="verb" data-hint="Mute" onclick="act('mute')">${ic('mute')}Mute</button>
-        <button class="verb" data-hint="Sound on" onclick="act('unmute')">${ic('vol')}Sound on</button>
-        <button class="verb" data-hint="Set volume" onclick="openVolume()">${ic('slid')}Volume</button>
-        <button class="verb" data-hint="Lock screens" onclick="act('lock')">${ic('lock')}Lock</button>
-        <button class="verb" data-hint="Unlock screens" onclick="act('unlock')">${ic('unlock')}Unlock</button>
+        ${vbtn('mute', 'mute')}
+        ${vbtn('unmute', 'vol')}
+        ${vbtn('volume', 'slid', 'openVolume()')}
+        ${vbtn('lock', 'lock')}
+        ${vbtn('unlock', 'unlock')}
       </div>
     </div>
     <div class="vgroup">
       <span class="glabel">Apps</span>
       <div class="vrow">
-        <button class="verb" data-hint="Open an app" onclick="openApps()">${ic('apps')}Open app</button>
-        <button class="verb" data-hint="Close the app" onclick="act('close-app')">${ic('close')}Close app</button>
-        <button class="verb" data-hint="Open a web page" onclick="openUrl()">${ic('globe')}Open page</button>
+        ${vbtn('open-app', 'apps', 'openApps()')}
+        ${vbtn('close-app', 'close')}
+        ${vbtn('open-url', 'globe', 'openUrl()')}
       </div>
     </div>
     <div class="vgroup">
       <span class="glabel">Power</span>
       <div class="vrow">
-        <button class="verb danger" data-hint="Restart" onclick="confirmRestart()">${ic('boot')}Restart</button>
-        <button class="verb danger" data-hint="Power off" onclick="confirmPoweroff()">${ic('pwr')}Power off</button>
+        ${vbtn('restart', 'boot', 'confirmRestart()', true)}
+        ${vbtn('poweroff', 'pwr', 'confirmPoweroff()', true)}
       </div>
     </div>
     <button class="selx" onclick="clearSel()" title="clear selection" aria-label="clear selection">
@@ -559,10 +507,10 @@ $('stage').addEventListener('mouseout', () => {
 });
 $('bar').addEventListener('mouseover', e => {
   if (e.target.closest('.selx')) return setHint('Clear selection');
-  const v = e.target.closest('[data-hint]');
+  const v = e.target.closest('[data-verb]');
   if (v){
     const n = sel.size;
-    return setHint(`${v.dataset.hint} · ${n} machine${n === 1 ? '' : 's'}`);
+    return setHint(`${VERBS[v.dataset.verb].label} · ${n} machine${n === 1 ? '' : 's'}`);
   }
   setHint('');
 });
@@ -581,9 +529,8 @@ function toggle(m){
   sel.has(m.id) ? sel.delete(m.id) : sel.add(m.id);
   render();
 }
-function setView(v){ view = v; render(); }
 function clearSel(){ clearSettled(); sel.clear(); render(); }
-window.addEventListener('resize', () => { if (view === 'ring') render(); });
+window.addEventListener('resize', render);
 
 /* ── sheets ──────────────────────────────────────────────────────────────── */
 function openSheet(html){ $('sheet').innerHTML = html; $('ovl').classList.add('show'); }

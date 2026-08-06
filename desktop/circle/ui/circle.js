@@ -82,17 +82,20 @@ function act(verb, extra){
   post(verb, extra);
 }
 
-/* clean results fade on their own shortly after settling; results with a
-   fail/noreply stick until the teacher's next gesture (selection, new verb).
-   Clearing goes through a short fading phase: spokes ease back to blue while
-   the chips and the status line fade out, on the same clock. */
+/* after the linger, good outcomes always release: a clean run fades away
+   whole, a mixed run sheds its ok/accepted machines and keeps only the
+   errors — their red screens, dead threads and retry knobs stay until a
+   gesture or a retry resolves them. */
 function scheduleResultClear(){
-  const job    = lastAction.job;
-  const sticky = Object.values(lastAction.peers || {})
-                       .some(s => s === 'fail' || s === 'noreply');
-  if (sticky) return;
+  const job = lastAction.job;
   setTimeout(() => {
-    if (lastAction && !lastAction.live && lastAction.job === job) clearSettled();
+    if (!(lastAction && !lastAction.live && lastAction.job === job)) return;
+    const entries = Object.entries(lastAction.peers || {});
+    const bad     = entries.filter(([, s]) => s === 'fail' || s === 'noreply');
+    if (!bad.length) return clearSettled();
+    if (bad.length === entries.length) return;      // all-error: nothing to shed
+    lastAction = Object.assign({}, lastAction, {peers: Object.fromEntries(bad)});
+    render();
   }, RESULT_LINGER);
 }
 function clearSettled(){

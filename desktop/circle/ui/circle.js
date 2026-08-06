@@ -227,7 +227,7 @@ function nodeCls(m, tierCls){
    when offline. Every glyph is always in the markup, hidden by default and
    revealed by node classes, so the svg never changes and transitions animate */
 function monSvg(hub){
-  return `<svg class="mon" viewBox="0 0 48 ${hub ? 34 : 42}" aria-hidden="true">
+  return `<svg class="mon" viewBox="0 0 48 42" aria-hidden="true">
     <rect class="mon-frame" x="1.5" y="1.5" width="45" height="31" rx="4.5"/>
     <rect class="mon-screen" x="6" y="6" width="36" height="22" rx="2"/>
     <g class="scr scr-lock"><rect x="19.5" y="15" width="9" height="7.5" rx="1.5"/>
@@ -242,8 +242,10 @@ function monSvg(hub){
         <line x1="28.7" y1="12.3" x2="27.1" y2="13.9"/><line x1="28.7" y1="21.7" x2="27.1" y2="20.1"/>
         <line x1="19.3" y1="12.3" x2="20.9" y2="13.9"/><line x1="19.3" y1="21.7" x2="20.9" y2="20.1"/>
       </g>
+      <g class="scr scr-retry" transform="translate(17,10) scale(0.58)">${I.boot}</g>
       <text id="hub-num" class="scr scr-num" x="24" y="21.4" text-anchor="middle">${sel.size || ''}</text>`
-    : '<path class="mon-stand" d="M19.5 36.5h9l2 4h-13z"/>'}
+    : ''}
+    <path class="mon-stand" d="M19.5 36.5h9l2 4h-13z"/>
   </svg>`;
 }
 
@@ -265,19 +267,29 @@ function nodeInner(m){
 /* the hub is mission control: a bigger machine glyph whose screen carries the
    run state through the SAME classes the peers use (busy dots / check / X),
    with fleet counts + selection pills when idle and results + dismiss after */
-function selectAll(){
-  if (busyNow()) return;
-  clearSettled();
-  M.forEach(m => { if (!m.self && m.online) sel.add(m.id); });
+/* the hub button: retry-all when a failed run is on screen, otherwise the
+   two-mode selection toggle — choose everyone, or clear when all are chosen */
+function failedIds(){
+  return run ? [...run.res.entries()]
+                 .filter(([, s]) => s === 'fail' || s === 'noreply')
+                 .map(([id]) => id)
+             : [];
+}
+function retryAll(){
+  const targets = failedIds();
+  if (!targets.length) return;
+  post(lastPost.verb, lastPost.extra, targets);
+  lastAction = null;
   render();
 }
-/* the x on the hub screen's corner clears whatever the screen shows:
-   the armed selection when idle, the settled results after a run */
-function hubX(e){
-  e.stopPropagation();
+function hubClick(){
   if (busyNow()) return;
-  if (run) clearSettled();
-  else clearSel();
+  if (run && run.finished && canRetry() && failedIds().length) return retryAll();
+  const targets = M.filter(m => !m.self && m.online);
+  clearSettled();
+  if (targets.length && targets.every(m => sel.has(m.id))) sel.clear();
+  else targets.forEach(m => sel.add(m.id));
+  render();
 }
 
 function hubCls(){
@@ -293,7 +305,34 @@ function hubCls(){
 /* the hub renders into four persistent slots — actions on top, glyph, two
    text lines — so the svg is never recreated (state transitions stay soft)
    and content swaps never move the glyph */
+let hint = '';   // transient hover hint, shown in the hub's text lines
+
+function setHint(h){
+  h = h || '';
+  if (h === hint) return;
+  hint = h;
+  if (view !== 'ring') return;
+  const l1 = $('hub-l1');
+  if (!l1) return;
+  const s = hubSlots();
+  setInner(l1, s.l1);
+  setInner($('hub-l2'), s.l2);
+}
+function peerHint(m){
+  if (!m || m.self) return '';
+  if (!m.online) return `${esc(m.name)} is off`;
+  return (sel.has(m.id) ? 'Unselect ' : 'Select ') + esc(m.name);
+}
+function hubHint(){
+  if (run && run.finished && canRetry() && failedIds().length)
+    return `Retry ${failedIds().length} machine${failedIds().length === 1 ? '' : 's'}`;
+  const targets = M.filter(m => !m.self && m.online);
+  if (targets.length && targets.every(m => sel.has(m.id))) return 'Clear selection';
+  return `Choose all ${targets.length}`;
+}
+
 function hubSlots(){
+  if (hint) return {l1: `<span class="hubhint">${hint}</span>`, l2: ''};
   if (run && !run.finished)
     return {l1: `<span class="hubverb">${run.label}</span>`,
             l2: `<span class="hubprog">${run.done} of ${run.total}…</span>`};
@@ -307,17 +346,12 @@ function hubSlots(){
                  c.noreply ? `<span>${c.noreply} no reply</span>` : '']
                 .filter(Boolean).join('<span class="hubdot">·</span>')};
   }
-  const online = M.filter(m => m.online).length;
-  return {l1: `<span class="hubcount">${M.length} machines · ${online} on</span>`,
-          l2: ''};
+  return {l1: '', l2: ''};
 }
 
 function centerInner(){
   const s = hubSlots();
-  return `<span class="hubmonwrap">${monSvg(true)}
-      <button class="hubx" onclick="hubX(event)" title="clear" aria-label="clear">
-        <span class="ic"><svg viewBox="0 0 24 24">${I.x}</svg></span>
-      </button></span>
+  return `${monSvg(true)}
     <span class="hubslot hubl" id="hub-l1">${s.l1}</span>
     <span class="hubslot hubl" id="hub-l2">${s.l2}</span>`;
 }
@@ -381,7 +415,7 @@ function renderRing(){
      dash swept along the same geometry by animating stroke-dashoffset —
      dasharray's gap exceeds the line length so only one dash is ever visible */
   const iconR  = tier.iconR;
-  const hubOff = 24, hubIR = 46;                // threads anchor on the hub glyph
+  const hubOff = 32, hubIR = 54;                // threads anchor on the hub glyph
   const hy     = cy - hubOff;
   const retryBtns = [];
   const spokes = others.map((m, i) => {
@@ -469,26 +503,26 @@ function renderVerbs(){
     <div class="vgroup">
       <span class="glabel">Session</span>
       <div class="vrow">
-        <button class="verb" onclick="act('mute')">${ic('mute')}Mute</button>
-        <button class="verb" onclick="act('unmute')">${ic('vol')}Sound on</button>
-        <button class="verb" onclick="openVolume()">${ic('slid')}Volume</button>
-        <button class="verb" onclick="act('lock')">${ic('lock')}Lock</button>
-        <button class="verb" onclick="act('unlock')">${ic('unlock')}Unlock</button>
+        <button class="verb" data-hint="Mute" onclick="act('mute')">${ic('mute')}Mute</button>
+        <button class="verb" data-hint="Sound on" onclick="act('unmute')">${ic('vol')}Sound on</button>
+        <button class="verb" data-hint="Set volume" onclick="openVolume()">${ic('slid')}Volume</button>
+        <button class="verb" data-hint="Lock screens" onclick="act('lock')">${ic('lock')}Lock</button>
+        <button class="verb" data-hint="Unlock screens" onclick="act('unlock')">${ic('unlock')}Unlock</button>
       </div>
     </div>
     <div class="vgroup">
       <span class="glabel">Apps</span>
       <div class="vrow">
-        <button class="verb" onclick="openApps()">${ic('apps')}Open app</button>
-        <button class="verb" onclick="act('close-app')">${ic('close')}Close app</button>
-        <button class="verb" onclick="openUrl()">${ic('globe')}Open page</button>
+        <button class="verb" data-hint="Open an app" onclick="openApps()">${ic('apps')}Open app</button>
+        <button class="verb" data-hint="Close the app" onclick="act('close-app')">${ic('close')}Close app</button>
+        <button class="verb" data-hint="Open a web page" onclick="openUrl()">${ic('globe')}Open page</button>
       </div>
     </div>
     <div class="vgroup">
       <span class="glabel">Power</span>
       <div class="vrow">
-        <button class="verb danger" onclick="confirmRestart()">${ic('boot')}Restart</button>
-        <button class="verb danger" onclick="confirmPoweroff()">${ic('pwr')}Power off</button>
+        <button class="verb danger" data-hint="Restart" onclick="confirmRestart()">${ic('boot')}Restart</button>
+        <button class="verb danger" data-hint="Power off" onclick="confirmPoweroff()">${ic('pwr')}Power off</button>
       </div>
     </div>
     <button class="selx" onclick="clearSel()" title="clear selection" aria-label="clear selection">
@@ -498,14 +532,36 @@ function renderVerbs(){
 
 /* ── selection ───────────────────────────────────────────────────────────── */
 $('stage').addEventListener('click', e => {
-  if (e.target.closest('#ring-center')) return selectAll();
+  if (e.target.closest('#ring-center')) return hubClick();
   const el = e.target.closest('[data-id]'); if (!el) return;
   toggle(byId(el.dataset.id));
 });
+$('stage').addEventListener('mouseover', e => {
+  if (e.target.closest('.lineretry')){
+    const m = byId(e.target.closest('.lineretry').id.replace('retry-', ''));
+    return setHint(m ? 'Retry ' + esc(m.name) : '');
+  }
+  if (e.target.closest('#ring-center')) return setHint(hubHint());
+  const el = e.target.closest('[data-id]');
+  if (el) return setHint(peerHint(byId(el.dataset.id)));
+  setHint('');
+});
+$('stage').addEventListener('mouseout', () => setHint(''));
+$('bar').addEventListener('mouseover', e => {
+  if (e.target.closest('.selx')) return setHint('Clear selection');
+  const v = e.target.closest('[data-hint]');
+  if (v){
+    const n = sel.size;
+    return setHint(`${v.dataset.hint} · ${n} machine${n === 1 ? '' : 's'}`);
+  }
+  setHint('');
+});
+$('bar').addEventListener('mouseout', () => setHint(''));
+
 $('stage').addEventListener('keydown', e => {
   if (e.key !== ' ' && e.key !== 'Enter') return;
-  if (e.target.closest('.hubx,.lineretry')) return;   // buttons handle their own keys
-  if (e.target.closest('#ring-center')){ e.preventDefault(); return selectAll(); }
+  if (e.target.closest('.lineretry')) return;   // the button handles its own keys
+  if (e.target.closest('#ring-center')){ e.preventDefault(); return hubClick(); }
   const el = e.target.closest('[data-id]'); if (!el) return;
   e.preventDefault(); toggle(byId(el.dataset.id));
 });

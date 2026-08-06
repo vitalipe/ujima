@@ -30,6 +30,28 @@ let M    = [];            // render models of S.peers
 let sel  = new Set();
 let run  = null;          // computed from lastAction on each render
 
+/* discovery lifecycle: startup opens in scanning; rescan re-enters it; the
+   reveal staggers machines in as they are "found" (mock fakes the delay) */
+let scanning  = true;
+let revealing = false;
+let scanTimer = null;
+
+function rescanNow(){
+  if (scanning || busyNow()) return;
+  clearSettled();
+  sel.clear();
+  scanning = true;
+  render();
+  scanTimer = setTimeout(finishScan, 1100);
+}
+function finishScan(){
+  scanTimer = null;
+  scanning  = false;
+  revealing = true;
+  render();
+  setTimeout(() => { revealing = false; render(); }, M.length*70 + 700);
+}
+
 let lastAction = null;    // latest action seen, {..., live:bool}
 
 /* ── server state ────────────────────────────────────────────────────────── */
@@ -68,6 +90,7 @@ async function poll(){
     const m = byId(id);
     if (!m || !m.online) sel.delete(id);
   }
+  if (scanning && !scanTimer) return finishScan();
   render();
 }
 
@@ -183,8 +206,9 @@ function appRow(m, cls){   /* cls: 'napp' (ring) or 'approw' (grid) */
 function render(){
   if (!S) return;
   run = runView();
-  const self = M.find(m => m.self);
-  $('selfnote').textContent = self ? `this computer · ${self.name}` : '';
+  $('rescan').classList.toggle('on', scanning);
+  $('rescan-label').textContent = scanning ? 'scanning…' : 'rescan';
+
   renderRing();
 
   const bar = $('bar');
@@ -236,7 +260,6 @@ function monSvg(hub){
         <line x1="28.7" y1="12.3" x2="27.1" y2="13.9"/><line x1="28.7" y1="21.7" x2="27.1" y2="20.1"/>
         <line x1="19.3" y1="12.3" x2="20.9" y2="13.9"/><line x1="19.3" y1="21.7" x2="20.9" y2="20.1"/>
       </g>
-      <g class="scr scr-retry" transform="translate(17,10) scale(0.58)">${I.boot}</g>
       <text id="hub-num" class="scr scr-num" x="24" y="21.4" text-anchor="middle">${sel.size || ''}</text>`
     : ''}
     <path class="mon-stand" d="M19.5 36.5h9l2 4h-13z"/>
@@ -277,8 +300,7 @@ function retryAll(){
   render();
 }
 function hubClick(){
-  if (busyNow()) return;
-  if (run && run.finished && canRetry() && failedIds().length) return retryAll();
+  if (busyNow() || scanning) return;
   const targets = M.filter(m => !m.self && m.online);
   clearSettled();
   if (targets.length && targets.every(m => sel.has(m.id))) sel.clear();
@@ -317,34 +339,49 @@ function peerHint(m){
   return (sel.has(m.id) ? 'Unselect ' : 'Select ') + esc(m.name);
 }
 function hubHint(){
-  if (run && run.finished && canRetry() && failedIds().length)
-    return `Retry ${failedIds().length} machine${failedIds().length === 1 ? '' : 's'}`;
+  if (scanning) return '';
   const targets = M.filter(m => !m.self && m.online);
   if (targets.length && targets.every(m => sel.has(m.id))) return 'Clear selection';
   return `Select all ${targets.length}`;
 }
 
+function crownBtns(){
+  const n = run && run.finished && !run.fading && canRetry() ? failedIds().length : 0;
+  return n
+    ? `<button class="hubretry" data-hh="Retry ${n} machine${n === 1 ? '' : 's'}" onclick="retryBtnClick(event)">
+         <span class="ic"><svg viewBox="0 0 24 24">${I.boot}</svg></span><span>${n}</span></button>`
+    : '';
+}
+function retryBtnClick(e){
+  e.stopPropagation();
+  if (busyNow() || !canRetry()) return;
+  retryAll();
+}
+
 function hubSlots(){
-  if (hint) return {l1: `<span class="hubhint">${hint}</span>`, l2: ''};
+  const top = crownBtns();
+  if (scanning) return {top, l1: `<span class="hubprog">looking for machines…</span>`, l2: ''};
+  if (hint) return {top, l1: `<span class="hubhint">${hint}</span>`, l2: ''};
   if (run && !run.finished)
-    return {l1: `<span class="hubverb">${run.label}</span>`,
+    return {top, l1: `<span class="hubverb">${run.label}</span>`,
             l2: `<span class="hubprog">${run.done} of ${run.total}…</span>`};
   if (run){
     const c = {ok:0, accepted:0, fail:0, noreply:0};
     run.res.forEach(v => { if (v in c) c[v]++; });
-    return {l1: `<span class="hubverb">${run.label}</span>`,
+    return {top, l1: `<span class="hubverb">${run.label}</span>`,
             l2: [c.ok ? `<span class="ok">${c.ok} done</span>` : '',
                  c.accepted ? `<span class="ok">${c.accepted} accepted</span>` : '',
                  c.fail ? `<span class="fail">${c.fail} failed</span>` : '',
                  c.noreply ? `<span>${c.noreply} no reply</span>` : '']
                 .filter(Boolean).join('<span class="hubdot">·</span>')};
   }
-  return {l1: '', l2: ''};
+  return {top, l1: '', l2: ''};
 }
 
 function centerInner(){
   const s = hubSlots();
-  return `${monSvg(true)}
+  return `<span class="hubslot hubtop" id="hub-top">${s.top}</span>
+    ${monSvg(true)}
     <span class="hubslot hubl" id="hub-l1">${s.l1}</span>
     <span class="hubslot hubl" id="hub-l2">${s.l2}</span>`;
 }
@@ -367,7 +404,7 @@ function renderRing(){
 
   const n    = Math.max(others.length, 1);
   const tier = ringTier(n);
-  const d    = tier.d, centerD = 190, gap = 5;
+  const d    = tier.d, centerD = 196, gap = 5;
   const maxR = Math.min(W, H)/2 - d/2 - 26;
   const minR = centerD/2 + gap + d/2 + 8;
   const R    = Math.max(minR, maxR);
@@ -379,6 +416,8 @@ function renderRing(){
   const wrap = $('stage').firstElementChild;
   if (wrap && wrap.dataset && wrap.dataset.sig === sig){
     wrap.classList.toggle('lock', busyNow());
+    wrap.classList.toggle('scanning', scanning);
+    wrap.classList.toggle('reveal', revealing);
     for (const m of others){
       $('spoke-' + m.id).setAttribute('class', spokeCls(m));
       $('packet-' + m.id).setAttribute('class', packetCls(m));
@@ -391,6 +430,7 @@ function renderRing(){
     const hub = $('ring-center');
     hub.setAttribute('class', hubCls());
     const s = hubSlots();
+    setInner($('hub-top'), s.top);
     setInner($('hub-l1'), s.l1);
     setInner($('hub-l2'), s.l2);
     $('hub-num').textContent = String(sel.size || '');
@@ -408,7 +448,7 @@ function renderRing(){
      dash swept along the same geometry by animating stroke-dashoffset —
      dasharray's gap exceeds the line length so only one dash is ever visible */
   const iconR  = tier.iconR;
-  const hubOff = 36, hubIR = 66;                // threads anchor on the hub glyph
+  const hubOff = 20, hubIR = 66;                // threads anchor on the hub glyph
   const hy     = cy - hubOff;
   const retryBtns = [];
   const spokes = others.map((m, i) => {
@@ -428,13 +468,13 @@ function renderRing(){
             stroke-dasharray="12 ${L + 24}" style="--end:${-L}px;--delay:${(i % 5) * .15}s"/>`;
   }).join('');
 
-  const nodes = others.map(m => `
+  const nodes = others.map((m, i) => `
     <div id="node-${m.id}" class="${nodeCls(m, tier.cls)}" data-id="${m.id}"
-         style="left:${pos[m.id].x}px;top:${pos[m.id].y}px;width:${d}px;height:${d}px"
+         style="left:${pos[m.id].x}px;top:${pos[m.id].y}px;width:${d}px;height:${d}px;--i:${i}"
          role="checkbox" aria-checked="${sel.has(m.id)}" tabindex="0">${nodeInner(m)}</div>`).join('');
 
   $('stage').innerHTML = `
-    <div class="ringwrap tier-${tier.cls} ${busyNow() ? 'lock' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
+    <div class="ringwrap tier-${tier.cls} ${busyNow() ? 'lock' : ''}${scanning ? ' scanning' : ''}${revealing ? ' reveal' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
       <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
       <div id="ring-center" class="${hubCls()}" role="button" tabindex="0"
            aria-label="select all or clear"
@@ -488,6 +528,12 @@ $('stage').addEventListener('click', e => {
   toggle(byId(el.dataset.id));
 });
 $('stage').addEventListener('mouseover', e => {
+  const hb = e.target.closest('.hubretry');
+  if (hb && hb.dataset && hb.dataset.hh){
+    const wrap0 = $('stage').firstElementChild;
+    if (wrap0 && wrap0.classList) wrap0.classList.toggle('hub-hot', false);
+    return setHint(hb.dataset.hh);
+  }
   const hubHot = !!(e.target.closest('#ring-center') && e.target.closest('.mon'));
   const wrap = $('stage').firstElementChild;
   if (wrap && wrap.classList) wrap.classList.toggle('hub-hot', hubHot);
@@ -518,7 +564,7 @@ $('bar').addEventListener('mouseout', () => setHint(''));
 
 $('stage').addEventListener('keydown', e => {
   if (e.key !== ' ' && e.key !== 'Enter') return;
-  if (e.target.closest('.lineretry')) return;   // the button handles its own keys
+  if (e.target.closest('.hubretry,.lineretry')) return;   // buttons handle their own keys
   if (e.target.closest('#ring-center')){ e.preventDefault(); return hubClick(); }
   const el = e.target.closest('[data-id]'); if (!el) return;
   e.preventDefault(); toggle(byId(el.dataset.id));
@@ -531,6 +577,8 @@ function toggle(m){
 }
 function clearSel(){ clearSettled(); sel.clear(); render(); }
 window.addEventListener('resize', render);
+$('rescan').addEventListener('mouseover', () => setHint('Rescan the circle'));
+$('rescan').addEventListener('mouseout', () => setHint(''));
 
 /* ── sheets ──────────────────────────────────────────────────────────────── */
 function openSheet(html){ $('sheet').innerHTML = html; $('ovl').classList.add('show'); }

@@ -8,7 +8,11 @@
 </head>
 <body>
 
-<span class="selfnote" id="selfnote"></span>
+<button class="rescan" id="rescan" onclick="rescanNow()" title="rescan the circle" aria-label="rescan the circle">
+  <span class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.6 2.6L21 8"/><path d="M21 3v5h-5"/></svg></span>
+  <span id="rescan-label">rescan</span>
+</button>
+
 
 <main id="stage" class="ringstage" aria-label="Machines"></main>
 

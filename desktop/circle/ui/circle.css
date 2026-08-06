@@ -28,7 +28,6 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .ic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 
 /* ── floating chrome (no header bar) ────────────────────────────────────── */
-.selfnote{position:fixed;top:22px;left:20px;z-index:15;font-size:11.5px;color:var(--faint)}
 
 .txtbtn{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;
   color:var(--dim);padding:8px 10px;border-radius:9px;transition:background .15s,color .15s}
@@ -109,6 +108,22 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .hubslot{display:flex;gap:6px;align-items:center;justify-content:center;
   transition:opacity .45s ease}
 .hubl{min-height:21px;white-space:nowrap}
+.hubtop{min-height:28px}
+.hubretry{display:flex;align-items:center;gap:5px;height:28px;padding:0 11px;border-radius:999px;
+  background:var(--panel);color:rgb(var(--danger));font-size:11.5px;font-weight:700;
+  box-shadow:inset 0 0 0 1.5px rgba(var(--danger),.55),0 4px 12px rgba(0,0,0,.4);
+  transition:background .15s}
+.hubretry:hover{background:rgba(var(--danger),.18)}
+.hubretry .ic{width:13px;height:13px}
+/* the rescan escape hatch, top right */
+.rescan{position:fixed;top:16px;right:16px;z-index:15;display:flex;align-items:center;gap:7px;
+  padding:8px 14px;border-radius:11px;font-size:12px;font-weight:650;color:var(--dim);
+  background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+  transition:background .15s,color .15s}
+.rescan:hover{background:rgba(255,255,255,.09);color:var(--text)}
+.rescan .ic{width:12px;height:12px}
+.rescan.on{color:var(--faint);pointer-events:none}
+.rescan.on .ic{animation:cogturn 1.1s linear infinite}
 /* the hub screen speaks: a slowly turning cog at rest, the armed count when
    machines are chosen, then the shared busy/check/X language */
 .scr-cog circle,.scr-cog line{stroke:rgba(var(--frost),.75);stroke-width:1.5}
@@ -118,10 +133,6 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .scr-num{fill:rgb(var(--sel));font-size:13px;font-weight:700}
 .node.center.has-sel .scr-num{opacity:1}
 .node.center.has-sel .mon-screen{fill:rgba(var(--sel),.13)}
-/* a failed run turns the hub screen into the retry-all button */
-.scr-retry path{stroke:rgb(var(--danger));stroke-width:2.4}
-.node.center.res-fail .scr-err{opacity:0}
-.node.center.res-fail .scr-retry{opacity:1}
 .hubhint{font-size:15px;font-weight:700;white-space:nowrap}
 .node.center.fading .hubslot{opacity:0}
 .hubdot{color:var(--faint)}
@@ -146,6 +157,15 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.res-noreply .mon-frame{stroke:rgba(var(--danger),.6);stroke-width:2}
 .node.fading .mon-frame{transition:stroke .45s ease}
 .ringwrap.lock .node{pointer-events:none}
+/* discovery: while scanning only the hub remains; found machines stagger in */
+.ringwrap.scanning .node:not(.center),
+.ringwrap.scanning .spokes,
+.ringwrap.scanning .lineretry{opacity:0 !important;pointer-events:none;transition:none}
+.ringwrap.scanning .node.center .scr-cog{opacity:1;animation:cogturn 1.1s linear infinite;
+  transform-origin:24px 17px;transform-box:view-box}
+.ringwrap.reveal .node:not(.center){animation:appear .5s ease-out backwards;
+  animation-delay:calc(var(--i,0)*.07s)}
+@keyframes appear{from{opacity:0;transform:translate(-50%,-50%) scale(.86)}}
 
 .nname{font-size:13.5px;font-weight:650;letter-spacing:-.2px;max-width:92px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

@@ -94,8 +94,8 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.busy .scr-load circle:nth-child(3){animation-delay:.36s}
 @keyframes blink{0%,100%{opacity:.25}40%{opacity:1}}
 
-.node.pickable:hover .mon-frame{stroke:rgba(255,255,255,.4)}
-.node.sel .mon-frame,.node.sel:hover .mon-frame{stroke:rgba(var(--sel),.9);stroke-width:2}
+.node.pickable:hover .mon-frame{stroke:rgba(var(--sel),.45)}
+.node.sel .mon-frame{stroke:rgba(var(--sel),.9);stroke-width:2}
 .node.sel .nname{color:rgb(var(--sel))}
 /* the hub is a machine glyph like its peers — its screen carries the run
    state through the same classes (busy dots / check / X), frost when idle */
@@ -152,6 +152,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .lineretry .ic{width:13px;height:13px}
 /* hovering the hub glyph whispers "these will be chosen" on eligible machines */
 .ringwrap.hub-hot .node:not(.off):not(.sel):not(.center) .mon-frame{stroke:rgba(var(--sel),.45)}
+.ringwrap.hub-hot.all-in .node.sel:not(.center) .mon-frame{stroke:rgba(var(--sel),.45)}
 /* ring results on the monitor frame; after .sel so they win */
 .node.res-ok .mon-frame,.node.res-accepted .mon-frame{stroke:rgba(var(--ok),.9);stroke-width:2}
 .node.res-fail .mon-frame{stroke:rgba(var(--danger),.95);stroke-width:2}

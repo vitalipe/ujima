@@ -403,7 +403,9 @@ function renderRing(){
   const H = Math.max(window.innerHeight - 160, 430);   // floating chrome + bar
   const cx = W/2, cy = H/2;
 
-  const n    = Math.max(others.length, 1);
+  const n      = Math.max(others.length, 1);
+  const onks   = others.filter(m => m.online);
+  const allIn  = onks.length > 0 && onks.every(m => sel.has(m.id));
   const tier = ringTier(n);
   const d    = tier.d, centerD = 196, gap = 5;
   const maxR = Math.min(W, H)/2 - d/2 - 26;
@@ -419,6 +421,7 @@ function renderRing(){
     wrap.classList.toggle('lock', busyNow());
     wrap.classList.toggle('scanning', scanning);
     wrap.classList.toggle('reveal', revealing);
+    wrap.classList.toggle('all-in', allIn);
     for (const m of others){
       $('spoke-' + m.id).setAttribute('class', spokeCls(m));
       $('packet-' + m.id).setAttribute('class', packetCls(m));
@@ -475,7 +478,7 @@ function renderRing(){
          role="checkbox" aria-checked="${sel.has(m.id)}" tabindex="0">${nodeInner(m)}</div>`).join('');
 
   $('stage').innerHTML = `
-    <div class="ringwrap tier-${tier.cls} ${busyNow() ? 'lock' : ''}${scanning ? ' scanning' : ''}${revealing ? ' reveal' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
+    <div class="ringwrap tier-${tier.cls} ${busyNow() ? 'lock' : ''}${scanning ? ' scanning' : ''}${revealing ? ' reveal' : ''}${allIn ? ' all-in' : ''}" data-sig="${sig}" style="width:${W}px;height:${H}px">
       <svg class="spokes" width="${W}" height="${H}">${spokes}</svg>
       <div id="ring-center" class="${hubCls()}" role="button" tabindex="0"
            aria-label="select all or clear"

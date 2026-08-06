@@ -84,7 +84,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 /* the flat computer: screen = state, frame stroke = selection/result */
 .mon{width:46px;height:40px;display:block;flex:none}
 .node.small .mon{width:36px;height:31px}
-.node.center .mon{width:92px;height:80px}
+.node.center .mon{width:120px;height:105px}
 .mon-frame{fill:#20262e;stroke:rgba(255,255,255,.16);stroke-width:1.5;transition:stroke .15s ease}
 .mon-stand{fill:#20262e;stroke:rgba(255,255,255,.1);stroke-width:1}
 

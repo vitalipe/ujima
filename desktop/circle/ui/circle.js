@@ -374,7 +374,7 @@ function renderRing(){
 
   const n    = Math.max(others.length, 1);
   const tier = ringTier(n);
-  const d    = tier.d, centerD = 176, gap = 5;
+  const d    = tier.d, centerD = 190, gap = 5;
   const maxR = Math.min(W, H)/2 - d/2 - 26;
   const minR = centerD/2 + gap + d/2 + 8;
   const R    = Math.max(minR, maxR);
@@ -415,7 +415,7 @@ function renderRing(){
      dash swept along the same geometry by animating stroke-dashoffset —
      dasharray's gap exceeds the line length so only one dash is ever visible */
   const iconR  = tier.iconR;
-  const hubOff = 32, hubIR = 54;                // threads anchor on the hub glyph
+  const hubOff = 36, hubIR = 66;                // threads anchor on the hub glyph
   const hy     = cy - hubOff;
   const retryBtns = [];
   const spokes = others.map((m, i) => {

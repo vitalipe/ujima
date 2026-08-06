@@ -1,0 +1,71 @@
+;; Circle mock world — the single source of truth for the mock fleet.
+;; `bb circle` copies this seed to tmp/circle/world.edn and reads/writes THAT
+;; file on every tick: edit the live copy to drive peers, delete it to reseed.
+;;
+;; :peers — exactly the GET /ui/circle wire shape. A peer without
+;;          [:apps :catalog] gets the top-level :catalog.
+;; :knobs — mock-only reply behavior per peer id, gone when the real
+;;          transport lands: {:reply :ok|:fail|:noreply, :delay-ms 500}
+{:self "pi-mwalimu"
+
+ :catalog [{:id :gcompris :name "GCompris"  :category :learn}
+           {:id :tuxmath  :name "Tux Math"  :category :learn}
+           {:id :library  :name "Library"   :category :web}
+           {:id :browser  :name "Browser"   :category :web}
+           {:id :scratch  :name "Scratch"   :category :create}
+           {:id :tuxpaint :name "Tux Paint" :category :create}
+           {:id :write    :name "Write"     :category :office}]
+
+ :peers
+ [{:id "pi-mwalimu" :name "Mwalimu" :online true
+   :desktop {:locked false}
+   :apps    {:running {:id :circle :name "Circle" :category :system}}
+   :audio   {:muted false :out :hdmi :volume 40}}
+
+  {:id "pi-simba" :name "Simba" :online true
+   :desktop {:locked false}
+   :apps    {:running {:id :gcompris :name "GCompris" :category :learn}}
+   :audio   {:muted false :out :hdmi :volume 40}}
+
+  {:id "pi-twiga" :name "Twiga" :online true
+   :desktop {:locked false}
+   :apps    {:running {:id :tuxmath :name "Tux Math" :category :learn}}
+   :audio   {:muted false :out :hdmi :volume 40}}
+
+  {:id "pi-tembo" :name "Tembo" :online true
+   :desktop {:locked false}
+   :apps    {:running {:id :library :name "Library" :category :web}}
+   :audio   {:muted false :out :hdmi :volume 40}}
+
+  {:id "pi-chui" :name "Chui" :online true
+   :desktop {:locked true}
+   :apps    {:running {:id :scratch :name "Scratch" :category :create}}
+   :audio   {:muted false :out :hdmi :volume 40}}
+
+  {:id "pi-kifaru" :name "Kifaru" :online true
+   :desktop {:locked false}
+   :apps    {:running {:id :write :name "Write" :category :office}}
+   :audio   {:muted false :out :hdmi :volume 40}}
+
+  {:id "pi-duma" :name "Duma" :online true
+   :desktop {:locked false}
+   :apps    {:running {:id :library :name "Library" :category :web}}
+   :audio   {:muted false :out :hdmi :volume 40}}
+
+  {:id "pi-nyati" :name "Nyati" :online true
+   :desktop {:locked false}
+   :apps    {:running nil}
+   :audio   {:muted true :out :hdmi :volume 40}}
+
+  {:id "pi-mamba" :name "Mamba" :online true
+   :desktop {:locked false}
+   :apps    {:running {:id :browser :name "Browser" :category :web}}
+   :audio   {:muted false :out :hdmi :volume 40}}
+
+  {:id "pi-punda" :name "Punda" :online false
+   :desktop {:locked false}
+   :apps    {:running nil}
+   :audio   {:muted false :out :hdmi :volume 40}}]
+
+ :knobs {"pi-mamba"  {:reply :noreply}
+         "pi-kifaru" {:delay-ms 4000}}}

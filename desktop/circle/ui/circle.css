@@ -1,0 +1,262 @@
+/* Circle — the fleet panel. */
+
+:root{
+  --bg:#14171b; --panel:#1b2027; --panel-brd:#282e38;
+  --text:#e7eaef; --dim:#9aa4b2; --faint:#697180;
+  --frost:136,192,208;   /* this computer / online */
+  --sel:126,158,214;     /* selection */
+  --ok:134,184,126;      /* done */
+  --danger:191,97,106;   /* failed / power verbs */
+  --warn:203,168,120;    /* attention (sand) */
+}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  color:var(--text); background-color:var(--bg);
+  background-image:radial-gradient(ellipse 130% 90% at 50% -12%, #1a2029 0%, #14171b 58%);
+  background-attachment:fixed; overflow-x:hidden;
+  font-family:'Public Sans',system-ui,'Noto Sans',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  user-select:none; -webkit-user-select:none; cursor:default;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:focus{outline:none}
+button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;border-radius:8px}
+
+.ic{display:inline-flex;flex:none}
+.ic svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ── floating chrome (no header bar) ────────────────────────────────────── */
+
+.txtbtn{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;
+  color:var(--dim);padding:8px 10px;border-radius:9px;transition:background .15s,color .15s}
+.txtbtn:hover{background:rgba(255,255,255,.07);color:var(--text)}
+
+
+/* ── RING view ──────────────────────────────────────────────────────────── */
+#stage.ringstage{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.ringwrap{position:relative;margin:0 auto}
+.spokes{position:absolute;inset:0;pointer-events:none}
+/* threads are invisible at rest and only exist while a command is in flight:
+   a faint guide while pending, a dead red dash for a machine that never
+   answered. Answers hand off to the machine frame and the thread fades.
+   base dasharray "1 0" = solid, but interpolable — dashes ease into a line */
+.spoke{stroke:transparent;stroke-width:1.5;fill:none;stroke-dasharray:1 0;
+  transition:stroke .45s ease,stroke-width .45s ease,stroke-dasharray .45s ease}
+.spoke.pending{stroke:rgba(var(--sel),.22)}
+.spoke.noreply{stroke:rgba(var(--danger),.45);stroke-width:2;stroke-dasharray:3 6}
+
+/* the packet: one short bright dash swept down the line (gap > line length),
+   staggered per target via --delay; --end = -length puts it just past the tip */
+.packet{fill:none;stroke:rgba(var(--sel),.9);stroke-width:2.5;stroke-linecap:round;
+  visibility:hidden}
+.packet.on{visibility:visible;animation:packet 1s linear infinite;
+  animation-delay:var(--delay,0s)}
+@keyframes packet{from{stroke-dashoffset:12}to{stroke-dashoffset:var(--end,-400px)}}
+
+.node{position:absolute;width:116px;height:116px;
+  transform:translate(-50%,-50%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  text-align:center;transition:opacity .3s}
+.node.pickable{cursor:pointer}
+.node.pickable:active{transform:translate(-50%,-50%) scale(.95)}
+.node.off{opacity:.4}
+
+/* the flat computer: screen = state, frame stroke = selection/result */
+.mon{width:46px;height:40px;display:block;flex:none}
+.node.small .mon{width:36px;height:31px}
+.node.center .mon{width:120px;height:105px}
+.mon-frame{fill:#20262e;stroke:rgba(255,255,255,.16);stroke-width:1.5;transition:stroke .15s ease}
+.mon-stand{fill:#20262e;stroke:rgba(255,255,255,.1);stroke-width:1}
+
+/* the screen shows state: tint + glyph, both eased by class changes */
+.mon-screen{fill:#12181f;transition:fill .45s ease}
+.node.center .mon-screen{fill:rgba(var(--frost),.12)}
+.node.off .mon-screen{fill:#0a0c0e}
+.node.locked .mon-screen{fill:rgba(var(--warn),.16)}
+.node.busy .mon-screen{fill:rgba(var(--sel),.15)}
+.node.res-ok .mon-screen,.node.res-accepted .mon-screen{fill:rgba(var(--ok),.17)}
+.node.res-fail .mon-screen,.node.res-noreply .mon-screen{fill:rgba(var(--danger),.15)}
+
+.scr{opacity:0;transition:opacity .45s ease}
+.scr rect,.scr path,.scr polyline,.scr line{fill:none;stroke-linecap:round;stroke-linejoin:round}
+.scr-lock rect,.scr-lock path{stroke:rgb(var(--warn));stroke-width:1.6}
+.scr-ok polyline{stroke:rgba(var(--ok),.95);stroke-width:2.2}
+.scr-err line{stroke:rgba(var(--danger),.9);stroke-width:2.2}
+.scr-load circle{fill:rgba(var(--sel),.9)}
+.node.locked .scr-lock{opacity:1}
+.node.busy .scr-load{opacity:1}
+.node.res-ok .scr-ok,.node.res-accepted .scr-ok{opacity:1}
+.node.res-fail .scr-err,.node.res-noreply .scr-err{opacity:1}
+.node.busy .scr-load circle{animation:blink 1.1s ease-in-out infinite}
+.node.busy .scr-load circle:nth-child(2){animation-delay:.18s}
+.node.busy .scr-load circle:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,100%{opacity:.25}40%{opacity:1}}
+
+.node.pickable:hover .mon-frame{stroke:rgba(var(--sel),.45)}
+.node.sel .mon-frame{stroke:rgba(var(--sel),.9);stroke-width:2}
+.node.sel .nname{color:rgb(var(--sel))}
+/* the hub is a machine glyph like its peers — its screen carries the run
+   state through the same classes (busy dots / check / X), frost when idle */
+.node.center{gap:5px;padding:0 16px}
+.node.center .mon{cursor:pointer}
+.node.center .mon-frame{stroke:rgba(var(--frost),.5)}
+.ringwrap.hub-hot .node.center .mon-frame{stroke:rgba(var(--frost),.8)}
+/* fixed-height slots: content swaps never move the glyph, and text slots fade
+   softly because the elements persist across state changes */
+.hubslot{display:flex;gap:6px;align-items:center;justify-content:center;
+  transition:opacity .45s ease}
+.hubl{min-height:21px;white-space:nowrap}
+.hubtop{min-height:28px}
+.hubretry{display:flex;align-items:center;gap:5px;height:28px;padding:0 11px;border-radius:999px;
+  background:var(--panel);color:rgb(var(--danger));font-size:11.5px;font-weight:700;
+  box-shadow:inset 0 0 0 1.5px rgba(var(--danger),.55),0 4px 12px rgba(0,0,0,.4);
+  transition:background .15s}
+.hubretry:hover{background:rgba(var(--danger),.18)}
+.hubretry .ic{width:13px;height:13px}
+/* the rescan escape hatch, top right */
+.rescan{position:fixed;top:16px;right:16px;z-index:15;display:flex;align-items:center;gap:7px;
+  padding:8px 14px;border-radius:11px;font-size:12px;font-weight:650;color:var(--dim);
+  background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);
+  transition:background .15s,color .15s}
+.rescan:hover{background:rgba(255,255,255,.09);color:var(--text)}
+.rescan .ic{width:12px;height:12px}
+.rescan.off{opacity:.4;pointer-events:none}
+.rescan.on{color:var(--faint);pointer-events:none}
+.rescan.on .ic{animation:cogturn 1.1s linear infinite}
+/* the hub screen speaks: a slowly turning cog at rest, the armed count when
+   machines are chosen, then the shared busy/check/X language */
+.scr-cog circle,.scr-cog line{stroke:rgba(var(--frost),.75);stroke-width:1.5}
+.node.center.calm .scr-cog{opacity:1;animation:cogturn 24s linear infinite;
+  transform-origin:24px 17px;transform-box:view-box}
+@keyframes cogturn{to{transform:rotate(360deg)}}
+.scr-num{fill:rgb(var(--sel));font-size:13px;font-weight:700}
+.node.center.has-sel .scr-num{opacity:1}
+.node.center.has-sel .mon-screen{fill:rgba(var(--sel),.13)}
+.hubhint{font-size:15px;font-weight:700;white-space:nowrap}
+.node.center.fading .hubslot{opacity:0}
+.hubdot{color:var(--faint)}
+.hubverb{font-size:15px;font-weight:700}
+.hubprog{font-size:13px;color:var(--dim)}
+.hubl{font-size:12.5px;color:var(--dim)}
+.hubl .ok{color:rgb(var(--ok))}
+.hubl .fail{color:rgb(var(--danger))}
+/* per-machine retry, sitting on the broken thread itself */
+.lineretry{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;
+  border-radius:999px;background:var(--panel);color:rgb(var(--danger));
+  box-shadow:inset 0 0 0 1.5px rgba(var(--danger),.55),0 4px 12px rgba(0,0,0,.4);
+  display:none;align-items:center;justify-content:center;z-index:5}
+.lineretry.on{display:flex}
+.lineretry:hover{background:rgba(var(--danger),.18);color:var(--text)}
+.lineretry .ic{width:13px;height:13px}
+/* hovering the hub glyph whispers "these will be chosen" on eligible machines */
+.ringwrap.hub-hot .node:not(.off):not(.sel):not(.center) .mon-frame{stroke:rgba(var(--sel),.45)}
+.ringwrap.hub-hot.all-in .node.sel:not(.center) .mon-frame{stroke:rgba(var(--sel),.45)}
+/* ring results on the monitor frame; after .sel so they win */
+.node.res-ok .mon-frame,.node.res-accepted .mon-frame{stroke:rgba(var(--ok),.9);stroke-width:2}
+.node.res-fail .mon-frame{stroke:rgba(var(--danger),.95);stroke-width:2}
+.node.res-noreply .mon-frame{stroke:rgba(var(--danger),.6);stroke-width:2}
+.node.fading .mon-frame{transition:stroke .45s ease}
+.ringwrap.lock .node{pointer-events:none}
+/* discovery: while scanning only the hub remains; found machines stagger in */
+.ringwrap.scanning .node:not(.center),
+.ringwrap.scanning .spokes,
+.ringwrap.scanning .lineretry{opacity:0 !important;pointer-events:none;transition:none}
+.ringwrap.scanning .node.center .scr-cog{opacity:1;animation:cogturn 1.1s linear infinite;
+  transform-origin:24px 17px;transform-box:view-box}
+.ringwrap.reveal .node:not(.center){animation:appear .5s ease-out backwards;
+  animation-delay:calc(var(--i,0)*.07s)}
+@keyframes appear{from{opacity:0;transform:translate(-50%,-50%) scale(.86)}}
+
+.nname{font-size:13.5px;font-weight:650;letter-spacing:-.2px;max-width:92px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.napp{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:500;min-height:15px;max-width:94px}
+.napp .txt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.napp .catdot{width:7px;height:7px;border-radius:2px;flex:none;background:rgb(var(--cat,105,113,128))}
+.napp.home,.napp.offline,.approw.home,.approw.offline{color:var(--faint)}
+.lockedrow{color:rgba(var(--warn),.95)}
+.lockedrow .ic{color:inherit}
+.napp .ic{width:11px;height:11px;color:var(--dim)}
+.nfoot{display:flex;align-items:center;gap:6px;min-height:17px}
+.nfoot .snd{width:13px;height:13px;color:var(--faint)}
+.selftag{font-size:9.5px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700;
+  color:rgba(var(--frost),.9)}
+.ringwrap.lock .hubslot{opacity:.35}
+/* small classes get big machines; the center scales with its peers */
+.node.big .mon{width:76px;height:66px}
+.node.big .nname{font-size:15.5px;max-width:132px}
+.node.big .napp{font-size:12.5px;max-width:134px}
+.node.mid .mon{width:56px;height:49px}
+.node.mid .nname{font-size:14px;max-width:106px}
+/* dense rings: icon + name only — the screen already tells the state */
+.node.small .nname{font-size:11.5px;max-width:86px}
+.node.small .napp,.node.small .nfoot{display:none}
+
+
+
+/* ── action bar ─────────────────────────────────────────────────────────── */
+.bar{position:fixed;left:50%;bottom:16px;transform:translate(-50%,150%);z-index:20;
+  max-width:calc(100vw - 24px);
+  background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;
+  padding:10px 14px 11px;display:flex;flex-direction:column;gap:8px;
+  box-shadow:0 12px 32px rgba(0,0,0,.45);transition:transform .22s ease}
+.bar.show{transform:translate(-50%,0)}
+/* one line when it fits, a stacked column when it doesn't — never a partial wrap */
+.verbs{display:flex;align-items:flex-end;gap:18px}
+.selx{align-self:flex-end;margin:0 0 3px 4px;width:32px;height:32px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;color:var(--faint);
+  transition:background .15s,color .15s}
+.selx .ic{width:14px;height:14px}
+.selx:hover{background:rgba(255,255,255,.07);color:var(--text)}
+@media (max-width:1239px){
+  .verbs{flex-direction:column;align-items:flex-start;gap:8px}
+  .count{padding:0 4px}
+}
+.bar.busy .verbs{opacity:.35;pointer-events:none}
+.count{font-size:12.5px;font-weight:650;color:var(--text);padding:0 4px 9px;white-space:nowrap}
+.vgroup{display:flex;flex-direction:column;gap:3px}
+.glabel{font-size:9.5px;text-transform:uppercase;letter-spacing:1.4px;font-weight:700;
+  color:var(--faint);padding-left:9px}
+.vrow{display:flex;gap:3px}
+.verb{display:flex;align-items:center;gap:7px;padding:9px 12px;border-radius:11px;
+  font-size:12.5px;font-weight:600;transition:background .15s;white-space:nowrap}
+.verb .ic{width:15px;height:15px}
+.verb:hover{background:rgba(255,255,255,.07)}
+.verb.danger{color:rgb(var(--danger))}
+.verb.danger:hover{background:rgba(var(--danger),.12)}
+
+/* ── sheets ─────────────────────────────────────────────────────────────── */
+.ovl{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+  background:rgba(10,12,15,.5)}
+.ovl.show{display:flex}
+.sheet{background:var(--panel);border:1px solid var(--panel-brd);border-radius:16px;
+  padding:18px;width:min(430px,calc(100vw - 32px));display:flex;flex-direction:column;gap:14px}
+.sheet h2{font-size:14.5px;font-weight:700}
+.sheet p{font-size:13px;color:var(--dim);line-height:1.45}
+.sfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:2px}
+.btn{padding:9px 14px;border-radius:11px;font-size:12.5px;font-weight:650;transition:background .15s}
+.btn.quiet{color:var(--dim)} .btn.quiet:hover{background:rgba(255,255,255,.07);color:var(--text)}
+.btn.primary{color:var(--text);background:rgba(var(--sel),.16);box-shadow:inset 0 0 0 1px rgba(var(--sel),.4)}
+.btn.primary:hover{background:rgba(var(--sel),.24)}
+.btn.dangerf{color:rgb(var(--danger));background:rgba(var(--danger),.14);box-shadow:inset 0 0 0 1px rgba(var(--danger),.4)}
+.btn.dangerf:hover{background:rgba(var(--danger),.22)}
+.appgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px}
+.apptile{display:flex;flex-direction:column;align-items:center;gap:7px;padding:12px 4px 10px;
+  border-radius:14px;background:rgba(255,255,255,.055);transition:box-shadow .15s,background .15s}
+.apptile:hover{background:rgba(255,255,255,.09)}
+.apptile.on{background:rgba(var(--sel),.12);box-shadow:inset 0 0 0 1.5px rgba(var(--sel),.6)}
+.apptile .glyph{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+  font-size:17px;font-weight:700;background:rgba(var(--cat),.14);color:rgb(var(--cat))}
+.apptile .an{font-size:11px;font-weight:600;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.apptile.on .an{color:var(--text)}
+.field{width:100%;background:var(--bg);border:0;border-radius:10px;padding:11px 12px;
+  color:var(--text);font:500 13.5px 'Public Sans',system-ui,sans-serif;
+  box-shadow:inset 0 0 0 1px var(--panel-brd)}
+.field::placeholder{color:var(--faint)}
+.field:focus{outline:none;box-shadow:inset 0 0 0 1.5px rgba(var(--sel),.55)}
+.volrow{display:flex;align-items:center;gap:14px}
+.volrow input[type=range]{flex:1;accent-color:rgb(var(--sel))}
+.volnum{font-size:14px;font-weight:650;min-width:44px;text-align:right;color:var(--dim)}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}

@@ -117,14 +117,15 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.sel .nname{color:rgb(var(--sel))}
 /* the hub is a machine glyph like its peers — its screen carries the run
    state through the same classes (busy dots / check / X), frost when idle */
-.node.center{cursor:pointer;gap:5px;padding:0 16px}
+.node.center{gap:5px;padding:0 16px}
+.node.center .mon{cursor:pointer}
 .node.center .mon-frame{stroke:rgba(var(--frost),.5)}
-.node.center:hover .mon-frame{stroke:rgba(var(--frost),.8)}
+.ringwrap.hub-hot .node.center .mon-frame{stroke:rgba(var(--frost),.8)}
 /* fixed-height slots: content swaps never move the glyph, and text slots fade
    softly because the elements persist across state changes */
 .hubslot{display:flex;gap:6px;align-items:center;justify-content:center;
   transition:opacity .45s ease}
-.hubl{min-height:19px}
+.hubl{min-height:21px;white-space:nowrap}
 /* the hub screen speaks: a slowly turning cog at rest, the armed count when
    machines are chosen, then the shared busy/check/X language */
 .scr-cog circle,.scr-cog line{stroke:rgba(var(--frost),.75);stroke-width:1.5}
@@ -138,7 +139,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .scr-retry path{stroke:rgb(var(--danger));stroke-width:2.4}
 .node.center.res-fail .scr-err{opacity:0}
 .node.center.res-fail .scr-retry{opacity:1}
-.hubhint{font-size:12.5px;color:var(--dim)}
+.hubhint{font-size:15px;font-weight:700;white-space:nowrap}
 .node.center.fading .hubslot{opacity:0}
 .hubdot{color:var(--faint)}
 .hubverb{font-size:15px;font-weight:700}
@@ -154,8 +155,8 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .lineretry.on{display:flex}
 .lineretry:hover{background:rgba(var(--danger),.18);color:var(--text)}
 .lineretry .ic{width:13px;height:13px}
-/* hovering the hub whispers "these will be chosen" on every eligible machine */
-#ring-center:hover ~ .node:not(.off):not(.sel) .mon-frame{stroke:rgba(var(--sel),.45)}
+/* hovering the hub glyph whispers "these will be chosen" on eligible machines */
+.ringwrap.hub-hot .node:not(.off):not(.sel):not(.center) .mon-frame{stroke:rgba(var(--sel),.45)}
 /* ring results on the monitor frame (grid keeps chips); after .sel so they win */
 .node.res-ok .mon-frame,.node.res-accepted .mon-frame{stroke:rgba(var(--ok),.9);stroke-width:2}
 .node.res-fail .mon-frame{stroke:rgba(var(--danger),.95);stroke-width:2}

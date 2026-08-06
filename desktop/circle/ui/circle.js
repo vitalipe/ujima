@@ -532,21 +532,28 @@ function renderVerbs(){
 
 /* ── selection ───────────────────────────────────────────────────────────── */
 $('stage').addEventListener('click', e => {
-  if (e.target.closest('#ring-center')) return hubClick();
+  if (e.target.closest('#ring-center')){ if (e.target.closest('.mon')) hubClick(); return; }
   const el = e.target.closest('[data-id]'); if (!el) return;
   toggle(byId(el.dataset.id));
 });
 $('stage').addEventListener('mouseover', e => {
+  const hubHot = !!(e.target.closest('#ring-center') && e.target.closest('.mon'));
+  const wrap = $('stage').firstElementChild;
+  if (wrap && wrap.classList) wrap.classList.toggle('hub-hot', hubHot);
   if (e.target.closest('.lineretry')){
     const m = byId(e.target.closest('.lineretry').id.replace('retry-', ''));
     return setHint(m ? 'Retry ' + esc(m.name) : '');
   }
-  if (e.target.closest('#ring-center')) return setHint(hubHint());
+  if (hubHot) return setHint(hubHint());
   const el = e.target.closest('[data-id]');
   if (el) return setHint(peerHint(byId(el.dataset.id)));
   setHint('');
 });
-$('stage').addEventListener('mouseout', () => setHint(''));
+$('stage').addEventListener('mouseout', () => {
+  const wrap = $('stage').firstElementChild;
+  if (wrap && wrap.classList) wrap.classList.toggle('hub-hot', false);
+  setHint('');
+});
 $('bar').addEventListener('mouseover', e => {
   if (e.target.closest('.selx')) return setHint('Clear selection');
   const v = e.target.closest('[data-hint]');

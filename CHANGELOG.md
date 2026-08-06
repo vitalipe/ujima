@@ -10,6 +10,9 @@ version truth; branch names and build labels may disagree.
 
 ### Added
 
+- Ujima Circle App (dev-only, not wired yet): a fleet control panel for teachers —
+  Runs against a file-backed mock fleet: `bb circle mock`
+  serves it on :1338, `bb circle world` is a TUI that drives the mock world.
 - The OS image boots as-is — `dd` it to a card for a system without A/B, where
   settings and storage are not persistent.
 

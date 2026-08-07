@@ -70,11 +70,13 @@ bb test:unit                                          unit tests
 bb test:integration <test|all>                        integration suite (loopback, needs root)
 ```
 
-The same OS script runs in both harnesses: `bb os script x.img desktop` (build
-chroot) and `bb dev script <ip> desktop` (live device).
+The same OS script runs in the build chroot (`bb os script x.img desktop`) and on a
+live device (`bb dev script <ip> desktop`).
 
 
 ## Building
+
+The target hardware is the Raspberry Pi 5 (including the Pi 500).
 
 Host requirements: Linux, [babashka](https://babashka.org), root for
 loopback/chroot work, `binfmt_misc` with qemu-aarch64 registered (e.g.
@@ -85,6 +87,10 @@ additionally wants `sshpass` and `rsync`.
 sudo bb build rpi-os          # release image
 sudo bb build rpi-os --dev    # dev image (`bb dev` commands require it)
 ```
+
+Dev images are wide open by design — ssh with the default `ujima/ujima` login and
+the VNC/input relay baked in. That is the public-access threat model (physical
+access already implies root); release images ship none of it.
 
 The first build fetches the pinned raspios base once into `out/vendor/` and
 bakes the packages into it (the install stage).  **no command ever deletes it** — rebuilding it is a manual `rm out/vendor/<name>.img`. Every later build starts from the cache:
@@ -98,7 +104,7 @@ Outputs land in `out/` as `ujima-<branch>-<commit>[-dirty][-dev].*`:
 …-disk.img    the flashable A/B disk (slot A installed and activated)
 ```
 
-Flash the disk image to an SD card:
+Flash the full build's A/B harness disk to an SD card (28 GiB — use a ≥32 GB card):
 
 ```
 sudo dd if=out/ujima-…-disk.img of=/dev/mmcblk0 bs=4M conv=fsync status=progress
@@ -110,7 +116,7 @@ pipeline.
 ### Build an OS image
 
 ```
-sudo bb stage rpi-os                             # vendor (cached) -> out/ujima-<branch>-<sha>.img
+sudo bb stage rpi-os                           # vendor (cached) -> out/ujima-<branch>-<sha>.img
 sudo bb os apply out/ujima-….img --dev         # the script chain; or one at a time: bb os script <img> base
 ```
 
@@ -124,7 +130,7 @@ every boot.
 sudo bb disk ab create autoboot out/u-disk.img   # or a real device: /dev/mmcblk0
 ```
 
-An empty A/B layout: control, boot A/B, root A/B, settings, storage.
+An empty A/B harness: control, boot A/B, root A/B, settings, storage.
 
 ### Apply to a slot
 
@@ -141,4 +147,33 @@ only**, shipped installs go through a pack.
 
 For the live iteration loop against a running dev device, `bb dev push <ip> ujimad`
 deploys the daemon and restarts the session; `bb dev script <ip> <name>` runs any
-OS script in place.
+OS script in place. Live deploys ship **code and static files only** — they never
+install packages, so anything that needs a new binary is an image rebuild (the
+failure mode is a quiet "won't open": the spawn throws on the missing binary).
+
+
+## The device
+
+**The A/B harness** — the card layout, owned by the installer: a control partition,
+boot + root **slot pairs**, and two partitions that belong to no slot — **settings**
+and **storage**. An update installs a pack into the inactive slot and activates it;
+the Pi's tryboot mechanism falls back to the previous slot if the new one fails to
+boot. Each install writes that slot's fstab, so a slot always mounts its own boot
+partition and the shared pair: the settings partition lands at `/mnt/settings`
+(one dir per slot), and binding the slot's dir to `/ujima/settings` IS slot
+selection.
+
+**UjimaOS** — inside a slot, the root filesystem is **read-only** under a tmpfs
+overlay: everything written to `/` resets on reboot. What persists — across reboots
+*and* A/B updates — lives on the harness's shared partitions: settings, storage, and
+the journal. On a running device:
+
+```
+/ujima/ujimad      the deployed core (runtime/)
+/ujima/desktop     the desktop layer (desktop/, mirrored)
+/ujima/apps        the app catalog scan root
+/ujima/settings    per-slot settings scope          (persists)
+/ujima/storage     shared storage — files, apps     (persists)
+/ujima/run         ephemeral runtime state          (resets)
+/ujima/dev         the dev kit                      (dev images only)
+```

@@ -2,10 +2,20 @@
 
 The ujima core codebase — shared, not the daemon's private tree.
 
-- `src/lib/` — shared infrastructure (shell DSL, io, tasks, cli); `tools/` and `os/build` link it on the host.
-- `src/ujima/` — the runtime: control plane, desktop/session layer, device + A/B install, linux glue. Entry: `ujima.ujimad`.
+- `src/lib/` — shared infrastructure (shell DSL, io, tasks, cli): the project's
+  standard library; everything else builds on it.
+- `src/ujima/ujimad.clj` — the daemon entry point.
+- `src/ujima/linux/` — linux glue.
+- `src/ujima/device/` — device + A/B install.
+- `src/ujima/control/` — the control plane.
+- `src/ujima/desktop/` — the desktop/session layer.
 - `config/` — deployment config (`ujimad.edn`), staged with the code.
 - `test/` — the unit + integration suites (`bb test:unit`, `bb test:integration`).
 
 The ujimad stage deploys this tree to `/ujima/ujimad`; on-device consumers beyond the
 daemon (the installer) run from the same deploy.
+
+ujimad is session-scoped, not a system daemon: i3 execs it inside the X session, so
+app/window lifecycle and the `:1337` loopback API run with the session's environment.
+`ujima.service` runs and supervises the whole session — its `Restart=always` *is* the
+recovery story (the unit file carries the full rationale).

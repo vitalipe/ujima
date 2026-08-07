@@ -1,7 +1,7 @@
 (ns pipeline.desktop.i18n
   "Writes the GNU gettext .mo binary format directly from a catalog map — the ~40 lines
-   that replace a vendored binary + python producer. GTK's chooser-label override
-   (os/desktop/i18n/catalog.edn) is generated at stage time in the chroot; no gettext
+   that replace a vendored binary + python producer. GTK's chooser-label override is
+   generated from the desktop stage's catalog at stage time in the chroot; no gettext
    toolchain involved. Format: little-endian header (magic, revision, count, key-table
    offset, value-table offset, hash size/offset), sorted-msgid key/value tables of
    (length, offset) pairs, then the NUL-terminated strings (lengths exclude the NUL)."

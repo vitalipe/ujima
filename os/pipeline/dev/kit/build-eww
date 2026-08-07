@@ -51,7 +51,7 @@ echo
 echo "built eww $EWW_REF -> $out/eww-aarch64-latest"
 "$out/eww-aarch64-latest" --version || true
 echo
-echo "runtime libs (pin these in tools.scripts.install):"
+echo "runtime libs (pin these in the install stage):"
 ldd "$out/eww-aarch64-latest" | awk '{print $1}' | sort -u
 echo
 echo "copy into the repo (single tracked file; the version rides the commit message):"

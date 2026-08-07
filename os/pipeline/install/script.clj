@@ -4,7 +4,7 @@
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
-            [pipeline.appcatalog.script :as appcatalog]))
+            [build.apps :as apps]))
 
 
 (defn run! [{:keys [project]}]
@@ -65,11 +65,11 @@
     ($! apt-get install -y --no-install-recommends
         "pipewire" "pipewire-pulse" "pipewire-alsa" "wireplumber")
 
-    ;; classroom apps the launcher opens: install recipes live beside their catalog specs in
-    ;; the appcatalog script (one entry per app). Runs HERE so the app packages — libreoffice,
+    ;; classroom apps the launcher opens: install recipes live in each app's os/apps/<id>/install.edn —
+    ;; scanned by build.apps. Runs HERE so the app packages — libreoffice,
     ;; chromium, inkscape, the fetched TurboWarp, … — bake into the cached vendor base instead of
     ;; re-downloading every build. `apt-get update` above already primed the lists.
-    (appcatalog/install! {:project project})
+    (apps/install! project)
 
     ;; runtime babashka: the same vendored aarch64 binary we are running under,
     ;; copied + made executable in one shot

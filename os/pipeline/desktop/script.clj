@@ -12,7 +12,7 @@
             [babashka.fs :as fs]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [pipeline.appcatalog.script :as appcatalog]
+            [build.apps :as apps]
             [pipeline.desktop.i18n :as i18n]
             [build.files :as files]))
 
@@ -77,8 +77,8 @@
     (files/install! project "desktop/links/ujima-open-url.desktop"
                     "/usr/share/applications/ujima-open-url.desktop")
 
-    ;; per-app trees (apps/<id>): app.edn specs -> the catalog scan root, rootfs/
+    ;; the packaged app set (os/apps/<id>): app.edn specs -> the catalog scan root, rootfs/
     ;; defaults overlaid onto / — AFTER the mirrors above so a clean-mirror can't clobber
-    ;; them; rides both the image build and live `dev script desktop`, so an app edit ships
+    ;; them; same — an app edit ships
     ;; without a rebuild.
-    (appcatalog/stage-defaults! {:project project})))
+    (apps/stage-defaults! project)))

@@ -1,0 +1,2 @@
+;; STUB tile — the local server isn't stood up yet; chromium fronts it meanwhile
+{:apt ["chromium"]}

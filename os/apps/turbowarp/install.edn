@@ -1,0 +1,2 @@
+;; app-dir tarball, unpacked with the top dir stripped
+{:fetch {:url "https://github.com/TurboWarp/desktop/releases/download/v1.16.0/TurboWarp-linux-arm64-1.16.0.tar.gz", :sha256 "5909f02d92536c3ee52121dec4f1b7a73261a08ac7e091d15205cbff9893e33a", :dest "/ujima/apps/turbowarp"}}

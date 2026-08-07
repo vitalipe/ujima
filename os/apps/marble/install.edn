@@ -1,0 +1,2 @@
+;; Qt-only build; marble-data = offline maps
+{:apt ["marble-qt" "marble-data"]}

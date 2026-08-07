@@ -76,7 +76,7 @@
 ;; script that reads a new asset dir adds one entry here.
 (def ^:private stage-paths ["runtime/src" "runtime/config"
                             "os"          ; pipeline scripts + concern dirs + build machinery (incl. vendored bb)
-                            "desktop" "apps"])
+                            "desktop"])
 
 
 (defn script!

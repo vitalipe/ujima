@@ -1,0 +1,4 @@
+;; official arm64 editor, a .zip carrying one versioned binary → :bin renames it to a stable
+;; `godot`; Vulkan Mobile needs mesa-vulkan-drivers (install stage). The vendored demo
+;; project rides this app's rootfs tree
+{:fetch {:url "https://github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.arm64.zip", :sha256 "db5aa126353a18fd664818e4f1b9cfffaa77e32d4c9af0ea87e8f028a395a1ed", :dest "/ujima/apps/godot", :bin "godot"}}

@@ -92,8 +92,8 @@ Dev images are wide open by design — ssh with the default `ujima/ujima` login 
 the VNC/input relay baked in. That is the public-access threat model (physical
 access already implies root); release images ship none of it.
 
-The first build fetches the pinned raspios base once into `out/vendor/` and
-bakes the packages into it (the install stage).  **no command ever deletes it** — rebuilding it is a manual `rm out/vendor/<name>.img`. Every later build starts from the cache:
+The first build fetches the pinned raspios base once into `out/cache/` and
+bakes the packages into it (the install stage).  **no command ever deletes it** — rebuilding it is a manual `rm out/cache/<name>.img`. Every later build starts from the cache:
 copy → content scripts in the chroot → pack → A/B disk.
 
 Outputs land in `out/` as `ujima-<branch>-<commit>[-dirty][-dev].*`:

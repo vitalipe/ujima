@@ -1,7 +1,7 @@
 (ns tools.cmd.stage
   "bb stage <target>: build a staged image from a pinned base OS.
 
-   Vendor base (fetch + `os script install`, cached under out/vendor/) -> copy to
+   Vendor base (fetch + `os script install`, cached under out/cache/) -> copy to
    out/ujima-<branch>-<commit>.img. The vendor is built once; rm it to rebuild
    (e.g. after editing the install stage or bumping the vendored bb). Fetch lives here because
    the vendor build is its only caller."
@@ -63,7 +63,7 @@
    })
 
 
-(def ^:private vendor-dir "out/vendor")
+(def ^:private vendor-dir "out/cache")
 (def ^:private out-dir    "out")
 
 
@@ -127,7 +127,7 @@
 
 (defn stage!
   "Build a cached vendor base (base OS + packages + bb) and copy it to a working
-   image. The vendor is built once; rm out/vendor/<name>.img to rebuild it."
+   image. The vendor is built once; rm out/cache/<name>.img to rebuild it."
   [target _opts]
   (let [{:keys [url sha256]} (or (get targets target)
                                  (throw (ex-info (str "Unknown stage target: " target)

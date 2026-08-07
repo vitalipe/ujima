@@ -21,7 +21,7 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
             [babashka.process :as p]
-            [build.runner :as runner]
+            [build.scripts         :as scripts]
             [lib.shell :refer [sh! sh?]]))
 
 
@@ -68,7 +68,7 @@
 ;; staging dir on the device = the chroot repo bind path; NOT the install target —
 ;; the ujimad script copies <project>/runtime/src into /ujima/ujimad, staging there would
 ;; copy it into itself
-(def ^:private device-stage runner/project-mnt)
+(def ^:private device-stage scripts/project-mnt)
 
 ;; Repo subset staged to the device — the dirs scripts read plus what the bb classpath needs.
 ;; Explicit include-list, NEVER the whole worktree: it holds tens of GB of build output under
@@ -85,17 +85,15 @@
    analog of `bb os script`. Stages the repo subset the scripts need to device-stage, then
    runs the device's own bb against it as root. No chroot, no qemu (native aarch64), no host root."
   [{:keys [script ip] :as opts}]
-  (runner/require-script! script)                    ; fail fast, before any ssh/rsync
+  (scripts/require-script! script)                    ; fail fast, before any ssh/rsync
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (require-host-cmd! "rsync"   "install it (e.g. apt install rsync)")
   (let [{:keys [ssh-e host] :as transport} (ssh-transport opts)
         ;; resolve bb AS THE LOGIN USER first ($(command -v bb) on its PATH), then sudo the
         ;; absolute path: sudo's secure_path won't include the vendored bb, so a bare `sudo bb`
         ;; would be command-not-found.
-        remote-cmd (str "sudo \"$(command -v bb)\""
-                        " --classpath " (runner/classpath device-stage)
-                        " -x " (runner/script-ns script) "/run!"
-                        " --project " device-stage)]
+        remote-cmd (str "sudo \"$(command -v bb)\" "
+                        (str/join " " (scripts/run-args script device-stage)))]
     ;; device preflight (loud): need rsync to stage and bb to run
     (doseq [c ["rsync" "bb"]]
       (when-not (:ok? (remote-sh? transport (str "command -v " c " >/dev/null")))
@@ -111,7 +109,7 @@
            "-e" ssh-e
            (concat stage-paths [(str host ":" device-stage "/")]))
     (println "staged" (str/join " " stage-paths) "->" (str ip ":" device-stage))
-    (println (str "running " (runner/script-ns script) "/run! on " ip))
+    (println (str "running the " script " script on " ip))
     (remote-exec! transport remote-cmd)
     {:script script :ip ip :stage device-stage}))
 

@@ -1,15 +1,15 @@
-(ns tools.cmd.os
-  "Host-only os-image machinery: script -> chroot.
+(ns build.image
+  "The os-image executor: script -> chroot. Host-side, beside the scripts it runs.
 
    `script` runs a <name>.script/run! namespace inside the target chroot (aarch64 bb
    under qemu) against a read-only project bind, so the script's file ops / shell-outs land in
-   the image. The script contract (names, entry ns, classpath, bind path) is build.runner —
+   the image. The script contract (names, entry ns, classpath, bind path) is build.scripts —
    shared with tools.cmd.dev; this namespace is wiring + the chroot mechanics. (The A/B disk
    verbs live in tools.cmd.disk.)"
   (:require
     [babashka.fs      :as fs]
     [babashka.process :as p]
-    [build.runner           :as runner]
+    [build.scripts         :as scripts]
     [lib.shell              :refer [$! require-root!]]
     [ujima.linux.disk       :as linux-disk]
     [ujima.linux.disk.loop  :as loopback]
@@ -25,7 +25,7 @@
 ;; path *inside* the chroot.
 (def ^:private qemu-src    "assets/tools/qemu-aarch64-static")
 (def ^:private qemu-chroot "/usr/bin/qemu-aarch64-static")
-(def ^:private project-mnt runner/project-mnt)  ;; repo bind in the chroot = dev rsync stage
+(def ^:private project-mnt scripts/project-mnt)  ;; repo bind in the chroot = dev rsync stage
 
 
 ;; Base image has 2 partitions [boot root]. Mount root, mount boot at the path the target
@@ -78,26 +78,23 @@
 ;;
 ;; A script is <name>.script/run!, executed *inside* the chroot by the
 ;; vendored aarch64 bb (run in place from the read-only project bind). Add a
-;; script by dropping os/<name>/script.clj — see build.runner, the contract.
+;; script by dropping os/<name>/script.clj — see build.scripts, the contract.
 ;; ---------------------------------------------------------------------------
 
 
 (def ^:private chroot-bb   (str project-mnt "/assets/tools/bb-aarch64"))
-(def ^:private chroot-cp   (runner/classpath project-mnt))
 
 
 (defn- do-chroot-run-script! [mnt target]
-  (p/shell {:inherit true}
-           "sudo" "chroot" (str mnt)
-           chroot-bb "--classpath" chroot-cp
-           "-x" (str (runner/script-ns target) "/run!")
-           "--project" project-mnt))
+  (apply p/shell {:inherit true}
+         "sudo" "chroot" (str mnt) chroot-bb
+         (scripts/run-args target project-mnt)))
 
 
 (defn script!
   "Run a single image-content script (<script>.script/run!) inside the chroot."
   [{:keys [img script]}]
-  (runner/require-script! script)
+  (scripts/require-script! script)
   (require-root!)
   (loopback/with-loopback-device [dev img]
     (with-chrooted-rootfs* dev
@@ -116,7 +113,7 @@
   (require-root!)
   (let [scripts (conj content-scripts (if dev "dev" "cleanup"))]
     (doseq [s scripts]                                  ; whole chain up front, so a typo or a
-      (runner/require-script! s))                       ; missing script never runs half of it
+      (scripts/require-script! s))                       ; missing script never runs half of it
     (doseq [s scripts]
       (println (str "== os script " s " -> " img))
       (script! {:img img :script s}))

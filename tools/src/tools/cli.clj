@@ -11,7 +11,7 @@
     [lib.task           :as task]
     [tools.cmd.loopback :as loopback]
     [tools.cmd.pack     :as pack]
-    [tools.cmd.os       :as os]
+    [build.image        :as image]
     [tools.cmd.disk     :as disk]
     [tools.cmd.stage    :as stage]
     [tools.cmd.build    :as build]
@@ -42,7 +42,7 @@
    "os"
    {"apply"
     {:usage "Usage: os apply <img> [--dev]"
-     :target os/apply!
+     :target image/apply!
      :args [:img]
      :spec {:img {:desc "Staged OS image to apply the ujima content chain into" :require true}
             :dev {:coerce :boolean
@@ -50,13 +50,13 @@
 
     "script"
     {:usage "Usage: os script <img> <name>"
-     :target os/script! :args [:img :script]
+     :target image/script! :args [:img :script]
      :spec {:img    {:desc "OS image to customize" :require true}
             :script {:desc "os.<name> to run inside the chroot" :require true}}}
 
     "chroot"
     {:usage "Usage: os chroot <img>"
-     :target os/chroot-shell! :args [:img]
+     :target image/chroot-shell! :args [:img]
      :spec {:img {:desc "OS image to open an interactive chroot into" :require true}}}}
 
    "pack"

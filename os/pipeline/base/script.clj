@@ -10,7 +10,7 @@
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$ $! $? with-console-out]]
             [babashka.fs :as fs]
-            [build.stage :as stage]))
+            [build.files :as files]))
 
 
 (defn- mask!
@@ -54,25 +54,25 @@
     ;;    (0440 or sudo silently ignores it; visudo -c fails the build loudly on a bad
     ;;    rule) + tty1 console autologin
     (create-login-user!)
-    (stage/install! project "base/login/ujima-nopasswd" "/etc/sudoers.d/ujima-nopasswd"
+    (files/install! project "base/login/ujima-nopasswd" "/etc/sudoers.d/ujima-nopasswd"
                     {:mode "0440"})
     ($! visudo -c -f "/etc/sudoers.d/ujima-nopasswd")
-    (stage/install! project "base/login/autologin.conf"
+    (files/install! project "base/login/autologin.conf"
                     "/etc/systemd/system/getty@tty1.service.d/autologin.conf")
 
     ;; 4. default host identity — the baked name IS the default ([:system :hostname] is nil
     ;;    unless a rename is set); the hosts mapping keeps sudo/X from warning "unable to
     ;;    resolve"; the initramfs hook keeps machine-id stable under the overlay (the why
     ;;    lives in the file)
-    (stage/install! project "base/identity/hostname" "/etc/hostname")
+    (files/install! project "base/identity/hostname" "/etc/hostname")
     ($! sh -c "grep -qw ujimaos /etc/hosts || printf '127.0.1.1\\tujimaos\\n' >> /etc/hosts")
-    (stage/install! project "base/identity/ujima-machine-id"
+    (files/install! project "base/identity/ujima-machine-id"
                     "/etc/initramfs-tools/scripts/init-bottom/ujima-machine-id")
 
     ;; 5. X bring-up plumbing — the packages ride install's cached layer; the confs live
     ;;    HERE so an edit ships without a package-set (cache-key) change
-    (stage/install! project "base/x11/Xwrapper.config" "/etc/X11/Xwrapper.config")
-    (stage/install! project "base/x11/99-vc4.conf" "/etc/X11/xorg.conf.d/99-vc4.conf")
+    (files/install! project "base/x11/Xwrapper.config" "/etc/X11/Xwrapper.config")
+    (files/install! project "base/x11/99-vc4.conf" "/etc/X11/xorg.conf.d/99-vc4.conf")
 
     ;; 6. A/B disk mount points + bind targets — rootfs layout is build content, so every
     ;;    image carries its own. The per-slot fstab that references them is written at

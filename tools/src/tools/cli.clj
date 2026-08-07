@@ -52,7 +52,7 @@
     {:usage "Usage: os script <img> <name>"
      :target image/script! :args [:img :script]
      :spec {:img    {:desc "OS image to customize" :require true}
-            :script {:desc "os.<name> to run inside the chroot" :require true}}}
+            :script {:desc "pipeline script to run inside the chroot" :require true}}}
 
     "chroot"
     {:usage "Usage: os chroot <img>"
@@ -122,7 +122,7 @@
      :target dev/script!
      :args [:ip :script]
      :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :script   {:desc "os.<name> to run live on the device" :require true :coerce :string}
+            :script   {:desc "pipeline script to run live on the device" :require true :coerce :string}
             :user     {:desc "SSH user"     :default "ujima" :coerce :string}
             :password {:desc "SSH password" :default "ujima" :coerce :string}
             :port     {:desc "SSH port"     :default "22"    :coerce :string}}}

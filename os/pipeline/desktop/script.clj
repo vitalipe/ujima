@@ -14,7 +14,7 @@
             [clojure.java.io :as io]
             [pipeline.appcatalog.script :as appcatalog]
             [pipeline.desktop.i18n :as i18n]
-            [build.stage :as stage]))
+            [build.files :as files]))
 
 
 (defn run! [{:keys [project]}]
@@ -39,20 +39,20 @@
     ;; eww binary: built out-of-band on a Pi (build-eww, dev kit) and vendored as the
     ;; single tracked file — versions live in git history. Staged here (not install) so a
     ;; rebuilt eww ships via `dev push desktop` without rebuilding the cached vendor base.
-    (stage/install! project "desktop/eww/eww" "/usr/local/bin/eww")
+    (files/install! project "desktop/eww/eww" "/usr/local/bin/eww")
 
     ;; the skin: Public Sans (shell face) + Nordic + the GTK defaults that point at them
     ;; (the why lives in theme/settings.ini)
-    (stage/mirror! project "desktop/fonts/public-sans" "/usr/share/fonts/truetype/public-sans")
+    (files/mirror! project "desktop/fonts/public-sans" "/usr/share/fonts/truetype/public-sans")
     ($! fc-cache -f)
-    (stage/mirror! project "desktop/theme/Nordic" "/usr/share/themes/Nordic")
-    (stage/install! project "desktop/theme/settings.ini" "/etc/gtk-3.0/settings.ini")
+    (files/mirror! project "desktop/theme/Nordic" "/usr/share/themes/Nordic")
+    (files/install! project "desktop/theme/settings.ini" "/etc/gtk-3.0/settings.ini")
 
     ;; GTK chooser label override ("Home" -> "Temporary"; the why lives in the catalog):
     ;; the .mo is GENERATED here from the catalog — no vendored binary, no gettext in the
     ;; chroot (desktop.i18n writes the format directly). One catalog, two locale installs.
     (let [mo (i18n/mo-bytes (edn/read-string
-                             (slurp (stage/source project "desktop/i18n/catalog.edn"))))]
+                             (slurp (files/source project "desktop/i18n/catalog.edn"))))]
       (doseq [loc ["en_GB" "en_US"]]
         (fs/create-dirs (str "/usr/share/locale/" loc "/LC_MESSAGES"))
         (with-open [out (io/output-stream (str "/usr/share/locale/" loc "/LC_MESSAGES/gtk30.mo"))]
@@ -61,20 +61,20 @@
     ;; session-level home seeds → the ujima user's home (per-APP home defaults live in their
     ;; apps trees, staged below): links routing + the Files-plane defaults. install! creates
     ;; parent dirs as root — the chown heals them (apps + xdg rewrite these as ujima).
-    (stage/install! project "desktop/links/mimeapps.list"
+    (files/install! project "desktop/links/mimeapps.list"
                     "/home/ujima/.config/mimeapps.list" {:owner "ujima:ujima"})
-    (stage/install! project "desktop/files/user-dirs.dirs"
+    (files/install! project "desktop/files/user-dirs.dirs"
                     "/home/ujima/.config/user-dirs.dirs" {:owner "ujima:ujima"})
-    (stage/install! project "desktop/files/bookmarks"
+    (files/install! project "desktop/files/bookmarks"
                     "/home/ujima/.config/gtk-3.0/bookmarks" {:owner "ujima:ujima"})
     ($! chown -R "ujima:ujima" "/home/ujima/.config")
 
     ;; the Files-area tmpfiles half (kid-facing /ujima/storage/files) — the files plane is
     ;; desktop's; the /ujima/run half stays with ujimaify's layout concern
-    (stage/install! project "desktop/files/ujima-files.conf" "/etc/tmpfiles.d/ujima-files.conf")
+    (files/install! project "desktop/files/ujima-files.conf" "/etc/tmpfiles.d/ujima-files.conf")
 
     ;; url handler registration (routing story lives in links/ujima-open-url.desktop)
-    (stage/install! project "desktop/links/ujima-open-url.desktop"
+    (files/install! project "desktop/links/ujima-open-url.desktop"
                     "/usr/share/applications/ujima-open-url.desktop")
 
     ;; per-app trees (apps/<id>): app.edn specs -> the catalog scan root, rootfs/

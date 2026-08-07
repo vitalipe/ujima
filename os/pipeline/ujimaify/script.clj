@@ -12,22 +12,22 @@
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
-            [build.stage :as stage]))
+            [build.files :as files]))
 
 
 (defn run! [{:keys [project]}]
   (with-console-out
     ;; the desktop session: the supervising unit (PAMName/teardown story lives in the
     ;; file), its stop path, the in-session ujimad launcher, the xinitrc startx runs
-    (stage/install! project "ujimaify/session/ujima.service" "/etc/systemd/system/ujima.service")
-    (stage/install! project "ujimaify/session/ujimad" "/usr/local/bin/ujimad")
-    (stage/install! project "ujimaify/session/ujima-session-stop" "/usr/local/bin/ujima-session-stop")
-    (stage/install! project "ujimaify/session/xinitrc" "/etc/X11/xinit/xinitrc")
+    (files/install! project "ujimaify/session/ujima.service" "/etc/systemd/system/ujima.service")
+    (files/install! project "ujimaify/session/ujimad" "/usr/local/bin/ujimad")
+    (files/install! project "ujimaify/session/ujima-session-stop" "/usr/local/bin/ujima-session-stop")
+    (files/install! project "ujimaify/session/xinitrc" "/etc/X11/xinit/xinitrc")
     ($! systemctl enable "ujima")
 
     ;; persistent capped journal on storage + the /ujima runtime dirs
-    (stage/install! project "ujimaify/journal/ujima.conf" "/etc/systemd/journald.conf.d/ujima.conf")
-    (stage/install! project "ujimaify/layout/ujima-layout.conf" "/etc/tmpfiles.d/ujima-layout.conf")
+    (files/install! project "ujimaify/journal/ujima.conf" "/etc/systemd/journald.conf.d/ujima.conf")
+    (files/install! project "ujimaify/layout/ujima-layout.conf" "/etc/tmpfiles.d/ujima-layout.conf")
 
     ;; overlayfs rejects `mount -o remount` via the modern mount API ("No changes allowed in
     ;; reconfigure"), so systemd-remount-fs — which remounts / rw early in boot — fails under the

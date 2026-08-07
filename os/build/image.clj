@@ -42,7 +42,7 @@
     (mount/with-mounted-ext4 [mnt root]
       (try
         ;; the boot partition is image content too (cmdline.txt, initramfs), so a script sees it
-        ;; exactly where a running device does — the same os.<name>/run! then works unchanged
+        ;; exactly where a running device does — the same pipeline script then works unchanged
         ;; under `bb dev script`, where /boot/firmware is already mounted.
         (mount/mount! "vfat" boot (str mnt boot-mnt))
         (doseq [b binds]

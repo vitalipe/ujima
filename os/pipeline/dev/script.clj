@@ -12,7 +12,7 @@
   (:require [clojure.string :as str]
             [lib.shell :refer [$! with-console-out]]
             [babashka.fs :as fs]
-            [build.stage :as stage]))
+            [build.files :as files]))
 
 
 (defn run! [{:keys [project]}]
@@ -35,12 +35,12 @@
 
     ;; the on-device dev kit (wifi, lock-fs, peek, build-* producers …): mirrored wholesale,
     ;; so a file removed from the kit disappears from the device on re-runs
-    (stage/mirror! project "dev/kit" "/ujima/dev")
+    (files/mirror! project "dev/kit" "/ujima/dev")
 
     ;; dev shell prompt: tag the ujima user's shell so an SSH/console session is obviously
     ;; *this* box. Sourced from ~/.bashrc exactly once (guarded, appended last so it wins
     ;; over the skel PS1); the file itself is a full overwrite, always current.
-    (stage/install! project "dev/prompt/prompt.sh" "/home/ujima/.ujima-dev.sh")
+    (files/install! project "dev/prompt/prompt.sh" "/home/ujima/.ujima-dev.sh")
     (let [bashrc  "/home/ujima/.bashrc"
           srcline "[ -f ~/.ujima-dev.sh ] && . ~/.ujima-dev.sh  # ujima dev prompt"]
       (when-not (and (fs/exists? bashrc)
@@ -49,6 +49,6 @@
 
     ;; loopback audio sink that classifies as :usb — ujimad's volume path is testable
     ;; without real USB audio (the rig's rationale lives in the files)
-    (stage/install! project "dev/audio-rig/snd-aloop.conf" "/etc/modules-load.d/snd-aloop.conf")
-    (stage/install! project "dev/audio-rig/99-ujima-dev-audio-rig.conf"
+    (files/install! project "dev/audio-rig/snd-aloop.conf" "/etc/modules-load.d/snd-aloop.conf")
+    (files/install! project "dev/audio-rig/99-ujima-dev-audio-rig.conf"
                     "/etc/wireplumber/wireplumber.conf.d/99-ujima-dev-audio-rig.conf")))

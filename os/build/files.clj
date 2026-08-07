@@ -1,4 +1,4 @@
-(ns build.stage
+(ns build.files
   "Pull-based staging of static device files from the per-script concern dirs:
    os/<script>/<concern>/<file>, staged by an explicit call in src/os/<script>.clj — the
    source path names the file once, the call site names the destination. A concern dir
@@ -15,7 +15,7 @@
   [project src]
   (let [s (str project "/os/pipeline/" src)]
     (when-not (fs/exists? s)
-      (throw (ex-info "build.stage: missing source file" {:src src :path s})))
+      (throw (ex-info "build.files: missing source file" {:src src :path s})))
     s))
 
 

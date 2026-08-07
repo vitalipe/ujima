@@ -1,12 +1,12 @@
 #!/bin/sh
 # build-initramfs — regenerate the overlayroot initramfs natively on THIS Pi and stage it,
-# version-named, for copying into the repo's assets/initramfs/. Run as root.
+# version-named, for copying into the repo's os/pipeline/boot/initramfs/. Run as root.
 #
 # The image build can't generate this initramfs (update-initramfs segfaults under qemu), so it bakes
 # a prebuilt one instead (tools.cmd.image/initramfs!). This script produces that artifact: it
 # re-enables update-initramfs (the image ships it off), regenerates for all installed kernels, and
 # copies the results into /ujima/dev/initramfs-out/<kernel-version>/. Copy that <version>/ folder
-# straight into the repo's assets/initramfs/ — the build selects it by kernel version.
+# straight into the repo's os/pipeline/boot/initramfs/ — the build selects it by kernel version.
 #
 # Run on a dev Pi (overlayroot installed) with the overlay DISABLED: update-initramfs can't resolve
 # the root device when / is the overlay, so `lock-fs disable` + reboot first, then run this.
@@ -41,4 +41,4 @@ done
 
 echo
 echo "staged -> $out"
-echo "copy it into the repo, e.g.:  scp -r ujima@<this-pi>:$out  <repo>/assets/initramfs/"
+echo "copy it into the repo, e.g.:  scp -r ujima@<this-pi>:$out  <repo>/os/pipeline/boot/initramfs/"

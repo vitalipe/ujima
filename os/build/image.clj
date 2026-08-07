@@ -23,7 +23,7 @@
 ;; Vendored host-side binaries (repo-relative). The aarch64 bb runs in place from the
 ;; read-only project bind; only qemu must be copied, because binfmt resolves it at a fixed
 ;; path *inside* the chroot.
-(def ^:private qemu-src    "assets/tools/qemu-aarch64-static")
+(def ^:private qemu-src    "os/build/vendor/qemu-aarch64-static")
 (def ^:private qemu-chroot "/usr/bin/qemu-aarch64-static")
 (def ^:private project-mnt scripts/project-mnt)  ;; repo bind in the chroot = dev rsync stage
 
@@ -82,7 +82,7 @@
 ;; ---------------------------------------------------------------------------
 
 
-(def ^:private chroot-bb   (str project-mnt "/assets/tools/bb-aarch64"))
+(def ^:private chroot-bb   (str project-mnt "/os/build/vendor/bb-aarch64"))
 
 
 (defn- do-chroot-run-script! [mnt target]

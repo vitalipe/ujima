@@ -75,9 +75,8 @@
 ;; stage/ plus private untracked files, none of which should go over the wire to a Pi. A new
 ;; script that reads a new asset dir adds one entry here.
 (def ^:private stage-paths ["runtime/src" "runtime/config"
-                            "os"          ; every script.clj + the concern dirs it pulls + build.*
-                            "desktop" "apps"
-                            "assets/tools"])
+                            "os"          ; pipeline scripts + concern dirs + build machinery (incl. vendored bb)
+                            "desktop" "apps"])
 
 
 (defn script!

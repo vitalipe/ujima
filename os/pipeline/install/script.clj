@@ -74,5 +74,5 @@
     ;; runtime babashka: the same vendored aarch64 binary we are running under,
     ;; copied + made executable in one shot
     ($! install -m "0755"
-                (str project "/assets/tools/bb-aarch64")
+                (str project "/os/build/vendor/bb-aarch64")
                 "/usr/local/bin/bb")))

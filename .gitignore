@@ -1,6 +1,6 @@
 pad.md
 /tmp/
-/stage/
+/out/
 runtime/config/*.local.edn
 tools/config/*.local.edn
 

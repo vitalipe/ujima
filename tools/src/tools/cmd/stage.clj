@@ -1,8 +1,8 @@
 (ns tools.cmd.stage
   "bb stage <target>: build a staged image from a pinned base OS.
 
-   Vendor base (fetch + `os script install`, cached under stage/vendor/) -> copy to
-   stage/ujima-<branch>-<commit>.img. The vendor is built once; rm it to rebuild
+   Vendor base (fetch + `os script install`, cached under out/vendor/) -> copy to
+   out/ujima-<branch>-<commit>.img. The vendor is built once; rm it to rebuild
    (e.g. after editing the install stage or bumping the vendored bb). Fetch lives here because
    the vendor build is its only caller."
   (:require
@@ -63,8 +63,8 @@
    })
 
 
-(def ^:private vendor-dir "stage/vendor")
-(def ^:private stage-dir  "stage")
+(def ^:private vendor-dir "out/vendor")
+(def ^:private out-dir    "out")
 
 
 (declare expand-root!)
@@ -127,13 +127,13 @@
 
 (defn stage!
   "Build a cached vendor base (base OS + packages + bb) and copy it to a working
-   image. The vendor is built once; rm stage/vendor/<name>.img to rebuild it."
+   image. The vendor is built once; rm out/vendor/<name>.img to rebuild it."
   [target _opts]
   (let [{:keys [url sha256]} (or (get targets target)
                                  (throw (ex-info (str "Unknown stage target: " target)
                                                  {:target target :available (vec (keys targets))})))
         vendor (vendor-img url)
-        out    (str (fs/path stage-dir (stage-img-name)))]
+        out    (str (fs/path out-dir (stage-img-name)))]
     (require-root!)
 
     ;; 1. vendor base (base + install), built once and cached
@@ -143,7 +143,7 @@
 
     ;; 2. copy to the working image — sparse (the vendor is a 10G rootfs pre-grown in build-vendor!,
     ;; so no post-copy expand is needed; --sparse=always keeps the copy from inflating the holes).
-    (fs/create-dirs stage-dir)
+    (fs/create-dirs out-dir)
     (println "copy ->" out)
     ($! cp --sparse=always [vendor] [out])
 

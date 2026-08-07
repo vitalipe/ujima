@@ -7,7 +7,7 @@
    deliverable, not an intermediate (it is what installs into a slot later), so it is
    packed explicitly and kept rather than going through `disk slot from-image`.
 
-   The vendor cache (stage/vendor) is READ here and built only when absent
+   The vendor cache (out/vendor) is READ here and built only when absent
    (tools.cmd.stage, temp-then-atomic-move) — no code path in build deletes or
    overwrites an existing vendor; rebuilding stays the manual documented rm."
   (:require

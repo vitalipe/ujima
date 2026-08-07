@@ -86,11 +86,11 @@ sudo bb build rpi-os          # release image
 sudo bb build rpi-os --dev    # dev image (`bb dev` commands require it)
 ```
 
-The first build fetches the pinned raspios base once into `stage/vendor/` and
-bakes the packages into it (the install stage).  **no command ever deletes it** — rebuilding it is a manual `rm stage/vendor/<name>.img`. Every later build starts from the cache:
+The first build fetches the pinned raspios base once into `out/vendor/` and
+bakes the packages into it (the install stage).  **no command ever deletes it** — rebuilding it is a manual `rm out/vendor/<name>.img`. Every later build starts from the cache:
 copy → content scripts in the chroot → pack → A/B disk.
 
-Outputs land in `stage/` as `ujima-<branch>-<commit>[-dirty][-dev].*`:
+Outputs land in `out/` as `ujima-<branch>-<commit>[-dirty][-dev].*`:
 
 ```
 ….img         the OS image (2 partitions — what the chroot scripts mutate)
@@ -101,7 +101,7 @@ Outputs land in `stage/` as `ujima-<branch>-<commit>[-dirty][-dev].*`:
 Flash the disk image to an SD card:
 
 ```
-sudo dd if=stage/ujima-…-disk.img of=/dev/mmcblk0 bs=4M conv=fsync status=progress
+sudo dd if=out/ujima-…-disk.img of=/dev/mmcblk0 bs=4M conv=fsync status=progress
 ```
 
 The granular verbs compose to the same result when you need only part of the
@@ -110,8 +110,8 @@ pipeline.
 ### Build an OS image
 
 ```
-sudo bb stage rpi-os                             # vendor (cached) -> stage/ujima-<branch>-<sha>.img
-sudo bb os apply stage/ujima-….img --dev         # the script chain; or one at a time: bb os script <img> base
+sudo bb stage rpi-os                             # vendor (cached) -> out/ujima-<branch>-<sha>.img
+sudo bb os apply out/ujima-….img --dev         # the script chain; or one at a time: bb os script <img> base
 ```
 
 The image boots on its own — `dd` it to a card for a system with no A/B and no
@@ -121,7 +121,7 @@ every boot.
 ### Create a disk
 
 ```
-sudo bb disk ab create autoboot stage/u-disk.img   # or a real device: /dev/mmcblk0
+sudo bb disk ab create autoboot out/u-disk.img   # or a real device: /dev/mmcblk0
 ```
 
 An empty A/B layout: control, boot A/B, root A/B, settings, storage.
@@ -129,10 +129,10 @@ An empty A/B layout: control, boot A/B, root A/B, settings, storage.
 ### Apply to a slot
 
 ```
-sudo bb pack stage/ujima-….img stage/u.pack                  # the distributable
-sudo bb disk slot A from-pack stage/u.pack stage/u-disk.img
-sudo bb disk slot A activate stage/u-disk.img
-sudo bb disk info stage/u-disk.img                           # what's in each slot
+sudo bb pack out/ujima-….img out/u.pack                  # the distributable
+sudo bb disk slot A from-pack out/u.pack out/u-disk.img
+sudo bb disk slot A activate out/u-disk.img
+sudo bb disk info out/u-disk.img                           # what's in each slot
 ```
 
 Install re-points only `root=` in the pack's cmdline; everything else on that line

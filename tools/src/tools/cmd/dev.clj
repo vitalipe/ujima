@@ -72,7 +72,7 @@
 
 ;; Repo subset staged to the device — the dirs scripts read plus what the bb classpath needs.
 ;; Explicit include-list, NEVER the whole worktree: it holds tens of GB of build output under
-;; stage/ plus private untracked files, none of which should go over the wire to a Pi. A new
+;; out/ plus private untracked files, none of which should go over the wire to a Pi. A new
 ;; script that reads a new asset dir adds one entry here.
 (def ^:private stage-paths ["runtime/src" "runtime/config"
                             "os"          ; pipeline scripts + concern dirs + build machinery (incl. vendored bb)

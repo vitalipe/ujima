@@ -1,16 +1,16 @@
-(ns os.base
+(ns base.script
   "Runs INSIDE the target chroot as root. Turns a stock raspios rootfs into the ujima *base*:
    strips the first-boot machinery, disables cloud-init, and provisions the login user
    (passwordless console autologin + passwordless sudo) — a clean, bootable, logged-in machine
    that the ujimad/desktop layers build on. Static files live in os/base/<concern>/ (login,
-   identity, x11); this script is the pulls + the actions. (fstab + boot units → os.ujimaify.)
+   identity, x11); this script is the pulls + the actions. (fstab + boot units → the ujimaify stage.)
 
    Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$ $! $? with-console-out]]
             [babashka.fs :as fs]
-            [os.lib.stage :as stage]))
+            [build.stage :as stage]))
 
 
 (defn- mask!

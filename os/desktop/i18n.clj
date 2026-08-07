@@ -1,4 +1,4 @@
-(ns os.lib.i18n
+(ns desktop.i18n
   "Writes the GNU gettext .mo binary format directly from a catalog map — the ~40 lines
    that replace a vendored binary + python producer. GTK's chooser-label override
    (os/desktop/i18n/catalog.edn) is generated at stage time in the chroot; no gettext

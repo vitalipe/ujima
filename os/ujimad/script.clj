@@ -1,10 +1,10 @@
-(ns os.ujimad
+(ns ujimad.script
   "Runs INSIDE the target chroot as root (and is the live `dev push ujimad` deploy path). Stages
    ujimad: the runtime/ source tree + deployment config into /ujima/ujimad. The deployed
    artifact keeps the daemon's name (nothing else on the device consumes it); the repo tree is
    runtime/ because tools+os link it too. This is the artifact you iterate on most — re-run it
    (then restart ujimad) to pick up code changes. The systemd unit that runs it lives in
-   os.ujimaify.
+   the ujimaify stage.
 
    Pipeline: install -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 

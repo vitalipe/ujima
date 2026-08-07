@@ -1,4 +1,4 @@
-(ns os.dev
+(ns dev.script
   "Runs INSIDE the target chroot as root. Layers DEV-only conveniences onto a configured ujima
    image: an SSH server for headless access, x11vnc + maim + xdotool for the desktop relay
    (`tools dev view` / `dev screenshot` / `dev click|type|key`), the dev kit (os/dev/kit ->
@@ -12,7 +12,7 @@
   (:require [clojure.string :as str]
             [lib.shell :refer [$! with-console-out]]
             [babashka.fs :as fs]
-            [os.lib.stage :as stage]))
+            [build.stage :as stage]))
 
 
 (defn run! [{:keys [project]}]
@@ -21,7 +21,7 @@
     ;; desktop-relay tools — x11vnc (interactive `dev view`), maim (one-shot `dev screenshot`), and
     ;; xdotool (synthetic input for `dev click|type|key`). DEV-ONLY by design: a VNC server +
     ;; synthetic-input tooling are remote-control surfaces that must never ship in a release image,
-    ;; so they go here (release skips this script), NOT in os.install.
+    ;; so they go here (release skips this script), NOT in the install stage.
     ($! apt-get update)
     ($! apt-get install -y --no-install-recommends
         "openssh-server" "rsync" "x11vnc" "maim" "xdotool")
@@ -30,7 +30,7 @@
     ;; read-only overlay (dev-kit lock-fs): sshd then reads them from the ro lower instead of
     ;; regenerating into ephemeral tmpfs every boot (which trips "REMOTE HOST IDENTIFICATION HAS
     ;; CHANGED"). `-A` only fills in missing key types (idempotent); raspios ships none. Release
-    ;; skips this script and os.cleanup wipes any keys, so it's a dev-only concern.
+    ;; skips this script and the cleanup stage wipes any keys, so it's a dev-only concern.
     ($! ssh-keygen -A)
 
     ;; the on-device dev kit (wifi, lock-fs, peek, build-* producers …): mirrored wholesale,

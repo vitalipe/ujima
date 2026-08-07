@@ -3,7 +3,7 @@
 
    Vendor base (fetch + `os script install`, cached under stage/vendor/) -> copy to
    stage/ujima-<branch>-<commit>.img. The vendor is built once; rm it to rebuild
-   (e.g. after editing os.install or bumping the vendored bb). Fetch lives here because
+   (e.g. after editing the install stage or bumping the vendored bb). Fetch lives here because
    the vendor build is its only caller."
   (:require
     [clojure.java.io :as io]

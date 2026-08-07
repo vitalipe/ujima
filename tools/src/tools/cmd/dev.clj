@@ -1,13 +1,13 @@
 (ns tools.cmd.dev
   "Host-side dev-loop commands against a RUNNING ujima dev device over ssh. Distinct from
-   os.dev (the in-chroot build script).
+   dev.script (the in-chroot build script).
 
    Every verb takes the device FIRST (like `ssh <host> <cmd>`), so the payload trails and a
    re-run only edits the tail:
 
-     push <ip> ujimad    deploy ujimad live: run os.ujimad (= `script ujimad` — stages
+     push <ip> ujimad    deploy ujimad live: run the ujimad script (= `script ujimad` — stages
                          runtime/ src + config into /ujima/ujimad), then restart ujima.service.
-     script <ip> <name>  run os.<name>/run! live on the device — the running-system
+     script <ip> <name>  run <name>.script/run! live on the device — the running-system
                          analog of `bb os script` (which runs the same fn in the build chroot).
      view <ip>           interactive x11vnc mirror of the device's :0 desktop — mouse + keyboard live.
      screenshot <ip>     pull a one-frame PNG of :0 to the host (a quick look / for Claude to verify).
@@ -21,8 +21,8 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
             [babashka.process :as p]
-            [lib.shell :refer [sh! sh?]]
-            [tools.cmd.os :as os]))
+            [build.runner :as runner]
+            [lib.shell :refer [sh! sh?]]))
 
 
 (defn- require-host-cmd! [cmd hint]
@@ -66,35 +66,35 @@
 
 
 ;; staging dir on the device = the chroot repo bind path; NOT the install target —
-;; ujimad.clj copies <project>/runtime/src into /ujima/ujimad, staging there would copy it into itself
-(def ^:private device-stage os/project-mnt)
+;; the ujimad script copies <project>/runtime/src into /ujima/ujimad, staging there would
+;; copy it into itself
+(def ^:private device-stage runner/project-mnt)
 
 ;; Repo subset staged to the device — the dirs scripts read plus what the bb classpath needs.
 ;; Explicit include-list, NEVER the whole worktree: it holds tens of GB of build output under
 ;; stage/ plus private untracked files, none of which should go over the wire to a Pi. A new
 ;; script that reads a new asset dir adds one entry here.
 (def ^:private stage-paths ["runtime/src" "runtime/config"
-                            "os"          ; src + the per-script concern dirs the scripts pull
+                            "os"          ; every script.clj + the concern dirs it pulls + build.*
                             "desktop" "apps"
                             "assets/tools"])
 
 
 (defn script!
-  "Run an image script (os.<name>/run!) on a RUNNING dev device over ssh — the live
+  "Run an image script (<name>.script/run!) on a RUNNING dev device over ssh — the live
    analog of `bb os script`. Stages the repo subset the scripts need to device-stage, then
    runs the device's own bb against it as root. No chroot, no qemu (native aarch64), no host root."
   [{:keys [script ip] :as opts}]
-  (os/require-script! script)                        ; fail fast, before any ssh/rsync
+  (runner/require-script! script)                    ; fail fast, before any ssh/rsync
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (require-host-cmd! "rsync"   "install it (e.g. apt install rsync)")
   (let [{:keys [ssh-e host] :as transport} (ssh-transport opts)
-        cp         (str device-stage "/runtime/src:" device-stage "/os/src")
         ;; resolve bb AS THE LOGIN USER first ($(command -v bb) on its PATH), then sudo the
         ;; absolute path: sudo's secure_path won't include the vendored bb, so a bare `sudo bb`
         ;; would be command-not-found.
         remote-cmd (str "sudo \"$(command -v bb)\""
-                        " --classpath " cp
-                        " -x os." script "/run!"
+                        " --classpath " (runner/classpath device-stage)
+                        " -x " (runner/script-ns script) "/run!"
                         " --project " device-stage)]
     ;; device preflight (loud): need rsync to stage and bb to run
     (doseq [c ["rsync" "bb"]]
@@ -102,7 +102,7 @@
         (throw (ex-info (str c " missing on " ip
                              " — install it on the device or reflash a dev image that ships it")
                         {:ip ip :cmd c}))))
-    ;; stage the subset (-R recreates the runtime/src os/src … layout under device-stage). No
+    ;; stage the subset (-R recreates the runtime/src os … layout under device-stage). No
     ;; --chmod: preserve source perms so executables (dev-kit wifi, vendored bb) stay +x.
     ;; root-owned, remote rsync elevated via passwordless sudo.
     (apply sh! :rsync "-aR" "--delete"
@@ -111,7 +111,7 @@
            "-e" ssh-e
            (concat stage-paths [(str host ":" device-stage "/")]))
     (println "staged" (str/join " " stage-paths) "->" (str ip ":" device-stage))
-    (println (str "running os." script "/run! on " ip))
+    (println (str "running " (runner/script-ns script) "/run! on " ip))
     (remote-exec! transport remote-cmd)
     {:script script :ip ip :stage device-stage}))
 
@@ -132,9 +132,9 @@
 (defn push!
   "Entry for `dev push <ip> <target>`: stage + run the target's image script (the copy, via
    script!), then restart its systemd unit so the new code is live — and REFUSE to report
-   success until a FRESH ujimad pid is seen. The PAMName/logind session leak (see ujimaify.clj
+   success until a FRESH ujimad pid is seen. The PAMName/logind session leak (see ujimaify session/ujima.service
    ujima-service) once let a 'successful' restart leave an orphan session serving OLD code;
-   never trust a push without a new pid. Today only \"ujimad\" (os.ujimad ->
+   never trust a push without a new pid. Today only \"ujimad\" (the ujimad script ->
    ujima.service); a new target is one entry in push-targets."
   [{:keys [target ip] :as opts}]
   (if-let [{:keys [script service]} (get push-targets target)]
@@ -166,7 +166,7 @@
 ;; ---------------------------------------------------------------------------
 ;; Screen relay (desktop iteration). view = interactive x11vnc (mouse+keyboard), screenshot =
 ;; one-shot maim PNG. Both ride the shared ssh-transport; their device tools are baked DEV-ONLY by
-;; os.dev (a VNC server must never ship in a release image).
+;; the dev stage (a VNC server must never ship in a release image).
 ;; ---------------------------------------------------------------------------
 
 (defn screenshot!
@@ -235,7 +235,7 @@
 ;; ---------------------------------------------------------------------------
 ;; Synthetic input (xdotool on :0) — the programmatic sibling of `dev view`: drive the desktop
 ;; headlessly in a loop (screenshot -> click/type/key -> screenshot to verify). xdotool is baked
-;; DEV-ONLY by os.dev; screenshot pixels map 1:1 to xdotool coords.
+;; DEV-ONLY by the dev stage; screenshot pixels map 1:1 to xdotool coords.
 ;; ---------------------------------------------------------------------------
 
 (defn- sh-quote

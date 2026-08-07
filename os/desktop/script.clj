@@ -1,8 +1,8 @@
-(ns os.desktop
+(ns desktop.script
   "Runs INSIDE the target chroot as root (and is the live `dev push desktop` deploy path).
    Stages the ujima *desktop* layer — the desktop/ tree, plus its concern files under
    os/desktop/ (theme, fonts, links, files, eww, i18n) — onto the base. The graphical
-   session's systemd unit lives in os.ujimaify; runtime desktop *settings* (wallpaper,
+   session's systemd unit lives in the ujimaify stage; runtime desktop *settings* (wallpaper,
    resolution, …) are ujimad's job at runtime, not this build script.
 
    Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
@@ -12,9 +12,9 @@
             [babashka.fs :as fs]
             [clojure.edn :as edn]
             [clojure.java.io :as io]
-            [os.appcatalog :as appcatalog]
-            [os.lib.i18n :as i18n]
-            [os.lib.stage :as stage]))
+            [appcatalog.script :as appcatalog]
+            [desktop.i18n :as i18n]
+            [build.stage :as stage]))
 
 
 (defn run! [{:keys [project]}]
@@ -29,7 +29,7 @@
 
     ;; desktop background: rasterize the vector wall.svg -> a ≥1080p PNG for feh (the X root can't
     ;; take an SVG). Uses the librsvg gdk-pixbuf loader via python3-gi — both installed by
-    ;; os.install. wall.svg is the editable source; wall.png is what i3's `exec feh` sets.
+    ;; the install stage. wall.svg is the editable source; wall.png is what i3's `exec feh` sets.
     (when (fs/exists? "/ujima/desktop/wall.svg")
       ($! python3 "-c"
           (str "import gi; gi.require_version('GdkPixbuf','2.0'); from gi.repository import GdkPixbuf; "
@@ -50,7 +50,7 @@
 
     ;; GTK chooser label override ("Home" -> "Temporary"; the why lives in the catalog):
     ;; the .mo is GENERATED here from the catalog — no vendored binary, no gettext in the
-    ;; chroot (os.lib.i18n writes the format directly). One catalog, two locale installs.
+    ;; chroot (desktop.i18n writes the format directly). One catalog, two locale installs.
     (let [mo (i18n/mo-bytes (edn/read-string
                              (slurp (stage/source project "desktop/i18n/catalog.edn"))))]
       (doseq [loc ["en_GB" "en_US"]]

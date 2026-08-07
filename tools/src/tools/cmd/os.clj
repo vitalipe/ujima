@@ -1,14 +1,15 @@
 (ns tools.cmd.os
   "Host-only os-image machinery: script -> chroot.
 
-   `script` runs an os.<name>/run! namespace inside the target chroot (aarch64 bb
+   `script` runs a <name>.script/run! namespace inside the target chroot (aarch64 bb
    under qemu) against a read-only project bind, so the script's file ops / shell-outs land in
-   the image. Reuses the e2e-tested ujima.device/pack/loopback fns; this namespace is wiring +
-   the chroot mechanics. (The A/B disk verbs live in tools.cmd.disk.)"
+   the image. The script contract (names, entry ns, classpath, bind path) is build.runner —
+   shared with tools.cmd.dev; this namespace is wiring + the chroot mechanics. (The A/B disk
+   verbs live in tools.cmd.disk.)"
   (:require
-    [clojure.string  :as str]
     [babashka.fs      :as fs]
     [babashka.process :as p]
+    [build.runner           :as runner]
     [lib.shell              :refer [$! require-root!]]
     [ujima.linux.disk       :as linux-disk]
     [ujima.linux.disk.loop  :as loopback]
@@ -24,7 +25,7 @@
 ;; path *inside* the chroot.
 (def ^:private qemu-src    "assets/tools/qemu-aarch64-static")
 (def ^:private qemu-chroot "/usr/bin/qemu-aarch64-static")
-(def project-mnt "/ujima-src")  ;; repo bind in the chroot = dev rsync stage (tools.cmd.dev)
+(def ^:private project-mnt runner/project-mnt)  ;; repo bind in the chroot = dev rsync stage
 
 
 ;; Base image has 2 partitions [boot root]. Mount root, mount boot at the path the target
@@ -75,45 +76,28 @@
 ;; ---------------------------------------------------------------------------
 ;; Image-content scripts
 ;;
-;; A script is os.<name>/run!, executed *inside* the chroot by the
+;; A script is <name>.script/run!, executed *inside* the chroot by the
 ;; vendored aarch64 bb (run in place from the read-only project bind). Add a
-;; script by dropping os/src/os/<name>.clj.
+;; script by dropping os/<name>/script.clj — see build.runner, the contract.
 ;; ---------------------------------------------------------------------------
 
 
-;; the script set IS the os/src/os dir — one file per script, nothing else. The check
-;; fails a typo BEFORE the expensive part: root+loopback here, a full rsync in cmd/dev.
-(def ^:private os-scripts-dir "os/src/os")
-
-(defn- available-scripts []
-  (->> (fs/glob os-scripts-dir "*.clj")
-       (mapv #(str/replace (str (fs/file-name %)) #"\.clj$" ""))
-       sort vec))
-
-(defn require-script!
-  "Throw (listing what's available) if os.<script> doesn't exist."
-  [script]
-  (when-not (fs/exists? (fs/path os-scripts-dir (str script ".clj")))
-    (throw (ex-info (str "Unknown script: " script)
-                    {:script script :available (available-scripts)}))))
-
-
 (def ^:private chroot-bb   (str project-mnt "/assets/tools/bb-aarch64"))
-(def ^:private chroot-cp   (str project-mnt "/runtime/src:" project-mnt "/os/src"))
+(def ^:private chroot-cp   (runner/classpath project-mnt))
 
 
 (defn- do-chroot-run-script! [mnt target]
   (p/shell {:inherit true}
            "sudo" "chroot" (str mnt)
            chroot-bb "--classpath" chroot-cp
-           "-x" (str "os." (name target) "/run!")
+           "-x" (str (runner/script-ns target) "/run!")
            "--project" project-mnt))
 
 
 (defn script!
-  "Run a single image-content script (os.<script>/run!) inside the chroot."
+  "Run a single image-content script (<script>.script/run!) inside the chroot."
   [{:keys [img script]}]
-  (require-script! script)
+  (runner/require-script! script)
   (require-root!)
   (loopback/with-loopback-device [dev img]
     (with-chrooted-rootfs* dev
@@ -132,7 +116,7 @@
   (require-root!)
   (let [scripts (conj content-scripts (if dev "dev" "cleanup"))]
     (doseq [s scripts]                                  ; whole chain up front, so a typo or a
-      (require-script! s))                              ; missing script never runs half of it
+      (runner/require-script! s))                       ; missing script never runs half of it
     (doseq [s scripts]
       (println (str "== os script " s " -> " img))
       (script! {:img img :script s}))

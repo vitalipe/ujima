@@ -1,4 +1,4 @@
-(ns os.ujimaify
+(ns ujimaify.script
   "Runs INSIDE the target chroot as root. 'ujimaifies' the staged system: stages the boot
    services that turn the staged ujimad + desktop into a bootable session — the session
    concern (unit + wrapper + stop path + xinitrc), the persistent journal, the /ujima
@@ -12,7 +12,7 @@
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
-            [os.lib.stage :as stage]))
+            [build.stage :as stage]))
 
 
 (defn run! [{:keys [project]}]
@@ -32,7 +32,7 @@
     ;; overlayfs rejects `mount -o remount` via the modern mount API ("No changes allowed in
     ;; reconfigure"), so systemd-remount-fs — which remounts / rw early in boot — fails under the
     ;; overlay root. The overlay already gives us a writable / (the tmpfs upper), so the service is
-    ;; redundant: mask it. Pairs with os.boot's cmdline: without one of `overlayroot=tmpfs` or
+    ;; redundant: mask it. Pairs with the boot stage's cmdline: without one of `overlayroot=tmpfs` or
     ;; `rw` there, / mounts read-only and nothing ever remounts it.
     ($! ln -sf "/dev/null" "/etc/systemd/system/systemd-remount-fs.service")
 

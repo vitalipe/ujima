@@ -1,4 +1,4 @@
-(ns os.boot
+(ns boot.script
   "Runs INSIDE the target chroot as root. Owns the boot partition: the overlayroot cmdline and the
    prebuilt initramfs that implements it.
 

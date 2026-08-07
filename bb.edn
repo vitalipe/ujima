@@ -1,4 +1,4 @@
-{:paths ["runtime/src" "tools/src" "os/src" "desktop/circle/src"]
+{:paths ["runtime/src" "tools/src" "os" "desktop/circle/src"]
 
  :deps {http-kit/http-kit {:mvn/version "2.8.0"}
         cheshire/cheshire {:mvn/version "5.13.0"}
@@ -54,7 +54,7 @@
   repl
   {:doc "Start Ujima dev REPL"
    :override-builtin true
-   :task (shell "bb" "-cp" "runtime/src:tools/src:os/src:runtime/test" "-e" "(require 'tools.repl) (tools.repl/start!)")}
+   :task (shell "bb" "-cp" "runtime/src:tools/src:os:runtime/test" "-e" "(require 'tools.repl) (tools.repl/start!)")}
 
   test:unit
   {:doc "Run unit tests"

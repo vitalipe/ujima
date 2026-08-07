@@ -50,7 +50,7 @@
    Root is NOT listed — the kernel mounts it from the cmdline and overlayroot overlays it
    (read-only lower + tmpfs upper) and rewrites this fstab itself, so a '/' entry would be
    pointless (overlayroot just comments it out) and systemd-remount-fs, which would act on it,
-   is masked in os.ujimaify (overlayfs rejects its remount).
+   is masked in the ujimaify stage (overlayfs rejects its remount).
 
    Settings is a REQUIRED mount (no `nofail`): ujimad is meaningless without it, so a
    missing/corrupt settings partition must halt boot (emergency) rather than silently fall back to
@@ -131,7 +131,7 @@
                                                    "root" (str "PARTUUID=" (slot->root-uuid slot)))))
 
       ;; per-slot fstab. Its mount points / bind targets are rootfs content baked at build
-      ;; time (os.base) — a pack is expected to carry them.
+      ;; time (the base stage) — a pack is expected to carry them.
       (let [ujimad-owner
             (with-mounted-ext4 [root-mnt root]
               (fs/create-dirs (fs/path root-mnt "etc"))   ; real rootfs has it; a minimal/test root may not

@@ -1,7 +1,7 @@
 #!/bin/sh
 # managed by the ujima image build — source: os/base/identity/ujima-machine-id
 #
-# Overlay-safe machine-id. Under the overlay (every image — see os.boot's cmdline) systemd
+# Overlay-safe machine-id. Under the overlay (every image — see the boot stage's cmdline) systemd
 # can't persist /etc/machine-id — writes hit the ephemeral tmpfs upper, so PID 1 mints a
 # random id each boot, churning journald's /var/log/journal/<machine-id>/ into one orphan
 # dir per boot (defeating the persistent journal). Fix: this initramfs hook derives the id

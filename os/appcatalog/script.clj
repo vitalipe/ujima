@@ -1,4 +1,4 @@
-(ns os.appcatalog
+(ns appcatalog.script
   "Install recipes for the launcher apps. The catalog SPECS live with the apps themselves —
    apps/<id>/app.edn, scanned by ujimad at boot (ujima.desktop.app/load-catalog) —
    so this file holds only what the IMAGE BUILD needs: which packages/payloads to install.
@@ -7,13 +7,13 @@
 
    Two build seams share this one data source:
      install!         apt-installs every :apt (deduped) + fetches each :fetch + installs
-                      each pinned :deb. Called from os.install, so it rides the
+                      each pinned :deb. Called from the install stage, so it rides the
                       CACHED vendor base (the heavy app packages download once, not every
                       build).
      stage-defaults!  stages each app's app.edn into the on-device scan root
                       (/ujima/apps/<id>/) and overlays its rootfs/ defaults tree onto
                       / — first-run config, demo payloads, SPA builds; a path in the tree IS
-                      its destination. Called from os.desktop (image build + live
+                      its destination. Called from the desktop stage (image build + live
                       `dev script desktop`), so an app edit ships without a rebuild.
 
    Pipeline: install (-> install!) -> base -> ujimad -> desktop (-> stage-defaults!) -> ujimaify.
@@ -110,7 +110,7 @@
 
 (defn install!
   "apt-install the deduped union of every :apt, fetch each :fetch payload, and apt-install each
-   pinned :deb. Assumes apt is already updated (os.install runs `apt-get update` once)."
+   pinned :deb. Assumes apt is already updated (the install stage runs `apt-get update` once)."
   [_]
   (let [pkgs (->> apps (mapcat :apt) (remove nil?) distinct vec)]
     (apply sh! "apt-get" "install" "-y" "--no-install-recommends" pkgs))
@@ -186,8 +186,8 @@
 
 (defn run!
   "Standalone full pass: apt-install + fetch, then stage app.edn specs + defaults. The image
-   build reaches install! via os.install (cached) and stage-defaults! via
-   os.desktop; this run! is the manual `bb os script <img> appcatalog`."
+   build reaches install! via the install stage (cached) and stage-defaults! via
+   the desktop stage; this run! is the manual `bb os script <img> appcatalog`."
   [opts]
   (with-console-out
     ($! apt-get update)

@@ -1,6 +1,6 @@
 (ns tools.cmd.dev
   "Host-side dev-loop commands against a RUNNING ujima dev device over ssh. Distinct from
-   dev.script (the in-chroot build script).
+   pipeline.dev.script (the in-chroot build script).
 
    Every verb takes the device FIRST (like `ssh <host> <cmd>`), so the payload trails and a
    re-run only edits the tail:
@@ -130,8 +130,8 @@
 (defn push!
   "Entry for `dev push <ip> <target>`: stage + run the target's image script (the copy, via
    script!), then restart its systemd unit so the new code is live — and REFUSE to report
-   success until a FRESH ujimad pid is seen. The PAMName/logind session leak (see ujimaify session/ujima.service
-   ujima-service) once let a 'successful' restart leave an orphan session serving OLD code;
+   success until a FRESH ujimad pid is seen. The PAMName/logind session leak (see ujimaify
+   session/ujima.service) once let a 'successful' restart leave an orphan session serving OLD code;
    never trust a push without a new pid. Today only \"ujimad\" (the ujimad script ->
    ujima.service); a new target is one entry in push-targets."
   [{:keys [target ip] :as opts}]

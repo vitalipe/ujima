@@ -1,0 +1,12 @@
+#!/bin/sh
+# managed by the ujima image build — source: os/pipeline/ujimaify/session/ujimad
+#
+# The in-session ujimad launcher. i3 execs `ujimad` as the session user, so app/window
+# lifecycle + the loopback API run with the session env (DISPLAY, XDG_RUNTIME_DIR) —
+# exactly what they need and what a root boot service couldn't give. Privileged ops still
+# go through `sudo$` (ujima has NOPASSWD), so running as the user costs nothing.
+cd /ujima/ujimad
+# NOT exec: when ujimad exits (crash/OOM), tear the session down with `i3-msg exit` so
+# systemd's Restart=always rebuilds it cold — no orphaned eww/app zombies, one startup path.
+bb -cp src -m ujima.ujimad
+i3-msg exit

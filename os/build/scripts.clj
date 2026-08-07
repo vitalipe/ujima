@@ -1,8 +1,8 @@
 (ns build.scripts
   "The os-script contract, kept beside the scripts it describes: where the repo binds
-   (the chroot bind IS the dev rsync stage), which scripts exist (os/<name>/script.clj —
+   (the chroot bind IS the dev rsync stage), which scripts exist (os/pipeline/<name>/script.clj —
    the dir is the script's identity), and how a name runs — run-args is the whole bb
-   invocation tail. Consumed by the two executors — tools.cmd.os (chroot) and
+   invocation tail. Consumed by the two executors — build.image (chroot) and
    tools.cmd.dev (live ssh) — which supply only what genuinely differs: which bb, and
    the wrapper around it (chroot argv / ssh string). Neither depends on the other."
   (:require [clojure.string :as str]
@@ -12,7 +12,7 @@
 (def project-mnt "/ujima-src")
 
 
-(def ^:private scripts-root "os")
+(def ^:private scripts-root "os/pipeline")
 
 
 (defn available-scripts []
@@ -22,13 +22,13 @@
 
 
 (defn- script-ns
-  "\"ujimaify\" -> \"ujimaify.script\", the ns whose run! is the script's entry."
+  "\"ujimaify\" -> \"pipeline.ujimaify.script\", the ns whose run! is the script's entry."
   [script]
-  (str (name script) ".script"))
+  (str "pipeline." (name script) ".script"))
 
 
 (defn require-script!
-  "Throw (listing what's available) if os/<script>/script.clj doesn't exist — fails a
+  "Throw (listing what's available) if os/pipeline/<script>/script.clj doesn't exist — fails a
    typo BEFORE the expensive part: root+loopback in cmd.os, a full rsync in cmd.dev."
   [script]
   (when-not (fs/exists? (fs/path scripts-root (name script) "script.clj"))

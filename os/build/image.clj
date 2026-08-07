@@ -78,7 +78,7 @@
 ;;
 ;; A script is <name>.script/run!, executed *inside* the chroot by the
 ;; vendored aarch64 bb (run in place from the read-only project bind). Add a
-;; script by dropping os/<name>/script.clj — see build.scripts, the contract.
+;; script by dropping os/pipeline/<name>/script.clj — see build.scripts, the contract.
 ;; ---------------------------------------------------------------------------
 
 

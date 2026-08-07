@@ -5,4 +5,4 @@ runtime/config/*.local.edn
 tools/config/*.local.edn
 
 # personal per-network wifi wrappers (e.g. wifi.home); the `wifi` tool itself stays tracked
-os/dev/kit/wifi.*
+os/pipeline/dev/kit/wifi.*

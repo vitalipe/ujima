@@ -1,0 +1,60 @@
+# managed by the ujima image build — source: os/pipeline/ujimaify/session/ujima.service
+#
+# The graphical session is the boot service — NOT ujimad. ujimad moved INTO the X
+# session (it owns desktop lifecycle: i3 IPC, eww, app launch, audio — all session-scoped),
+# so it runs as `ujima` via i3 `exec` (see /ujima/desktop/i3/config) through the `ujimad`
+# wrapper (session/ujimad). `ujima.service` is repurposed to run + SUPERVISE the session:
+# systemd runs startx on tty1 as ujima, and Restart=always brings the whole desktop back
+# if i3/X dies — that IS the session-recovery a standalone watchdog would otherwise
+# provide. Conflicts=getty@tty1 hands tty1 over from the base console autologin;
+# PAMName=login sets up the logind session (XDG_RUNTIME_DIR).
+# HW-VERIFIED: do NOT set TTYPath/StandardInput=tty — systemd grabbing tty1 collides with
+# X's own VT management and the service flaps; without it startx opens vt1 itself and the
+# session is stable.
+[Unit]
+Description=ujima desktop session
+After=systemd-user-sessions.service
+Conflicts=getty@tty1.service
+
+[Service]
+User=ujima
+PAMName=login
+# Qt/KDE apps (Marble, Stellarium) follow the Nordic GTK theme — a session-wide env
+# inherited by startx → Xorg → i3 → ujimad → every launched app. qt6-gtk-platformtheme
+# (install.clj) is the GTK→Qt bridge; Qt selects its platform theme from the env only
+# (no /etc file like gtk-3.0).
+Environment=QT_QPA_PLATFORMTHEME=gtk3
+# /ujima/desktop/bin -> bare ujima-* calls (i3, yuck); /usr/games -> tuxtype
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/ujima/desktop/bin
+# links an app opens go through ujimad -> the Web app (with mimeapps.list, desktop's links concern)
+Environment=BROWSER=/ujima/desktop/bin/ujima-open-url
+StandardOutput=journal
+Restart=always
+RestartSec=3
+# -br = black root, so the 2-4s of session bring-up shows black, not the grey X weave
+# -ac = no X access control: ujimad converges [:system :hostname] mid-session, and xauth
+#       cookies are keyed FamilyLocal/<hostname> — the rename strands every later X client
+#       ("Authorization required" cold-boot stall, one dead session per boot). Auth gates
+#       nobody here anyway (single uid owns ~/.Xauthority; physical access = root). Revisit
+#       only if apps ever get their own displays.
+ExecStart=/usr/bin/startx -- vt1 -br -ac
+# PAMName migrates the real session (startx→Xorg→i3→ujimad) into a logind session-N.scope,
+# so the unit's OWN cgroup is empty — a plain stop/restart kills only the startx script and
+# leaves the whole desktop running as an orphan holding vt1/:0/:1337; the replacement startx
+# then crash-loops at exit 1 while the ghost serves OLD code (cost weeks of "flaky Pi").
+# ujima-session-stop (session/ujima-session-stop) rides the designed teardown instead:
+# ask ujimad to die, then BLOCK on $MAINPID until X is really down — that wait is what
+# TimeoutStopSec bounds. `post` runs even after a stop timeout and is the wedged-ujimad
+# last resort: it reaches into the logind scope, which the unit's own kill phase never
+# touches. `+` = run as root (signal + loginctl rights); both paths exit 0 on an
+# already-dead session, keeping crash-recovery restarts working unchanged.
+# prestart reaps stale /tmp/.X*-lock files (a hard-killed Xorg can't clean its own):
+# without it every hard kill bumps the next session to the next display number and all
+# the :0-assuming dev tooling silently breaks (HW: one test storm crept :0 -> :7).
+ExecStartPre=+/usr/local/bin/ujima-session-stop prestart
+ExecStop=+/usr/local/bin/ujima-session-stop stop
+ExecStopPost=+/usr/local/bin/ujima-session-stop post
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

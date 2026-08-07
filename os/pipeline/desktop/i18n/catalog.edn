@@ -1,0 +1,9 @@
+;; managed by the ujima image build — source: os/pipeline/desktop/i18n/catalog.edn
+;;
+;; GTK chooser label overrides, compiled to a .mo at stage time (desktop.i18n) and
+;; installed over the distro's en_GB/en_US gtk3 catalogs — every other GTK string falls
+;; back to its American msgid, accepted. "Home" -> "Temporary" states the truth: home IS
+;; the tmpfs overlay upper (Files, on storage, survives reboots). The "" entry is the
+;; required .mo metadata header.
+{""     "Content-Type: text/plain; charset=UTF-8\n"
+ "Home" "Temporary"}

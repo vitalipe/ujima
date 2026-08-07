@@ -13,7 +13,7 @@
    than copy it (e.g. desktop's i18n catalog). Throws on a missing file, like every
    staging call: a typo must never stage nothing, silently."
   [project src]
-  (let [s (str project "/os/" src)]
+  (let [s (str project "/os/pipeline/" src)]
     (when-not (fs/exists? s)
       (throw (ex-info "build.stage: missing source file" {:src src :path s})))
     s))

@@ -1,7 +1,8 @@
 (ns tools.cli
-  "The host CLI, one bb task per noun: os (the 2-partition rootfs image), pack (the .pack
-   artifact), disk (the full A/B disk), dev (a RUNNING device over ssh), loopback (loop-device
-   utility). Each task passes its noun as the first token; the tree below is the whole surface.
+  "The host CLI, one bb task per noun: build (the whole pipeline), stage (an image from the
+   pinned base), os (the 2-partition rootfs image), pack (the .pack artifact), disk (the full
+   A/B disk), dev (a RUNNING device over ssh), loopback (loop-device utility). Each task passes
+   its noun as the first token; the tree below is the whole surface.
    `bb pack <src> <out>` sugars to `pack make` (see pack-defaulted)."
   (:require
     [clojure.walk       :as walk]

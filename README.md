@@ -28,7 +28,7 @@ The split is by type of work — product source, system definition, host tooling
 
 - **`runtime/`** — the ujima core codebase: shared `lib/` + the `ujima/` runtime. Runs on the device as ujimad; tools and the os build link it on the host.
 - **`desktop/`** — the desktop product: `shell/` (the chrome), `bin/` (its programs), `circle/` (the fleet panel).
-- **`os/`** — the system definition: `pipeline/` (the build stages + the static files each stages), `build/` (the machinery that runs them), `apps/` (third-party software packaged for ujima).
+- **`os/`** — the system definition: `pipeline/` (the build stages, each with the static files it stages), `build/` (the machinery that runs them), `apps/` (third-party software packaged for ujima).
 - **`tools/`** — the host CLI behind the `bb` tasks: pipeline orchestration, image/pack/disk work, the live dev loop.
 
 
@@ -172,6 +172,7 @@ the journal. On a running device:
 /ujima/ujimad      the deployed core (runtime/)
 /ujima/desktop     the desktop layer (desktop/, mirrored)
 /ujima/apps        the app catalog scan root
+/ujima/system      the install record (pack.edn)    (per-slot)
 /ujima/settings    per-slot settings scope          (persists)
 /ujima/storage     shared storage — files, apps     (persists)
 /ujima/run         ephemeral runtime state          (resets)

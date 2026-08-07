@@ -1,12 +1,12 @@
 #!/bin/sh
 # build-eww — build the eww binary natively on THIS Pi (aarch64) and stage it for copying into the
-# repo's os/desktop/eww/. Run as root.
+# repo's os/pipeline/desktop/eww/. Run as root.
 #
 # eww isn't packaged for the ujima base (Debian trixie has no eww; upstream ships no binaries), and
 # the image build can't compile it (the pipeline's aarch64 chroot runs under qemu, where a Rust+GTK
 # build is unusably slow). So we build it here on real hardware once and vendor the binary — the same
 # shape as build-initramfs. The image consumes the result in the desktop stage, which
-# copies os/desktop/eww/eww -> /usr/local/bin/eww (single tracked file; versions = git history).
+# copies os/pipeline/desktop/eww/eww -> /usr/local/bin/eww (single tracked file; versions = git history).
 #
 # Run with the overlay DISABLED (lock-fs disable + reboot): the apt build-deps + Rust toolchain +
 # cargo target dir are multi-GB and would otherwise land in the ephemeral tmpfs upper (RAM).
@@ -55,4 +55,4 @@ echo "runtime libs (pin these in tools.scripts.install):"
 ldd "$out/eww-aarch64-latest" | awk '{print $1}' | sort -u
 echo
 echo "copy into the repo (single tracked file; the version rides the commit message):"
-echo "  scp ujima@<this-pi>:$out/eww-aarch64-$ver <repo>/os/desktop/eww/eww"
+echo "  scp ujima@<this-pi>:$out/eww-aarch64-$ver <repo>/os/pipeline/desktop/eww/eww"

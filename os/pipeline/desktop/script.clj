@@ -79,6 +79,6 @@
 
     ;; the packaged app set (os/apps/<id>): app.edn specs -> the catalog scan root, rootfs/
     ;; defaults overlaid onto / — AFTER the mirrors above so a clean-mirror can't clobber
-    ;; them; same — an app edit ships
+    ;; them; rides this same script live (`dev script desktop`), so an app edit ships
     ;; without a rebuild.
     (apps/stage-defaults! project)))

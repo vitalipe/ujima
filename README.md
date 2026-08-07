@@ -22,6 +22,16 @@ Core ideas:
 This mono repo contains the code and tooling needed to build, install, and run UjimaOS.
 
 
+## Layout
+
+The split is by type of work — product source, system definition, host tooling:
+
+- **`runtime/`** — the ujima core codebase: shared `lib/` + the `ujima/` runtime. Runs on the device as ujimad; tools and the os build link it on the host.
+- **`desktop/`** — the desktop product: `shell/` (the chrome), `bin/` (its programs), `circle/` (the fleet panel).
+- **`os/`** — the system definition: `pipeline/` (the build stages + the static files each stages), `build/` (the machinery that runs them), `apps/` (third-party software packaged for ujima).
+- **`tools/`** — the host CLI behind the `bb` tasks: pipeline orchestration, image/pack/disk work, the live dev loop.
+
+
 ## CLI
 
 ```

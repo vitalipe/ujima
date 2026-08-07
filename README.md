@@ -30,7 +30,7 @@ bb build <target> [--dev]                             the whole pipeline, one co
 bb stage <target>                                     stage an OS image from the pinned base (vendor-cached)
 
 bb os apply <img> [--dev]                             run the whole script chain into a staged image
-bb os script <img> <name>                             run os.<name> inside the image's chroot
+bb os script <img> <name>                             run pipeline script <name> inside the image's chroot
 bb os chroot <img>                                    interactive root shell inside the image
 
 bb pack <img|blockdev> <out.pack>                     pack an OS image into a .pack
@@ -44,7 +44,7 @@ bb disk slot <A|B> activate <img|blockdev>            set the boot slot
 bb disk info <img|blockdev>                           slots, install metadata, boot selection
 
 bb dev push <ip> ujimad                               deploy the daemon + restart the session
-bb dev script <ip> <name>                             run os.<name> live on the device
+bb dev script <ip> <name>                             run pipeline script <name> live on the device
 bb dev view <ip>                                      interactive VNC mirror of the device's display
 bb dev screenshot <ip>                                one-frame PNG of the device's display
 bb dev click <ip> <x> <y>                             synthetic input on the device
@@ -77,7 +77,7 @@ sudo bb build rpi-os --dev    # dev image (`bb dev` commands require it)
 ```
 
 The first build fetches the pinned raspios base once into `stage/vendor/` and
-bakes the packages into it (`os.install`).  **no command ever deletes it** — rebuilding it is a manual `rm stage/vendor/<name>.img`. Every later build starts from the cache:
+bakes the packages into it (the install stage).  **no command ever deletes it** — rebuilding it is a manual `rm stage/vendor/<name>.img`. Every later build starts from the cache:
 copy → content scripts in the chroot → pack → A/B disk.
 
 Outputs land in `stage/` as `ujima-<branch>-<commit>[-dirty][-dev].*`:

@@ -174,7 +174,8 @@
   [{:keys [ip out display xauth] :as opts}]
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (let [{:keys [password ssh-opts host] :as transport} (ssh-transport opts)
-        outf (or out "ujima-screen.png")]
+        outf (or out "tmp/screen/ujima-screen.png")]   ;; tmp/ is gitignored — no repo-root droppings
+    (some-> (fs/parent outf) fs/create-dirs)   ;; nil parent = bare filename in cwd
     (when-not (:ok? (remote-sh? transport "command -v maim >/dev/null"))
       (throw (ex-info (str "maim missing on " ip " — run `bb dev script " ip " dev` to bake it (or reflash a dev image that ships it)")
                       {:ip ip :cmd "maim"})))

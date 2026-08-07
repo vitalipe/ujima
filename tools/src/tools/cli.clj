@@ -140,11 +140,11 @@
             :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
 
     "screenshot"
-    {:usage "Usage: dev screenshot <ip> [--out ujima-screen.png] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+    {:usage "Usage: dev screenshot <ip> [--out tmp/screen/ujima-screen.png] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
      :target dev/screenshot!
      :args [:ip]
      :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :out      {:desc "Host PNG output path" :default "ujima-screen.png"}
+            :out      {:desc "Host PNG output path" :default "tmp/screen/ujima-screen.png"}
             :display  {:desc "X display to grab" :default ":0"}
             :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
             :user     {:desc "SSH user"     :default "ujima" :coerce :string}

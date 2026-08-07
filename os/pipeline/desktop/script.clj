@@ -1,7 +1,7 @@
 (ns pipeline.desktop.script
   "Runs INSIDE the target chroot as root (and is the live `dev push desktop` deploy path).
    Stages the ujima *desktop* layer — the desktop/ tree, plus its concern files under
-   os/desktop/ (theme, fonts, links, files, eww, i18n) — onto the base. The graphical
+   os/pipeline/desktop/ (theme, fonts, links, files, eww, i18n) — onto the base. The graphical
    session's systemd unit lives in the ujimaify stage; runtime desktop *settings* (wallpaper,
    resolution, …) are ujimad's job at runtime, not this build script.
 

@@ -1,9 +1,10 @@
 (ns build.files
-  "Pull-based staging of static device files from the per-script concern dirs:
-   os/<script>/<concern>/<file>, staged by an explicit call in src/os/<script>.clj — the
-   source path names the file once, the call site names the destination. A concern dir
-   belongs to exactly one script. Files land root-owned unless :owner says otherwise —
-   cp -a alone would carry the repo's build-host uids onto the device."
+  "Pull-based staging of static device files from the per-stage concern dirs:
+   os/pipeline/<name>/<concern>/<file>, staged by an explicit call in that stage's
+   script.clj — the source path names the file once, the call site names the
+   destination. A concern dir belongs to exactly one stage. Files land root-owned
+   unless :owner says otherwise — cp -a alone would carry the repo's build-host uids
+   onto the device."
   (:require [babashka.fs :as fs]
             [lib.shell :refer [$!]]))
 
@@ -20,8 +21,8 @@
 
 
 (defn install!
-  "One file: <project>/os/<src> -> absolute <dst>. Preserves the exec bit (cp -a);
-   :mode for the rest (sudoers 0440), :owner when not root:root."
+  "One file: <project>/os/pipeline/<src> -> absolute <dst>. Preserves the exec bit
+   (cp -a); :mode for the rest (sudoers 0440), :owner when not root:root."
   ([project src dst] (install! project src dst {}))
   ([project src dst {:keys [mode owner]}]
    (let [s (source project src)]

@@ -1,10 +1,10 @@
 (ns pipeline.dev.script
   "Runs INSIDE the target chroot as root. Layers DEV-only conveniences onto a configured ujima
    image: an SSH server for headless access, x11vnc + maim + xdotool for the desktop relay
-   (`tools dev view` / `dev screenshot` / `dev click|type|key`), the dev kit (os/dev/kit ->
+   (`tools dev view` / `dev screenshot` / `dev click|type|key`), the dev kit (os/pipeline/dev/kit ->
    /ujima/dev: wifi, lock-fs, peek, the build-* producers), a tagged shell prompt, and the
    loopback audio rig. Not part of the release pipeline — run on dev images only; nothing
-   under os/dev/ may ship in a release.
+   under os/pipeline/dev/ may ship in a release.
 
    Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 

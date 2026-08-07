@@ -3,7 +3,7 @@
    services that turn the staged ujimad + desktop into a bootable session — the session
    concern (unit + wrapper + stop path + xinitrc), the persistent journal, the /ujima
    runtime layout — then enables them and stamps the build. File contents (and their
-   HW-learned lessons) live in os/ujimaify/<concern>/; this script is the pulls + the few
+   HW-learned lessons) live in os/pipeline/ujimaify/<concern>/; this script is the pulls + the few
    actions. Writing/enabling units lives here (rare); *restarting* them for a live
    iteration is the CLI's job (`dev push`), not this script. (fstab is written per-slot
    at install time — ujima.device.ab/install-into-slot! — not here.)

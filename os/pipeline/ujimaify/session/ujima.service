@@ -21,7 +21,7 @@ User=ujima
 PAMName=login
 # Qt/KDE apps (Marble, Stellarium) follow the Nordic GTK theme — a session-wide env
 # inherited by startx → Xorg → i3 → ujimad → every launched app. qt6-gtk-platformtheme
-# (install.clj) is the GTK→Qt bridge; Qt selects its platform theme from the env only
+# (the install stage) is the GTK→Qt bridge; Qt selects its platform theme from the env only
 # (no /etc file like gtk-3.0).
 Environment=QT_QPA_PLATFORMTHEME=gtk3
 # /ujima/desktop/bin -> bare ujima-* calls (i3, yuck); /usr/games -> tuxtype

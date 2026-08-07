@@ -29,7 +29,7 @@
 
 ;; the generic app face: an app dir without an icon.svg renders this instead of breaking the
 ;; front-ends — icon resolution is a loader concern, so the catalog always carries a real path
-(def ^:private fallback-icon "/ujima/desktop/icons/launcher.svg")
+(def ^:private fallback-icon "/ujima/desktop/shell/icons/launcher.svg")
 
 ;; the desugar targets: :link / :web-app specs become invocations of these at spawn time
 (def ^:private open-web-app-bin  "/ujima/desktop/bin/ujima-open-web-app")

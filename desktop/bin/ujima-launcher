@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """UjimaOS launcher host — a single chromeless WebKitGTK window that renders the launcher
-home surface (desktop/launcher), served by ujimad on :1337 so it is same-origin with
+home surface (desktop/shell/launcher), served by ujimad on :1337 so it is same-origin with
 the app API. Deliberately lean: no GPU compositing and no JS JIT (the launcher is layout-heavy,
 not JS-heavy) keep the web view ~200 MB instead of ~260 MB. i3 tiles it into the space between
 eww's top bar and dock. Exiting (window closed / web process gone) is the caller's signal."""

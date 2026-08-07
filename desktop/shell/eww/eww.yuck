@@ -7,7 +7,7 @@
 
 (defpoll clock :interval "10s" "date +%H:%M")
 
-(defvar ewwcmd "eww --config /ujima/desktop/eww")
+(defvar ewwcmd "eww --config /ujima/desktop/shell/eww")
 ; a launcher click steals focus from the override-redirect bars → they go dormant; only a REAL
 ; XTEST click on a bar re-wakes them (a click SENT via XSendEvent does not — HW-tested). Tap the
 ; far top-right corner: the arrow glyph draws down-right from its hotspot, so parked at 1279,0
@@ -43,7 +43,7 @@
   (box :class "topbar"
     (box :class {(apps.current?.id ?: "") == "" ? "bar off" : "bar"} :space-evenly false
       (box :class "idcell" :valign "center"
-        (image :path "${apps.current?.icon ?: "/ujima/desktop/icons/launcher.svg"}"
+        (image :path "${apps.current?.icon ?: "/ujima/desktop/shell/icons/launcher.svg"}"
                :image-width 20 :image-height 20
                :visible {(apps.current?.id ?: "") != ""}))
       (label :class "title" :halign "start" :hexpand true :text {apps.current?.title ?: ""})
@@ -103,7 +103,7 @@
     (box :halign "start" :space-evenly false :spacing 6
       (button :class {(apps.current?.id ?: "") == "" ? "home active" : "home"} :timeout "2s"
         :onclick "ujima-api POST /app/home >/dev/null"
-        (image :path "/ujima/desktop/icons/launcher.svg" :image-width 25 :image-height 25))
+        (image :path "/ujima/desktop/shell/icons/launcher.svg" :image-width 25 :image-height 25))
       ;; files: hidden from the launcher (its 'system' category) — pinned next to home. It's an
       ;; ACTION like the launcher (not an app), so it shares .home: bare at rest, frost when focused.
       (button :class {(apps.current?.id ?: "") == "files" ? "home active" : "home"} :timeout "2s"
@@ -124,7 +124,7 @@
         :onclick "ujima-api POST /api/input/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
         (label :text {state.keyboard.layout}))
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
-        (image :path {state.audio.muted ? "/ujima/desktop/icons/speaker-muted.svg" : "/ujima/desktop/icons/speaker.svg"} :image-width 19 :image-height 19))
+        (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 19 :image-height 19))
       (label :class "clock" :text {clock}))))
 
 
@@ -146,7 +146,7 @@
            :onchange "${ewwcmd} update vol={} ; ujima-api POST /ui/volume/move '{\"value\": {}}' >/dev/null")
     (button :class "volmute" :timeout "2s"
       :onclick "ujima-api POST /api/audio/mute '{\"muted\": ${!state.audio.muted}}' >/dev/null"
-      (image :path {state.audio.muted ? "/ujima/desktop/icons/speaker-muted.svg" : "/ujima/desktop/icons/speaker.svg"} :image-width 22 :image-height 22))))
+      (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 22 :image-height 22))))
 
 
 ;; --- surfaces ------------------------------------------------------------

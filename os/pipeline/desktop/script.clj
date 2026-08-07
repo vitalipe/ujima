@@ -30,11 +30,11 @@
     ;; desktop background: rasterize the vector wall.svg -> a ≥1080p PNG for feh (the X root can't
     ;; take an SVG). Uses the librsvg gdk-pixbuf loader via python3-gi — both installed by
     ;; the install stage. wall.svg is the editable source; wall.png is what i3's `exec feh` sets.
-    (when (fs/exists? "/ujima/desktop/wall.svg")
+    (when (fs/exists? "/ujima/desktop/shell/wall.svg")
       ($! python3 "-c"
           (str "import gi; gi.require_version('GdkPixbuf','2.0'); from gi.repository import GdkPixbuf; "
-               "GdkPixbuf.Pixbuf.new_from_file_at_scale('/ujima/desktop/wall.svg',1920,1200,False)"
-               ".savev('/ujima/desktop/wall.png','png',[],[])")))
+               "GdkPixbuf.Pixbuf.new_from_file_at_scale('/ujima/desktop/shell/wall.svg',1920,1200,False)"
+               ".savev('/ujima/desktop/shell/wall.png','png',[],[])")))
 
     ;; eww binary: built out-of-band on a Pi (build-eww, dev kit) and vendored as the
     ;; single tracked file — versions live in git history. Staged here (not install) so a

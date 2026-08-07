@@ -147,6 +147,6 @@
   "Start the loopback API (+ static launcher assets from static-root); returns http-kit's stop
    fn. A taken port throws — the session dies loudly and systemd rebuilds it."
   [{:keys [host port static-root]
-    :or   {host "127.0.0.1" port 1337 static-root "/ujima/desktop"}}]
+    :or   {host "127.0.0.1" port 1337 static-root "/ujima/desktop/shell"}}]
   (log/info "desktop http listening" {:host host :port port :static static-root})
   (http/run-server (partial handler static-root) {:ip host :port port}))

@@ -54,6 +54,8 @@ let layQ = '';
 let inflight = 0;        // jobs in flight on the CURRENT machine (drives the head glyph)
 let headRes  = null;     // 'ok' | 'noreply' — the head glyph's settled state
 let detailKey = '';      // cur|tab|online — the pane rebuilds only when this moves
+let scanning  = false;   // a sweep is running: rail shows the hint, the page locks
+let revealing = false;   // the render right after a sweep staggers the rows in
 
 const I = {
   kbd:'<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M6 14h0M18 14h0M9 14h6"/>',
@@ -109,9 +111,16 @@ async function poll(){
   let s;
   try { s = await (await fetch('/ui/setup')).json(); }
   catch (e) { return; }                       // server gone — keep last frame
+  const first = S === null;
   S = s;
   if (!byId(cur)) { cur = S.self; detailKey = ''; }
+  if (first) reveal();
   render();
+}
+function reveal(){
+  revealing = true;
+  render();
+  setTimeout(() => { revealing = false; render(); }, S.peers.length * 60 + 500);
 }
 
 async function postJob(url, body){
@@ -136,15 +145,24 @@ async function pollJob(id){
 function render(){
   $('counts').textContent =
     `${S.peers.length} machines · ${S.peers.filter(m => m.online).length} on`;
+  document.querySelector('.wrap').classList.toggle('scanning', scanning);
   renderRail();
   const m = byId(cur);
   const key = [cur, tab, m.online].join('|');
   if (key !== detailKey){ detailKey = key; renderDetail(); }
   else patchDetail(m);
 }
+const railOrder = () =>
+  [...S.peers.filter(m => m.id === S.self), ...S.peers.filter(m => m.id !== S.self)];
 function renderRail(){
-  $('rail').innerHTML = S.peers.map(m => `
-    <div class="mrow ${glyphCls(m)} ${m.id===cur?'on':''} ${m.online?'':'off'}" onclick="pick('${m.id}')">
+  if (scanning){
+    $('rail').innerHTML =
+      `<div class="scanhint"><span class="spin"></span>looking for machines…</div>`;
+    return;
+  }
+  $('rail').innerHTML = railOrder().map((m, i) => `
+    <div class="mrow ${glyphCls(m)} ${m.id===cur?'on':''} ${m.online?'':'off'} ${revealing?'appear':''}"
+         style="--i:${i}" onclick="pick('${m.id}')">
       ${monSvg()}<span class="nm">${esc(m.name)}</span>
       ${m.id === S.self ? `<span class="tag">this</span>` : ''}
     </div>`).join('');
@@ -187,13 +205,17 @@ function renderDetail(){
     return;
   }
   $('detail').innerHTML = head + (tab === 'settings' ? settingsHtml(m) : diagHtml(m));
-  if (tab === 'settings' && m.id === S.self){ refreshSend('clock'); refreshSend('layouts'); }
+  if (tab === 'settings') refreshGates(m);
+}
+function refreshGates(m){
+  if (m.id === S.self){ refreshSend('clock'); refreshSend('layouts'); }
+  ['name','clock','layouts','snd'].forEach(refreshSave);
 }
 /* between rebuilds the poll only touches what can't hold a draft */
 function patchDetail(m){
   const st = $('dstatus'); if (st) st.textContent = statusText(m);
   const nm = $('dname');   if (nm && nm.textContent !== m.name) nm.textContent = m.name;
-  if (tab === 'settings' && m.id === S.self){ refreshSend('clock'); refreshSend('layouts'); }
+  if (tab === 'settings') refreshGates(m);
 }
 function refreshHead(){
   const el = $('dhead');
@@ -213,7 +235,8 @@ function settingsHtml(m){
   <div class="scard">
     <span class="sc-title">${ic('tag')}Name</span>
     <div class="frow">
-      <input class="field grow" id="f-name" value="${esc(m.name)}" maxlength="16">
+      <input class="field grow" id="f-name" value="${esc(m.name)}" maxlength="16"
+        oninput="refreshSave('name')">
       ${saveBtn('b-name','Save','','primary',"saveSec('name')")}
     </div>
     <p class="hint">Shown in Circle and on the machine. Letters, numbers and dashes.</p>
@@ -222,19 +245,21 @@ function settingsHtml(m){
   <div class="scard">
     <span class="sc-title">${ic('clock')}Clock</span>
     <div class="frow">
-      <select class="field" id="f-tz" onchange="refreshSend('clock')">${
+      <select class="field" id="f-tz" onchange="refreshSend('clock');refreshSave('clock')">${
         [...new Set([...TZ, sys(m).timezone].filter(Boolean))].map(t =>
         `<option ${t===sys(m).timezone?'selected':''}>${esc(t)}</option>`).join('')}</select>
-      <input class="field" id="f-date" type="date" value="${esc(today)}">
-      <input class="field" id="f-time" type="time" value="${esc(now)}">
+      <input class="field" id="f-date" type="date" value="${esc(today)}" data-init="${esc(today)}"
+        oninput="refreshSave('clock')">
+      <input class="field" id="f-time" type="time" value="${esc(now)}" data-init="${esc(now)}"
+        oninput="refreshSave('clock')">
     </div>
     <div class="frow">
-      ${isSelf ? '' : `<button class="btn quiet" onclick="copyClock()">${ic('clock')}Use this computer’s clock</button>`}
+      ${isSelf ? '' : `<button class="btn quiet" onclick="copyClock()">${ic('clock')}Use ${esc(self().name)}’s time</button>`}
       <span class="grow"></span>
       ${isSelf ? saveBtn('b-all-clock','Send to all machines','cast','quiet',"sendAll('clock')") : ''}
       ${saveBtn('b-clock','Save','','primary',"saveSec('clock')")}
     </div>
-    <p class="hint">Machines forget the time when unplugged for long. After a blackout, set it here${isSelf ? ' and Save — then Send makes every machine match this computer’s clock' : ''}.</p>
+    <p class="hint">Machines forget the time when unplugged for long. After a blackout, set it here.</p>
   </div>
 
   <div class="scard" id="laycard">${layCardInner(m)}</div>
@@ -292,16 +317,44 @@ function fillLayList(){
     ? rows.map(l => `<button class="optrow" onclick="addLay('${l.k}')">${ic('kbd')}${l.n}</button>`).join('')
     : `<p class="hint">Nothing matches “${esc(layQ)}”.</p>`;
 }
-function addLay(k){ workLay.push(k); closeSheet(); $('laycard').innerHTML = layCardInner(); refreshSend('layouts'); }
-function rmLay(k){ workLay = workLay.filter(x => x !== k); $('laycard').innerHTML = layCardInner(); refreshSend('layouts'); }
+function addLay(k){ workLay.push(k); closeSheet(); $('laycard').innerHTML = layCardInner(); refreshSend('layouts'); refreshSave('layouts'); }
+function rmLay(k){ workLay = workLay.filter(x => x !== k); $('laycard').innerHTML = layCardInner(); refreshSend('layouts'); refreshSave('layouts'); }
 function pickSnd(el){
   document.querySelectorAll('.optrow.snd').forEach(r => r.classList.remove('on'));
   el.classList.add('on');
+  refreshSave('snd');
 }
 function copyClock(){
   const [d, t] = splitNow(sys(self()).now);
   $('f-date').value = d;
   $('f-time').value = t;
+  refreshSave('clock');
+}
+
+/* a section is dirty when its draft differs from the machine's saved state;
+   the clock compares against the fields' render-time baseline (saved wall
+   time keeps moving — what matters is whether the user touched it) */
+function cardDirty(key){
+  const m = byId(cur);
+  if (key === 'name')    return $('f-name').value.trim() !== m.name;
+  if (key === 'snd'){
+    const on = document.querySelector('.optrow.snd.on');
+    return !!on && on.dataset.k !== (m.audio && m.audio.out);
+  }
+  if (key === 'layouts'){
+    const saved = layouts(m);
+    return workLay.length !== saved.length || workLay.some(k => !saved.includes(k));
+  }
+  const d = $('f-date'), t = $('f-time');
+  return $('f-tz').value !== sys(m).timezone ||
+         d.value !== d.dataset.init || t.value !== t.dataset.init;
+}
+/* Save is an idle-state gate only: pending stays disabled on its own, and a
+   stuck Failed / No reply must stay clickable — it is the retry. */
+function refreshSave(key){
+  const b = $('b-' + key); if (!b) return;
+  if (b.querySelector('.spin') || b.classList.contains('done') || b.classList.contains('failed')) return;
+  b.disabled = !cardDirty(key);
 }
 
 /* the Save button IS the status: Save → Saving… → Done (releases after the
@@ -320,6 +373,7 @@ function relax(id, machine){
     if (cur === machine && b && b.classList.contains('done')){
       setBtn(id, null);
       if (id.startsWith('b-all-')) refreshSend(id.slice(6));
+      else if (id.startsWith('b-')) refreshSave(id.slice(2));
     }
   }, LINGER);
 }
@@ -366,6 +420,11 @@ async function saveSec(key){
   if (st === 'ok' || st === 'accepted'){
     headRes = 'ok'; refreshHead();
     setBtn(bid, 'ok'); relax(bid, machine);
+    if (key === 'clock'){                     // the sent time is the new baseline
+      const d = $('f-date'), t = $('f-time');
+      if (d) d.dataset.init = d.value;
+      if (t) t.dataset.init = t.value;
+    }
     poll();                                   // fresh truth: rail name, gates
     setTimeout(() => {
       if (cur === machine && headRes === 'ok' && !inflight){ headRes = null; refreshHead(); }
@@ -558,14 +617,19 @@ async function doRemove(id){
   poll();
 }
 
-/* ── rescan: the server runs the sweep; the button spins while it does ───── */
+/* ── rescan: the server runs the sweep; the page locks and the rail shows
+   the scan, then the found machines stagger back in ─────────────────────── */
 async function rescanNow(){
-  const b = $('rescan');
-  if (b.classList.contains('scanning')) return;
-  b.classList.add('scanning');
+  if (scanning) return;
+  scanning = true;
+  $('rescan').classList.add('scanning');
+  render();
   try { await fetch('/setup/rescan', {method: 'POST'}); } catch (e) {}
-  b.classList.remove('scanning');
-  poll();
+  try { S = await (await fetch('/ui/setup')).json(); } catch (e) {}
+  if (!byId(cur)) { cur = S.self; detailKey = ''; }
+  scanning = false;
+  $('rescan').classList.remove('scanning');
+  reveal();
 }
 
 /* ── boot: scanning until the first world arrives ────────────────────────── */

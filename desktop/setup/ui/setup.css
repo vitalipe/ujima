@@ -76,6 +76,11 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .rail{width:236px;flex:none;display:flex;flex-direction:column;gap:6px}
 .scanhint{display:flex;align-items:center;gap:10px;padding:12px 13px;
   font-size:13px;color:var(--dim)}
+/* a running sweep locks the page; found machines stagger back in */
+.wrap.scanning{pointer-events:none}
+.wrap.scanning .detail{opacity:.35;transition:opacity .25s ease}
+.mrow.appear{animation:appear .3s ease backwards;animation-delay:calc(var(--i)*60ms)}
+@keyframes appear{from{opacity:0;transform:translateX(-10px)}}
 .mrow{display:flex;align-items:center;gap:11px;padding:9px 13px;border-radius:13px;
   background:var(--panel);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
   cursor:pointer;transition:box-shadow .15s,background .15s}

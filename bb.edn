@@ -1,4 +1,4 @@
-{:paths ["runtime/src" "tools/src" "os" "desktop/circle/src"]
+{:paths ["runtime/src" "tools/src" "os" "desktop/console/src"]
 
  :deps {http-kit/http-kit {:mvn/version "2.8.0"}
         cheshire/cheshire {:mvn/version "5.13.0"}
@@ -41,15 +41,15 @@
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "loopback" *command-line-args*)}
 
-  circle
-  {:doc "Circle dev: mock (panel server, :1338) | world (mock-world TUI)"
+  console
+  {:doc "Console dev (Circle + Setup panels): mock (server, :1338) | world (mock-world TUI)"
    :task (case (first *command-line-args*)
-           "mock"  ((requiring-resolve 'circle.main/-main))
-           "world" ((requiring-resolve 'circle.world/-main))
-           (do (println "usage: bb circle <mode>")
-               (println "  mock   panel server on the mock fleet (http://localhost:1338)")
-               (println "  world  TUI driving tmp/circle/world.edn (add/drop, set counts)")
-               (println "  real   (later) panel server against live ujima peers")))}
+           "mock"  ((requiring-resolve 'console.main/-main))
+           "world" ((requiring-resolve 'console.world/-main))
+           (do (println "usage: bb console <mode>")
+               (println "  mock   console server on the mock fleet (http://localhost:1338)")
+               (println "  world  TUI driving tmp/console/world.edn (add/drop, set counts)")
+               (println "  real   (later) console server against live ujima peers")))}
 
   repl
   {:doc "Start Ujima dev REPL"

@@ -93,6 +93,12 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .mrow.on .nm{color:rgb(var(--sel))}
 .mrow .tag{font-size:9px;text-transform:uppercase;letter-spacing:1.2px;font-weight:700;
   color:rgba(var(--frost),.9);margin-left:auto}
+.rowretry{margin-left:auto;width:24px;height:24px;border-radius:8px;flex:none;
+  display:flex;align-items:center;justify-content:center;
+  color:rgb(var(--danger));background:rgba(var(--danger),.12);
+  transition:background .15s}
+.rowretry:hover{background:rgba(var(--danger),.24)}
+.rowretry .ic{width:12px;height:12px}
 
 .detail{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px}
 .dhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:2px 2px 0}

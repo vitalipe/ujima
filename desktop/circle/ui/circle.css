@@ -123,6 +123,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .title{display:flex;align-items:center;gap:11px}
 .title h1{font-size:24px;font-weight:700;letter-spacing:-.4px;line-height:1}
 .title .ic{width:24px;height:24px;color:rgb(var(--frost))}
+.counts{font-size:13px;color:var(--dim);margin-left:2px}
 .head .grow{flex:1}
 #rescan{display:inline-flex;align-items:center;gap:7px;padding:9px 14px;border-radius:11px;
   height:40px;font-size:12.5px;font-weight:650;color:var(--dim);

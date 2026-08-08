@@ -56,6 +56,10 @@ let headRes  = null;     // 'ok' | 'noreply' — the head glyph's settled state
 let detailKey = '';      // cur|tab|online — the pane rebuilds only when this moves
 let scanning  = false;   // a sweep is running: rail shows the hint, the page locks
 let revealing = false;   // the render right after a sweep staggers the rows in
+let fanout    = null;    // a running/settled send-to-all, shown on the rail:
+                         // {key url body total peers:{id:status} live} — greens
+                         // shed after the linger, errors stick with a row retry
+let fanoutTimer = 0;
 
 const I = {
   kbd:'<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M6 14h0M18 14h0M9 14h6"/>',
@@ -135,12 +139,13 @@ async function postJob(url, body){
     return r.ok ? {job: d.job} : {err: d.error || 'request failed'};
   } catch (e) { return {err: 'no reply from the server'}; }
 }
-async function pollJob(id){
+async function pollJob(id, onTick){
   for (;;){
     await new Promise(r => setTimeout(r, JOB_MS));
     let j;
     try { j = await (await fetch('/console/job/' + id)).json(); }
     catch (e) { return null; }
+    if (j && onTick) onTick(j);
     if (j && j.finished) return j;
   }
 }
@@ -164,12 +169,21 @@ function renderRail(){
       `<div class="scanhint"><span class="spin"></span>looking for machines…</div>`;
     return;
   }
-  $('rail').innerHTML = railOrder().map((m, i) => `
-    <div class="mrow ${glyphCls(m)} ${m.id===cur?'on':''} ${m.online?'':'off'} ${revealing?'appear':''}"
+  $('rail').innerHTML = railOrder().map((m, i) => {
+    const fs    = fanout && fanout.peers[m.id];
+    const state = fs === 'pending' ? 'busy'
+                : (fs === 'ok' || fs === 'accepted') ? 'res-ok'
+                : fs ? 'res-noreply' : '';
+    const retry = fanout && !fanout.live && state === 'res-noreply';
+    return `
+    <div class="mrow ${glyphCls(m, state)} ${m.id===cur?'on':''} ${m.online?'':'off'} ${revealing?'appear':''}"
          style="--i:${i}" onclick="pick('${m.id}')">
       ${monSvg()}<span class="nm">${esc(m.name)}</span>
       ${m.id === S.self ? `<span class="tag">this</span>` : ''}
-    </div>`).join('');
+      ${retry ? `<button class="rowretry" title="Try ${esc(m.name)} again"
+                   onclick="retryRow(event,'${m.id}')">${ic('boot')}</button>` : ''}
+    </div>`;
+  }).join('');
 }
 function pick(id){
   cur = id; tab = 'settings'; inflight = 0; headRes = null;
@@ -443,33 +457,87 @@ async function saveSec(key){
 }
 
 /* Send = fanout of THIS COMPUTER'S SAVED STATE — it never reads the form.
-   Editing gates it: Save first, then Send. "Make everyone match this computer." */
-async function sendAll(key){
-  const machine = cur, bid = 'b-all-' + key, me = self();
-  const targets = S.peers.filter(m => m.online).map(m => m.id);
-  let url, body;
-  if (key === 'clock'){
-    const [d, t] = splitNow(sys(me).now);
-    url = '/setup/clock'; body = {tz: sys(me).timezone, date: d, time: t};
+   Editing gates it: Save first, then Send. "Make everyone match this computer."
+   The rail is the fanout's face: rows blink while their machine works, show
+   the result, shed the greens after the linger and keep errors sticky with a
+   per-row retry. A stuck Send button retries just the failed set, same values. */
+const failedIds = () =>
+  Object.entries(fanout.peers)
+    .filter(([, st]) => st !== 'ok' && st !== 'accepted')
+    .map(([id]) => id);
+
+function scheduleFanoutClear(){
+  const t = ++fanoutTimer;
+  setTimeout(() => {
+    if (t !== fanoutTimer || !fanout || fanout.live) return;
+    const bad = failedIds();
+    if (!bad.length) fanout = null;
+    else fanout.peers = Object.fromEntries(bad.map(id => [id, fanout.peers[id]]));
+    renderRail();
+  }, LINGER);
+}
+
+/* runs the job over targets, painting the rail as replies land; returns the
+   settled job (null = the server itself never answered) */
+async function runFanout(targets){
+  fanout.live = true;
+  targets.forEach(id => { fanout.peers[id] = 'pending'; });
+  renderRail();
+  const sent = await postJob(fanout.url, Object.assign({targets}, fanout.body));
+  const job  = sent.job != null
+    ? await pollJob(sent.job, j => { Object.assign(fanout.peers, j.peers); renderRail(); })
+    : null;
+  if (job) Object.assign(fanout.peers, job.peers);
+  else targets.forEach(id => { fanout.peers[id] = 'noreply'; });
+  fanout.live = false;
+  renderRail();
+  scheduleFanoutClear();
+  return job ? job : {err: sent.err};
+}
+
+function sendBtnSettle(bid, machine){
+  const bad = failedIds();
+  if (bad.length){
+    setBtn(bid, 'fail', `${fanout.total - bad.length} of ${fanout.total}`,
+           bad.map(id => (byId(id) || {name: id}).name).join(', ')
+           + ' did not reply — click to try again');
   } else {
-    url = '/setup/settings';
-    body = {writes: [{path: ['keyboard','available-layouts'], value: [...layouts(me)]}]};
+    setBtn(bid, 'ok', `Done on ${fanout.total}`); relax(bid, machine);
+  }
+}
+
+async function sendAll(key){
+  if (fanout && fanout.live) return;
+  const machine = cur, bid = 'b-all-' + key, me = self();
+  const retrying = fanout && fanout.key === key && failedIds().length;
+  if (!retrying){
+    let url, body;
+    if (key === 'clock'){
+      const [d, t] = splitNow(sys(me).now);
+      url = '/setup/clock'; body = {tz: sys(me).timezone, date: d, time: t};
+    } else {
+      url = '/setup/settings';
+      body = {writes: [{path: ['keyboard','available-layouts'], value: [...layouts(me)]}]};
+    }
+    const all = S.peers.filter(m => m.online).map(m => m.id);
+    fanout = {key, url, body, total: all.length, peers: {}, live: false};
   }
   setBtn(bid, 'pending');
-  inflight++; refreshHead();
-  const sent = await postJob(url, Object.assign({targets}, body));
-  const job  = sent.job != null ? await pollJob(sent.job) : null;
+  inflight++; headRes = null; refreshHead();
+  const job = await runFanout(retrying ? failedIds() : S.peers.filter(m => m.online).map(m => m.id));
   if (!jobDone(machine)) return;
-  if (!job) return setBtn(bid, 'fail', 'Failed', sent.err || 'no reply from the server');
-  const miss = Object.entries(job.peers || {})
-    .filter(([, st]) => st !== 'ok' && st !== 'accepted')
-    .map(([id]) => (byId(id) || {name: id}).name);
-  if (miss.length){
-    setBtn(bid, 'fail', `${targets.length - miss.length} of ${targets.length}`,
-           miss.join(', ') + ' did not reply — click to try again');
-  } else {
-    setBtn(bid, 'ok', `Done on ${targets.length}`); relax(bid, machine);
-  }
+  if (job.err != null) return setBtn(bid, 'fail', 'Failed', job.err || 'no reply from the server');
+  sendBtnSettle(bid, machine);
+}
+
+/* the row's own retry: same values, one machine — the blinking row IS the
+   progress; the head glyph stays out of it */
+async function retryRow(e, id){
+  e.stopPropagation();
+  if (!fanout || fanout.live) return;
+  const bid = 'b-all-' + fanout.key;
+  await runFanout([id]);
+  if ($(bid) && $(bid).classList.contains('failed')) sendBtnSettle(bid, cur);
 }
 /* dirty gate: while the section's draft differs from this computer's saved
    state, Send is disabled — its tooltip names the exact value it would send. */

@@ -208,6 +208,8 @@ function appRow(m, cls){   /* cls: 'napp' (ring) or 'approw' (grid) */
 function render(){
   if (!S) return;
   run = runView();
+  $('counts').textContent =
+    `${M.length} machines · ${M.filter(m => m.online).length} on`;
   $('rescan').classList.toggle('on', scanning);
   $('rescan').classList.toggle('off', busyNow());
   $('rescan-label').textContent = scanning ? 'Scanning…' : 'Rescan';

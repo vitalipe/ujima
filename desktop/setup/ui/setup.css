@@ -136,11 +136,11 @@ select.field{appearance:none;-webkit-appearance:none;padding-right:34px;cursor:p
 .btn .spin{width:12px;height:12px;border-width:2px}
 .btn:disabled{cursor:default;opacity:.5}
 .btn.quiet{color:var(--dim);background:rgba(255,255,255,.05);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
-.btn.quiet:hover{background:rgba(255,255,255,.09);color:var(--text)}
+.btn.quiet:not(:disabled):hover{background:rgba(255,255,255,.09);color:var(--text)}
 .btn.primary{color:var(--text);background:rgba(var(--sel),.16);box-shadow:inset 0 0 0 1px rgba(var(--sel),.4)}
-.btn.primary:hover{background:rgba(var(--sel),.24)}
+.btn.primary:not(:disabled):hover{background:rgba(var(--sel),.24)}
 .btn.dangerf{color:rgb(var(--danger));background:rgba(var(--danger),.14);box-shadow:inset 0 0 0 1px rgba(var(--danger),.4)}
-.btn.dangerf:hover{background:rgba(var(--danger),.22)}
+.btn.dangerf:not(:disabled):hover{background:rgba(var(--danger),.22)}
 /* button-as-status: Save morphs; Done releases after the linger, errors stick */
 .btn.done{color:rgb(var(--ok));background:rgba(var(--ok),.14);box-shadow:inset 0 0 0 1px rgba(var(--ok),.4)}
 .btn.failed{color:rgb(var(--danger));background:rgba(var(--danger),.14);box-shadow:inset 0 0 0 1px rgba(var(--danger),.4)}

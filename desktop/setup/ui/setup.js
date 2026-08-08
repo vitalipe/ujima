@@ -120,7 +120,11 @@ async function poll(){
 function reveal(){
   revealing = true;
   render();
-  setTimeout(() => { revealing = false; render(); }, S.peers.length * 60 + 500);
+  setTimeout(() => {
+    revealing = false;
+    $('rescan').disabled = false;
+    render();
+  }, S.peers.length * 60 + 500);
 }
 
 async function postJob(url, body){
@@ -620,15 +624,17 @@ async function doRemove(id){
 /* ── rescan: the server runs the sweep; the page locks and the rail shows
    the scan, then the found machines stagger back in ─────────────────────── */
 async function rescanNow(){
-  if (scanning) return;
+  if (scanning || revealing) return;
   scanning = true;
-  $('rescan').classList.add('scanning');
+  const b = $('rescan');
+  b.disabled = true;                 // native block: mouse, keyboard and focus
+  b.classList.add('scanning');       // held until the reveal settles
   render();
   try { await fetch('/setup/rescan', {method: 'POST'}); } catch (e) {}
   try { S = await (await fetch('/ui/setup')).json(); } catch (e) {}
   if (!byId(cur)) { cur = S.self; detailKey = ''; }
   scanning = false;
-  $('rescan').classList.remove('scanning');
+  b.classList.remove('scanning');
   reveal();
 }
 

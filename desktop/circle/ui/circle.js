@@ -210,7 +210,7 @@ function render(){
   run = runView();
   $('rescan').classList.toggle('on', scanning);
   $('rescan').classList.toggle('off', busyNow());
-  $('rescan-label').textContent = scanning ? 'scanning…' : 'rescan';
+  $('rescan-label').textContent = scanning ? 'Scanning…' : 'Rescan';
 
   renderRing();
 

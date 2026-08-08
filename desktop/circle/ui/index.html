@@ -8,10 +8,17 @@
 </head>
 <body>
 
-<button class="rescan" id="rescan" onclick="rescanNow()" title="rescan the circle" aria-label="rescan the circle">
-  <span class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.6 2.6L21 8"/><path d="M21 3v5h-5"/></svg></span>
-  <span id="rescan-label">rescan</span>
-</button>
+<header class="head">
+  <div class="title">
+    <span class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="1.6"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4"/><path d="M7.8 16.2a6 6 0 0 1 0-8.4"/><path d="M19.1 4.9a10 10 0 0 1 0 14.2"/><path d="M4.9 19.1a10 10 0 0 1 0-14.2"/></svg></span>
+    <h1>Circle</h1>
+  </div>
+  <span class="grow"></span>
+  <button id="rescan" onclick="rescanNow()" title="rescan the circle" aria-label="rescan the circle">
+    <span class="ic"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.9 1 6.6 2.6L21 8"/><path d="M21 3v5h-5"/></svg></span>
+    <span id="rescan-label">Rescan</span>
+  </button>
+</header>
 
 
 <main id="stage" class="ringstage" aria-label="Machines"></main>

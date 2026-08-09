@@ -60,6 +60,8 @@ let fanout    = null;    // a running/settled send-to-all, shown on the rail:
                          // {key url body total peers:{id:status} live} — greens
                          // shed after the linger, errors stick with a row retry
 let fanoutTimer = 0;
+let revealDrawn = false; // the reveal render built the rail; later ticks inside
+                         // the window must not rebuild it (restarts the stagger)
 
 const I = {
   kbd:'<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M6 14h0M18 14h0M9 14h6"/>',
@@ -167,8 +169,13 @@ function renderRail(){
   if (scanning){
     $('rail').innerHTML =
       `<div class="scanhint"><span class="spin"></span>looking for machines…</div>`;
+    revealDrawn = false;
     return;
   }
+  if (revealing){
+    if (revealDrawn) return;   // mid-reveal poll: leave the animation alone
+    revealDrawn = true;
+  } else revealDrawn = false;
   $('rail').innerHTML = railOrder().map((m, i) => {
     const fs    = fanout && fanout.peers[m.id];
     const state = fs === 'pending' ? 'busy'

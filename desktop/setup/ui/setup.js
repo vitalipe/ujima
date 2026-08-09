@@ -126,7 +126,6 @@ function reveal(){
   render();
   setTimeout(() => {
     revealing = false;
-    $('rescan').disabled = false;
     render();
   }, S.peers.length * 60 + 500);
 }
@@ -155,6 +154,7 @@ function render(){
   $('counts').textContent =
     `${S.peers.length} machines · ${S.peers.filter(m => m.online).length} on`;
   document.querySelector('.wrap').classList.toggle('scanning', scanning);
+  refreshRescan();
   renderRail();
   const m = byId(cur);
   const key = [cur, tab, m.online].join('|');
@@ -238,6 +238,13 @@ function patchDetail(m){
 function refreshHead(){
   const el = $('dhead');
   if (el) el.setAttribute('class', 'dhead ' + headGlyphCls(byId(cur)));
+  refreshRescan();
+}
+/* rescan yields to any running network command — a sweep mid-save would hide
+   the very state the user is watching */
+const netBusy = () => inflight > 0 || !!(fanout && fanout.live);
+function refreshRescan(){
+  $('rescan').disabled = scanning || revealing || netBusy();
 }
 
 /* ── settings tab ────────────────────────────────────────────────────────── */
@@ -421,6 +428,7 @@ function readVals(key){
 
 function jobDone(machine){
   inflight = Math.max(0, inflight - 1);
+  refreshRescan();
   if (cur !== machine) return false;
   refreshHead();
   return true;
@@ -481,6 +489,7 @@ function scheduleFanoutClear(){
    settled job (null = the server itself never answered) */
 async function runFanout(targets){
   fanout.live = true;
+  refreshRescan();
   targets.forEach(id => { fanout.peers[id] = 'pending'; });
   renderRail();
   const sent = await postJob(fanout.url, Object.assign({targets}, fanout.body));
@@ -490,6 +499,7 @@ async function runFanout(targets){
   if (job) Object.assign(fanout.peers, job.peers);
   else targets.forEach(id => { fanout.peers[id] = 'noreply'; });
   fanout.live = false;
+  refreshRescan();
   renderRail();
   scheduleFanoutClear();
   return job ? job : {err: sent.err};
@@ -692,11 +702,9 @@ async function doRemove(id){
 /* ── rescan: the server runs the sweep; the page locks and the rail shows
    the scan, then the found machines stagger back in ─────────────────────── */
 async function rescanNow(){
-  if (scanning || revealing) return;
+  if (scanning || revealing || netBusy()) return;
   scanning = true;
-  const b = $('rescan');
-  b.disabled = true;                 // native block: mouse, keyboard and focus
-  b.classList.add('scanning');       // held until the reveal settles
+  $('rescan').classList.add('scanning');   // held until the reveal settles
   render();
   try { await fetch('/setup/rescan', {method: 'POST'}); } catch (e) {}
   try { S = await (await fetch('/ui/setup')).json(); } catch (e) {}

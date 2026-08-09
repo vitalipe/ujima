@@ -710,7 +710,7 @@ async function rescanNow(){
   try { S = await (await fetch('/ui/setup')).json(); } catch (e) {}
   if (!byId(cur)) { cur = S.self; detailKey = ''; }
   scanning = false;
-  b.classList.remove('scanning');
+  $('rescan').classList.remove('scanning');
   reveal();
 }
 

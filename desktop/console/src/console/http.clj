@@ -17,6 +17,13 @@
 (defn- json [status body]
   {:status status :headers {"content-type" "application/json"} :body (edn->json body)})
 
+(defn- body-edn
+  "The request body as edn; a body that isn't JSON is the caller's fault, not a 500."
+  [req]
+  (try (json->edn (:body req))
+       (catch Exception _
+         (throw (ex-info "body must be JSON" {:error :request/malformed})))))
+
 
 (def ^:private content-types {"html" "text/html; charset=utf-8"
                               "css"  "text/css"
@@ -67,11 +74,11 @@
       (cond
         (and (= :post method) (circle/verb-routes parts))
         (let [verb (circle/verb-routes parts)
-              body (json->edn (:body req))]
+              body (body-edn req)]
           (json 202 {:job (circle/act! transport verb body)}))
 
         (and (= :post method) (= 2 (count parts)) (= "setup" (first parts)))
-        (or (setup-route transport (second parts) (json->edn (:body req)))
+        (or (setup-route transport (second parts) (body-edn req))
             (json 404 {:error "not found"}))
 
         (and (= :get method) (= ["ui" "circle"] parts))

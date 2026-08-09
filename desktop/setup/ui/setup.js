@@ -113,10 +113,14 @@ function glyphCls(m, extra){
 }
 
 /* ── server state ────────────────────────────────────────────────────────── */
+/* S is always null or a valid world — error payloads (degraded server) and
+   dead fetches both keep the last good frame, so render is always safe and
+   the rescan button (shipped disabled) unlocks only once machines exist */
 async function poll(){
   let s;
   try { s = await (await fetch('/ui/setup')).json(); }
   catch (e) { return; }                       // server gone — keep last frame
+  if (!s || !s.peers) return;                 // error payload — same discipline
   const first = S === null;
   S = s;
   if (!byId(cur)) { cur = S.self; detailKey = ''; }
@@ -709,12 +713,15 @@ async function doRemove(id){
 /* ── rescan: the server runs the sweep; the page locks and the rail shows
    the scan, then the found machines stagger back in ─────────────────────── */
 async function rescanNow(){
-  if (scanning || revealing || netBusy()) return;
+  if (!S || scanning || revealing || netBusy()) return;
   scanning = true;
   $('rescan').classList.add('scanning');   // held until the reveal settles
   render();
   try { await fetch('/setup/rescan', {method: 'POST'}); } catch (e) {}
-  try { S = await (await fetch('/ui/setup')).json(); } catch (e) {}
+  try {
+    const s = await (await fetch('/ui/setup')).json();
+    if (s && s.peers) S = s;               // degraded reply — keep last frame
+  } catch (e) {}
   if (!byId(cur)) { cur = S.self; detailKey = ''; }
   scanning = false;
   $('rescan').classList.remove('scanning');

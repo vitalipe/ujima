@@ -30,6 +30,15 @@
    `(timbre/debug ~message ~data)))
 
 
+(defn log!
+  "The fn form, for injection — lib takes a logger, not a require."
+  [level message data]
+  (case level
+    :error (timbre/error message data)
+    :warn  (timbre/warn  message data)
+    (timbre/info message data)))
+
+
 ;; <N> syslog-priority prefix: journald strips it and sets PRIORITY, so `journalctl -p` filters by level.
 (def ^:private level->syslog {:trace 7 :debug 7 :info 6 :warn 4 :error 3 :fatal 2 :report 5 :spy 7})
 

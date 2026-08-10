@@ -1,5 +1,5 @@
 #!/bin/sh
-# eww -> ujimad loopback API (ujima.desktop.http). Keeps curl/quoting out of yuck.
+# eww -> ujimad loopback API (lib.http edge). Keeps curl/quoting out of yuck.
 #   ujima-api GET  /api/audio                                # prints the response
 #   ujima-api POST /api/audio/mute '{"muted":true}' audio    # 4th arg: eww var updated with the response
 set -eu

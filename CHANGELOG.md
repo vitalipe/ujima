@@ -10,6 +10,9 @@ version truth; branch names and build labels may disagree.
 
 ### Added
 
+- The device API on :1337 can answer in edn: `?format=edn` on any data route
+  (JSON stays the default; files and streams are unaffected).
+
 - Ujima Circle App (dev-only, not wired yet): a fleet control panel for teachers —
   Runs against a file-backed mock fleet: `bb circle mock`
   serves it on :1338, `bb circle world` is a TUI that drives the mock world.

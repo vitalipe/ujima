@@ -1,8 +1,7 @@
 (ns ujima.desktop
   (:require [lib.shell :as shell]
             [ujima.log :as log]
-            [ujima.desktop.http :as http]
-            [ujima.desktop.eww  :as eww]))
+            [ujima.desktop.eww :as eww]))
 
 
 (def ^:private x-tries    60)   ; x 250ms = ~15s for X to accept an authorized connection
@@ -29,10 +28,9 @@
 
 
 (defn init!! [cfg]
-  
+
   (log/info "opening ujima shell" cfg)
-    
-  (http/init! (:http cfg))
+
   (launcher-init!  "/ujima/desktop/bin/ujima-launcher"
                     "http://127.0.0.1:1337/launcher/")
 

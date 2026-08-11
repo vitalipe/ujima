@@ -42,3 +42,4 @@ done
 echo
 echo "staged -> $out"
 echo "copy it into the repo, e.g.:  scp -r ujima@<this-pi>:$out  <repo>/os/pipeline/boot/initramfs/"
+echo "or from the host:  bb pin initramfs <this-pi>"

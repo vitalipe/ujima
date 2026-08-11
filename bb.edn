@@ -57,15 +57,10 @@
    :override-builtin true
    :task (shell "bb" "--config" "bb.repl.edn" "-e" "(require 'tools.repl) (tools.repl/start!)")}
 
-  schema
-  {:doc "Regenerate the pinned tz/xkb catalogs (src/schema/build) from a system root"
-   :requires ([build.schema :as schema])
-   :task (schema/generate! (or (first *command-line-args*) "/"))}
-
-  deps-pin
-  {:doc "Regenerate the pinned bb-deps manifest (os/build/deps-pin.edn) from :deps"
-   :requires ([build.deps :as deps])
-   :task (deps/pin!)}
+  pin
+  {:doc "Pin world-truth into the repo: bb pin <schema|deps|initramfs> …"
+   :requires ([tools.cmd.pin :as pin])
+   :task (apply pin/dispatch! *command-line-args*)}
 
   test:unit
   {:doc "Run unit tests"

@@ -1,5 +1,5 @@
 ;; The single deps site: what ujima's bb code needs beyond bb's built-ins.
 ;; Every config (bb.edn + the bb.*.edn task configs) pulls this via
-;; {ujima/deps {:local/root "."}}; `bb deps-pin` turns it into the committed
+;; {ujima/deps {:local/root "."}}; `bb pin deps` turns it into the committed
 ;; manifest the install stage bakes into the image (os/build/deps-pin.edn).
 {:deps {metosin/malli {:mvn/version "0.20.1"}}}

@@ -34,7 +34,7 @@
 ;; ssh transport (shared by push + script)
 ;; ---------------------------------------------------------------------------
 
-(defn- ssh-transport
+(defn ssh-transport
   "Derive the ssh wiring for a device from opts: the ssh option vector, the `-e` transport string
    rsync drives ssh through, and user@host. StrictHostKeyChecking off + throwaway known_hosts —
    these are dev boxes that get reflashed."
@@ -53,7 +53,7 @@
   (apply sh? :sshpass "-p" password "ssh" (concat ssh-opts [host cmd])))
 
 
-(defn- remote-exec!
+(defn remote-exec!
   "Run `cmd` (one shell string) on the device, streaming stdout/stderr live to the console
    (inherit). Throws on a nonzero remote exit, so a failed script surfaces loudly host-side."
   [{:keys [password ssh-opts host]} cmd]

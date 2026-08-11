@@ -5,7 +5,7 @@
     [babashka.fs :as fs]
 
     [lib.io :as io]
-    [e2e.runner :as e2e]
+    [integration.runner :as e2e]
 
     [lib.shell :refer [$! sh! install-remap!]]
     [ujima.linux.disk  :as disk]

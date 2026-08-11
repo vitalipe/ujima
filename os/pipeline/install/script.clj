@@ -4,7 +4,8 @@
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
-            [build.apps :as apps]))
+            [build.apps :as apps]
+            [build.deps :as deps]))
 
 
 (defn run! [{:keys [project]}]
@@ -75,4 +76,10 @@
     ;; copied + made executable in one shot
     ($! install -m "0755"
                 (str project "/os/build/vendor/bb-aarch64")
-                "/usr/local/bin/bb")))
+                "/usr/local/bin/bb")
+
+    ;; bb runtime libs (malli, …): sha-verified downloads into /ujima/m2 per the
+    ;; committed manifest (bb deps-pin) — plain HTTP, no resolver (that needs a JVM
+    ;; the image never carries). Like the packages above, a manifest change ships
+    ;; only after the vendor cache is rebuilt.
+    (deps/install! {:project project})))

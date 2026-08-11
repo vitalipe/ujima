@@ -6,7 +6,11 @@
 # exactly what they need and what a root boot service couldn't give. Privileged ops still
 # go through `sudo$` (ujima has NOPASSWD), so running as the user costs nothing.
 cd /ujima/ujimad
+# bb libs (malli, …) live in /ujima/m2 — baked by the install stage from the deps-pin
+# manifest. An explicit -cp = no resolution on-device (bb's resolver needs a JVM the
+# image doesn't carry); whatever jars are baked are on the path.
+CP="src$(find /ujima/m2 -name '*.jar' -printf ':%p' 2>/dev/null)"
 # NOT exec: when ujimad exits (crash/OOM), tear the session down with `i3-msg exit` so
 # systemd's Restart=always rebuilds it cold — no orphaned eww/app zombies, one startup path.
-bb -cp src -m ujima.ujimad
+bb -cp "$CP" -m ujima.ujimad
 i3-msg exit

@@ -12,6 +12,8 @@ version truth; branch names and build labels may disagree.
 
 - The device API on :1337 can answer in edn: `?format=edn` on any data route
   (JSON stays the default; files and streams are unaffected).
+- The image bakes ujima's bb libraries into `/ujima/m2` (pinned, sha-verified
+  at build); like packages, they never change on a live deploy.
 
 - Ujima Circle App (dev-only, not wired yet): a fleet control panel for teachers —
   Runs against a file-backed mock fleet: `bb circle mock`

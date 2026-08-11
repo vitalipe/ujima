@@ -1,0 +1,3 @@
+;; test:integration's config — runtime + the whole test tree. Deps from deps.edn.
+{:paths ["runtime/src" "runtime/test"]
+ :deps  {ujima/deps {:local/root "."}}}

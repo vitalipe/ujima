@@ -1,0 +1,3 @@
+;; the dev REPL's config — everything. Deps from deps.edn.
+{:paths ["runtime/src" "tools/src" "os" "runtime/test"]
+ :deps  {ujima/deps {:local/root "."}}}

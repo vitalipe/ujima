@@ -1,0 +1,4 @@
+;; test:unit's config — the isolation harness: runtime alone must load
+;; (no tools/, no desktop/ on the path). Deps come from deps.edn.
+{:paths ["runtime/src" "runtime/test/unit"]
+ :deps  {ujima/deps {:local/root "."}}}

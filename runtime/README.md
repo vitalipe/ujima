@@ -2,9 +2,12 @@
 
 The ujima core codebase — shared, not the daemon's private tree.
 
-- `src/lib/` — shared infrastructure (shell DSL, io, tasks, cli): the project's
-  standard library; everything else builds on it.
+- `src/lib/` — shared infrastructure (shell DSL, io, http edge, tasks, cli): the
+  project's standard library; everything else builds on it.
+- `src/schema/` — the data plane: settings vocabulary + pinned catalogs, pure
+  data (see its README).
 - `src/ujima/ujimad.clj` — the daemon entry point.
+- `src/ujima/api.clj` — the `/api` tier of the machine edge.
 - `src/ujima/linux/` — linux glue.
 - `src/ujima/device/` — device + A/B install.
 - `src/ujima/control/` — the control plane.

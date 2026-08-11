@@ -40,8 +40,9 @@
                 ;; it reverts only on reboot
                 :default nil
                 :scopes  #{:device}
+                ;; anchored: malli's :re is re-find, not re-matches
                 :shape   [:re {:error/message "hostname must be 1-16 letters, numbers or dashes"}
-                          #"[A-Za-z0-9-]{1,16}"]}
+                          #"^[A-Za-z0-9-]{1,16}$"]}
 
                {:key     [:system :timezone]
                 :doc     "IANA timezone (tzdata name)"

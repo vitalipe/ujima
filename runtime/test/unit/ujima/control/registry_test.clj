@@ -1,10 +1,10 @@
 (ns ujima.control.registry-test
   (:require [clojure.test :refer [deftest is]]
             [ujima.control.registry :as registry]
-            [ujima.control.defs :as defs]))
+            [schema.ujima.settings :as defs]))
 
 
-;; Self-contained fixture (deliberately independent of defs.clj). Keys are path vectors,
+;; Self-contained fixture (deliberately independent of schema.ujima.settings). Keys are path vectors,
 ;; the system's key shape. Includes a falsy default ([:a :muted] false) and a multi-scope
 ;; setting ([:a :all]) to cover the regressions this logic hit during development.
 (def schema
@@ -129,7 +129,7 @@
 
 
 ;; ---------------------------------------------------------------------------
-;; real schema invariant (guards typos in defs.clj)
+;; real schema invariant (guards typos in schema.ujima.settings)
 ;; ---------------------------------------------------------------------------
 
 (deftest defs-schema-is-internally-consistent

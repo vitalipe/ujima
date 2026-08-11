@@ -3,7 +3,7 @@
             [clojure.edn :as edn]
             [babashka.fs :as fs]
             [ujima.control :as control]
-            [ujima.control.defs :as defs]))
+            [schema.ujima.settings :as defs]))
 
 
 ;; Full control-plane loop against real temp files. Control is a pure settings

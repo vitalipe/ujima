@@ -10,7 +10,8 @@
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
-            [babashka.fs :as fs]))
+            [babashka.fs :as fs]
+            [build.schema :as schema]))
 
 
 (defn run! [{:keys [project]}]
@@ -22,4 +23,7 @@
       ;; ujimad.local.edn survives pushes
       ($! rm -rf (str dst "/src"))
       ($! cp -a (str project "/runtime/src")              (str dst "/"))
-      ($! cp -a (str project "/runtime/config/ujimad.edn") (str dst "/config/")))))
+      ($! cp -a (str project "/runtime/config/ujimad.edn") (str dst "/config/"))
+
+      ;; the catalogs gate: this rootfs must match the pinned tz/xkb lists exactly
+      (println "catalogs" (schema/verify! "/")))))

@@ -8,7 +8,7 @@
 
             [lib.io    :as io]
             [ujima.log :as log]
-            [ujima.control.defs     :as defs]
+            [schema.ujima.settings        :as defs]
             [ujima.control.registry :refer [->registry
                                             effective-value
                                             default-settings

@@ -17,10 +17,10 @@
 
    A handler is (fn [req]) and answers with data {:status n :body <edn>}, a raw
    ring response (files, streams — passed through untouched), or nil for a
-   404. The request arrives parsed: :body is the decoded json (POST only, the
-   raw stream is gone), :query is the query string as a map, and :format is
-   the wire form the caller asked for. Data renders as json, ?format=edn for
-   the edn wire (the console transport asks for it).
+   404. The request arrives parsed: :body is the decoded json (for the methods
+   that carry one — the raw stream is gone), :query is the query string as a
+   map, and :format is the wire form the caller asked for. Data renders as
+   json, ?format=edn for the edn wire (the console transport asks for it).
 
    Failures are ex-info {:error kw} mapped by the module's OWN :errors — a
    keyword one module knows is not a status for another module's throw. An
@@ -34,6 +34,9 @@
 
 ;; transport-level vocabulary; every module gets it for free
 (def ^:private base-errors {:request/malformed 400})
+
+;; DELETE may legally carry one but its meaning is unsettled — say so if we ever want it
+(def ^:private body-methods #{:post :put :patch})
 
 (defn- println-log [level message data]
   (println (str "[" (name level) "] " message) data))
@@ -57,7 +60,7 @@
     (assoc req
            :format (if (= "edn" (:format query)) :edn :json)
            :query  (dissoc query :format)
-           :body   (when (= :post (:request-method req)) (json->edn (:body req))))))
+           :body   (when (body-methods (:request-method req)) (json->edn (:body req))))))
 
 
 ;; --- the response --------------------------------------------------------

@@ -25,7 +25,7 @@
 
   (let [env         (io/slurp-config "config" "ujimad")
         app-catalog (app/load-catalog (get-in env [:desktop :app :catalog]))
-        http-cfg    (get-in env [:desktop :http] {})]
+        http-cfg    (get-in env [:http] {})]
 
 
     (shell/install-remap! (get-in env [:shell :commands] {}))

@@ -8,7 +8,9 @@
               through the catalog, not a verb)
    and the launcher statics — served from here (not file://) so the webview is
    same-origin with the app API and its click POSTs need no CORS. The static
-   routes ARE the whitelist; \"../\" is refused inside the tail."
+   routes ARE the whitelist, and the shell tree is the only thing served: a
+   path is checked for containment after resolution, so \"..\" and a symlink
+   leading out of it are refused alike."
   (:require [clojure.string  :as str]
             [clojure.java.io :as io]
             [ujima.desktop.app      :as app]
@@ -25,26 +27,22 @@
 
 ;; --- file serving: statics + the app icon --------------------------------
 
-(defn- static-file
-  "TAIL under `static-root`, joined back onto the route's own prefix. The
-   router hands the tail through verbatim, so \"..\" is ours to refuse; an
-   empty tail is the directory's index.html."
-  [prefix tail]
-  (let [tail (if (str/blank? tail) "index.html" tail)]
-    (when-not (some #{".."} (str/split tail #"/"))
-      (let [f   (io/file static-root (str prefix "/" tail))
-            ext (some-> (re-find #"\.([^.]+)$" (.getName f)) second str/lower-case)]
-        (when (.isFile f)
-          {:status 200
-           :headers {"content-type" (get content-types ext "application/octet-stream")}
-           :body f})))))
-
-(defn- static-root-file [name]
-  (let [f (io/file static-root name)]
-    (when (.isFile f)
+(defn- serve
+  "A file from the shell tree, or nil. Containment is checked on the RESOLVED
+   path — this tree is the only thing we ever serve — so \"..\", a symlink out
+   of it, and anything else that leaves fail the same way."
+  [f]
+  (let [root (str (.getCanonicalPath (io/file static-root)) "/")
+        ext  (some-> (re-find #"\.([^.]+)$" (.getName f)) second str/lower-case)]
+    (when (and (.isFile f) (str/starts-with? (.getCanonicalPath f) root))
       {:status 200
-       :headers {"content-type" (get content-types (subs name (inc (str/index-of name "."))))}
+       :headers {"content-type" (get content-types ext "application/octet-stream")}
        :body f})))
+
+(defn- static-file
+  "TAIL under the route's own directory; an empty tail is its index.html."
+  [dir tail]
+  (serve (io/file static-root dir (if (str/blank? tail) "index.html" tail))))
 
 (defn- icon-file
   "GET /app/icon/<id> -> the catalog-resolved icon, so the launcher never
@@ -82,5 +80,5 @@
 
     "GET  /launcher/**"  (fn [{[tail] :path-params}] (static-file "launcher" tail))
     "GET  /icons/**"     (fn [{[tail] :path-params}] (static-file "icons" tail))
-    "GET  /wall.png"     (fn [_] (static-root-file "wall.png"))
-    "GET  /wall.svg"     (fn [_] (static-root-file "wall.svg"))}})
+    "GET  /wall.png"     (fn [_] (serve (io/file static-root "wall.png")))
+    "GET  /wall.svg"     (fn [_] (serve (io/file static-root "wall.svg")))}})

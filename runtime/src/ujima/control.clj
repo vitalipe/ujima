@@ -94,12 +94,13 @@
                        default))))))
 
 
-(defn settings-records
-  "`settings` with the story behind each value: what it is, the scope it came
-   from (:default when none sets it), the default, and every scope allowed to
-   set it holding what that scope holds now (nil = unset — the allowed keys
-   double as the write whitelist). One pass over the scope files, so the whole
-   map is one snapshot. Same read-only, unlocked terms as `settings`."
+(defn settings-records-tree
+  "`settings` as a tree, each leaf the story behind its value: what it is, the
+   scope it came from (:default when none sets it), the default, and every
+   scope allowed to set it holding what that scope holds now (nil = unset — the
+   allowed keys double as the write whitelist). Path keys become the nesting,
+   so the tree is addressable. One pass over the scope files, so it is one
+   snapshot. Same read-only, unlocked terms as `settings`."
   []
   (let [registry    @registry*
         scope-keys  (scopes registry)
@@ -107,15 +108,17 @@
         by-scope    (zipmap scope-keys (map :settings scopes-data))
         allowed     (zipmap scope-keys (map (partial scope->allowed-settings registry) scope-keys))]
 
-    (->> (default-settings registry)
-      (map-kv-vals
-        (fn [key default]
-          (let [via (effective-scope scope-keys scopes-data key)]
+    (reduce-kv
+      (fn [tree key default]
+        (let [via (effective-scope scope-keys scopes-data key)]
+          (assoc-in tree key
             {:effective (if via (get-in by-scope [via key]) default)
              :via       (or via :default)
              :default   default
              :scopes    (into {} (for [scope scope-keys :when (contains? (allowed scope) key)]
-                                   [scope (get-in by-scope [scope key])]))}))))))
+                                   [scope (get-in by-scope [scope key])]))})))
+      {}
+      (default-settings registry))))
 
 
 (defn update-settings!

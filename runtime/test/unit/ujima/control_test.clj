@@ -103,20 +103,23 @@
   (fresh!)
   (control/settings! :session  [:keyboard :layout] "tz")
   (control/settings! :activity [:keyboard :layout] "il")
-  (let [recs (control/settings-records)]
+  (let [tree (control/settings-records-tree)]
     (is (= {:effective "il" :via :activity :default "us"
             :scopes {:device nil :session "tz" :activity "il"}}
-           (get recs [:keyboard :layout]))
+           (get-in tree [:keyboard :layout]))
         "the winner, why it won, what it falls back to, and what each scope holds")
-    (is (= {:device nil} (:scopes (get recs [:system :hostname])))
+    (is (= {:device nil} (:scopes (get-in tree [:system :hostname])))
         "only the scopes the def allows — the keys are the write whitelist")
-    (is (= :default (:via (get recs [:audio :muted]))) "nothing set = the default stands")))
+    (is (= :default (:via (get-in tree [:audio :muted]))) "nothing set = the default stands")
+    (is (= #{:active :muted :usb :hdmi} (set (keys (:audio tree))))
+        "a path key nests — [:audio :usb :volume] is three levels, not one")))
 
 
 (deftest records-and-settings-cannot-disagree
   (fresh!)
   (control/settings! :device   [:audio :usb :volume] 85)
   (control/settings! :activity [:audio :muted]       true)
-  (let [flat (control/settings)]
-    (is (= flat (update-vals (control/settings-records) :effective))
+  (let [flat (control/settings)
+        tree (control/settings-records-tree)]
+    (is (= flat (into {} (map (fn [[key _]] [key (:effective (get-in tree key))])) flat))
         "one merge, two renders")))

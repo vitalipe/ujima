@@ -1,29 +1,75 @@
 (ns ujima.api
-  "The /api tier of the machine edge (lib.http tries it): the core resource
-   API over control — the stable(ish) surface agents and remote ops consume.
-   Transport only: parse, run at most ONE command, respond with a query —
-   writes answer with the fresh resource, as data (the edge owns the wire
-   form). The v1 query/commands families grow here."
-  (:require [ujima.control.commands :as commands]
-            [ujima.control.queries  :as queries]))
+  "The /api tier — real wherever a reader exists, canned where none does yet:
+   settings, the v1 verbs, and every machine node with something behind it.
+
+     GET  /api/query/machine/**   a node per source; some still canned
+     GET  /api/query/settings/**  one node — control's records, live
+     POST /api/commands/…         the contract's verbs, gated and real
+
+   Routes are a plain data map — the router sorts by specificity, so an
+   unmatched path is the edge's 404 rather than anything of ours."
+  (:require [ujima.api.routes       :as routes]
+            [ujima.control          :as control]
+            [ujima.control.queries  :as queries]
+            [ujima.control.commands :as effects]
+            [ujima.desktop.app      :as desktop]
+            [ujima.linux.system     :as system]
+            [schema.ujima.api       :as contract]))
 
 
-;; this tier's ex-info vocabulary -> status, merged into the edge at init
-(def error-status
-  {:audio/no-output         409
-   :keyboard/unknown-layout 409})
+;; ── the routes ──────────────────────────────────────────────────────────────
 
 
-(defn handler [req parts body]
-  (case [(:request-method req) parts]
-    [:get  ["api" "audio"]]                     {:status 200 :body (queries/audio-status)}
-    [:get  ["api" "input" "keyboard"]]          {:status 200 :body (queries/keyboard-status)}
-    [:post ["api" "audio" "volume"]]            (do (commands/change-current-volume! (:value body))
-                                                    {:status 200 :body (queries/audio-status)})
-    [:post ["api" "audio" "mute"]]              (do (commands/change-mute! (:muted body))
-                                                    {:status 200 :body (queries/audio-status)})
-    [:post ["api" "audio" "output"]]            (do (commands/change-active-output! (:output body))
-                                                    {:status 200 :body (queries/audio-status)})
-    [:post ["api" "input" "keyboard" "layout"]] (do (commands/change-keyboard-layout! (:layout body))
-                                                    {:status 200 :body (queries/keyboard-status)})
-    nil))
+(def ^:private commands
+  {"desktop/:scope/audio/volume"    {:handler (fn [{:keys [scope value]}]  (effects/change-current-volume! value scope))}
+   "desktop/:scope/audio/mute"      {:handler (fn [{:keys [scope muted]}]  (effects/change-mute! muted scope))}
+   "desktop/:scope/audio/output"    {:handler (fn [{:keys [scope output]}] (effects/change-active-output! output scope))}
+   "desktop/:scope/keyboard/layout" {:handler (fn [{:keys [scope layout]}] (effects/change-keyboard-layout! layout scope))}
+
+   "desktop/open-app"  {:handler (fn [{:keys [app]}] (desktop/run! (keyword app)))}
+   "desktop/close-app" {:handler (fn [_]             (desktop/close-focused!))}
+   "desktop/open-url"  {:handler (fn [{:keys [url]}] (desktop/open-url! url))}
+   "system/restart"    {:handler (fn [_]             (system/reboot!))}
+   "system/poweroff"   {:handler (fn [_]             (system/shutdown!))}})
+
+
+(def endpoints
+  {:errors contract/errors
+   :routes
+   (merge
+   (routes/commands
+    {:base     "commands"
+     :commands (merge-with merge contract/commands commands)})
+
+   (routes/queries
+    {:base  "query/machine"
+     :nodes {[:schema]  (constantly 1)
+             [:id]      (constantly "mock-00000001")
+             [:device]  (constantly {:serial "10000000deadbeef"
+                                     :model  "Raspberry Pi 500 Rev 1.0"})
+             [:image]   (constantly {:version "0.9.0"})
+             [:disk]    (constantly {:type     :ab
+                                     :slot     :a
+                                     :storage  {:total-mb 28000 :free-mb 21500}
+                                     :settings {:total-mb 256   :free-mb 249}})
+             [:apps]    desktop/catalog-listing
+
+             [:desktop :locked]  (constantly false)
+             [:desktop :running] #(:current (desktop/current-apps-state))
+             [:desktop :catalog] desktop/catalog-listing
+
+             [:audio]    queries/audio-status
+             [:keyboard] queries/keyboard-status
+             [:net]      (constantly {:ip "192.168.1.196"})
+
+             [:system :hostname] system/hostname
+             [:system :timezone] system/timezone
+             [:system :clock-ms] #(System/currentTimeMillis)
+
+             [:monitor :uptime-minutes] (constantly 42)
+             [:monitor :messages]       (constantly [])}})
+
+   (routes/queries
+    {:base  "query"
+     :nodes {[:settings] control/settings-records-tree}}))})
+

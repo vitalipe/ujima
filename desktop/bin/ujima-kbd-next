@@ -8,4 +8,4 @@ next=$(curl -sf --max-time 2 http://127.0.0.1:1337/ui/keyboard/layout/next \
        | sed -n 's/.*"next":"\([^"]*\)".*/\1/p')
 [ -n "$next" ] || exit 0   # no layouts configured -> nothing to cycle
 exec curl -sf --max-time 3 -o /dev/null -X POST \
-     -d "{\"layout\": \"$next\"}" http://127.0.0.1:1337/api/input/keyboard/layout
+     -d "{\"layout\": \"$next\"}" http://127.0.0.1:1337/api/commands/desktop/session/keyboard/layout

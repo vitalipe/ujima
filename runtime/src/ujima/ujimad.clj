@@ -42,7 +42,8 @@
 
     ;; the machine edge: ujimad composes the tiers, the edge knows neither's vocabulary
     (http/listen! (merge http-cfg
-                         {:endpoints {"" shell-http/endpoints}   ; "api" mounts when that module lands
+                         {:endpoints {"api" api/endpoints
+                                      ""    shell-http/endpoints}
                           :log       log/log!}))
 
     (try

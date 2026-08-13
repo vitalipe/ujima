@@ -121,7 +121,7 @@
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
       ; the label flips when the push lands
       (button :class "kbd" :timeout "2s"
-        :onclick "ujima-api POST /api/input/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
+        :onclick "ujima-api POST /api/commands/desktop/session/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
         (label :text {state.keyboard.layout}))
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
         (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 19 :image-height 19))
@@ -145,7 +145,7 @@
            :value {vol < 0 ? (state.audio.volume ?: 0) : vol}
            :onchange "${ewwcmd} update vol={} ; ujima-api POST /ui/volume/move '{\"value\": {}}' >/dev/null")
     (button :class "volmute" :timeout "2s"
-      :onclick "ujima-api POST /api/audio/mute '{\"muted\": ${!state.audio.muted}}' >/dev/null"
+      :onclick "ujima-api POST /api/commands/desktop/session/audio/mute '{\"muted\": ${!state.audio.muted}}' >/dev/null"
       (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 22 :image-height 22))))
 
 

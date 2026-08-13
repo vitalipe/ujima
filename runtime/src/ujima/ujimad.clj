@@ -42,9 +42,8 @@
 
     ;; the machine edge: ujimad composes the tiers, the edge knows neither's vocabulary
     (http/listen! (merge http-cfg
-                         {:handlers [api/handler (shell-http/handler http-cfg)]
-                          :errors   (merge api/error-status shell-http/error-status)
-                          :log      log/log!}))
+                         {:endpoints {"" shell-http/endpoints}   ; "api" mounts when that module lands
+                          :log       log/log!}))
 
     (try
       (desktop/init!! (get-in env [:desktop] {}))

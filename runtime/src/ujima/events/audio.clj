@@ -33,4 +33,4 @@
   (let [current (get (control/settings) [:audio :active])
         active  (pick-active before classes current)]
     (log/info "audio devices changed" {:present classes :active active})
-    (commands/change-active-output! active)))
+    (commands/change-active-output! active :session)))

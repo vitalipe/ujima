@@ -21,7 +21,7 @@
 (defonce ^:private change-volume-throttled!
   (throttle-leading-trailing 250
     (fn [value]
-      (try (commands/change-current-volume! value)
+      (try (commands/change-current-volume! value :session)
            (catch Exception e
              (log/warn "volume move dropped" {:value value :error (ex-message e)}))))))
 

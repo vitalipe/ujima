@@ -25,7 +25,7 @@
   ;; must still happen (its converge re-applies state onto the new device)
   (let [written (atom [])]
     (with-redefs [control/settings              (constantly {[:audio :active] :usb})
-                  commands/change-active-output! (fn [v] (swap! written conj v) {:output v})]
+                  commands/change-active-output! (fn [v _scope] (swap! written conj v) {:output v})]
       (events-audio/on-sinks-changed! {:before #{:usb} :classes #{:usb}})
       (events-audio/on-sinks-changed! {:before #{:usb} :classes #{:usb :hdmi}}))
     (is (= [:usb :hdmi] @written)

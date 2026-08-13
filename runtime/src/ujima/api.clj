@@ -62,8 +62,8 @@
              [:keyboard] queries/keyboard-status
              [:net]      (constantly {:ip "192.168.1.196"})
 
-             [:system :hostname] system/hostname
-             [:system :timezone] system/timezone
+             [:system :hostname] #(get (control/settings) [:system :hostname])
+             [:system :timezone] #(get (control/settings) [:system :timezone])
              [:system :clock-ms] #(System/currentTimeMillis)
 
              [:monitor :uptime-minutes] (constantly 42)

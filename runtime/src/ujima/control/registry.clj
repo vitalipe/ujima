@@ -32,13 +32,20 @@
   (map :key scopes))
 
 
-(defn effective-value [_registry scopes-data key]
+(defn effective-value [scopes-data key]
   ;; Note: use complete scopes, so when we add policy we don't change params
   (->> scopes-data
     (map :settings)
     (map #(get % key)) ;; keys are path vectors, not IFn-able keywords
     (remove nil?)
     (last))) ;; for now we always :merge :override
+
+
+(defn effective-scope [scope-keys scopes-data key]
+  (->> (map vector scope-keys scopes-data)
+    (filter (fn [[_ {settings :settings}]] (some? (get settings key))))
+    (last)
+    (first)))
 
 
 (defn update-settings-in-scope [registry scope f scope-data]

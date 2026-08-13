@@ -11,7 +11,9 @@
             [schema.ujima.settings        :as defs]
             [ujima.control.registry :refer [->registry
                                             effective-value
+                                            effective-scope
                                             default-settings
+                                            scope->allowed-settings
                                             update-settings-in-scope
                                             scopes]]))
 
@@ -81,14 +83,39 @@
    fine for advisory reads. Do NOT read-then-write off this value outside the
    lock; use `update-settings!` for read-modify-write."
   []
-  (let [all-scopes         (map slurp-scope (scopes @registry*))
-        setting->effective (partial effective-value @registry* all-scopes)]
-        
-    (->> (default-settings @registry*)
+  (let [registry           @registry*
+        all-scopes         (map slurp-scope (scopes registry))
+        setting->effective (partial effective-value all-scopes)]
+
+    (->> (default-settings registry)
       (map-kv-vals (fn [k default] 
                      (if-some [effective (setting->effective k)]
                        effective
                        default))))))
+
+
+(defn settings-records
+  "`settings` with the story behind each value: what it is, the scope it came
+   from (:default when none sets it), the default, and every scope allowed to
+   set it holding what that scope holds now (nil = unset — the allowed keys
+   double as the write whitelist). One pass over the scope files, so the whole
+   map is one snapshot. Same read-only, unlocked terms as `settings`."
+  []
+  (let [registry    @registry*
+        scope-keys  (scopes registry)
+        scopes-data (mapv slurp-scope scope-keys)
+        by-scope    (zipmap scope-keys (map :settings scopes-data))
+        allowed     (zipmap scope-keys (map (partial scope->allowed-settings registry) scope-keys))]
+
+    (->> (default-settings registry)
+      (map-kv-vals
+        (fn [key default]
+          (let [via (effective-scope scope-keys scopes-data key)]
+            {:effective (if via (get-in by-scope [via key]) default)
+             :via       (or via :default)
+             :default   default
+             :scopes    (into {} (for [scope scope-keys :when (contains? (allowed scope) key)]
+                                   [scope (get-in by-scope [scope key])]))}))))))
 
 
 (defn update-settings!

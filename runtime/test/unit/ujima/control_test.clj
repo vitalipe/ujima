@@ -97,3 +97,26 @@
     (is (= 85 (get (control/settings) [:audio :hdmi :volume])) "throwing target didn't break the write")
     (control/converge-fresh!)
     (is (= [[85 70] [85 nil]] @seen) "external converge: prv nil = assume nothing")))
+
+
+(deftest records-carry-the-story-behind-the-value
+  (fresh!)
+  (control/settings! :session  [:keyboard :layout] "tz")
+  (control/settings! :activity [:keyboard :layout] "il")
+  (let [recs (control/settings-records)]
+    (is (= {:effective "il" :via :activity :default "us"
+            :scopes {:device nil :session "tz" :activity "il"}}
+           (get recs [:keyboard :layout]))
+        "the winner, why it won, what it falls back to, and what each scope holds")
+    (is (= {:device nil} (:scopes (get recs [:system :hostname])))
+        "only the scopes the def allows — the keys are the write whitelist")
+    (is (= :default (:via (get recs [:audio :muted]))) "nothing set = the default stands")))
+
+
+(deftest records-and-settings-cannot-disagree
+  (fresh!)
+  (control/settings! :device   [:audio :usb :volume] 85)
+  (control/settings! :activity [:audio :muted]       true)
+  (let [flat (control/settings)]
+    (is (= flat (update-vals (control/settings-records) :effective))
+        "one merge, two renders")))

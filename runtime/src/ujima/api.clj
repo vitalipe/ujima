@@ -37,39 +37,39 @@
   {:errors contract/errors
    :routes
    (merge
-   (routes/commands
-    {:base     "commands"
-     :commands (merge-with merge contract/commands commands)})
+     (routes/commands
+      {:base     "commands"
+       :commands (merge-with merge contract/commands commands)})
 
-   (routes/queries
-    {:base  "query/machine"
-     :nodes {[:schema]  (constantly 1)
-             [:id]      (constantly "mock-00000001")
-             [:device]  (constantly {:serial "10000000deadbeef"
-                                     :model  "Raspberry Pi 500 Rev 1.0"})
-             [:image]   (constantly {:version "0.9.0"})
-             [:disk]    (constantly {:type     :ab
-                                     :slot     :a
-                                     :storage  {:total-mb 28000 :free-mb 21500}
-                                     :settings {:total-mb 256   :free-mb 249}})
-             [:apps]    desktop/catalog-listing
+     (routes/queries
+      {:base  "query/machine"
+       :nodes {[:schema]  (constantly 1)
+               [:id]      (constantly "mock-00000001")
+               [:device]  (constantly {:serial "10000000deadbeef"
+                                       :model  "Raspberry Pi 500 Rev 1.0"})
+               [:image]   (constantly {:version "0.9.0"})
+               [:disk]    (constantly {:type     :ab
+                                       :slot     :a
+                                       :storage  {:total-mb 28000 :free-mb 21500}
+                                       :settings {:total-mb 256   :free-mb 249}})
+               [:apps]    desktop/catalog-listing
 
-             [:desktop :locked]  (constantly false)
-             [:desktop :running] #(:current (desktop/current-apps-state))
-             [:desktop :catalog] desktop/catalog-listing
+               [:desktop :locked]  (constantly false)
+               [:desktop :running] #(:current (desktop/current-apps-state))
+               [:desktop :catalog] desktop/catalog-listing
 
-             [:audio]    queries/audio-status
-             [:keyboard] queries/keyboard-status
-             [:net]      (constantly {:ip "192.168.1.196"})
+               [:audio]    queries/audio-status
+               [:keyboard] queries/keyboard-status
+               [:net]      (constantly {:ip "192.168.1.196"})
 
-             [:system :hostname] #(get (control/settings) [:system :hostname])
-             [:system :timezone] #(get (control/settings) [:system :timezone])
-             [:system :clock-ms] #(System/currentTimeMillis)
+               [:system :hostname] #(get (control/settings) [:system :hostname])
+               [:system :timezone] #(get (control/settings) [:system :timezone])
+               [:system :clock-ms] #(System/currentTimeMillis)
 
-             [:monitor :uptime-minutes] (constantly 42)
-             [:monitor :messages]       (constantly [])}})
+               [:monitor :uptime-minutes] (constantly 42)
+               [:monitor :messages]       (constantly [])}})
 
-   (routes/queries
-    {:base  "query"
-     :nodes {[:settings] control/settings-records-tree}}))})
+     (routes/queries
+      {:base  "query"
+       :nodes {[:settings] control/settings-records-tree}}))})
 

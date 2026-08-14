@@ -23,7 +23,13 @@
 (def machine
   (let [app-entry       [:map [:id :keyword] [:label [:maybe :string]]]
         desktop-entry   [:map [:id :keyword] [:label [:maybe :string]] [:category [:maybe :keyword]]]
-        partition-space [:map [:total-mb :int] [:free-mb :int]]]
+        partition-space [:map [:total-mb :int] [:free-mb :int]]
+        interface       [:map [:up :boolean]
+                              [:ip [:maybe :string]]
+                              [:prefix [:maybe :int]]
+                              [:mac [:maybe :string]]
+                              [:gateway [:maybe :string]]
+                              [:dhcp :boolean]]]
 
     [:map
      [:schema   [:= 1]]
@@ -40,7 +46,8 @@
                       [:catalog [:vector desktop-entry]]]]
      [:audio    audio]
      [:keyboard [:map [:layout :string] [:layouts [:vector :string]]]]
-     [:net      [:map [:ip [:maybe :string]]]]
+     [:net      [:map [:ip [:maybe :string]]
+                      [:interfaces [:map-of :keyword interface]]]]
      [:system   [:map [:hostname [:maybe :string]]
                       [:timezone [:maybe :string]]
                       [:clock-ms :int]]]

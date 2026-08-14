@@ -23,6 +23,7 @@
 
             [ujima.linux.audio-test]
             [ujima.linux.i3-test]
+            [ujima.linux.net-test]
             [ujima.linux.systemd-test]
             [lib.http-test]
             [ujima.desktop.http-test]
@@ -58,6 +59,7 @@
 
     ujima.linux.audio-test
     ujima.linux.i3-test
+    ujima.linux.net-test
     ujima.linux.systemd-test
     lib.http-test
     ujima.desktop.http-test

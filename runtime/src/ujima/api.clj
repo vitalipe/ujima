@@ -9,6 +9,7 @@
             [ujima.desktop.app      :as desktop]
             [ujima.linux.devicetree :as devicetree]
             [ujima.linux.disk       :as disk]
+            [ujima.linux.net        :as net]
             [ujima.linux.system     :as system]))
 
 
@@ -100,7 +101,9 @@
 
                "audio"    queries/audio-status
                "keyboard" queries/keyboard-status
-               "net"      (constantly {:ip "192.168.1.196"})
+               "net"      (fn [] (let [facts (net/interface-facts)]
+                                   {:ip         (net/lan-ip facts)
+                                    :interfaces facts}))
 
                "system/hostname" #(get (control/settings) [:system :hostname])
                "system/timezone" #(get (control/settings) [:system :timezone])

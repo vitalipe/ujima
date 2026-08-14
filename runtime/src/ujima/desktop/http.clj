@@ -9,7 +9,7 @@
 
 ;; --- what this module serves ---------------------------------------------
 
-(def endpoints
+(defn endpoints [{:keys [static-root]}]
   {:errors {:app/unknown-app 404
             :app/bad-url     400}
 
@@ -26,7 +26,7 @@
     "GET  /app/catalog"  (fn [_] {:status 200 :body {:apps (app/catalog-listing)}})
     "GET  /app/icon/*"   (fn [{[id] :path-params}] (files/icon-file id))
 
-    "GET  /launcher/**"  (fn [{[tail] :path-params}] (files/static-file "launcher" tail))
-    "GET  /icons/**"     (fn [{[tail] :path-params}] (files/static-file "icons" tail))
-    "GET  /wall.png"     (fn [_] (files/wall "wall.png"))
-    "GET  /wall.svg"     (fn [_] (files/wall "wall.svg"))}})
+    "GET  /launcher/**"  (fn [{[tail] :path-params}] (files/static-file static-root "launcher" tail))
+    "GET  /icons/**"     (fn [{[tail] :path-params}] (files/static-file static-root "icons" tail))
+    "GET  /wall.png"     (fn [_] (files/wall static-root "wall.png"))
+    "GET  /wall.svg"     (fn [_] (files/wall static-root "wall.svg"))}})

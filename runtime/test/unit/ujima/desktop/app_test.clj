@@ -28,7 +28,7 @@
 
 (def ^:private test-catalog
   (let [root (scan-root! catalog-apps)
-        c    (app/load-catalog [root])]
+        c    (app/load-catalog [root] "fallback-launcher.svg")]
     (fs/delete-tree root)
     c))
 
@@ -92,7 +92,7 @@
     (fs/create-dirs (fs/path root "payload-only"))            ; no app.edn -> not an app
     (spit (str (fs/path root "stray.txt")) "not a dir")
     (spit (str (fs/path root "alpha" "icon.svg")) "<svg/>")   ; alpha owns its face
-    (let [c (app/load-catalog [root])]
+    (let [c (app/load-catalog [root] "fallback-launcher.svg")]
       (is (= [:alpha :mango :zebra] (:order c)) "dir name = id, abc = launcher order")
       (is (= "A" (get-in c [:by-id :alpha :label])))
       (is (= (str (fs/path root "alpha" "icon.svg")) (get-in c [:by-id :alpha :icon]))
@@ -107,12 +107,12 @@
     (spit (str (fs/path root "garbage" "app.edn")) "{:label \"oops\"")     ; truncated edn
     (fs/create-dirs (fs/path root "specless"))
     (spit (str (fs/path root "specless" "app.edn")) (pr-str {:label "NoExec"}))
-    (let [c (app/load-catalog [root])]
+    (let [c (app/load-catalog [root] "fallback-launcher.svg")]
       (is (= [:good] (:order c)) "bad apps skipped loudly; the rest boot"))
     (fs/delete-tree root)))
 
 (deftest scan-missing-root-is-an-empty-catalog
-  (let [c (app/load-catalog ["/nope/missing"])]
+  (let [c (app/load-catalog ["/nope/missing"] "fallback-launcher.svg")]
     (is (= [] (:order c)) "no app content can stop the session")))
 
 (deftest scan-merges-roots-later-wins-position-stable
@@ -120,7 +120,7 @@
                            "web"   {:label "Web"   :exec ["w"]}})
         extra (scan-root! {"paint" {:label "Paint v2" :exec ["p2"]}
                            "amp"   {:label "Amp"   :exec ["a"]}})]
-    (let [c (app/load-catalog [base extra])]
+    (let [c (app/load-catalog [base extra] "fallback-launcher.svg")]
       (is (= [:amp :paint :web] (:order c)) "union, abc on id — an override keeps its position")
       (is (= "Paint v2" (get-in c [:by-id :paint :label])) "later root wins on :id")
       (is (= ["p2"] (get-in c [:by-id :paint :exec]))))
@@ -129,7 +129,7 @@
 
 (deftest scan-missing-second-root-is-not-fatal
   (let [base (scan-root! {"paint" {:label "Paint" :exec ["p"]}})]
-    (let [c (app/load-catalog [base "/mnt/nope/apps"])]
+    (let [c (app/load-catalog [base "/mnt/nope/apps"] "fallback-launcher.svg")]
       (is (= [:paint] (:order c)) "fresh storage = normal, baked apps unaffected"))
     (fs/delete-tree base)))
 
@@ -155,7 +155,7 @@
     (fs/create-dirs (fs/path root "payload"))                 ; relative argv[0] present -> in
     (spit (str (fs/path root "payload" "app.edn")) (pr-str {:label "P" :exec ["./run.sh"]}))
     (spit (str (fs/path root "payload" "run.sh")) "#!/bin/sh\n")
-    (let [c (app/load-catalog [root])]
+    (let [c (app/load-catalog [root] "fallback-launcher.svg")]
       (is (= [:board :lib :payload] (:order c)) "broken/unknown skipped, valid kinds in")
       (is (= "ujima-lib"   (get-in c [:by-id :lib :class]))   "link derives its class")
       (is (= "ujima-board" (get-in c [:by-id :board :class])) "web-app derives its class")
@@ -163,16 +163,17 @@
     (fs/delete-tree root)))
 
 (deftest app->runnable-computes-argv-per-kind
-  (is (= ["tuxpaint" "--nolockfile"]
-         (app/app->runnable {:kind :exec :exec ["tuxpaint" "--nolockfile"] :dir "/x"})))
-  (is (= ["tuxpaint"] (app/app->runnable {:exec ["tuxpaint"] :dir "/x"}))
-      ":kind defaults to :exec")
-  (is (= ["/ujima/desktop/bin/ujima-open-web-app" "http://x.local/" "ujima-lib"]
-         (app/app->runnable {:kind :link :url "http://x.local/" :class "ujima-lib"})))
-  (is (= ["/ujima/desktop/bin/ujima-serve-web-app" "/apps/board/app" "index.html" "8100" "ujima-board"]
-         (app/app->runnable {:kind :web-app :dir "/apps/board" :entry "index.html"
-                             :port 8100 :class "ujima-board"}))
-      "port coerced to string, serve dir = <dir>/app"))
+  (let [bins {:open-web-app-bin "open-web-app" :serve-web-app-bin "serve-web-app"}]
+    (is (= ["tuxpaint" "--nolockfile"]
+           (app/app->runnable bins {:kind :exec :exec ["tuxpaint" "--nolockfile"] :dir "/x"})))
+    (is (= ["tuxpaint"] (app/app->runnable bins {:exec ["tuxpaint"] :dir "/x"}))
+        ":kind defaults to :exec")
+    (is (= ["open-web-app" "http://x.local/" "ujima-lib"]
+           (app/app->runnable bins {:kind :link :url "http://x.local/" :class "ujima-lib"})))
+    (is (= ["serve-web-app" "/apps/board/app" "index.html" "8100" "ujima-board"]
+           (app/app->runnable bins {:kind :web-app :dir "/apps/board" :entry "index.html"
+                                    :port 8100 :class "ujima-board"}))
+        "port coerced to string, serve dir = <dir>/app")))
 
 
 ;; --- run: scope-gated switch-then-launch ---

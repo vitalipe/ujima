@@ -7,7 +7,7 @@
 
 
 (def ^:private ping-deadline-ms 10000)               ; wall-clock cap for the daemon socket
-(def ^:private eww-dir*    (atom "/ujima/desktop/shell/eww"))
+(def ^:private eww-dir*    (atom nil))               ; config via init!!
 (def ^:private shown?      (atom true))              ; bar visibility
 (def ^:private gen*        (atom 0))                 ; supersedes a pending debounced flip
 (def ^:private debounce-ms 200)                      ; actuate only after fullscreen settles quiet
@@ -55,7 +55,7 @@
   "Start the eww daemon (foreground child), open the bars, then BLOCK on the daemon for the
    session — its return means eww is gone and the caller tears the session down."
   [cfg]
-  (let [dir    (or (:eww-config cfg) "/ujima/desktop/shell/eww")
+  (let [dir    (:eww-config cfg)
         daemon (shell/with-spawn (shell/inheriting shell/*spawn*)
                  (shell/sh :eww :--config dir "daemon" :--no-daemonize))]
     (log/info "opening eww" {:eww dir})

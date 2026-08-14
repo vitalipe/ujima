@@ -27,13 +27,9 @@
 (def force-hi-ms 3000)                     ; a 2nd ✕ later = a fresh close, not an escalation
 
 
-;; the generic app face: an app dir without an icon.svg renders this instead of breaking the
-;; front-ends — icon resolution is a loader concern, so the catalog always carries a real path
-(def ^:private fallback-icon "/ujima/desktop/shell/icons/launcher.svg")
-
-;; the desugar targets: :link / :web-app specs become invocations of these at spawn time
-(def ^:private open-web-app-bin  "/ujima/desktop/bin/ujima-open-web-app")
-(def ^:private serve-web-app-bin "/ujima/desktop/bin/ujima-serve-web-app")
+;; the desugar targets (:open-web-app-bin :serve-web-app-bin), config via init! — spawn-time
+;; state because app->runnable's internal callers sit on the listener thread
+(def ^:private bins* (atom {}))
 
 
 (defn- validate-kind!
@@ -66,10 +62,11 @@
 (defn- read-app
   "One scan entry: DIR/app.edn -> spec + what scanning resolves: :id = the dir name, :dir =
    the dir itself (spawn cwd; relative paths in the spec resolve there), :icon = the dir's
-   icon.svg (fallback glyph when absent), and for the web kinds a DERIVED :class ujima-<id>
+   icon.svg (FALLBACK-ICON when absent — icon resolution is a loader concern, so the catalog
+   always carries a real path), and for the web kinds a DERIVED :class ujima-<id>
    (authored :class ignored — the kind owns window identity). Bad content logs and returns
    nil — an app can break itself, never the session."
-  [dir]
+  [fallback-icon dir]
   (try
     (let [icon (fs/path dir "icon.svg")
           id   (keyword (fs/file-name dir))]
@@ -90,11 +87,11 @@
   "All valid app specs under ROOT, in abc dir order: each subdir directly containing an
    app.edn is an app (payload-only dirs are invisible). A missing root contributes nothing —
    warn, not error: a fresh storage partition is a normal state."
-  [root]
+  [fallback-icon root]
   (if (and root (fs/directory? (str root)))
     (into [] (comp (filter fs/directory?)
                    (filter #(fs/exists? (fs/path % "app.edn")))
-                   (keep read-app))
+                   (keep (partial read-app fallback-icon)))
           (sort-by fs/file-name (fs/list-dir (str root))))
     (do (log/warn "app root missing — skipped" {:root (str root)}) [])))
 
@@ -105,24 +102,25 @@
    (an override keeps its tile position). Apps are external data to the OS: bad entries are
    skipped loudly, a missing root contributes nothing, and the session boots regardless —
    an empty catalog is an error line, not a crash."
-  [roots]
+  [roots fallback-icon]
   (let [merged (reduce (fn [m {:keys [id] :as app}]
                          (when (contains? m id)
                            (log/info "app overridden by later root" {:app id}))
                          (assoc m id app))
                        {}
-                       (mapcat scan-root roots))
+                       (mapcat (partial scan-root fallback-icon) roots))
         apps   (vec (sort-by (comp name :id) (vals merged)))]
     (when (empty? apps)
       (log/error "app catalog is empty" {:roots (mapv str roots)}))
     (catalog/->catalog {:apps apps})))
 
 
-(defn init! [{:keys [catalog converge-targets]}]
+(defn init! [{:keys [catalog converge-targets] :as cfg}]
   (reset! catalog* catalog)
   (reset! prev*    nil)
   (reset! close*   nil)
   (reset! targets* (vec converge-targets))
+  (reset! bins*    (select-keys cfg [:open-web-app-bin :serve-web-app-bin]))
   catalog)
 
 
@@ -179,12 +177,12 @@
 ;; --- act (write side; listener thread only). scope = lifecycle ---
 
 (defn app->runnable
-  "SPEC -> argv, computed at spawn time — the one seam where a kind becomes a process
-   (bwrap wrapping, per-user paths etc. hook here later). :exec runs as-authored (cwd = the
-   app dir, so relative paths resolve there; bare commands stay PATH lookups); :web-app
-   serves <dir>/app on :port and opens it kiosk; :link opens :url kiosk. Trusts scan-time
-   validate-kind!."
-  [{:keys [kind exec dir entry port url class]}]
+  "BINS (the desugar targets) + SPEC -> argv, computed at spawn time — the one seam where a
+   kind becomes a process (bwrap wrapping, per-user paths etc. hook here later). :exec runs
+   as-authored (cwd = the app dir, so relative paths resolve there; bare commands stay PATH
+   lookups); :web-app serves <dir>/app on :port and opens it kiosk; :link opens :url kiosk.
+   Trusts scan-time validate-kind!."
+  [{:keys [open-web-app-bin serve-web-app-bin]} {:keys [kind exec dir entry port url class]}]
   (case (or kind :exec)
     :exec    (vec exec)
     :web-app [serve-web-app-bin (str (fs/path dir "app")) (str entry) (str port) class]
@@ -198,7 +196,7 @@
   (i3/switch-workspace! (name id))
   (when-not (systemd/active? id)
     (try
-      (systemd/spawn-scoped! id (into (app->runnable app) extra) dir)
+      (systemd/spawn-scoped! id (into (app->runnable @bins* app) extra) dir)
       (log/info "app launched" {:app id})
       (catch Throwable e
         (log/error "app launch failed" {:app id :error (ex-message e)})
@@ -210,7 +208,7 @@
    in the existing scope). Cold: a normal scoped launch with the url. Either way, switch there."
   [{:keys [id dir] :as app} url]
   (if (systemd/active? id)
-    (do (apply shell/sh {:out :inherit :err :inherit :dir dir} (conj (app->runnable app) url))
+    (do (apply shell/sh {:out :inherit :err :inherit :dir dir} (conj (app->runnable @bins* app) url))
         (i3/switch-workspace! (name id)))
     (do-run! app [url])))
 

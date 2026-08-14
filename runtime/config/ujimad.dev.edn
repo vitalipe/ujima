@@ -1,7 +1,13 @@
 {:log     {:level :debug}
  :control {:storage "/tmp/ujima/settings/"
            :tmp     "/tmp/ujima/settings/session"}
- :desktop {:app {:catalog ["apps"]}}
+ :desktop {:launcher "desktop/bin/ujima-launcher"
+           :http     {:static-root "desktop/shell"}
+           :eww      {:eww-config "desktop/shell/eww"}
+           :app      {:catalog ["apps"]
+                      :fallback-icon     "desktop/shell/icons/launcher.svg"
+                      :open-web-app-bin  "desktop/bin/ujima-open-web-app"
+                      :serve-web-app-bin "desktop/bin/ujima-serve-web-app"}}
 
  ;; Dev stubs: the daemon's whole command surface (linux/system + linux/audio).
  ;; sudo-wrapped setters are remapped on the WRAPPED command (remap skips `sudo -n`),

@@ -1,8 +1,20 @@
 {:log     {:level :warn}
  :shell   {:commands {}}
+
  :control {:storage "/ujima/settings/"
            :tmp     "/ujima/run/session"}
+
  :events  {:audio-poll-ms 1000}
+
  :http    {:host "0.0.0.0" :port 1337}   ; LAN-reachable for remote admin — no auth, physical-access threat model
- :desktop {:eww        {:eww-config  "/ujima/desktop/shell/eww"}
-           :app        {:catalog ["/ujima/apps" "/ujima/storage/apps"]}}}
+
+ :desktop {:launcher "/ujima/desktop/bin/ujima-launcher"
+
+           :http     {:static-root "/ujima/desktop/shell"}
+
+           :eww      {:eww-config "/ujima/desktop/shell/eww"}
+
+           :app      {:catalog           ["/ujima/apps" "/ujima/storage/apps"]  ; scan order: later root wins
+                      :fallback-icon     "/ujima/desktop/shell/icons/launcher.svg"
+                      :open-web-app-bin  "/ujima/desktop/bin/ujima-open-web-app"
+                      :serve-web-app-bin "/ujima/desktop/bin/ujima-serve-web-app"}}}

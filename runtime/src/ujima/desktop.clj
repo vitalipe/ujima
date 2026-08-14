@@ -31,7 +31,7 @@
 
   (log/info "opening ujima shell" cfg)
 
-  (launcher-init!  "/ujima/desktop/bin/ujima-launcher"
+  (launcher-init!  (:launcher cfg)
                     "http://127.0.0.1:1337/launcher/")
 
 

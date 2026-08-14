@@ -24,7 +24,8 @@
 
   (let [env         (io/slurp-config "config" "ujimad")
         deploy      (io/slurp-edn "config/env.edn")   ; deploy-stamped facts (nil on hosts)
-        app-catalog (app/load-catalog (get-in env [:desktop :app :catalog]))
+        app-cfg     (get-in env [:desktop :app])
+        app-catalog (app/load-catalog (:catalog app-cfg) (:fallback-icon app-cfg))
         http-cfg    (get-in env [:http] {})]
 
 
@@ -37,14 +38,15 @@
     (desktop/await-x!)
     (control/converge-fresh!)
 
-    (app/init! {:catalog app-catalog :converge-targets [shell-http-converge/converge-apps! eww/converge!]})
+    (app/init! (merge (select-keys app-cfg [:open-web-app-bin :serve-web-app-bin])
+                      {:catalog app-catalog :converge-targets [shell-http-converge/converge-apps! eww/converge!]}))
 
     (events/init! (get-in env [:events] {}))
 
     ;; the machine edge: ujimad composes the tiers, the edge knows neither's vocabulary
     (http/listen! (merge http-cfg
-                         {:endpoints {"api" (api/endpoints {:version (:version deploy)})
-                                      ""    shell-http/endpoints}
+                         {:endpoints {"api" (api/endpoints        {:version (:version deploy)})
+                                      ""    (shell-http/endpoints (get-in env [:desktop :http] {}))}
                           :log       log/log!}))
 
     (try

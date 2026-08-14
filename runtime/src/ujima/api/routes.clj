@@ -1,20 +1,8 @@
 (ns ujima.api.routes
-  "Route builders for the /api families: a table in, a plain route map out.
-
-   COMMANDS are keyed by path with :slug holes, or a trailing ** whose tail
-   arrives as :path. Params are one open map over
-   body, query and slug merged in that order, so a body key cannot rewrite the
-   URL. A slug the shape rejects returns nil — that URL was never ours, so it
-   404s; anything else is a humanized :request/malformed. :reply present -> 200
-   with the handler's return, absent -> 202.
-
-   QUERIES are one ** route over nodes keyed by path (\"system/clock-ms\", or
-   \"\" for the root — the URL's own syntax). The deepest node prefixing the
-   request answers and the remainder is get-in'd out of it, so a node must
-   carry every key it declares, nil-filled, or a real nil reads as a typo.
-   Above every node the answer is assembled from those below, which is what
-   makes a table a view rather than a mirror. Overlap is legal, deepest wins.
-   A collection answers bare, a scalar wears the key it was asked for."
+  "Route builders. COMMANDS: keyed by path with :slug holes or a trailing **, params are body,
+   query and slug merged; a rejected slug is nil (404), anything else a humanized 400; :reply
+   absent -> 202. QUERIES: one ** route over nodes keyed by path — deepest prefix answers and
+   get-ins the rest (nodes nil-fill, or a real nil reads as a typo), above them it assembles."
   (:require [clojure.string  :as str]
             [lib.util        :refer [map-keys map-kv-vals]]
             [malli.core      :as m]

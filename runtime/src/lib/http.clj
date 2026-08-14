@@ -1,21 +1,7 @@
 (ns lib.http
-  "A small http-kit edge for ujima's backends. Pure transport, no state of its
-   own; the logger is injected (:log, a (fn [level message data])).
-
-   :endpoints is a map of url prefix -> what that module serves:
-
-     {\"api\" {:routes {\"GET /audio\" (fn [req] ...)} :errors {:audio/none 409}}}
-
-   The prefix is the mount point, so a module never writes it into its own
-   keys. All of it compiles to ONE clj-simple-router matcher, so the most
-   specific route wins rather than whichever module came first.
-
-   A handler is (fn [req]) answering {:status n :body <edn>}, a raw ring
-   response (files, streams — passed through), or nil for a 404. The request
-   arrives parsed: :body decoded json, :query the query string as a map,
-   :format the wire form (?format=edn, else json). Failures are ex-info
-   {:error kw} mapped by the module's OWN :errors; an unmapped keyword is a
-   bug, so it logs and 500s."
+  "http-kit edge. :endpoints is {prefix -> {:routes {\"GET /x\" (fn [req])} :errors {kw status}}},
+   compiled to one router. A handler answers {:status :body}, a raw ring response, or nil for a
+   404; the request arrives parsed (:body :query :format). An unnamed error keyword is a 500."
   (:require [clojure.string     :as str]
             [org.httpkit.server :as http]
             [clj-simple-router.core :as router]
@@ -26,7 +12,7 @@
 ;; transport-level vocabulary; every module gets it for free
 (def ^:private base-errors {:request/malformed 400})
 
-;; DELETE may legally carry one but its meaning is unsettled — say so if we ever want it
+;; DELETE's body has no settled meaning — left out on purpose
 (def ^:private body-methods #{:post :put :patch})
 
 (defn- println-log [level message data]
@@ -94,8 +80,7 @@
                     (for [[prefix {:keys [routes errors]}] endpoints
                           [route f] routes]
                       [(mount prefix route) (guard (merge base-errors errors) log f)]))]
-    ;; a root-mounted module can still claim a prefixed module's path, and
-    ;; merge would drop one silently
+    ;; a root-mounted module can claim a prefixed one's path; merge drops one
     (assert (= (count table) (reduce + (map (comp count :routes val) endpoints)))
             "duplicate route across endpoints")
     table))

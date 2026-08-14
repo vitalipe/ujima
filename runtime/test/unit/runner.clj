@@ -18,6 +18,7 @@
             [ujima.control-test]
             [ujima.control.commands-test]
             [ujima.control.queries-test]
+            [ujima.api-test]
             [ujima.api.routes-test]
 
             [ujima.linux.audio-test]
@@ -52,6 +53,7 @@
     ujima.control-test
     ujima.control.commands-test
     ujima.control.queries-test
+    ujima.api-test
     ujima.api.routes-test
 
     ujima.linux.audio-test

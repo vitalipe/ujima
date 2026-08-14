@@ -1,11 +1,7 @@
 (ns ujima.desktop.http
-  "The desktop's shell module, mounted at the root:
-     /ui/**   the NDJSON streams and the verbs where interaction ≠ state
-     /app/**  the catalog, the icon fetch, and the cycle keybinds
-   plus the launcher statics — served here, not file://, so the webview is
-   same-origin and its click POSTs need no CORS. The static routes ARE the
-   whitelist, and containment is checked after the path resolves, so \"..\"
-   and a symlink out of the tree are refused alike."
+  "The shell module, mounted at the root: /ui/** the streams and interaction verbs, /app/**
+   the catalog, icons and cycle keybinds, plus the launcher statics. The static routes are the
+   whitelist and containment is checked after the path resolves."
   (:require [clojure.string  :as str]
             [clojure.java.io :as io]
             [ujima.desktop.app      :as app]

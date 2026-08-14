@@ -145,7 +145,7 @@
            :value {vol < 0 ? (state.audio.volume ?: 0) : vol}
            :onchange "${ewwcmd} update vol={} ; ujima-api POST /ui/volume/move '{\"value\": {}}' >/dev/null")
     (button :class "volmute" :timeout "2s"
-      :onclick "ujima-api POST /api/commands/audio/mute '{\"scope\": \"session\", \"muted\": ${!state.audio.muted}}' >/dev/null"
+      :onclick "ujima-api POST /api/commands/settings/audio/muted '{\"scope\": \"session\", \"value\": ${!state.audio.muted}}' >/dev/null"
       (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 22 :image-height 22))))
 
 

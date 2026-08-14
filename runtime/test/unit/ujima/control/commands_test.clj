@@ -19,13 +19,6 @@
            (try (commands/change-current-volume! 50 :session) (catch Exception e (:error (ex-data e))))))))
 
 
-(deftest change-mute-writes-the-desired-state
-  (let [written (atom nil)]
-    (with-redefs [control/settings! (fn [scope k v] (reset! written [scope k v]) {})]
-      (is (= {:muted true} (commands/change-mute! true :session)))
-      (is (= [:session [:audio :muted] true] @written)))))
-
-
 (deftest change-active-output-normalizes-and-validates
   (let [written (atom nil)]
     (with-redefs [control/settings! (fn [scope k v] (reset! written [scope k v]) {})]
@@ -40,9 +33,7 @@
 
 (deftest verbs-reject-malformed-values
   (is (= :request/malformed
-         (try (commands/change-current-volume! "loud" :session) (catch Exception e (:error (ex-data e))))))
-  (is (= :request/malformed
-         (try (commands/change-mute! "yes" :session) (catch Exception e (:error (ex-data e)))))))
+         (try (commands/change-current-volume! "loud" :session) (catch Exception e (:error (ex-data e)))))))
 
 
 (deftest change-keyboard-layout-accepts-only-available-codes

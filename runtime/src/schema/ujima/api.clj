@@ -62,15 +62,12 @@
    "app/open-url" {:doc    "Open a URL in the Web app."
                    :params [:map [:url [:string {:min 1}]]]}
 
+   ;; not settings/**: which output's volume is resolved at write time
    "audio/volume" {:doc    "Set the ACTIVE output's volume; the effect clamps to 0-100."
                    :params [:map [:scope runtime-scope] [:value [:or :int :double]]]}
 
-   "audio/mute"   {:doc    "Mute or unmute; a desired state, not a toggle."
-                   :params [:map [:scope runtime-scope] [:muted :boolean]]}
-
-   "audio/output" {:doc    "Select the active output class; null = none."
-                   :params [:map [:scope runtime-scope] [:output [:maybe [:enum :usb :hdmi]]]]}
-
+   ;; not settings/**: the narrowing is against another setting's value, which
+   ;; no :shape can see
    "keyboard/layout" {:doc    "Set the layout; only codes in available-layouts are accepted."
                       :params [:map [:scope runtime-scope] [:layout [:string {:min 1}]]]}
 

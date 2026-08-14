@@ -24,8 +24,6 @@
    "app/open-url" {:handler (fn [{:keys [url]}] (desktop/open-url! url))}
 
    "audio/volume"    {:handler (fn [{:keys [scope value]}]  (effects/change-current-volume! value scope))}
-   "audio/mute"      {:handler (fn [{:keys [scope muted]}]  (effects/change-mute! muted scope))}
-   "audio/output"    {:handler (fn [{:keys [scope output]}] (effects/change-active-output! output scope))}
    "keyboard/layout" {:handler (fn [{:keys [scope layout]}] (effects/change-keyboard-layout! layout scope))}
 
    "settings/**"     {:handler (fn [{:keys [path value scope]}] (effects/change-setting! path value scope))}

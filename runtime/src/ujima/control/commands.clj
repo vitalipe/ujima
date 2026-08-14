@@ -39,8 +39,9 @@
 
 
 (defn change-active-output!
-  "Select the active output class (nil = none). Written by ujimad's device
-   policy on plug/unplug; the console can set it too. Idempotent — re-asserting
+  "Select the active output class (nil = none). ujimad's device policy writes
+   this on plug/unplug; over HTTP it is settings/audio/active, whose :shape
+   takes no nil — only the event layer discovers that there is no output. Idempotent — re-asserting
    the same class still converges, which is what re-applies state onto a swapped
    device of the same class."
   [output scope]
@@ -50,14 +51,6 @@
     (control/settings! scope [:audio :active] output)
     {:output output}))
 
-
-(defn change-mute!
-  "Set mute to a concrete desired state (idempotent)."
-  [muted scope]
-  (when-not (boolean? muted)
-    (throw (ex-info "muted must be a boolean" {:error :request/malformed :value muted})))
-  (control/settings! scope [:audio :muted] muted)
-  {:muted muted})
 
 
 (defn change-keyboard-layout!

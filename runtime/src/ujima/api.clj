@@ -7,6 +7,7 @@
             [ujima.control.queries  :as queries]
             [ujima.control.commands :as effects]
             [ujima.desktop.app      :as desktop]
+            [ujima.linux.devicetree :as devicetree]
             [ujima.linux.system     :as system]))
 
 
@@ -81,8 +82,8 @@
       {:base  "query/machine"
        :nodes {"schema"   (constantly 1)
                "id"       (constantly id)
-               "device"   (constantly {:serial "10000000deadbeef"
-                                       :model  "Raspberry Pi 500 Rev 1.0"})
+               "device"   (fn [] {:serial (devicetree/serial)
+                                  :model  (devicetree/model)})
                "image"    (constantly {:version version})
                "disk"     (constantly {:type     :ab
                                        :slot     :a

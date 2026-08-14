@@ -81,7 +81,7 @@ async function poll(){
   if (action) lastAction = Object.assign({}, action, {live: true});
   else if (lastAction && lastAction.live){    // it finished — fetch final chips
     try {
-      const j = await (await fetch('/circle/job/' + lastAction.job)).json();
+      const j = await (await fetch('/console/job/' + lastAction.job)).json();
       lastAction = Object.assign({}, j, {live: false});
     } catch (e) { lastAction = Object.assign({}, lastAction, {live: false}); }
     scheduleResultClear();
@@ -208,9 +208,11 @@ function appRow(m, cls){   /* cls: 'napp' (ring) or 'approw' (grid) */
 function render(){
   if (!S) return;
   run = runView();
+  $('counts').textContent =
+    `${M.length} machines · ${M.filter(m => m.online).length} on`;
   $('rescan').classList.toggle('on', scanning);
   $('rescan').classList.toggle('off', busyNow());
-  $('rescan-label').textContent = scanning ? 'scanning…' : 'rescan';
+  $('rescan-label').textContent = scanning ? 'Scanning…' : 'Rescan';
 
   renderRing();
 

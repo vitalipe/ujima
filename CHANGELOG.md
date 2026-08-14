@@ -16,8 +16,13 @@ version truth; branch names and build labels may disagree.
   at build); like packages, they never change on a live deploy.
 
 - Ujima Circle App (dev-only, not wired yet): a fleet control panel for teachers —
-  Runs against a file-backed mock fleet: `bb circle mock`
-  serves it on :1338, `bb circle world` is a TUI that drives the mock world.
+  runs against a file-backed mock fleet.
+- Ujima Setup App (dev-only, not wired yet): per-machine setup over the same
+  fleet — name, clock (timezone + wall time), keyboard layouts, sound output,
+  diagnostics with derived checks, remove/rescan.
+- One console backend serves both panels: `bb console mock` on :1338 (`/` picks
+  a panel, `/circle/`, `/setup/`), `bb console world` is the TUI driving the
+  shared mock world (replaces `bb circle mock|world`).
 - The OS image boots as-is — `dd` it to a card for a system without A/B, where
   settings and storage are not persistent.
 

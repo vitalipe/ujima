@@ -1,17 +1,17 @@
-(ns circle.world
+(ns console.world
   "Dev TUI that drives the mock world file: add/drop random machines, jump to
-   set counts. Edits tmp/circle/world.edn in place — the running mock server
-   re-reads it every poll, so changes land in the panel within ~2s. Separate
+   set counts. Edits tmp/console/world.edn in place — the running mock server
+   re-reads it every tick, so changes land in the panels within ~2s. Separate
    process from the server: last writer wins, same contract as hand-editing."
   (:require [clojure.edn      :as edn]
             [clojure.pprint   :as pprint]
             [clojure.string   :as str]
             [babashka.process :as process]
-            [circle.mock      :as mock]))
+            [console.mock     :as mock]))
 
 
-(def ^:private seed-path "desktop/circle/dev/world.edn")
-(def ^:private live-path "tmp/circle/world.edn")
+(def ^:private seed-path "desktop/console/dev/world.edn")
+(def ^:private live-path "tmp/console/world.edn")
 
 (def ^:private name-pool
   ["Kobe" "Ndege" "Samaki" "Nyoka" "Kanga" "Kima" "Fisi" "Mbuni" "Kiboko"
@@ -25,6 +25,8 @@
 (defn- write-world! [world] (spit live-path (with-out-str (pprint/pprint world))))
 
 
+(defn- gen-serial [] (apply str (repeatedly 16 #(rand-nth "0123456789abcdef"))))
+
 (defn- gen-machine [world]
   (let [used    (set (map :name (:peers world)))
         name    (or (first (shuffle (remove used name-pool)))
@@ -32,12 +34,21 @@
         online? (< (rand) 0.9)
         app     (when (and online? (< (rand) 0.7))
                   (rand-nth (:catalog world)))
-        peer    {:id      (str "pi-" (str/lower-case name))
-                 :name    name
-                 :online  online?
-                 :desktop {:locked (boolean (and online? (< (rand) 0.125)))}
-                 :apps    {:running app}
-                 :audio   {:muted (< (rand) 0.125) :out :hdmi :volume 40}}
+        peer    {:id       (str "pi-" (str/lower-case name))
+                 :name     name
+                 :online   online?
+                 :desktop  {:locked (boolean (and online? (< (rand) 0.125)))}
+                 :apps     {:running app}
+                 :audio    {:muted (< (rand) 0.125) :out :hdmi :volume 40}
+                 :system   {:timezone      "Africa/Dar_es_Salaam"
+                            :clock-off-min (if (< (rand) 0.12) (- (rand-int 600) 300) 0)
+                            :serial        (gen-serial)
+                            :ip            (str "10.0.0." (+ 20 (rand-int 200)))
+                            :up-min        (rand-int 400)
+                            :slot          (if (< (rand) 0.85) "A" "B")
+                            :store-free    (+ 35 (rand-int 55))}
+                 :keyboard {:layouts (if (< (rand) 0.8) ["us" "tz"] ["us"])}
+                 :warns    (if (< (rand) 0.08) ["Keyboard battery low"] [])}
         r       (rand)
         knob    (cond (< r 0.10) {:reply :noreply}
                       (< r 0.22) {:delay-ms (+ 2000 (rand-int 3000))})]
@@ -55,7 +66,8 @@
       (let [id (:id (nth (:peers world) idx))]
         (-> world
             (update :peers #(vec (concat (subvec % 0 idx) (subvec % (inc idx)))))
-            (update :knobs dissoc id))))))
+            (update :knobs dissoc id)
+            (update :removed (fnil disj #{}) id))))))
 
 (defn- set-count [world n]
   (let [n (max 1 (min 99 n))]
@@ -71,18 +83,20 @@
 (defn- marker [world p]
   (let [knob (get-in world [:knobs (:id p)])]
     (str (:name p)
-         (when (= (:id p) (:self world))       "*")
-         (when-not (:online p)                 "·off")
-         (when (get-in p [:desktop :locked])   "·l")
-         (when (get-in p [:audio :muted])      "·m")
+         (when (= (:id p) (:self world))                     "*")
+         (when-not (:online p)                               "·off")
+         (when (contains? (set (:removed world)) (:id p))    "·rm")
+         (when (get-in p [:desktop :locked])                 "·l")
+         (when (get-in p [:audio :muted])                    "·m")
+         (when-not (zero? (get-in p [:system :clock-off-min] 0)) "·clk")
          (cond (= :noreply (:reply knob)) "·nr"
                (:delay-ms knob)           "·slow"))))
 
 (defn- render [world]
   (print "\u001b[2J\u001b[H")
-  (println (str "circle world — " (count (:peers world)) " machines   (" live-path ")"))
+  (println (str "console world — " (count (:peers world)) " machines   (" live-path ")"))
   (println (str/join "  " (map (partial marker world) (:peers world))))
-  (println "   * self  ·off offline  ·l locked  ·m muted  ·nr no-reply  ·slow slow")
+  (println "   * self  ·off offline  ·rm removed  ·l locked  ·m muted  ·clk drifted  ·nr no-reply  ·slow slow")
   (println)
   (println "[a]dd  [d]rop  [0]→6  [1]→10  [2]→24  [3]→32  [n] custom  [r]eseed  [q]uit")
   (flush))

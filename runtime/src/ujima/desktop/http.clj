@@ -5,7 +5,7 @@
   (:require [clojure.string  :as str]
             [clojure.java.io :as io]
             [ujima.desktop.app      :as app]
-            [ujima.desktop.converge :as converge]
+            [ujima.desktop.http.converge :as converge]
             [ujima.desktop.http.ui  :as ui]))
 
 

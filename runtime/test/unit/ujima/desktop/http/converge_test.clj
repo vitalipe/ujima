@@ -1,6 +1,6 @@
-(ns ujima.desktop.converge-test
+(ns ujima.desktop.http.converge-test
   (:require [clojure.test :refer [deftest is]]
-            [ujima.desktop.converge :as converge]))
+            [ujima.desktop.http.converge :as converge]))
 
 
 (def ^:private settings

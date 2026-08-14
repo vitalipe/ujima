@@ -1,4 +1,4 @@
-(ns ujima.desktop.converge
+(ns ujima.desktop.http.converge
   "The GUI's converge ports and the streams they feed. control hands it the
    whole settings plane, so this projects; the app layer projects before its
    targets run, so that one republishes as-is."

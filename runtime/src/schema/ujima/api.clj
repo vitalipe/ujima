@@ -30,6 +30,10 @@
 ;; driven from elsewhere. :device is config, not a moment, so never here
 (def runtime-scope [:enum :session :activity])
 
+;; a settings write may name any scope — which ones a given setting accepts is
+;; the def's business, checked where the path is known
+(def scope [:enum :device :session :activity])
+
 
 (def audio
   [:map
@@ -69,6 +73,10 @@
 
    "keyboard/layout" {:doc    "Set the layout; only codes in available-layouts are accepted."
                       :params [:map [:scope runtime-scope] [:layout [:string {:min 1}]]]}
+
+   "settings/**"  {:doc    "Set any setting by its path; the def decides the legal
+                            scopes and values."
+                   :params [:map [:path [:vector :keyword]] [:scope scope] [:value :any]]}
 
    "system/restart"  {:doc "Reboot this machine."}
    "system/poweroff" {:doc "Power this machine off."}})

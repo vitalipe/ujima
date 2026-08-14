@@ -9,7 +9,19 @@
    narrow ack of what they wrote; projections live in ujima.control.queries
    (the http layer stitches command-then-query for response bodies). Failures
    throw ex-info {:error <kw>} for the HTTP tier to map onto statuses."
-  (:require [ujima.control :as control]))
+  (:require [malli.core      :as m]
+            [malli.error     :as me]
+            [malli.transform :as mt]
+            [schema.ujima.settings :as defs]
+            [ujima.control   :as control]))
+
+
+;; a setting without a :shape would silently skip the gate — die at load instead
+(doseq [{:keys [key shape]} defs/settings]
+  (assert shape (str "no :shape for " key)))
+
+(def ^:private specs
+  (into {} (map (juxt :key #(select-keys % [:shape :scopes]))) defs/settings))
 
 
 (defn change-current-volume!
@@ -61,3 +73,21 @@
                       {:error :keyboard/unknown-layout :value code :layouts layouts})))
     (control/settings! scope [:keyboard :layout] code)
     {:layout code}))
+
+
+(defn change-setting!
+  "Set any setting by its path. The def owns both halves of what is legal: the
+   scopes that may hold it, and the :shape its value must decode to."
+  [setting value scope]
+  (let [{:keys [shape scopes]} (specs setting)]
+    (when-not shape
+      (throw (ex-info "not a setting" {:error :settings/unknown :setting setting})))
+    (when-not (contains? scopes scope)
+      (throw (ex-info (str "this setting takes " (clojure.string/join " or " (map name (sort scopes))))
+                      {:error :request/malformed :setting setting :scope scope})))
+    (let [v (m/decode shape value mt/string-transformer)]
+      (when-not (m/validate shape v)
+        (throw (ex-info (->> (me/humanize (m/explain shape v)) flatten (remove nil?) first)
+                        {:error :request/malformed :setting setting :value value})))
+      (control/settings! scope setting v)
+      {:value v})))

@@ -28,6 +28,8 @@
    "audio/output"    {:handler (fn [{:keys [scope output]}] (effects/change-active-output! output scope))}
    "keyboard/layout" {:handler (fn [{:keys [scope layout]}] (effects/change-keyboard-layout! layout scope))}
 
+   "settings/**"     {:handler (fn [{:keys [path value scope]}] (effects/change-setting! path value scope))}
+
    "system/restart"  {:handler (fn [_] (system/reboot!))}
    "system/poweroff" {:handler (fn [_] (system/shutdown!))}})
 

@@ -1,7 +1,8 @@
 (ns ujima.api.routes
   "Route builders for the /api families: a table in, a plain route map out.
 
-   COMMANDS are keyed by path with :slug holes. Params are one open map over
+   COMMANDS are keyed by path with :slug holes, or a trailing ** whose tail
+   arrives as :path. Params are one open map over
    body, query and slug merged in that order, so a body key cannot rewrite the
    URL. A slug the shape rejects returns nil — that URL was never ours, so it
    404s; anything else is a humanized :request/malformed. :reply present -> 200
@@ -21,6 +22,12 @@
             [malli.transform :as mt]))
 
 
+(defn- ->path
+  "\"system/clock-ms\" -> [:system :clock-ms]; blank is the root."
+  [s]
+  (if (str/blank? s) [] (mapv keyword (str/split s #"/"))))
+
+
 (defn- slugs-in [path]
   (->> (str/split path #"/")
        (filter #(str/starts-with? % ":"))
@@ -31,10 +38,17 @@
   (str "POST /" base "/" (str/replace path #":[^/]+" "*")))
 
 
-(defn- ->params [req slugs]
-  (merge (:body req)
-         (:query req)
-         (zipmap slugs (:path-params req))))
+(defn- ->params
+  "Slugs by name, and a ** tail as :path — the caught values are positional,
+   the tail last."
+  [req slugs tail?]
+  (let [caught (:path-params req)
+        named  (zipmap slugs caught)]
+    (merge (:body req)
+           (:query req)
+           (if tail?
+             (assoc named :path (->path (when (> (count caught) (count slugs)) (last caught))))
+             named))))
 
 
 (defn- sentence [explanation]
@@ -57,9 +71,10 @@
 (defn- ->command [path {:keys [handler reply] shape :params}]
   (assert handler (str "no :handler for " path))
   (let [slugs (slugs-in path)
+        tail? (str/ends-with? path "**")
         gate  (if shape (partial conform! shape (set slugs)) identity)]
     (fn [req]
-      (when-some [params (gate (->params req slugs))]
+      (when-some [params (gate (->params req slugs tail?))]
         (if reply
           {:status 200 :body (handler params)}
           (do (handler params)
@@ -75,12 +90,6 @@
 
 
 ;; ── queries ─────────────────────────────────────────────────────────────────
-
-(defn- ->path
-  "\"system/clock-ms\" -> [:system :clock-ms]; blank is the root."
-  [s]
-  (if (str/blank? s) [] (mapv keyword (str/split s #"/"))))
-
 
 (defn- prefix? [short long]
   (= short (vec (take (count short) long))))

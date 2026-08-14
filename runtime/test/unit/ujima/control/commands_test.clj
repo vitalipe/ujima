@@ -55,3 +55,44 @@
              (try (commands/change-keyboard-layout! "zz" :session) (catch Exception e (:error (ex-data e))))))
       (is (= :request/malformed
              (try (commands/change-keyboard-layout! nil :session) (catch Exception e (:error (ex-data e)))))))))
+
+
+;; ── change-setting!: the generic write, gated by the def ────────────────────
+
+(defn- setting! [path value scope]
+  (let [written (atom nil)]
+    (with-redefs [control/settings! (fn [scope k v] (reset! written [scope k v]) {})]
+      (try {:ack (commands/change-setting! path value scope) :wrote @written}
+           (catch clojure.lang.ExceptionInfo e
+             {:error (:error (ex-data e)) :message (ex-message e)})))))
+
+
+(deftest change-setting-decodes-against-the-defs-shape
+  (is (= {:ack {:value 55} :wrote [:session [:audio :usb :volume] 55]}
+         (setting! [:audio :usb :volume] "55" :session))
+      "a wire string decodes to the shape's type")
+  (is (= [:device [:system :hostname] "meru-01"]
+         (:wrote (setting! [:system :hostname] "meru-01" :device))))
+  (is (= [:device [:keyboard :available-layouts] ["us" "fr"]]
+         (:wrote (setting! [:keyboard :available-layouts] ["us" "fr"] :device)))))
+
+
+(deftest change-setting-refuses-with-the-defs-own-sentence
+  (is (= "should be at most 100"
+         (:message (setting! [:audio :usb :volume] 999 :session))))
+  (is (= "not a timezone ujima knows"
+         (:message (setting! [:system :timezone] "Mars/Olympus" :device)))
+      "the pinned catalog is part of the shape")
+  (is (= "hostname must be 1-16 letters, numbers or dashes"
+         (:message (setting! [:system :hostname] "no spaces!" :device))))
+  (is (= :request/malformed (:error (setting! [:audio :muted] "yes" :session)))))
+
+
+(deftest change-setting-checks-the-path-and-the-scope
+  (is (= :settings/unknown (:error (setting! [:no :such] "x" :session)))
+      "not a setting — the addressing layer's answer, not a write")
+  (let [{:keys [error message]} (setting! [:system :hostname] "meru-01" :session)]
+    (is (= :request/malformed error) "hostname is device-only")
+    (is (= "this setting takes device" message) "the def names the scopes it takes"))
+  (is (= [:activity [:audio :muted] true] (:wrote (setting! [:audio :muted] true :activity)))
+      "a scope the def does allow goes through"))

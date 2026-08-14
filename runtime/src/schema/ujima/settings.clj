@@ -1,9 +1,8 @@
 (ns schema.ujima.settings
   "The settings vocabulary — pure data, one entry = the whole description:
    key, doc, default, scopes, and the value :shape (malli, as data).
-   src/schema is the data plane: entries require nothing outside it
-   (schema.build.* = the generated pins); machinery and enforcement live
-   outside (control merges scopes; the HTTP gate will conform :shape)."
+   Entries require nothing outside the data plane; machinery and enforcement
+   live outside it."
   (:require [schema.build.timezones   :as tz]
             [schema.build.xkb-layouts :as xkb]))
 

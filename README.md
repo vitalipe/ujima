@@ -27,7 +27,7 @@ This mono repo contains the code and tooling needed to build, install, and run U
 The split is by type of work — product source, system definition, host tooling:
 
 - **`runtime/`** — the ujima core codebase: shared `lib/` + the `ujima/` runtime. Runs on the device as ujimad; tools and the os build link it on the host.
-- **`desktop/`** — the desktop product: `shell/` (the chrome), `bin/` (its programs), `circle/` (the fleet panel).
+- **`desktop/`** — the desktop product: the shell, its programs, and the panel apps.
 - **`os/`** — the system definition: `pipeline/` (the build stages, each with the static files it stages), `build/` (the machinery that runs them), `apps/` (third-party software packaged for ujima).
 - **`tools/`** — the host CLI behind the `bb` tasks: pipeline orchestration, image/pack/disk work, the live dev loop.
 
@@ -64,6 +64,8 @@ bb dev key <ip> <chord>
 bb loopback attach <img> [--readonly]                 loop-device utility
 bb loopback detach <img|loopdev>
 bb loopback list
+
+bb pin <schema|deps|initramfs>                        pull world-truth into the repo as a committed pin
 
 bb repl                                               dev REPL
 bb test:unit                                          unit tests
@@ -170,6 +172,7 @@ the journal. On a running device:
 
 ```
 /ujima/ujimad      the deployed core (runtime/)
+/ujima/m2          the bb libraries it runs on
 /ujima/desktop     the desktop layer (desktop/, mirrored)
 /ujima/apps        the app catalog scan root
 /ujima/system      the install record (pack.edn)    (per-slot)

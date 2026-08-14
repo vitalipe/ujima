@@ -1,5 +1,5 @@
 (ns console.http
-  "The console's HTTP edge (http-kit). Transport only, desktop.http-style:
+  "The console's HTTP edge (http-kit). Transport only:
      POST /circle/<verb>       circle's command tier -> 202 {:job id}
      POST /setup/<op>          setup's commands (jobs) + panel ops (sync)
      GET  /ui/circle, /ui/setup   the composed views the panels poll

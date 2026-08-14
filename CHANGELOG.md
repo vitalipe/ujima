@@ -39,6 +39,8 @@ version truth; branch names and build labels may disagree.
   `/ujima/storage/apps`.
 - An installed system records itself in one file, `/ujima/system/pack.edn` (was
   `metadata.edn` + `install.edn`): pack version, packed-at, installed-at.
+- The device API on :1337 has one shape: reads under `/api/query/`, writes under
+  `/api/commands/`. The old per-subject paths are gone.
 
 ### Fixed
 

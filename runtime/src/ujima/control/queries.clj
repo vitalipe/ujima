@@ -1,8 +1,7 @@
 (ns ujima.control.queries
   "Read-side projections over the control plane — pure settings reads, no
    shell-outs: the [:audio :active] setting IS the truth for \"which output\"
-   (ujimad's device policy keeps it aligned with the world). Feed the /api
-   GETs, the POST response stitching in the http layer, and the /ui stream."
+   (ujimad's device policy keeps it aligned with the world)."
   (:require [ujima.control :as control]))
 
 

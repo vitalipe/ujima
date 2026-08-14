@@ -109,7 +109,7 @@
                "system/timezone" #(get (control/settings) [:system :timezone])
                "system/clock-ms" #(System/currentTimeMillis)
 
-               "monitor/uptime-minutes" (constantly 42)
+               "monitor/uptime-minutes" system/uptime-minutes
                "monitor/messages"       (constantly [])}})
 
      (routes/queries

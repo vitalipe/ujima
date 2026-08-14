@@ -1,5 +1,7 @@
 (ns ujima.linux.system
-  (:require [lib.shell :refer [$? $!]]
+  (:require [clojure.string :as str]
+            [lib.io :refer [slurp-text]]
+            [lib.shell :refer [$? $!]]
             [ujima.linux.sudo :refer [sudo$!]]))
 
 
@@ -21,6 +23,10 @@
 (defn timezone! [timezone]
   (sudo$! timedatectl set-timezone [timezone])
   ($! timedatectl show -p "Timezone" --value))
+
+
+(defn uptime-minutes []
+  (some-> (slurp-text "/proc/uptime" nil) (str/split #"\s") first parse-double (/ 60) long))
 
 
 (defn reboot! []

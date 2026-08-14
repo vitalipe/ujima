@@ -12,8 +12,10 @@
 
   ([path default]
    (try
-     (cond 
-       (fs/exists? path) (slurp (str path))
+     (cond
+       ;; not clojure's slurp: /proc and size-0 sysfs files EINVAL its sized read
+       (fs/exists? path) (with-open [in (java.io.FileInputStream. (str path))]
+                           (String. (.readAllBytes in) java.nio.charset.StandardCharsets/UTF_8))
        :otherwise        default)
      (catch Exception _ default))))
 

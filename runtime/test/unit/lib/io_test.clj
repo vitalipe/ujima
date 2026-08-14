@@ -4,6 +4,12 @@
             [lib.io :as io]))
 
 
+(deftest slurp-text-reads-unsized-proc-files
+  ;; /proc/uptime stats size 0 — a sized read (clojure's slurp) EINVALs on it
+  (is (some-> (io/slurp-text "/proc/uptime" nil) (subs 0 1) parse-long)
+      "the first byte is a digit, not an exception"))
+
+
 (deftest slurp-config-merges-base-dev-local
   (fs/with-temp-dir [dir {}]
     (spit (str (fs/path dir "app.edn"))

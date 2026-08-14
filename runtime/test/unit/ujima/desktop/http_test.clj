@@ -4,7 +4,8 @@
   (:require [clojure.test :refer [deftest is]]
             [babashka.fs  :as fs]
             [lib.http     :as http]
-            [ujima.desktop.http :as shell]))
+            [ujima.desktop.http       :as shell]
+            [ujima.desktop.http.files :as files]))
 
 
 (defn- tree []
@@ -19,7 +20,7 @@
 
 
 (defn- GET [root uri]
-  (with-redefs [shell/static-root root]
+  (with-redefs [files/static-root root]
     ((http/app {:endpoints {"" shell/endpoints} :log (fn [& _])})
      {:request-method :get :uri uri})))
 

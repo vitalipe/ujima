@@ -26,7 +26,7 @@
             [ujima.linux.systemd-test]
             [lib.http-test]
             [ujima.desktop.http-test]
-            [ujima.desktop.http.ui-test]
+            [ujima.desktop.converge-test]
             [ujima.desktop.app.catalog-test]
             [ujima.desktop.app-test]
             [ujima.desktop.eww-test]
@@ -61,7 +61,7 @@
     ujima.linux.systemd-test
     lib.http-test
     ujima.desktop.http-test
-    ujima.desktop.http.ui-test
+    ujima.desktop.converge-test
     ujima.desktop.app.catalog-test
     ujima.desktop.app-test
     ujima.desktop.eww-test

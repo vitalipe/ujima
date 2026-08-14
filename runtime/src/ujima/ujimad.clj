@@ -14,7 +14,7 @@
             [ujima.desktop.eww      :as eww]
             [ujima.desktop.http     :as shell-http]
             [ujima.desktop.http.ui  :as ui]
-            [ujima.desktop.http.app :as apps]
+            [ujima.desktop.converge :as converge]
             [ujima.desktop.app      :as app]
             [ujima.events           :as events]))
 
@@ -29,14 +29,16 @@
 
 
     (shell/install-remap! (get-in env [:shell :commands] {}))
+    (log/init!            (get-in env [:log] {:level :info}))
 
-    (log/init!         (get-in env [:log] {:level :info}))
+    (converge/init!)
+
     (control/init!     (merge (get-in env [:control] {})
-                              {:converge-targets [linux/converge! ui/converge!]}))
+                              {:converge-targets [linux/converge! converge/converge-ui!]}))
     (desktop/await-x!)
     (control/converge-fresh!)
 
-    (app/init! {:catalog app-catalog :converge-targets [apps/converge! eww/converge!]})
+    (app/init! {:catalog app-catalog :converge-targets [converge/converge-apps! eww/converge!]})
 
     (events/init! (get-in env [:events] {}))
 

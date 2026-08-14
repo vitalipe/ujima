@@ -5,7 +5,7 @@
   (:require [clojure.string  :as str]
             [clojure.java.io :as io]
             [ujima.desktop.app      :as app]
-            [ujima.desktop.http.app :as apps]
+            [ujima.desktop.converge :as converge]
             [ujima.desktop.http.ui  :as ui]))
 
 
@@ -49,8 +49,8 @@
             :app/bad-url     400}
 
    :routes
-   {"GET  /ui/state"                 (fn [req] (ui/stream req))
-    "GET  /ui/apps"                  (fn [req] (apps/stream req))
+   {"GET  /ui/state"                 (fn [req] (converge/stream-ui   req))
+    "GET  /ui/apps"                  (fn [req] (converge/stream-apps req))
     "GET  /ui/keyboard/layout/next"  (fn [_] {:status 200 :body (ui/keyboard-next)})
     "POST /ui/volume/move"           (fn [{body :body}] (ui/volume-moved! (:value body))
                                                         {:status 202 :body {}})

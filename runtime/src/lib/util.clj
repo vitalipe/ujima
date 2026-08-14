@@ -783,3 +783,12 @@
                              :else (concat res (lazy-seq (step (mapv rest ss))))))
                      (f nil)))))]
      (step (conj colls c1)))))
+
+
+(defn next-of
+  "The element after X in XS, wrapping; the first when X isn't in XS."
+  [xs x]
+  (let [i (.indexOf (vec xs) x)]
+    (if (neg? i)
+      (first xs)
+      (nth xs (mod (inc i) (count xs))))))

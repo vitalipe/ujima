@@ -7,7 +7,7 @@
             [lib.http     :as http]
             [ujima.control    :as control]
             [ujima.api        :as api]
-            [schema.ujima.api :as contract]))
+            [schema.ujima.api.query :as query]))
 
 
 (defn- fresh! []
@@ -23,7 +23,7 @@
 
 (deftest the-machine-tree-answers-its-contract
   (fresh!)
-  (is (nil? (drift contract/machine (GET "/api/query/machine")))
+  (is (nil? (drift query/machine (GET "/api/query/machine")))
       "every node together has to make the shape the contract promises"))
 
 
@@ -32,12 +32,12 @@
   (let [tree (GET "/api/query/settings")
         recs (map #(get-in tree %) (keys (control/settings)))]
     (is (= (count (control/settings)) (count recs)) "one leaf per setting")
-    (is (nil? (first (keep (partial drift contract/settings-record) recs))))))
+    (is (nil? (first (keep (partial drift query/settings-record) recs))))))
 
 
 (deftest a-slice-of-the-machine-tree-is-the-shape-a-write-reports
   (fresh!)
-  (is (nil? (drift contract/audio (GET "/api/query/machine/audio")))
+  (is (nil? (drift query/audio (GET "/api/query/machine/audio")))
       "audio is one def, so the two can't drift apart"))
 
 

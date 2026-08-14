@@ -1,5 +1,5 @@
-(ns schema.ujima.api
-  "The query side's reply shapes — the frozen v1 contract. Maps are OPEN: a new key is legal,
+(ns schema.ujima.api.query
+  "The shapes /api/query answers with — the frozen v1 contract. Maps are OPEN: a new key is legal,
    a renamed or retyped one fails the contract test.")
 
 

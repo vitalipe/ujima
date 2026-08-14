@@ -1,7 +1,7 @@
 (ns ujima.api
   "The /api tier: query/machine a node per source, query/settings one node over control's
    records, commands the verbs below. A verb keeps :doc, :params and :handler together; the
-   query side's reply shapes are pure data, in schema.ujima.api."
+   query side's reply shapes are pure data, in schema.ujima.api.query."
   (:require [ujima.api.routes       :as routes]
             [ujima.control          :as control]
             [ujima.control.queries  :as queries]

@@ -7,4 +7,4 @@ case "$url" in
 esac
 esc=$(printf '%s' "$url" | sed 's/\\/\\\\/g; s/"/\\"/g')
 exec curl -fsS -m 2 -X POST -H 'content-type: application/json' \
-  -d "{\"url\":\"$esc\"}" http://127.0.0.1:1337/app/open-url >/dev/null 2>&1
+  -d "{\"url\":\"$esc\"}" http://127.0.0.1:1337/api/commands/app/open-url >/dev/null 2>&1

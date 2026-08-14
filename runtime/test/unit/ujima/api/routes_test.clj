@@ -9,14 +9,14 @@
   (routes/commands
     {:base "api/commands"
      :commands
-     {"desktop/:scope/audio/volume"
+     {"audio/:where/volume"
       {:params  [:map
-                 [:scope [:enum :session :activity]]
+                 [:where [:enum :session :activity]]
                  [:value [:or :int :double]]]
        :reply   [:map [:volume :int]]
        :handler (fn [params] (reset! seen params) {:volume (:value params)})}
 
-      "desktop/close-app"
+      "app/close"
       {:handler (fn [params] (reset! seen params) :closed)}}}))
 
 
@@ -28,34 +28,34 @@
 
 
 (deftest slugs-become-the-routers-star
-  (is (= #{"POST /api/commands/desktop/*/audio/volume"
-           "POST /api/commands/desktop/close-app"}
+  (is (= #{"POST /api/commands/audio/*/volume"
+           "POST /api/commands/app/close"}
          (set (keys (built (atom nil)))))))
 
 
 (deftest params-arrive-from-slug-query-and-body
   (let [seen (atom nil)
         rs   (built seen)]
-    (call rs {:uri "/api/commands/desktop/session/audio/volume" :body {:value 55}})
-    (is (= {:scope :session :value 55} @seen) "the slug names itself, the shape decodes it")
+    (call rs {:uri "/api/commands/audio/session/volume" :body {:value 55}})
+    (is (= {:where :session :value 55} @seen) "the slug names itself, the shape decodes it")
 
-    (call rs {:uri "/api/commands/desktop/session/audio/volume" :query {:value "55"}})
-    (is (= {:scope :session :value 55} @seen) "a query string reads the same")
+    (call rs {:uri "/api/commands/audio/session/volume" :query {:value "55"}})
+    (is (= {:where :session :value 55} @seen) "a query string reads the same")
 
-    (call rs {:uri  "/api/commands/desktop/session/audio/volume"
-              :body {:scope :activity :value 1}})
-    (is (= :session (:scope @seen)) "the slug wins — a body key can't rewrite the URL")))
+    (call rs {:uri  "/api/commands/audio/session/volume"
+              :body {:where :activity :value 1}})
+    (is (= :session (:where @seen)) "the slug wins — a body key can't rewrite the URL")))
 
 
 (deftest a-slug-the-shape-rejects-is-not-our-route
   (is (nil? (call (built (atom nil))
-                  {:uri "/api/commands/desktop/nope/audio/volume" :body {:value 1}}))
+                  {:uri "/api/commands/audio/nope/volume" :body {:value 1}}))
       "nil falls through to the edge's 404"))
 
 
 (deftest anything-else-is-a-humanized-400
   (let [e (try (call (built (atom nil))
-                     {:uri "/api/commands/desktop/session/audio/volume" :body {:value "x"}})
+                     {:uri "/api/commands/audio/session/volume" :body {:value "x"}})
                nil
                (catch clojure.lang.ExceptionInfo e e))]
     (is (= "value should be an integer" (ex-message e)))
@@ -65,9 +65,9 @@
 (deftest reply-decides-the-status
   (let [rs (built (atom nil))]
     (is (= {:status 200 :body {:volume 55}}
-           (call rs {:uri "/api/commands/desktop/session/audio/volume" :body {:value 55}})))
+           (call rs {:uri "/api/commands/audio/session/volume" :body {:value 55}})))
     (is (= {:status 202 :body {}}
-           (call rs {:uri "/api/commands/desktop/close-app"}))
+           (call rs {:uri "/api/commands/app/close"}))
         "no :reply — accepted, no body")))
 
 

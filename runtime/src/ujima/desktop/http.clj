@@ -1,7 +1,7 @@
 (ns ujima.desktop.http
   "The desktop's shell module, mounted at the root:
      /ui/**   the NDJSON streams and the verbs where interaction ≠ state
-     /app/**  the app layer's catalog, verbs, and the launcher's icon fetch
+     /app/**  the catalog, the icon fetch, and the cycle keybinds
    plus the launcher statics — served here, not file://, so the webview is
    same-origin and its click POSTs need no CORS. The static routes ARE the
    whitelist, and containment is checked after the path resolves, so \"..\"
@@ -53,24 +53,18 @@
             :app/bad-url     400}
 
    :routes
-   {"GET  /ui/state"                 (fn [req] (ui/stream req))
-    "GET  /ui/apps"                  (fn [req] (apps/stream req))
-    "GET  /ui/keyboard/layout/next"  (fn [_] {:status 200 :body (ui/keyboard-next)})
-    "POST /ui/volume/move"           (fn [{body :body}] (ui/volume-moved! (:value body))
-                                                        {:status 202 :body {}})
+   (merge
+     apps/routes
+     {"GET  /ui/state"                 (fn [req] (ui/stream req))
+      "GET  /ui/apps"                  (fn [req] (apps/stream req))
+      "GET  /ui/keyboard/layout/next"  (fn [_] {:status 200 :body (ui/keyboard-next)})
+      "POST /ui/volume/move"           (fn [{body :body}] (ui/volume-moved! (:value body))
+                                                          {:status 202 :body {}})
 
-    "GET  /app/catalog"  (fn [_] {:status 200 :body {:apps (app/catalog-listing)}})
-    "POST /app/run"      (fn [{body :body}] (app/run! (keyword (:app-id body)))       {:status 202 :body {}})
-    "POST /app/switch"   (fn [{body :body}] (app/switch-to! (keyword (:app-id body))) {:status 202 :body {}})
-    "POST /app/open-url" (fn [{body :body}] (app/open-url! (:url body))               {:status 202 :body {}})
-    "POST /app/close"    (fn [_]            (app/close-focused!)                      {:status 202 :body {}})
-    "POST /app/home"     (fn [_]            (app/go-home!)                            {:status 202 :body {}})
-    "POST /app/next"     (fn [_]            (app/cycle! 1)                            {:status 202 :body {}})
-    "POST /app/prev"     (fn [_]            (app/cycle! -1)                           {:status 202 :body {}})
+      "GET  /app/catalog"  (fn [_] {:status 200 :body {:apps (app/catalog-listing)}})
+      "GET  /app/icon/*"   (fn [{[id] :path-params}] (icon-file id))
 
-    "GET  /app/icon/*"   (fn [{[id] :path-params}] (icon-file id))
-
-    "GET  /launcher/**"  (fn [{[tail] :path-params}] (static-file "launcher" tail))
-    "GET  /icons/**"     (fn [{[tail] :path-params}] (static-file "icons" tail))
-    "GET  /wall.png"     (fn [_] (serve (io/file static-root "wall.png")))
-    "GET  /wall.svg"     (fn [_] (serve (io/file static-root "wall.svg")))}})
+      "GET  /launcher/**"  (fn [{[tail] :path-params}] (static-file "launcher" tail))
+      "GET  /icons/**"     (fn [{[tail] :path-params}] (static-file "icons" tail))
+      "GET  /wall.png"     (fn [_] (serve (io/file static-root "wall.png")))
+      "GET  /wall.svg"     (fn [_] (serve (io/file static-root "wall.svg")))})})

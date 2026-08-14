@@ -1,5 +1,5 @@
 /* UjimaOS launcher (design turn 47a) — the category grid + identity/status. No framework, no CDN.
-   Served from ujimad on :1337 so it is same-origin with the app API (clicks POST /app/run).
+   Served from ujimad on :1337 so it is same-origin with the app API (clicks POST /api/commands/app/open).
    The grid is built ONCE from the catalog; pull(state) does stable, id-keyed updates of the
    changing bits. STATE is STATIC today — each field notes the API that will feed it. */
 'use strict';
@@ -51,7 +51,7 @@ const STATE = {
 
 // ── click = fire an HTTP POST (same-origin; fire-and-forget, we don't need the 202) ──
 function launch(appId){
-  fetch('/app/run', {
+  fetch('/api/commands/app/open', {
     method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({'app-id': appId}),
   }).catch(err => console.error('launch failed:', appId, err));

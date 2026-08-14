@@ -17,16 +17,19 @@
 
 
 (def ^:private commands
-  {"desktop/:scope/audio/volume"    {:handler (fn [{:keys [scope value]}]  (effects/change-current-volume! value scope))}
-   "desktop/:scope/audio/mute"      {:handler (fn [{:keys [scope muted]}]  (effects/change-mute! muted scope))}
-   "desktop/:scope/audio/output"    {:handler (fn [{:keys [scope output]}] (effects/change-active-output! output scope))}
-   "desktop/:scope/keyboard/layout" {:handler (fn [{:keys [scope layout]}] (effects/change-keyboard-layout! layout scope))}
+  {"app/open"     {:handler (fn [{:keys [app]}] (desktop/run! (keyword app)))}
+   "app/switch"   {:handler (fn [{:keys [app]}] (desktop/switch-to! (keyword app)))}
+   "app/close"    {:handler (fn [_]             (desktop/close-focused!))}
+   "app/home"     {:handler (fn [_]             (desktop/go-home!))}
+   "app/open-url" {:handler (fn [{:keys [url]}] (desktop/open-url! url))}
 
-   "desktop/open-app"  {:handler (fn [{:keys [app]}] (desktop/run! (keyword app)))}
-   "desktop/close-app" {:handler (fn [_]             (desktop/close-focused!))}
-   "desktop/open-url"  {:handler (fn [{:keys [url]}] (desktop/open-url! url))}
-   "system/restart"    {:handler (fn [_]             (system/reboot!))}
-   "system/poweroff"   {:handler (fn [_]             (system/shutdown!))}})
+   "audio/volume"    {:handler (fn [{:keys [scope value]}]  (effects/change-current-volume! value scope))}
+   "audio/mute"      {:handler (fn [{:keys [scope muted]}]  (effects/change-mute! muted scope))}
+   "audio/output"    {:handler (fn [{:keys [scope output]}] (effects/change-active-output! output scope))}
+   "keyboard/layout" {:handler (fn [{:keys [scope layout]}] (effects/change-keyboard-layout! layout scope))}
+
+   "system/restart"  {:handler (fn [_] (system/reboot!))}
+   "system/poweroff" {:handler (fn [_] (system/shutdown!))}})
 
 
 (def endpoints

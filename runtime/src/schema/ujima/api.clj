@@ -26,7 +26,8 @@
 ;; a reply that mirrors a slice of the machine tree IS that slice — one def, so
 ;; "POST volume answers what GET machine/audio shows" is a fact, not a habit
 
-;; the scopes a live command may write — :device is config, not a moment
+;; whose write this is: the user's own session, or a coordinated activity
+;; driven from elsewhere. :device is config, not a moment, so never here
 (def runtime-scope [:enum :session :activity])
 
 
@@ -38,45 +39,39 @@
 
 
 ;; ── commands: the verb vocabulary, keyed by path ────────────────────────────
-;; :params  malli, over (merge body query slug) — the slug wins, so a body key
-;;          can never rewrite what the URL said; a bad slug is a 404 (the URL
-;;          isn't ours), anything else a humanized 400
+;; subject first, then the verb or the field — the same vocabulary the machine
+;; tree reads by, so a write and a read of one thing share a coordinate.
+;; :params  malli, over (merge body query slug); :scope says whose write it is,
+;;          the user's session or a coordinated activity
 ;; :reply   a shape -> 200 with the handler's body; absent -> 202 {}
-;;          (contract-tested, never validated per request)
 
 (def commands
-  {"desktop/:scope/audio/volume"
-   {:doc    "Set the ACTIVE output's volume; the effect clamps to 0-100."
-    :params [:map [:scope runtime-scope] [:value [:or :int :double]]]}
+  {"app/open"     {:doc    "Open an app by catalog id."
+                   :params [:map [:app [:string {:min 1}]]]}
 
-   "desktop/:scope/audio/mute"
-   {:doc    "Mute or unmute; a desired state, not a toggle."
-    :params [:map [:scope runtime-scope] [:muted :boolean]]}
+   "app/switch"   {:doc    "Focus an app that is already open."
+                   :params [:map [:app [:string {:min 1}]]]}
 
-   "desktop/:scope/audio/output"
-   {:doc    "Select the active output class; null = none."
-    :params [:map [:scope runtime-scope] [:output [:maybe [:enum :usb :hdmi]]]]}
+   "app/close"    {:doc "Close the focused app."}
+   "app/home"     {:doc "Go to the home workspace."}
 
-   "desktop/:scope/keyboard/layout"
-   {:doc    "Set the layout; only codes in available-layouts are accepted."
-    :params [:map [:scope runtime-scope] [:layout [:string {:min 1}]]]}
+   "app/open-url" {:doc    "Open a URL in the Web app."
+                   :params [:map [:url [:string {:min 1}]]]}
 
-   "desktop/open-app"
-   {:doc    "Open an app by catalog id."
-    :params [:map [:app [:string {:min 1}]]]}
+   "audio/volume" {:doc    "Set the ACTIVE output's volume; the effect clamps to 0-100."
+                   :params [:map [:scope runtime-scope] [:value [:or :int :double]]]}
 
-   "desktop/close-app"
-   {:doc "Close the focused app."}
+   "audio/mute"   {:doc    "Mute or unmute; a desired state, not a toggle."
+                   :params [:map [:scope runtime-scope] [:muted :boolean]]}
 
-   "desktop/open-url"
-   {:doc    "Open a URL in the Web app."
-    :params [:map [:url [:string {:min 1}]]]}
+   "audio/output" {:doc    "Select the active output class; null = none."
+                   :params [:map [:scope runtime-scope] [:output [:maybe [:enum :usb :hdmi]]]]}
 
-   "system/restart"
-   {:doc "Reboot this machine."}
+   "keyboard/layout" {:doc    "Set the layout; only codes in available-layouts are accepted."
+                      :params [:map [:scope runtime-scope] [:layout [:string {:min 1}]]]}
 
-   "system/poweroff"
-   {:doc "Power this machine off."}})
+   "system/restart"  {:doc "Reboot this machine."}
+   "system/poweroff" {:doc "Power this machine off."}})
 
 
 ;; ── query trees: the reply shapes (the frozen v1 contract) ──────────────────

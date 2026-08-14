@@ -8,6 +8,7 @@
             [ujima.control.commands :as effects]
             [ujima.desktop.app      :as desktop]
             [ujima.linux.devicetree :as devicetree]
+            [ujima.linux.disk       :as disk]
             [ujima.linux.system     :as system]))
 
 
@@ -69,7 +70,8 @@
 
 ;; ── the routes ──────────────────────────────────────────────────────────────
 
-(defn endpoints [{:keys [version id]}]
+;; :disk = ujima-disk-info, queried once at boot; only the space numbers are live
+(defn endpoints [{:keys [version id] system-disk :disk}]
   
   {:errors errors
    :routes
@@ -85,10 +87,10 @@
                "device"   (fn [] {:serial (devicetree/serial)
                                   :model  (devicetree/model)})
                "image"    (constantly {:version version})
-               "disk"     (constantly {:type     :ab
-                                       :slot     :a
-                                       :storage  {:total-mb 28000 :free-mb 21500}
-                                       :settings {:total-mb 256   :free-mb 249}})
+               "disk"     (fn [] {:type     (:type system-disk)
+                                  :slot     (:boot-slot system-disk)
+                                  :storage  (disk/device->space (:storage system-disk))
+                                  :settings (disk/device->space (:config system-disk))})
                
                "apps"     desktop/catalog-listing
 

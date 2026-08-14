@@ -2,7 +2,8 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
             [lib.io :refer [file->number]]
-            [lib.shell :refer [$?]]))
+            [lib.shell :refer [$?]]
+            [ujima.linux.disk.mount :as mount]))
 
 
 (defn- sys-file->path [partition file-name]
@@ -48,4 +49,28 @@
      :start-sector start
      :end-sector   (+ start size -1)
      :size-bytes   (* 512 size)}))
+
+
+(defn partuuid->disk
+  "The whole-disk device holding PARTUUID, nil when no such partition."
+  [partuuid]
+  (let [{:keys [ok? out]} ($? lsblk -no "PKNAME" [(str "/dev/disk/by-partuuid/" partuuid)])]
+    (when ok?
+      (some->> out str/trim not-empty (str "/dev/")))))
+
+
+(defn path->space
+  "{:total-mb :free-mb} of the filesystem holding PATH, nil when it doesn't exist."
+  [path]
+  (let [f (fs/file (str path))]
+    (when (.exists f)
+      {:total-mb (quot (.getTotalSpace f) 1048576)
+       :free-mb  (quot (.getUsableSpace f) 1048576)})))
+
+
+(defn device->space
+  "path->space of DEVICE's mountpoint, nil when unmounted or absent."
+  [device]
+  (when device
+    (some-> (mount/device->mount-points device) first path->space)))
          

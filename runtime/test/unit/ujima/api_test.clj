@@ -51,6 +51,16 @@
       "no stamp = an honest nil, not a fake"))
 
 
+(deftest the-disk-node-merges-boot-info-and-live-space
+  (fresh!)
+  (is (= {:type :ab :slot :a :storage nil :settings nil}
+         (GET "/api/query/machine/disk" {:disk {:type :ab :boot-slot :a
+                                                :storage "/dev/nope1" :config "/dev/nope2"}}))
+      "boot-time disk info + live space lookup; absent devices read nil")
+  (is (= {:type nil :slot nil :storage nil :settings nil} (GET "/api/query/machine/disk"))
+      "no ujima disk (a host run) = the shape with honest nils"))
+
+
 (deftest the-id-is-the-system-stamp
   (fresh!)
   (is (= {:id "1b0c-test"} (GET "/api/query/machine/id" {:id "1b0c-test"}))

@@ -10,6 +10,7 @@
      Returns a map like:
 
      {:device  \"/dev/sda\"
+      :type    :ab
       :storage \"/dev/sda8\"
       :config  \"/dev/sda7\"
       :system-id \"1b0c…\"
@@ -47,7 +48,12 @@
 
 
   (set-try-boot-slot! [this slot]
-    "Set a pending trial boot slot. or `nil` to clear try-boot"))
+    "Set a pending trial boot slot. or `nil` to clear try-boot")
+
+
+  (system-id! [this]
+    "The disk's system-id, created on first call on a freshly provisioned disk;
+     an existing id is never rewritten. Reads: ujima-disk-info's :system-id."))
 
 
 
@@ -60,15 +66,4 @@
 
 
   (in-try-boot? [this]
-    "Returns true if booted in try-boot mode")
-
-
-  (system-id [this]
-    "The booted ujima system's identity, nil when never stamped or settings is
-     not mounted.")
-
-
-  (system-id! [this]
-    "system-id, created on first call on a freshly provisioned disk; an existing
-     id is never rewritten. First boot is the only generation point — the shared
-     image never carries one. Nil (with a warn) when settings is not mounted."))
+    "Returns true if booted in try-boot mode"))

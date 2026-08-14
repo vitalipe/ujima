@@ -3,7 +3,6 @@
     [babashka.fs :as fs]
     [clojure.string :as str]
     [lib.io                 :refer [file->uint-be slurp-text]]
-    [lib.shell              :refer [$?]]
     [ujima.log              :as log]
     [ujima.linux.disk       :refer [device->partitions]]
     [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
@@ -47,7 +46,6 @@
 ;; the installed system's identity: a file at the settings-partition ROOT — above the
 ;; slot dirs, so it follows the disk across slot installs (and boards; serial is the
 ;; board fact)
-(def ^:private settings-mount "/mnt/settings")
 (def ^:private system-id-file "system-id")
 
 
@@ -115,6 +113,7 @@
 
             (when-let [{boot-idx :boot try-boot-idx :try-boot} (autoboot/autoboot ctl-mnt)]
               {:device  device
+               :type    :ab
                :storage storage
                :config  config
                :system-id (probe-for-system-id config)
@@ -185,19 +184,35 @@
 
   (set-try-boot-slot! [_ slot]
     (require-ab-partition-layout! device)
-    
+
     (when-not (nil? slot) ;; nil is valid to reset try-boot
-      (require-ab-slot! slot)) 
+      (require-ab-slot! slot))
 
     (let [{ctl :control} (device->partitions-by-name device)
           try-boot-idx   (slot->idx slot)]
 
       (with-mounted-vfat [ctl-mnt ctl]
         (let [{boot-idx :boot} (autoboot/autoboot ctl-mnt)]
-          (autoboot/autoboot! ctl-mnt {:boot (or boot-idx try-boot-idx) 
+          (autoboot/autoboot! ctl-mnt {:boot (or boot-idx try-boot-idx)
                                        :try-boot try-boot-idx}))))
 
-    nil)) 
+    nil)
+
+
+  (system-id! [_]
+    (require-ab-partition-layout! device)
+    (let [{config :config} (device->partitions-by-name device)]
+      (with-mounted-ext4 [cfg-mnt config]
+        (or (read-system-id cfg-mnt)
+            (let [id (str (java.util.UUID/randomUUID))]
+              ;; root-owned partition root; install(1) like pack's manifest write
+              (fs/with-temp-dir [tmp {:prefix "ujima-system-id-"}]
+                (spit (str (fs/path tmp system-id-file)) (str id "\n"))
+                (sudo$! install -m "0644"
+                        (fs/path tmp system-id-file)
+                        (fs/path cfg-mnt system-id-file)))
+              (log/info "system id stamped" {:id id})
+              id)))))) 
 
 
 (defrecord AutobootRuntime []
@@ -208,24 +223,7 @@
     (sudo$! reboot 0 tryboot))
 
   (in-try-boot? [_]
-    (not (zero? (file->uint-be "/proc/device-tree/chosen/bootloader/tryboot"))))
-
-  (system-id [_]
-    (read-system-id settings-mount))
-
-  (system-id! [_]
-    (if-not (:ok? ($? mountpoint -q [settings-mount]))
-      (log/warn "settings not mounted — no system id" {:mount settings-mount})
-      (or (read-system-id settings-mount)
-          (let [id (str (java.util.UUID/randomUUID))]
-            ;; root-owned partition root; install(1) like pack's manifest write
-            (fs/with-temp-dir [tmp {:prefix "ujima-system-id-"}]
-              (spit (str (fs/path tmp system-id-file)) (str id "\n"))
-              (sudo$! install -m "0644"
-                      (fs/path tmp system-id-file)
-                      (fs/path settings-mount system-id-file)))
-            (log/info "system id stamped" {:id id})
-            id)))))
+    (not (zero? (file->uint-be "/proc/device-tree/chosen/bootloader/tryboot")))))
 
 
 (defn ->disk [{:keys [device]}]

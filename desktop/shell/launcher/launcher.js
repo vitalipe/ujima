@@ -53,7 +53,7 @@ const STATE = {
 function launch(appId){
   fetch('/api/commands/app/open', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({'app-id': appId}),
+    body: JSON.stringify({'app': appId}),
   }).catch(err => console.error('launch failed:', appId, err));
 }
 

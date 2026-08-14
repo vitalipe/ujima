@@ -49,18 +49,19 @@
             :app/bad-url     400}
 
    :routes
-   (merge
-     apps/routes
-     {"GET  /ui/state"                 (fn [req] (ui/stream req))
-      "GET  /ui/apps"                  (fn [req] (apps/stream req))
-      "GET  /ui/keyboard/layout/next"  (fn [_] {:status 200 :body (ui/keyboard-next)})
-      "POST /ui/volume/move"           (fn [{body :body}] (ui/volume-moved! (:value body))
-                                                          {:status 202 :body {}})
+   {"GET  /ui/state"                 (fn [req] (ui/stream req))
+    "GET  /ui/apps"                  (fn [req] (apps/stream req))
+    "GET  /ui/keyboard/layout/next"  (fn [_] {:status 200 :body (ui/keyboard-next)})
+    "POST /ui/volume/move"           (fn [{body :body}] (ui/volume-moved! (:value body))
+                                                        {:status 202 :body {}})
 
-      "GET  /app/catalog"  (fn [_] {:status 200 :body {:apps (app/catalog-listing)}})
-      "GET  /app/icon/*"   (fn [{[id] :path-params}] (icon-file id))
+    "POST /ui/app/next"  (fn [_] (app/cycle! 1)  {:status 202 :body {}})
+    "POST /ui/app/prev"  (fn [_] (app/cycle! -1) {:status 202 :body {}})
 
-      "GET  /launcher/**"  (fn [{[tail] :path-params}] (static-file "launcher" tail))
-      "GET  /icons/**"     (fn [{[tail] :path-params}] (static-file "icons" tail))
-      "GET  /wall.png"     (fn [_] (serve (io/file static-root "wall.png")))
-      "GET  /wall.svg"     (fn [_] (serve (io/file static-root "wall.svg")))})})
+    "GET  /app/catalog"  (fn [_] {:status 200 :body {:apps (app/catalog-listing)}})
+    "GET  /app/icon/*"   (fn [{[id] :path-params}] (icon-file id))
+
+    "GET  /launcher/**"  (fn [{[tail] :path-params}] (static-file "launcher" tail))
+    "GET  /icons/**"     (fn [{[tail] :path-params}] (static-file "icons" tail))
+    "GET  /wall.png"     (fn [_] (serve (io/file static-root "wall.png")))
+    "GET  /wall.svg"     (fn [_] (serve (io/file static-root "wall.svg")))}})

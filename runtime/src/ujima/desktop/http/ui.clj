@@ -5,9 +5,8 @@
    converge that actually changed the projection — plus the verbs where
    interaction ≠ state (throttled volume moves). The apps stream is the sibling
    ujima.desktop.http.app."
-  (:require [org.httpkit.server :as http]
-            [lib.edn            :refer [edn->json]]
-            [lib.throttle       :refer [throttle-leading-trailing]]
+  (:require [lib.http.ndjson :as ndjson]
+            [lib.throttle :refer [throttle-leading-trailing]]
             [ujima.log          :as log]
             [ujima.control          :as control]
             [ujima.control.commands :as commands]))
@@ -38,11 +37,6 @@
                      :value value})))
   (change-volume-throttled! value)
   nil)
-
-
-;; --- the state stream --------------------------------------------------------
-
-(defonce ^:private subs* (atom #{}))
 
 
 (defn- next-of
@@ -80,21 +74,15 @@
                     (get s [:keyboard :layout]))}))
 
 
-(defn- state-line [st]
-  (str (edn->json st) "\n"))
+(defonce ^:private state (ndjson/topic! :ui/state))
 
 
 (defn converge!
-  "The GUI converge port (see control/init! for the target contract): stateless —
-   pushes the rebuilt projection when settings actually changed, and always when
-   prv is nil (external converge: live HW facts like :output may have moved with
-   no settings write). Runs INSIDE control's critical section — strictly ordered
-   with converges, so the stream can't end on a stale line."
-  [settings prv]
-  (when (or (nil? prv) (not= settings prv))
-    (let [line (state-line (settings->ui settings))]
-      (doseq [ch @subs*]
-        (http/send! ch line false)))))
+  "The GUI converge port (see control/init! for the target contract). Runs
+   INSIDE control's critical section, so the stream can't end on a stale line;
+   the topic drops a republish that projects to what subscribers already have."
+  [settings _prv]
+  (ndjson/publish! state (settings->ui settings)))
 
 
 (defn stream
@@ -102,8 +90,4 @@
    then one line per real change. eww's deflisten reconnect loop rehydrates from
    the snapshot after a ujimad restart."
   [req]
-  (http/as-channel req
-    {:on-open  (fn [ch]
-                 (swap! subs* conj ch)
-                 (http/send! ch (state-line (settings->ui (control/settings))) false))
-     :on-close (fn [ch _] (swap! subs* disj ch))}))
+  (ndjson/subscribe! state req))

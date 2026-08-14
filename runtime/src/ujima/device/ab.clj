@@ -12,6 +12,7 @@
      {:device  \"/dev/sda\"
       :storage \"/dev/sda8\"
       :config  \"/dev/sda7\"
+      :system-id \"1b0c…\"
       :slots {:a {:boot \"/dev/sda2\"
                   :root \"/dev/sda5\"
                   :ujima-os {:pack-version 1 :packed-at ... :installed-at ...}}
@@ -22,7 +23,9 @@
       :boot-slot :a
       :try-boot-slot :b}
 
-     :try-boot-slot is nil when no trial boot is pending.")
+     :try-boot-slot -> nil when no trial boot is pending.
+     :system-id     -> the installed ujima system's identity it follows the disk
+                       across slot installs and board swaps.")
 
 
   (write-ujima-layout! [this]
@@ -57,4 +60,15 @@
 
 
   (in-try-boot? [this]
-    "Returns true if booted in try-boot mode"))
+    "Returns true if booted in try-boot mode")
+
+
+  (system-id [this]
+    "The booted ujima system's identity, nil when never stamped or settings is
+     not mounted.")
+
+
+  (system-id! [this]
+    "system-id, created on first call on a freshly provisioned disk; an existing
+     id is never rewritten. First boot is the only generation point — the shared
+     image never carries one. Nil (with a warn) when settings is not mounted."))

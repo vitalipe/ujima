@@ -51,6 +51,14 @@
       "no stamp = an honest nil, not a fake"))
 
 
+(deftest the-id-is-the-system-stamp
+  (fresh!)
+  (is (= {:id "1b0c-test"} (GET "/api/query/machine/id" {:id "1b0c-test"}))
+      "cfg :id (system-id! at startup) answers the id leaf")
+  (is (= {:id nil} (GET "/api/query/machine/id"))
+      "no stamped system = an honest nil (a host run)"))
+
+
 (deftest every-verb-is-answerable
   (doseq [[path {:keys [doc handler]}] api/commands]
     (is (string? doc)  (str path " has no :doc"))

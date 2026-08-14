@@ -3,6 +3,7 @@
             [ujima.log               :as log]
 
             [ujima.device         :as device]
+    [ujima.device.ab      :as ab]
             [ujima.control        :as control]
             [ujima.linux.converge :as linux]
             [lib.shell :as shell]
@@ -23,7 +24,8 @@
 (defn -main [& args]
 
   (let [env         (io/slurp-config "config" "ujimad")
-        deploy      (io/slurp-edn "config/env.edn")   ; deploy-stamped facts (nil on hosts)
+        deploy      (io/slurp-edn    "config/env.edn")   ; deploy-stamped facts (nil on hosts)
+        boot        (device/->boot {})
         app-cfg     (get-in env [:desktop :app])
         app-catalog (app/load-catalog (:catalog app-cfg) (:fallback-icon app-cfg))
         http-cfg    (get-in env [:http] {})]
@@ -45,7 +47,8 @@
 
     ;; the machine edge: ujimad composes the tiers, the edge knows neither's vocabulary
     (http/listen! (merge http-cfg
-                         {:endpoints {"api" (api/endpoints        {:version (:version deploy)})
+                         {:endpoints {"api" (api/endpoints        {:version (:version deploy)
+                                                                   :id      (ab/system-id! boot)})
                                       ""    (shell-http/endpoints (get-in env [:desktop :http] {}))}
                           :log       log/log!}))
 

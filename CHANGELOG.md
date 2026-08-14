@@ -10,6 +10,9 @@ version truth; branch names and build labels may disagree.
 
 ### Added
 
+- Every machine mints a persistent identity at first boot: a generated system id
+  on the settings partition, surviving A/B installs and board swaps; the machine
+  API reports it as `id` (null until a first boot stamps it).
 - The machine API reports the deployed version: `query/machine/image` answers
   the stamp written at build/deploy (git tag, plus commit id past a tag,
   `-dirty` for uncommitted trees); images from before the stamp answer null.

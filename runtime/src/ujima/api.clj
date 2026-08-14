@@ -68,7 +68,7 @@
 
 ;; ── the routes ──────────────────────────────────────────────────────────────
 
-(defn endpoints [{:keys [version]}]
+(defn endpoints [{:keys [version id]}]
   
   {:errors errors
    :routes
@@ -80,7 +80,7 @@
      (routes/queries
       {:base  "query/machine"
        :nodes {"schema"   (constantly 1)
-               "id"       (constantly "mock-00000001")
+               "id"       (constantly id)
                "device"   (constantly {:serial "10000000deadbeef"
                                        :model  "Raspberry Pi 500 Rev 1.0"})
                "image"    (constantly {:version version})

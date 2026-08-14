@@ -1,13 +1,9 @@
 (ns ujima.api
-  "The /api tier — real wherever a reader exists, canned where none does yet:
-   settings, the v1 verbs, and every machine node with something behind it.
+  "The /api tier — real wherever a reader exists, canned where none does yet.
 
      GET  /api/query/machine/**   a node per source; some still canned
      GET  /api/query/settings/**  one node — control's records, live
-     POST /api/commands/…         the contract's verbs, gated and real
-
-   Routes are a plain data map — the router sorts by specificity, so an
-   unmatched path is the edge's 404 rather than anything of ours."
+     POST /api/commands/…         the contract's verbs, gated and real"
   (:require [ujima.api.routes       :as routes]
             [ujima.control          :as control]
             [ujima.control.queries  :as queries]
@@ -43,33 +39,33 @@
 
      (routes/queries
       {:base  "query/machine"
-       :nodes {[:schema]  (constantly 1)
-               [:id]      (constantly "mock-00000001")
-               [:device]  (constantly {:serial "10000000deadbeef"
+       :nodes {"schema"   (constantly 1)
+               "id"       (constantly "mock-00000001")
+               "device"   (constantly {:serial "10000000deadbeef"
                                        :model  "Raspberry Pi 500 Rev 1.0"})
-               [:image]   (constantly {:version "0.9.0"})
-               [:disk]    (constantly {:type     :ab
+               "image"    (constantly {:version "0.9.0"})
+               "disk"     (constantly {:type     :ab
                                        :slot     :a
                                        :storage  {:total-mb 28000 :free-mb 21500}
                                        :settings {:total-mb 256   :free-mb 249}})
-               [:apps]    desktop/catalog-listing
+               "apps"     desktop/catalog-listing
 
-               [:desktop :locked]  (constantly false)
-               [:desktop :running] #(:current (desktop/current-apps-state))
-               [:desktop :catalog] desktop/catalog-listing
+               "desktop/locked"  (constantly false)
+               "desktop/running" #(:current (desktop/current-apps-state))
+               "desktop/catalog" desktop/catalog-listing
 
-               [:audio]    queries/audio-status
-               [:keyboard] queries/keyboard-status
-               [:net]      (constantly {:ip "192.168.1.196"})
+               "audio"    queries/audio-status
+               "keyboard" queries/keyboard-status
+               "net"      (constantly {:ip "192.168.1.196"})
 
-               [:system :hostname] #(get (control/settings) [:system :hostname])
-               [:system :timezone] #(get (control/settings) [:system :timezone])
-               [:system :clock-ms] #(System/currentTimeMillis)
+               "system/hostname" #(get (control/settings) [:system :hostname])
+               "system/timezone" #(get (control/settings) [:system :timezone])
+               "system/clock-ms" #(System/currentTimeMillis)
 
-               [:monitor :uptime-minutes] (constantly 42)
-               [:monitor :messages]       (constantly [])}})
+               "monitor/uptime-minutes" (constantly 42)
+               "monitor/messages"       (constantly [])}})
 
      (routes/queries
       {:base  "query"
-       :nodes {[:settings] control/settings-records-tree}}))})
+       :nodes {"settings" control/settings-records-tree}}))})
 

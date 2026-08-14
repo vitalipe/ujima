@@ -81,13 +81,13 @@
 (defn- tree [ran]
   (routes/queries
     {:base  "api/query/machine"
-     :nodes {[:audio]            (fn [] (swap! ran conj :audio)
+     :nodes {"audio"            (fn [] (swap! ran conj :audio)
                                         {:volume 40 :muted false :output :usb})
-             [:device]           (fn [] (swap! ran conj :device)
+             "device"           (fn [] (swap! ran conj :device)
                                         {:serial nil :model "Pi 500"})
-             [:apps]             (fn [] (swap! ran conj :apps) [{:id :gimp}])
-             [:system :hostname] (fn [] (swap! ran conj :hostname) "ujima")
-             [:system :clock-ms] (fn [] (swap! ran conj :clock-ms) 1786500000000)}}))
+             "apps"             (fn [] (swap! ran conj :apps) [{:id :gimp}])
+             "system/hostname"  (fn [] (swap! ran conj :hostname) "ujima")
+             "system/clock-ms"  (fn [] (swap! ran conj :clock-ms) 1786500000000)}}))
 
 
 (defn- ask [rs uri]
@@ -136,8 +136,8 @@
 (deftest the-deepest-node-wins
   (let [rs (routes/queries
              {:base  "api/query/machine"
-              :nodes {[:desktop]           (constantly {:running {:id :coarse}})
-                      [:desktop :running]  (constantly {:id :cheap})}})]
+              :nodes {"desktop"          (constantly {:running {:id :coarse}})
+                      "desktop/running"  (constantly {:id :cheap})}})]
     (is (= {:status 200 :body {:id :cheap}} (ask rs "/api/query/machine/desktop/running"))
         "overlap is legal — the deeper node serves its own subtree")
     (is (= {:status 200 :body {:running {:id :coarse}}} (ask rs "/api/query/machine/desktop"))

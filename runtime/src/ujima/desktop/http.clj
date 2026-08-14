@@ -1,16 +1,11 @@
 (ns ujima.desktop.http
-  "The desktop's shell module of the machine edge, mounted at the root:
-     /ui/**   the GUI edge (desktop.http.ui settings, desktop.http.app apps):
-              the NDJSON streams and the verbs where interaction ≠ state
-              (throttled volume moves)
-     /app/**  the app layer (ujima.desktop.app): the catalog and the verbs,
-              plus the launcher's icon fetch (ui-of-app: file serving resolved
-              through the catalog, not a verb)
-   and the launcher statics — served from here (not file://) so the webview is
-   same-origin with the app API and its click POSTs need no CORS. The static
-   routes ARE the whitelist, and the shell tree is the only thing served: a
-   path is checked for containment after resolution, so \"..\" and a symlink
-   leading out of it are refused alike."
+  "The desktop's shell module, mounted at the root:
+     /ui/**   the NDJSON streams and the verbs where interaction ≠ state
+     /app/**  the app layer's catalog, verbs, and the launcher's icon fetch
+   plus the launcher statics — served here, not file://, so the webview is
+   same-origin and its click POSTs need no CORS. The static routes ARE the
+   whitelist, and containment is checked after the path resolves, so \"..\"
+   and a symlink out of the tree are refused alike."
   (:require [clojure.string  :as str]
             [clojure.java.io :as io]
             [ujima.desktop.app      :as app]
@@ -28,9 +23,7 @@
 ;; --- file serving: statics + the app icon --------------------------------
 
 (defn- serve
-  "A file from the shell tree, or nil. Containment is checked on the RESOLVED
-   path — this tree is the only thing we ever serve — so \"..\", a symlink out
-   of it, and anything else that leaves fail the same way."
+  "A file from the shell tree, or nil — containment checked after resolution."
   [f]
   (let [root (str (.getCanonicalPath (io/file static-root)) "/")
         ext  (some-> (re-find #"\.([^.]+)$" (.getName f)) second str/lower-case)]
@@ -40,13 +33,12 @@
        :body f})))
 
 (defn- static-file
-  "TAIL under the route's own directory; an empty tail is its index.html."
+  "TAIL under DIR; an empty tail is that directory's index.html."
   [dir tail]
   (serve (io/file static-root dir (if (str/blank? tail) "index.html" tail))))
 
 (defn- icon-file
-  "GET /app/icon/<id> -> the catalog-resolved icon, so the launcher never
-   touches the filesystem layout."
+  "The catalog-resolved icon, so the launcher never sees the layout."
   [id]
   (let [f (some-> (app/icon-path (keyword id)) io/file)]
     (if (and f (.isFile f))

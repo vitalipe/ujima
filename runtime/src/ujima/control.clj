@@ -95,12 +95,11 @@
 
 
 (defn settings-records-tree
-  "`settings` as a tree, each leaf the story behind its value: what it is, the
-   scope it came from (:default when none sets it), the default, and every
-   scope allowed to set it holding what that scope holds now (nil = unset — the
-   allowed keys double as the write whitelist). Path keys become the nesting,
-   so the tree is addressable. One pass over the scope files, so it is one
-   snapshot. Same read-only, unlocked terms as `settings`."
+  "`settings` as an addressable tree, each leaf carrying the story behind its
+   value: what it is, the scope it came from (:default when none does), the
+   default, and every scope allowed to set it holding what it holds now — nil
+   for unset, and those keys double as the write whitelist. One pass over the
+   scope files. Same read-only, unlocked terms as `settings`."
   []
   (let [registry    @registry*
         scope-keys  (scopes registry)

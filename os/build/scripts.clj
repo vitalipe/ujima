@@ -6,7 +6,8 @@
    tools.cmd.dev (live ssh) — which supply only what genuinely differs: which bb, and
    the wrapper around it (chroot argv / ssh string). Neither depends on the other."
   (:require [clojure.string :as str]
-            [babashka.fs :as fs]))
+            [babashka.fs :as fs]
+            [lib.shell :refer [$?]]))
 
 
 (def project-mnt "/ujima-src")
@@ -42,11 +43,21 @@
   (str root "/runtime/src:" root "/os"))
 
 
+(defn- version
+  "`git describe` over the v* tag family (v0.3.0, v0.3.0-127-g252ed12, …-dirty) —
+   computed host-side: neither the chroot rootfs nor the dev-push stage carries git."
+  []
+  (str/trim (:out ($? git describe --tags --match "v*" --dirty --always))))
+
+
 (defn run-args
   "The bb argv tail that runs a script against a repo root — classpath, entry, project
-   bind. Everything shell-safe by construction (fixed paths + a require-script!-validated
-   name), so an executor may splice it into an argv or str/join it into one ssh string."
+   bind, version stamp. Everything shell-safe by construction (fixed paths, a
+   require-script!-validated name, git-describe output), so an executor may splice it
+   into an argv or str/join it into one ssh string."
   [script root]
-  ["--classpath" (classpath root)
-   "-x" (str (script-ns script) "/run!")
-   "--project" root])
+  (let [v (version)]
+    (cond-> ["--classpath" (classpath root)
+             "-x" (str (script-ns script) "/run!")
+             "--project" root]
+      (seq v) (conj "--version" v))))

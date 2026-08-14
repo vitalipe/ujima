@@ -23,6 +23,7 @@
 (defn -main [& args]
 
   (let [env         (io/slurp-config "config" "ujimad")
+        deploy      (io/slurp-edn "config/env.edn")   ; deploy-stamped facts (nil on hosts)
         app-catalog (app/load-catalog (get-in env [:desktop :app :catalog]))
         http-cfg    (get-in env [:http] {})]
 
@@ -42,7 +43,7 @@
 
     ;; the machine edge: ujimad composes the tiers, the edge knows neither's vocabulary
     (http/listen! (merge http-cfg
-                         {:endpoints {"api" api/endpoints
+                         {:endpoints {"api" (api/endpoints {:version (:version deploy)})
                                       ""    shell-http/endpoints}
                           :log       log/log!}))
 

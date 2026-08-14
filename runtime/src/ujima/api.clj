@@ -68,7 +68,8 @@
 
 ;; ── the routes ──────────────────────────────────────────────────────────────
 
-(def endpoints
+(defn endpoints [{:keys [version]}]
+  
   {:errors errors
    :routes
    (merge
@@ -82,11 +83,12 @@
                "id"       (constantly "mock-00000001")
                "device"   (constantly {:serial "10000000deadbeef"
                                        :model  "Raspberry Pi 500 Rev 1.0"})
-               "image"    (constantly {:version "0.9.0"})
+               "image"    (constantly {:version version})
                "disk"     (constantly {:type     :ab
                                        :slot     :a
                                        :storage  {:total-mb 28000 :free-mb 21500}
                                        :settings {:total-mb 256   :free-mb 249}})
+               
                "apps"     desktop/catalog-listing
 
                "desktop/locked"  (constantly false)

@@ -10,6 +10,9 @@ version truth; branch names and build labels may disagree.
 
 ### Added
 
+- The machine API reports the deployed version: `query/machine/image` answers
+  the stamp written at build/deploy (git tag, plus commit id past a tag,
+  `-dirty` for uncommitted trees); images from before the stamp answer null.
 - The device API on :1337 can answer in edn: `?format=edn` on any data route
   (JSON stays the default; files and streams are unaffected).
 - The image bakes ujima's bb libraries into `/ujima/m2` (pinned, sha-verified

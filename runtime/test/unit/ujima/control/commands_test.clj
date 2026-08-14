@@ -43,7 +43,7 @@
       (is (= {:layout "tz"} (commands/change-keyboard-layout! "tz" :session)))
       (is (= [:session [:keyboard :layout] "tz"] @written))
       (is (= :keyboard/unknown-layout
-             (try (commands/change-keyboard-layout! "zz" :session) (catch Exception e (:error (ex-data e))))))
+             (try (commands/change-keyboard-layout! "fr" :session) (catch Exception e (:error (ex-data e))))))
       (is (= :request/malformed
              (try (commands/change-keyboard-layout! nil :session) (catch Exception e (:error (ex-data e)))))))))
 
@@ -58,10 +58,11 @@
              {:error (:error (ex-data e)) :message (ex-message e)})))))
 
 
-(deftest change-setting-decodes-against-the-defs-shape
+(deftest change-setting-writes-what-the-defs-shape-allows
   (is (= {:ack {:value 55} :wrote [:session [:audio :usb :volume] 55]}
-         (setting! [:audio :usb :volume] "55" :session))
-      "a wire string decodes to the shape's type")
+         (setting! [:audio :usb :volume] 55 :session)))
+  (is (= :request/malformed (:error (setting! [:audio :usb :volume] "55" :session)))
+      "a string where the shape says int is an error, not something to coerce")
   (is (= [:device [:system :hostname] "meru-01"]
          (:wrote (setting! [:system :hostname] "meru-01" :device))))
   (is (= [:device [:keyboard :available-layouts] ["us" "fr"]]

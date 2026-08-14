@@ -4,7 +4,6 @@
    and throw ex-info {:error kw} — projections live in ujima.control.queries."
   (:require [malli.core      :as m]
             [malli.error     :as me]
-            [malli.transform :as mt]
             [schema.ujima.settings :as defs]
             [ujima.control   :as control]))
 
@@ -15,6 +14,15 @@
 
 (def ^:private specs
   (into {} (map (juxt :key #(select-keys % [:shape :scopes]))) defs/settings))
+
+
+(defn- valid!
+  "Throws unless VALUE fits the setting's :shape."
+  [setting value]
+  (let [shape (:shape (specs setting))]
+    (when-not (m/validate shape value)
+      (throw (ex-info (->> (me/humanize (m/explain shape value)) flatten (remove nil?) first)
+                      {:error :request/malformed :setting setting :value value})))))
 
 
 (defn change-current-volume!
@@ -35,8 +43,7 @@
    writes). Idempotent: re-asserting the same class still converges."
   [output scope]
   (let [output (cond-> output (string? output) keyword)]
-    (when-not (contains? #{:usb :hdmi nil} output)
-      (throw (ex-info "unknown output class" {:error :request/malformed :value output})))
+    (when (some? output) (valid! [:audio :active] output))
     (control/settings! scope [:audio :active] output)
     {:output output}))
 
@@ -46,8 +53,7 @@
   "Set a layout code. Only codes in available-layouts are accepted — a stray
    one would fail converge on every pass."
   [code scope]
-  (when-not (string? code)
-    (throw (ex-info "layout must be a string" {:error :request/malformed :value code})))
+  (valid! [:keyboard :layout] code)
   (let [layouts (get (control/settings) [:keyboard :available-layouts])]
     (when-not (some #{code} layouts)
       (throw (ex-info "layout not in available-layouts"
@@ -65,9 +71,6 @@
     (when-not (contains? scopes scope)
       (throw (ex-info (str "this setting takes " (clojure.string/join " or " (map name (sort scopes))))
                       {:error :request/malformed :setting setting :scope scope})))
-    (let [v (m/decode shape value mt/string-transformer)]
-      (when-not (m/validate shape v)
-        (throw (ex-info (->> (me/humanize (m/explain shape v)) flatten (remove nil?) first)
-                        {:error :request/malformed :setting setting :value value})))
-      (control/settings! scope setting v)
-      {:value v})))
+    (valid! setting value)
+    (control/settings! scope setting value)
+    {:value value}))

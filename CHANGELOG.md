@@ -13,6 +13,8 @@ version truth; branch names and build labels may disagree.
 - The clock never boots backwards: a heartbeat records witnessed time on the
   settings partition and boot lifts a lagging clock to it — wall time stays
   monotonic across power loss on battery-less boards.
+- `hwclock` ships (`util-linux-extra`): a set clock persists to the Pi's RTC,
+  surviving reboots while the board has power.
 - Every machine mints a persistent identity at first boot: a generated system id
   on the settings partition, surviving A/B installs and board swaps; the machine
   API reports it as `id` (null until a first boot stamps it).

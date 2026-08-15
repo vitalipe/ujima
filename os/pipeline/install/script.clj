@@ -12,7 +12,9 @@
   (with-console-out
     ;; base packages ujimad needs at runtime
     ($! apt-get update)
-    ($! apt-get install -y --no-install-recommends "ca-certificates")
+    ($! apt-get install -y --no-install-recommends
+        "ca-certificates"
+        "util-linux-extra")  ; hwclock — clock! persists a set clock to the RTC; Debian split it out of util-linux
 
     ;; ESCAPE HATCH — the one static file this script writes, deliberately NOT a concern
     ;; file: it must exist BEFORE the overlayroot install below (its postinst trigger runs

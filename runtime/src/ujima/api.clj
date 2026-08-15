@@ -70,6 +70,12 @@
                                    (effects/clear-setting! path scope)
                                    (effects/clear-scope! scope)))}
 
+   "system/clock"    {:doc     "Set the wall clock to EPOCH (ms); records it as the new floor."
+                      :params  [:map [:epoch [:int {:min 0}]]]
+                      :handler (fn [{:keys [epoch]}]
+                                 (system/clock! epoch)
+                                 (effects/change-setting! [:system :clock :epoch-floor] epoch :device))}
+
    "system/restart"  {:doc     "Reboot this machine."
                       :handler (fn [_] (system/reboot!))}
 

@@ -9,7 +9,8 @@
 
             [ujima.desktop.app  :as app]
             [ujima.events.token :as token-events]
-            [ujima.events.audio :as audio-events]))
+            [ujima.events.audio :as audio-events]
+            [ujima.events.clock :as clock-events]))
 
 
 (defn- listen!
@@ -52,4 +53,7 @@
 
   ;; scope-death rides the SAME pipe (i3/emit!) so it's queue-ordered on the one listener thread:
   ;; the crash/self-quit go-home backstop
-  (systemd/watch-scopes! {:interval-ms (:scope-poll-ms cfg 1000) :emit i3/emit!}))
+  (systemd/watch-scopes! {:interval-ms (:scope-poll-ms cfg 1000) :emit i3/emit!})
+
+  ;; the software RTC: witnessed time becomes the next boot's clock floor
+  (clock-events/init! cfg))

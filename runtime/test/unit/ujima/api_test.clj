@@ -6,8 +6,9 @@
             [malli.error  :as me]
             [lib.edn      :refer [edn->json]]
             [lib.http     :as http]
-            [ujima.control    :as control]
-            [ujima.api        :as api]
+            [ujima.control      :as control]
+            [ujima.linux.system :as system]
+            [ujima.api          :as api]
             [schema.ujima.api.query :as query]))
 
 
@@ -102,6 +103,19 @@
          (select-keys (GET "/api/query/settings/audio/muted") [:effective :via]))
       "the kid's own session state resumes")
   (is (= :default (:via (GET "/api/query/settings/keyboard/layout")))))
+
+
+(deftest the-clock-verb-sets-and-records-the-floor
+  (fresh!)
+  (let [set-to (atom nil)]
+    (with-redefs [system/clock! (fn [ms] (reset! set-to ms))]
+      (is (= 202 (:status (POST "/api/commands/system/clock" {:epoch 1755264000000}))))
+      (is (= 1755264000000 @set-to) "the wall clock was set to the instant")
+      (is (= {:effective 1755264000000 :via :device}
+             (select-keys (GET "/api/query/settings/system/clock/epoch-floor") [:effective :via]))
+          "the assertion became the new floor")
+      (is (= 400 (:status (POST "/api/commands/system/clock" {:epoch -5}))))
+      (is (= 400 (:status (POST "/api/commands/system/clock" {})))))))
 
 
 (deftest clear-rejects-what-it-must

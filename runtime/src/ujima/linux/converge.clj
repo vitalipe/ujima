@@ -55,6 +55,15 @@
         (apply! desired)))))
 
 
+(defn- converge-clock!
+  ;; the floor only lifts — a clock already ahead (RTC held, NTP synced) is left alone
+  [settings]
+  (let [floor (get settings [:system :clock :epoch-floor] 0)]
+    (when (< (System/currentTimeMillis) floor)
+      (log/info "converge: raising the clock to the floor" {:floor floor})
+      (system/clock! floor))))
+
+
 (defn converge!
   "Drive linux to match `settings` (the full effective map). Settings without a
    consumer here are simply not linux's business."
@@ -62,7 +71,8 @@
   (shell/with-timeout command-timeout-ms
     (doseq [[domain f] [[:audio    converge-audio!]
                         [:keyboard converge-keyboard!]
-                        [:system   converge-system!]]]
+                        [:system   converge-system!]
+                        [:clock    converge-clock!]]]
       (try (f settings)
            (catch Throwable e
              (log/error "converge: domain failed" {:domain domain :error (ex-message e)})))))

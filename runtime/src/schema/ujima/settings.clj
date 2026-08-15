@@ -49,6 +49,12 @@
                 :scopes  #{:device}
                 :shape   timezone}
 
+               {:key     [:system :clock :epoch-floor]
+                :doc     "Time never converges below this (epoch ms) — the software RTC; written by the clock heartbeat and the clock verb"
+                :default 0
+                :scopes  #{:device}
+                :shape   [:int {:min 0}]}
+
                {:key     [:keyboard :layout]
                 :doc     "XKB layout code (e.g. \"us\", \"tz\", \"il\")"
                 :default "us"

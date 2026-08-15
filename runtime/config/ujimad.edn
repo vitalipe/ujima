@@ -4,7 +4,8 @@
  :control {:storage "/ujima/settings/"
            :tmp     "/ujima/run/session"}
 
- :events  {:audio-poll-ms 1000}
+ :events  {:audio-poll-ms 1000
+           :clock-save-ms 600000}
 
  :http    {:host "0.0.0.0" :port 1337}   ; LAN-reachable for remote admin — no auth, physical-access threat model
 

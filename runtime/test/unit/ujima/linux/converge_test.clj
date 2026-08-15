@@ -102,3 +102,16 @@
       (converge/converge! base-settings nil))
     (is (= [[:hostname "ujima"]] @calls)
         "only the drifted hostname converged; layout and timezone were in sync")))
+
+
+(deftest clock-lifts-only-a-lagging-clock
+  (quiet-others
+    (fn []
+      (let [set-to (atom nil)]
+        (with-redefs [audio/full-topology (constantly {:default nil :sinks {}})
+                      system/clock!       (fn [ms] (reset! set-to ms))]
+          (converge/converge! (assoc base-settings [:system :clock :epoch-floor] 123) nil)
+          (is (nil? @set-to) "a floor in the past leaves the clock alone")
+          (let [ahead (+ (System/currentTimeMillis) 60000)]
+            (converge/converge! (assoc base-settings [:system :clock :epoch-floor] ahead) nil)
+            (is (= ahead @set-to) "a lagging clock rises to the floor")))))))

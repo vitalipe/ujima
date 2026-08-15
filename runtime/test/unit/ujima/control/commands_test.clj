@@ -88,3 +88,13 @@
     (is (= "this setting takes device" message) "the def names the scopes it takes"))
   (is (= [:activity [:audio :muted] true] (:wrote (setting! [:audio :muted] true :activity)))
       "a scope the def does allow goes through"))
+
+
+(deftest clear-scope-takes-any-defined-scope
+  (let [cleared (atom nil)]
+    (with-redefs [control/update-settings! (fn [scope f] (reset! cleared [scope (f {[:audio :muted] true})]) {})]
+      (is (= {:cleared true} (commands/clear-scope! :device))
+          "in-process callers may wipe any defined scope — runtime-only is the wire's gate")
+      (is (= [:device {}] @cleared) "the whole scope map empties")
+      (is (= :request/malformed
+             (try (commands/clear-scope! :banana) (catch Exception e (:error (ex-data e)))))))))

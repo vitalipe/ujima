@@ -62,6 +62,14 @@
                    :params  [:map [:path [:vector :keyword]] [:scope scope] [:value :any]]
                    :handler (fn [{:keys [path value scope]}] (effects/change-setting! path value scope))}
 
+   ;; a clear carries no body: the URL is the whole operation
+   "clear/:scope/**" {:doc     "Release SCOPE's hold on the setting at path — with no path, everything it holds. Runtime scopes only."
+                      :params  [:map [:scope runtime-scope] [:path [:vector :keyword]]]
+                      :handler (fn [{:keys [scope path]}]
+                                 (if (seq path)
+                                   (effects/clear-setting! path scope)
+                                   (effects/clear-scope! scope)))}
+
    "system/restart"  {:doc     "Reboot this machine."
                       :handler (fn [_] (system/reboot!))}
 

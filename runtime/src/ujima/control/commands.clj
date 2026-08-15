@@ -74,3 +74,27 @@
     (valid! setting value)
     (control/settings! scope setting value)
     {:value value}))
+
+
+(defn clear-setting!
+  "Release SCOPE's hold on a setting — the entry is removed, never nil'd."
+  [setting scope]
+  (let [{:keys [shape scopes]} (specs setting)]
+    (when-not shape
+      (throw (ex-info "not a setting" {:error :settings/unknown :setting setting})))
+    (when-not (contains? scopes scope)
+      (throw (ex-info (str "this setting takes " (clojure.string/join " or " (map name (sort scopes))))
+                      {:error :request/malformed :setting setting :scope scope})))
+    (control/update-settings! scope #(dissoc % setting))
+    {:cleared true}))
+
+
+(defn clear-scope!
+  "Release everything SCOPE holds; every setting falls back. Takes any defined
+   scope — narrowing clears to runtime scopes is the wire's policy, not this."
+  [scope]
+  (when-not (contains? (into #{} (map :key defs/scopes)) scope)
+    (throw (ex-info (str "scope must be " (clojure.string/join " or " (map (comp name :key) defs/scopes)))
+                    {:error :request/malformed :scope scope})))
+  (control/update-settings! scope (constantly {}))
+  {:cleared true})

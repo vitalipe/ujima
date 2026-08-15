@@ -4,6 +4,7 @@
             [babashka.fs  :as fs]
             [malli.core   :as m]
             [malli.error  :as me]
+            [lib.edn      :refer [edn->json]]
             [lib.http     :as http]
             [ujima.control    :as control]
             [ujima.api        :as api]
@@ -19,6 +20,14 @@
   ([uri cfg]
    (let [app (http/app {:endpoints {"api" (api/endpoints cfg)} :log (fn [& _])})]
      (read-string (:body (app {:request-method :get :uri uri :query-string "format=edn"}))))))
+
+(defn- POST
+  ([uri] (POST uri nil))
+  ([uri body]
+   (let [app  (http/app {:endpoints {"api" (api/endpoints {})} :log (fn [& _])})
+         resp (app (cond-> {:request-method :post :uri uri :query-string "format=edn"}
+                     body (assoc :body (edn->json body))))]
+     {:status (:status resp) :body (some-> (:body resp) read-string)})))
 
 (defn- drift [shape v] (some->> (m/explain shape v) me/humanize))
 
@@ -67,6 +76,40 @@
       "cfg :id (system-id! at startup) answers the id leaf")
   (is (= {:id nil} (GET "/api/query/machine/id"))
       "no stamped system = an honest nil (a host run)"))
+
+
+(deftest a-cleared-setting-releases-the-hold
+  (fresh!)
+  (is (= 202 (:status (POST "/api/commands/settings/audio/muted" {:scope "activity" :value true}))))
+  (is (= {:effective true :via :activity}
+         (select-keys (GET "/api/query/settings/audio/muted") [:effective :via])))
+  (is (= 202 (:status (POST "/api/commands/clear/activity/audio/muted"))))
+  (let [rec (GET "/api/query/settings/audio/muted")]
+    (is (= {:effective false :via :default} (select-keys rec [:effective :via])))
+    (is (nil? (get-in rec [:scopes :activity])) "released — the entry is gone, not false")))
+
+
+(deftest a-scope-clear-releases-everything-it-holds
+  (fresh!)
+  (POST "/api/commands/settings/audio/muted"     {:scope "session"  :value true})
+  (POST "/api/commands/settings/audio/muted"     {:scope "activity" :value false})
+  (POST "/api/commands/settings/keyboard/layout" {:scope "activity" :value "us"})
+  (is (= {:effective false :via :activity}
+         (select-keys (GET "/api/query/settings/audio/muted") [:effective :via]))
+      "the activity hold shadows the session write")
+  (is (= 202 (:status (POST "/api/commands/clear/activity/"))))
+  (is (= {:effective true :via :session}
+         (select-keys (GET "/api/query/settings/audio/muted") [:effective :via]))
+      "the kid's own session state resumes")
+  (is (= :default (:via (GET "/api/query/settings/keyboard/layout")))))
+
+
+(deftest clear-rejects-what-it-must
+  (fresh!)
+  (is (= 404 (:status (POST "/api/commands/clear/banana/audio/muted"))) "unknown scope is not an address")
+  (is (= 404 (:status (POST "/api/commands/clear/activity/no/such"))) "unknown setting")
+  (is (= 404 (:status (POST "/api/commands/clear/device/audio/muted"))) "device is not a clear address")
+  (is (= 404 (:status (POST "/api/commands/clear/device/"))) "runtime scopes only — device falls through"))
 
 
 (deftest every-verb-is-answerable

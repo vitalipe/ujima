@@ -1,7 +1,9 @@
 (ns lib.http
   "http-kit edge. :endpoints is {prefix -> {:routes {\"GET /x\" (fn [req])} :errors {kw status}}},
    compiled to one router. A handler answers {:status :body}, a raw ring response, or nil for a
-   404; the request arrives parsed (:body :query :format). An unnamed error keyword is a 500."
+   404; the request arrives parsed (:body :raw-body :query :format). An unnamed error keyword is
+   a 500. An optional :sign gets (req rendered-resp) and answers headers to merge — what it signs
+   and how is entirely its own."
   (:require [clojure.string     :as str]
             [org.httpkit.server :as http]
             [clj-simple-router.core :as router]
@@ -30,13 +32,21 @@
            (URLDecoder/decode (or v "") "UTF-8")])))
 
 (defn- prepare
-  "Parse once. ?format is the edge's own and never reaches :query."
+  "Parse once. ?format is the edge's own and never reaches :query.
+   :raw-body is the body AS IT ARRIVED — a signature covers those exact bytes,
+   and the stream reads only once, so :body is parsed from the string."
   [req]
-  (let [query (decode-query (:query-string req))]
+  (let [query (decode-query (:query-string req))
+        ;; http-kit hands a stream; a caller (and the tests) may hand a string
+        raw   (when (body-methods (:request-method req))
+                (let [b (:body req)]
+                  (cond (string? b) b
+                        (some? b)   (slurp b))))]
     (assoc req
-           :format (if (= "edn" (:format query)) :edn :json)
-           :query  (dissoc query :format)
-           :body   (when (body-methods (:request-method req)) (json->edn (:body req))))))
+           :format   (if (= "edn" (:format query)) :edn :json)
+           :query    (dissoc query :format)
+           :raw-body (or raw "")
+           :body     (when (body-methods (:request-method req)) (json->edn raw)))))
 
 
 ;; --- the response --------------------------------------------------------
@@ -86,22 +96,43 @@
     table))
 
 
-(defn- handler [{:keys [route! log]} req]
+(defn- finish
+  "Render, then sign — a signature covers the RENDERED bytes, so this is the only
+   place it can be taken. `sign` is opaque: it gets the request and the rendered
+   response and answers headers to merge, so this namespace never learns the
+   scheme, the header name or the field order."
+  [{:keys [sign]} req resp]
+  (let [rendered (render (:format req) resp)]
+    (if-not sign
+      rendered
+      (do
+        ;; render passes files and streams through unread — a signed tier that
+        ;; serves one would ship a signature over nothing, so refuse instead
+        (when-not (or (nil? (:body rendered)) (string? (:body rendered)))
+          (throw (ex-info "a signed endpoint cannot serve a file or stream"
+                          {:error :http/unsignable :uri (:uri req)})))
+        (update rendered :headers merge (sign req rendered))))))
+
+
+(defn- handler [{:keys [route! log] :as cfg} req]
   (let [req (prepare req)]
-    (render (:format req)
-      (try
-        (or (route! req) {:status 404 :body {:error "not found"}})
-        (catch Throwable e
-          (log :error "http: handler failed" {:uri (:uri req) :error (ex-message e)})
-          {:status 500 :body {:error "internal error"}})))))
+    (try
+      (finish cfg req (or (route! req) {:status 404 :body {:error "not found"}}))
+      (catch Throwable e
+        (log :error "http: handler failed" {:uri (:uri req) :error (ex-message e)})
+        ;; the error body renders to a string, so this path is always signable
+        (finish cfg req {:status 500 :body {:error "internal error"}})))))
 
 
 (defn app
-  "The composed ring handler; listen! serves it, the test calls it directly."
-  [{:keys [endpoints log]}]
+  "The composed ring handler; listen! serves it, the test calls it directly.
+   :sign is optional — a listener that has one signs every response, a listener
+   without one signs nothing (absent, not disabled)."
+  [{:keys [endpoints log sign]}]
   (let [log (or log println-log)]
     (partial handler {:route! (router/router (route-table endpoints log))
-                      :log    log})))
+                      :log    log
+                      :sign   sign})))
 
 
 (defn listen!

@@ -76,3 +76,56 @@
   (is (thrown? AssertionError
         (http/app {:endpoints {"api" {:routes {"GET /x"     (fn [_] nil)}}
                                ""    {:routes {"GET /api/x" (fn [_] nil)}}}}))))
+
+
+;; --- the raw body and the signing hook -----------------------------------
+
+(def ^:private raw-echo
+  (http/app
+    {:endpoints {"api" {:routes {"POST /raw-echo" (fn [req] {:status 200 :body {:raw  (:raw-body req)
+                                                                                :body (:body req)}})
+                                 "GET  /raw-echo" (fn [req] {:status 200 :body {:raw (:raw-body req)}})}}}
+     :log (fn [_ _ _])}))
+
+
+(deftest the-raw-body-is-kept-as-it-arrived
+  (let [sent "{\"appId\": \"calc\"}"
+        seen (json->edn (:body (raw-echo {:request-method :post :uri "/api/raw-echo" :body sent})))]
+    (is (= sent (:raw seen)) "byte-identical — a signature covers these, not the reparse")
+    (is (= {:app-id "calc"} (:body seen)) "and :body is still parsed, from the string"))
+
+  (is (= "" (:raw (json->edn (:body (raw-echo {:request-method :get :uri "/api/raw-echo"})))))
+      "no body is an empty string, not nil — one shape to hash"))
+
+
+(defn- signing-app [& {:keys [body]}]
+  (http/app
+    {:endpoints {"api" {:routes {"GET /thing" (fn [_] {:status 201 :body (or body {:ok true})})}}}
+     :log  (fn [_ _ _])
+     :sign (fn [req resp]
+             {"response-signature" (str (:uri req) "|" (:status resp) "|" (:body resp))})}))
+
+
+(deftest a-listener-with-sign-signs-every-response
+  (let [resp ((signing-app) {:request-method :get :uri "/api/thing"})]
+    (is (= "/api/thing|201|{\"ok\":true}" (get-in resp [:headers "response-signature"]))
+        "the hook sees the RENDERED body and the status, and owns the format")
+    (is (= "application/json" (get-in resp [:headers "content-type"]))
+        "and the render's own headers survive the merge"))
+
+  (is (= "/api/nope|404|{\"error\":\"not found\"}"
+         (get-in ((signing-app) {:request-method :get :uri "/api/nope"}) [:headers "response-signature"]))
+      "the edge's own errors are signed too — an unsigned 404 would look tampered"))
+
+
+(deftest a-listener-without-sign-signs-nothing
+  (is (nil? (get-in (GET "/api/echo/x") [:headers "response-signature"]))))
+
+
+(deftest a-signed-endpoint-refuses-to-serve-an-unsignable-body
+  ;; render passes streams through unread, so signing one would cover nothing
+  (let [app  (signing-app :body (java.io.ByteArrayInputStream. (.getBytes "a file")))
+        resp (app {:request-method :get :uri "/api/thing"})]
+    (is (= 500 (:status resp)) "loud, not a response carrying a signature over nothing")
+    (is (= {:error "internal error"} (json->edn (:body resp))))
+    (is (some? (get-in resp [:headers "response-signature"])) "and the 500 itself is still signed")))

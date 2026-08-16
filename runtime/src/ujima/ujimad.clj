@@ -30,7 +30,8 @@
         disk-info   (when disk (ab/ujima-disk-info disk))
         app-cfg     (get-in env [:desktop :app])
         app-catalog (app/load-catalog (:catalog app-cfg) (:fallback-icon app-cfg))
-        http-cfg    (get-in env [:http] {})]
+        api-http    (get-in env [:api :http] {})
+        ui-http     (get-in env [:desktop :http] {})]
 
 
     (shell/install-remap! (get-in env [:shell :commands] {}))
@@ -47,12 +48,16 @@
 
     (events/init! (get-in env [:events] {}))
 
-    ;; the machine edge: ujimad composes the tiers, the edge knows neither's vocabulary
-    (http/listen! (merge http-cfg
-                         {:endpoints {"api" (api/endpoints        {:version (:version deploy)
-                                                                   :id      machine-id
-                                                                   :disk    disk-info})
-                                      ""    (shell-http/endpoints (get-in env [:desktop :http] {}))}
+    ;; the machine edge: ujimad composes the tiers, the edge knows neither's vocabulary.
+    ;; one listener each — the remote tier is LAN-bound, the desktop's is loopback-only
+    (http/listen! (merge api-http
+                         {:endpoints {"api" (api/endpoints {:version (:version deploy)
+                                                            :id      machine-id
+                                                            :disk    disk-info})}
+                          :log       log/log!}))
+
+    (http/listen! (merge ui-http
+                         {:endpoints {"" (shell-http/endpoints ui-http)}
                           :log       log/log!}))
 
     (try

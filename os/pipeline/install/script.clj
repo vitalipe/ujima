@@ -50,7 +50,7 @@
                             ; it at RUNTIME on release images, so it is core, not dev-only
         "feh"               ; sets the desktop background (wall.png) on the X root — i3 `exec feh --bg-fill`
         ;; webview launcher host (desktop/bin/ujima-launcher): a chromeless WebKitGTK window
-        ;; renders the launcher home surface (served from :1337). python3-gi + the GTK3 / WebKit2-4.1
+        ;; renders the launcher home surface (served from :1336). python3-gi + the GTK3 / WebKit2-4.1
         ;; typelibs; libgtk-3-0 above is the shared runtime lib. Compositing + JIT disabled in the host.
         "python3-gi" "gir1.2-gtk-3.0" "gir1.2-webkit2-4.1"
         ;; bwrap: opt-in mount isolation for shell-bearing apps (mask the /ujima + /mnt partitions,

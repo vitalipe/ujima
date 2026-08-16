@@ -7,11 +7,14 @@
  :events  {:audio-poll-ms 1000
            :clock-save-ms 600000}
 
- :http    {:host "0.0.0.0" :port 1337}   ; LAN-reachable for remote admin — no auth, physical-access threat model
+ ;; two listeners, kernel-enforced: /api is the remote tier, /ui + the launcher's
+ ;; files are this machine's own and never leave loopback
+ :api     {:http {:host "0.0.0.0" :port 1337}}
 
  :desktop {:launcher "/ujima/desktop/bin/ujima-launcher"
 
-           :http     {:static-root "/ujima/desktop/shell"}
+           :http     {:host "127.0.0.1" :port 1336
+                      :static-root "/ujima/desktop/shell"}
 
            :eww      {:eww-config "/ujima/desktop/shell/eww"}
 

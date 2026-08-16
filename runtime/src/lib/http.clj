@@ -80,7 +80,7 @@
                     (for [[prefix {:keys [routes errors]}] endpoints
                           [route f] routes]
                       [(mount prefix route) (guard (merge base-errors errors) log f)]))]
-    ;; a root-mounted module can claim a prefixed one's path; merge drops one
+    ;; two modules on one listener can claim the same path; merge drops one
     (assert (= (count table) (reduce + (map (comp count :routes val) endpoints)))
             "duplicate route across endpoints")
     table))
@@ -106,7 +106,9 @@
 
 (defn listen!
   "Bind host:port and serve; returns http-kit's stop fn. A taken port throws —
-   the caller dies loudly and systemd rebuilds it."
-  [{:keys [host port log] :as cfg :or {host "127.0.0.1" port 1337}}]
+   the caller dies loudly and systemd rebuilds it. :host and :port are required:
+   a default would let two listeners silently collide on it."
+  [{:keys [host port log] :as cfg}]
+  (assert (and host port) (str "listen! needs :host and :port, got " {:host host :port port}))
   ((or log println-log) :info "http listening" {:host host :port port})
   (http/run-server (app cfg) {:ip host :port port}))

@@ -10,7 +10,7 @@
 # something real to bound. `post` runs even after a stop timeout and escalates through
 # logind: TERM first (X restores the VT on TERM; leading with SIGKILL on Xorg corrupts
 # the VT — HW-learned), then KILL only stragglers that ignored TERM (e.g. a SIGSTOPped
-# ujimad still holding :1337) so the next session's ujimad can bind.
+# ujimad still holding its ports) so the next session's ujimad can bind.
 STASH=/run/ujima-session-scope
 
 stop() {

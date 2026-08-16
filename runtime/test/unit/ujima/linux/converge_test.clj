@@ -7,7 +7,11 @@
 
 
 ;; Desired-vs-actual decision logic only (no OS): audio/full-topology and the setters are
-;; stubbed; :set-style stubs record what they were asked to do.
+;; stubbed; :set-style stubs record what they were asked to do. Fixtures stay scalar.
+
+
+(defn- records  [settings] (update-vals settings #(hash-map :effective %)))
+(defn- converge! [settings] (converge/converge! (records settings) nil))
 
 
 (def ^:private world-hdmi-default
@@ -43,7 +47,7 @@
        (with-redefs [audio/full-topology          (constantly world-hdmi-default)
                      audio/switch-output! (fn [id] (reset! switched id))
                      audio/apply-sink!    (fn [id d] (swap! applied assoc id d))]
-         (converge/converge! base-settings nil))
+         (converge! base-settings))
        (is (= 60 @switched)               "active :usb present but hdmi is default -> switch")
        (is (= {60 {:volume 40}} @applied) "usb corrected to its class volume; hdmi already in sync"))))
 
@@ -54,9 +58,9 @@
        (with-redefs [audio/full-topology          (constantly (assoc world-hdmi-default :default :usb))
                      audio/switch-output! (fn [id] (swap! switched conj id))
                      audio/apply-sink!    (fn [_ _])]
-         (converge/converge! base-settings nil)
-         (converge/converge! (assoc base-settings [:audio :active] nil) nil)
-         (converge/converge! (assoc base-settings [:audio :active] :hdmi) nil))
+         (converge! base-settings)
+         (converge! (assoc base-settings [:audio :active] nil))
+         (converge! (assoc base-settings [:audio :active] :hdmi)))
        (is (= [] (remove #{51} @switched)) "never switches to a sink that's absent or already right")
        (is (= [51] (filter #{51} @switched)) "the hdmi case did switch (usb was default)"))))
 
@@ -67,7 +71,7 @@
        (with-redefs [audio/full-topology          (constantly (assoc world-hdmi-default :default :usb))
                      audio/switch-output! (fn [_])
                      audio/apply-sink!    (fn [id d] (swap! applied assoc id d))]
-         (converge/converge! (assoc base-settings [:audio :muted] true) nil))
+         (converge! (assoc base-settings [:audio :muted] true)))
        (is (= {60 {:volume 40 :muted true}
                51 {:muted true}}
               @applied)
@@ -84,7 +88,7 @@
                   system/hostname! (fn [_])
                   system/timezone  (constantly "Africa/Dar_es_Salaam")
                   system/timezone! (fn [_])]
-      (is (= settings (converge/converge! settings nil)) "does not throw, returns settings"))
+      (is (= (records settings) (converge! settings)) "does not throw, returns settings"))
     (is (= "tz" @layout-applied) "keyboard converged despite audio throwing")))
 
 
@@ -99,7 +103,7 @@
                   system/hostname! (fn [v] (swap! calls conj [:hostname v]))
                   system/timezone  (constantly "Africa/Dar_es_Salaam")
                   system/timezone! (fn [v] (swap! calls conj [:timezone v]))]
-      (converge/converge! base-settings nil))
+      (converge! base-settings))
     (is (= [[:hostname "ujima"]] @calls)
         "only the drifted hostname converged; layout and timezone were in sync")))
 
@@ -110,8 +114,8 @@
       (let [set-to (atom nil)]
         (with-redefs [audio/full-topology (constantly {:default nil :sinks {}})
                       system/clock!       (fn [ms] (reset! set-to ms))]
-          (converge/converge! (assoc base-settings [:system :clock :epoch-floor] 123) nil)
+          (converge! (assoc base-settings [:system :clock :epoch-floor] 123))
           (is (nil? @set-to) "a floor in the past leaves the clock alone")
           (let [ahead (+ (System/currentTimeMillis) 60000)]
-            (converge/converge! (assoc base-settings [:system :clock :epoch-floor] ahead) nil)
+            (converge! (assoc base-settings [:system :clock :epoch-floor] ahead))
             (is (= ahead @set-to) "a lagging clock rises to the floor")))))))

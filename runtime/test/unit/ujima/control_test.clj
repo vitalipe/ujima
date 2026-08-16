@@ -20,13 +20,14 @@
 
 (defn- device-file [dir] (str dir "/device.edn"))
 
+(defn- value [key] (:effective (control/setting key)))
+
 
 (deftest defaults-when-nothing-is-stored
   (fresh!)
-  (let [s (control/settings)]
-    (is (= 40 (get s [:audio :usb :volume])))
-    (is (= 70 (get s [:audio :hdmi :volume])))
-    (is (nil? (get s [:system :hostname])) "nil default = keep the baked /etc/hostname")))
+  (is (= 40 (value [:audio :usb :volume])))
+  (is (= 70 (value [:audio :hdmi :volume])))
+  (is (nil? (value [:system :hostname])) "nil default = keep the baked /etc/hostname"))
 
 
 (deftest write-stamps-schema-and-round-trips
@@ -35,46 +36,45 @@
     (let [raw (edn/read-string (slurp (device-file dir)))]
       (is (= defs/schema (:schema raw)))
       (is (= 85 (get-in raw [:settings [:audio :hdmi :volume]]))))
-    (is (= 85 (get (control/settings) [:audio :hdmi :volume])))))
+    (is (= 85 (value [:audio :hdmi :volume])))))
 
 
 (deftest scope-precedence-and-sibling-path-independence
   (fresh!)
   (control/settings! :device  [:audio :hdmi :volume] 85)
   (control/settings! :session [:audio :usb :volume] 20)
-  (let [s (control/settings)]
-    (is (= 20 (get s [:audio :usb :volume]))  "session overrides default")
-    (is (= 85 (get s [:audio :hdmi :volume])) "sibling path untouched by session write"))
+  (is (= 20 (value [:audio :usb :volume]))  "session overrides default")
+  (is (= 85 (value [:audio :hdmi :volume])) "sibling path untouched by session write")
   (control/settings! :activity [:audio :usb :volume] 5)
-  (is (= 5 (get (control/settings) [:audio :usb :volume])) "activity outranks session"))
+  (is (= 5 (value [:audio :usb :volume])) "activity outranks session"))
 
 
 (deftest write-of-non-scope-key-is-pruned
   (fresh!)
   (control/settings! :session [:system :hostname] "nope")   ; :device-only key
-  (is (nil? (get (control/settings) [:system :hostname])) "pruned write leaves the nil default"))
+  (is (nil? (value [:system :hostname])) "pruned write leaves the nil default"))
 
 
 (deftest file-with-matching-schema-loads
   (let [dir (fresh!)]
     (spit (device-file dir) (pr-str {:schema defs/schema
                                      :settings {[:audio :hdmi :volume] 90}}))
-    (is (= 90 (get (control/settings) [:audio :hdmi :volume])))))
+    (is (= 90 (value [:audio :hdmi :volume])))))
 
 
 (deftest pre-schema-or-mismatched-file-is-ignored
   (let [dir (fresh!)]
     (spit (device-file dir) (pr-str {:settings {[:audio :hdmi :volume] 99}}))
-    (is (= 70 (get (control/settings) [:audio :hdmi :volume])) "no :schema -> defaults")
+    (is (= 70 (value [:audio :hdmi :volume])) "no :schema -> defaults")
 
     (spit (device-file dir) (pr-str {:schema -1 :settings {[:audio :hdmi :volume] 99}}))
-    (is (= 70 (get (control/settings) [:audio :hdmi :volume])) "wrong :schema -> defaults")
+    (is (= 70 (value [:audio :hdmi :volume])) "wrong :schema -> defaults")
 
     (spit (device-file dir) (pr-str {:settings {:audio/volume 55}}))
-    (is (= 70 (get (control/settings) [:audio :hdmi :volume])) "old keyword format -> defaults")
+    (is (= 70 (value [:audio :hdmi :volume])) "old keyword format -> defaults")
 
     (spit (device-file dir) "42")
-    (is (= 70 (get (control/settings) [:audio :hdmi :volume])) "non-map edn -> defaults")))
+    (is (= 70 (value [:audio :hdmi :volume])) "non-map edn -> defaults")))
 
 
 (deftest write-over-stale-file-replaces-it
@@ -88,13 +88,13 @@
 
 
 (deftest converge-targets-receive-effective-and-previous
-  (let [seen (atom [])]
-    (fresh! [(fn [s prv] (swap! seen conj [(get s [:audio :hdmi :volume])
-                                           (some-> prv (get [:audio :hdmi :volume]))]))
+  (let [seen  (atom [])
+        vol   #(:effective (get % [:audio :hdmi :volume]))]
+    (fresh! [(fn [s prv] (swap! seen conj [(vol s) (some-> prv vol)]))
              (fn [_ _] (throw (ex-info "boom" {})))])   ; must never break a converge
     (control/settings! :device [:audio :hdmi :volume] 85)
     (is (= [[85 70]] @seen) "write converge: (effective, previous-effective)")
-    (is (= 85 (get (control/settings) [:audio :hdmi :volume])) "throwing target didn't break the write")
+    (is (= 85 (value [:audio :hdmi :volume])) "throwing target didn't break the write")
     (control/converge-fresh!)
     (is (= [[85 70] [85 nil]] @seen) "external converge: prv nil = assume nothing")))
 
@@ -103,23 +103,18 @@
   (fresh!)
   (control/settings! :session  [:keyboard :layout] "tz")
   (control/settings! :activity [:keyboard :layout] "il")
-  (let [tree (control/settings-records-tree)]
+  (let [s (control/settings)]
     (is (= {:effective "il" :via :activity :default "us"
             :scopes {:device nil :session "tz" :activity "il"}}
-           (get-in tree [:keyboard :layout]))
+           (get s [:keyboard :layout]))
         "the winner, why it won, what it falls back to, and what each scope holds")
-    (is (= {:device nil} (:scopes (get-in tree [:system :hostname])))
+    (is (= {:device nil} (:scopes (get s [:system :hostname])))
         "only the scopes the def allows — the keys are the write whitelist")
-    (is (= :default (:via (get-in tree [:audio :muted]))) "nothing set = the default stands")
-    (is (= #{:active :muted :usb :hdmi} (set (keys (:audio tree))))
-        "a path key nests — [:audio :usb :volume] is three levels, not one")))
+    (is (= :default (:via (get s [:audio :muted]))) "nothing set = the default stands")
+    (is (= (count defs/settings) (count s)) "one record per setting, always")))
 
 
-(deftest records-and-settings-cannot-disagree
+(deftest setting-is-one-key-out-of-settings
   (fresh!)
-  (control/settings! :device   [:audio :usb :volume] 85)
-  (control/settings! :activity [:audio :muted]       true)
-  (let [flat (control/settings)
-        tree (control/settings-records-tree)]
-    (is (= flat (into {} (map (fn [[key _]] [key (:effective (get-in tree key))])) flat))
-        "one merge, two renders")))
+  (is (= (get (control/settings) [:audio :muted]) (control/setting [:audio :muted])))
+  (is (nil? (control/setting [:audio :mooted])) "an undefined path reads nil"))

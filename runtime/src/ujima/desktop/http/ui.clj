@@ -40,6 +40,6 @@
    the same cycle order the state topic publishes."
   []
   (let [s (control/settings)]
-    {:next (next-of (get s [:keyboard :available-layouts])
-                    (get s [:keyboard :layout]))}))
+    {:next (next-of (:effective (get s [:keyboard :available-layouts]))
+                    (:effective (get s [:keyboard :layout])))}))
 

@@ -24,7 +24,7 @@
   ;; a same-class swap arrives as an event with equal class sets — the write
   ;; must still happen (its converge re-applies state onto the new device)
   (let [written (atom [])]
-    (with-redefs [control/settings              (constantly {[:audio :active] :usb})
+    (with-redefs [control/setting               (constantly {:effective :usb})
                   commands/change-active-output! (fn [v _scope] (swap! written conj v) {:output v})]
       (events-audio/on-sinks-changed! {:before #{:usb} :classes #{:usb}})
       (events-audio/on-sinks-changed! {:before #{:usb} :classes #{:usb :hdmi}}))

@@ -6,7 +6,7 @@
 
 (deftest change-current-volume-targets-the-active-class
   (let [written (atom nil)]
-    (with-redefs [control/settings  (constantly {[:audio :active] :usb})
+    (with-redefs [control/setting   (constantly {:effective :usb})
                   control/settings! (fn [scope k v] (reset! written [scope k v]) {})]
       (is (= {:volume 100} (commands/change-current-volume! 250 :session)) "clamped before storing; narrow ack")
       (is (= [:session [:audio :usb :volume] 100] @written))
@@ -14,7 +14,7 @@
 
 
 (deftest change-current-volume-rejects-without-an-active-output
-  (with-redefs [control/settings (constantly {})]
+  (with-redefs [control/setting  (constantly {:effective nil})]
     (is (= :audio/no-output
            (try (commands/change-current-volume! 50 :session) (catch Exception e (:error (ex-data e))))))))
 
@@ -38,7 +38,7 @@
 
 (deftest change-keyboard-layout-accepts-only-available-codes
   (let [written (atom nil)]
-    (with-redefs [control/settings  (constantly {[:keyboard :available-layouts] ["us" "tz"]})
+    (with-redefs [control/setting   (constantly {:effective ["us" "tz"]})
                   control/settings! (fn [scope k v] (reset! written [scope k v]) {})]
       (is (= {:layout "tz"} (commands/change-keyboard-layout! "tz" :session)))
       (is (= [:session [:keyboard :layout] "tz"] @written))

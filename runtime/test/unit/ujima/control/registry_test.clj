@@ -61,37 +61,44 @@
 
 
 ;; ---------------------------------------------------------------------------
-;; effective-value (override merge)
+;; effective-scope (override merge)
 ;; ---------------------------------------------------------------------------
 
-(deftest effective-value-last-non-nil-wins
-  (is (= "z" (registry/effective-value [{:settings {[:a :k] "a"}} {:settings {[:a :k] "z"}}]
-                                       [:a :k]))))
+(def ^:private three [:device :session :activity])
 
-(deftest effective-value-skips-scopes-that-do-not-set-the-key
-  (is (= "a" (registry/effective-value [{:settings {[:a :k] "a"}}
-                                        {:settings {}}
-                                        {:settings {[:a :other] 1}}]
-                                       [:a :k]))))
+(deftest effective-scope-last-holder-wins
+  (is (= :session (registry/effective-scope three
+                                            [{:settings {[:a :k] "a"}} {:settings {[:a :k] "z"}} {}]
+                                            [:a :k]))))
 
-(deftest effective-value-falsy-value-still-overrides
+(deftest effective-scope-skips-scopes-that-do-not-set-the-key
+  (is (= :device (registry/effective-scope three
+                                           [{:settings {[:a :k] "a"}}
+                                            {:settings {}}
+                                            {:settings {[:a :other] 1}}]
+                                           [:a :k]))))
+
+(deftest effective-scope-falsy-value-still-holds
   ;; guards the if-some/falsy regression
-  (is (false? (registry/effective-value [{:settings {[:a :k] true}} {:settings {[:a :k] false}}]
-                                        [:a :k])))
-  (is (zero? (registry/effective-value [{:settings {[:a :k] 5}} {:settings {[:a :k] 0}}]
-                                       [:a :k]))))
+  (is (= :session (registry/effective-scope three
+                                            [{:settings {[:a :k] true}} {:settings {[:a :k] false}} {}]
+                                            [:a :k])))
+  (is (= :session (registry/effective-scope three
+                                            [{:settings {[:a :k] 5}} {:settings {[:a :k] 0}} {}]
+                                            [:a :k]))))
 
-(deftest effective-value-nil-when-no-scope-sets-it
-  (is (nil? (registry/effective-value [{:settings {}} {:settings {[:a :other] 1}}] [:a :k])))
-  (is (nil? (registry/effective-value [] [:a :k]))))
+(deftest effective-scope-nil-when-no-scope-sets-it
+  (is (nil? (registry/effective-scope three [{:settings {}} {:settings {[:a :other] 1}} {}] [:a :k])))
+  (is (nil? (registry/effective-scope [] [] [:a :k]))))
 
-(deftest effective-value-sibling-paths-override-independently
+(deftest effective-scope-sibling-paths-override-independently
   ;; the point of path keys: a scope overriding [:audio :usb :volume] must not
-  ;; disturb [:audio :hdmi :volume] (each path is its own scalar setting)
-  (let [scopes [{:settings {[:audio :usb :volume] 40 [:audio :hdmi :volume] 70}}
-                {:settings {[:audio :usb :volume] 20}}]]
-    (is (= 20 (registry/effective-value scopes [:audio :usb :volume])))
-    (is (= 70 (registry/effective-value scopes [:audio :hdmi :volume])))))
+  ;; disturb [:audio :hdmi :volume]
+  (let [data [{:settings {[:audio :usb :volume] 40 [:audio :hdmi :volume] 70}}
+              {:settings {[:audio :usb :volume] 20}}
+              {}]]
+    (is (= :session (registry/effective-scope three data [:audio :usb :volume])))
+    (is (= :device  (registry/effective-scope three data [:audio :hdmi :volume])))))
 
 
 ;; ---------------------------------------------------------------------------

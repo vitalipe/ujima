@@ -6,16 +6,18 @@
             [lib.http.ndjson :as ndjson]))
 
 
+(defn- effective [settings key] (:effective (get settings key)))
+
+
 (defn settings->ui
-  "Effective settings -> the UI blob ([:audio :active] is the truth for which
-   output). Presentation derivations belong here — :next is the switcher's
-   cycle order, not a domain fact."
+  "Settings records -> the UI blob. Presentation derivations belong here —
+   :next is the switcher's cycle order, not a domain fact."
   [settings]
-  (let [output  (get settings [:audio :active])
-        layout  (get settings [:keyboard :layout])
-        layouts (get settings [:keyboard :available-layouts])]
-    {:audio    {:volume (when output (get settings [:audio output :volume]))
-                :muted  (get settings [:audio :muted])
+  (let [output  (effective settings [:audio :active])
+        layout  (effective settings [:keyboard :layout])
+        layouts (effective settings [:keyboard :available-layouts])]
+    {:audio    {:volume (when output (effective settings [:audio output :volume]))
+                :muted  (effective settings [:audio :muted])
                 :output output}
      :keyboard {:layout  layout
                 :layouts layouts

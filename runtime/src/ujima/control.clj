@@ -10,7 +10,6 @@
             [ujima.log :as log]
             [schema.ujima.settings        :as defs]
             [ujima.control.registry :refer [->registry
-                                            effective-value
                                             effective-scope
                                             default-settings
                                             scope->allowed-settings
@@ -78,28 +77,19 @@
 
 
 (defn settings
-  "Return the effective (merged) settings.
+  "Every setting as a record, keyed by path vector — one entry per setting, always:
+
+     {[:keyboard :layout] {:effective \"tz\"
+                           :via       :session
+                           :default   \"us\"
+                           :scopes    {:device nil :session \"tz\" :activity nil}}}
+
+   :scopes carries only the scopes that setting's def allows, so its keys are
+   the write whitelist; :via is :default when no scope holds one.
+
    Read-only, not locked -- a read may observe a scope mid-mutation, which is
    fine for advisory reads. Do NOT read-then-write off this value outside the
    lock; use `update-settings!` for read-modify-write."
-  []
-  (let [registry           @registry*
-        all-scopes         (map slurp-scope (scopes registry))
-        setting->effective (partial effective-value all-scopes)]
-
-    (->> (default-settings registry)
-      (map-kv-vals (fn [k default] 
-                     (if-some [effective (setting->effective k)]
-                       effective
-                       default))))))
-
-
-(defn settings-records-tree
-  "`settings` as an addressable tree, each leaf carrying the story behind its
-   value: what it is, the scope it came from (:default when none does), the
-   default, and every scope allowed to set it holding what it holds now — nil
-   for unset, and those keys double as the write whitelist. One pass over the
-   scope files. Same read-only, unlocked terms as `settings`."
   []
   (let [registry    @registry*
         scope-keys  (scopes registry)
@@ -107,17 +97,21 @@
         by-scope    (zipmap scope-keys (map :settings scopes-data))
         allowed     (zipmap scope-keys (map (partial scope->allowed-settings registry) scope-keys))]
 
-    (reduce-kv
-      (fn [tree key default]
-        (let [via (effective-scope scope-keys scopes-data key)]
-          (assoc-in tree key
+    (->> (default-settings registry)
+      (map-kv-vals
+        (fn [key default]
+          (let [via (effective-scope scope-keys scopes-data key)]
             {:effective (if via (get-in by-scope [via key]) default)
              :via       (or via :default)
              :default   default
              :scopes    (into {} (for [scope scope-keys :when (contains? (allowed scope) key)]
-                                   [scope (get-in by-scope [scope key])]))})))
-      {}
-      (default-settings registry))))
+                                   [scope (get-in by-scope [scope key])]))}))))))
+
+
+(defn setting
+  "One setting's record — a whole pass for one key; read `settings` for several."
+  [key]
+  (get (settings) key))
 
 
 (defn update-settings!

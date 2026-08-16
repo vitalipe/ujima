@@ -30,7 +30,7 @@
    same value included, because the idempotent write still converges, which is
    what re-applies state onto a swapped device of the same class."
   [{:keys [before classes]}]
-  (let [current (get (control/settings) [:audio :active])
+  (let [current (:effective (control/setting [:audio :active]))
         active  (pick-active before classes current)]
     (log/info "audio devices changed" {:present classes :active active})
     (commands/change-active-output! active :session)))

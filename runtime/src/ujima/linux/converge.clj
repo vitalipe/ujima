@@ -6,6 +6,7 @@
    Domains are isolated: one failing block never stops the others."
   (:require [ujima.log            :as log]
             [lib.shell            :as shell]
+            [lib.util             :refer [map-vals]]
             [ujima.linux.system   :as system]
             [ujima.linux.keyboard :as keyboard]
             [ujima.linux.audio    :as audio]))
@@ -65,15 +66,16 @@
 
 
 (defn converge!
-  "Drive linux to match `settings` (the full effective map). Settings without a
-   consumer here are simply not linux's business."
+  "Drive linux to match `settings` (control's records; the domains see values).
+   Settings without a consumer here are simply not linux's business."
   [settings _prv]
-  (shell/with-timeout command-timeout-ms
-    (doseq [[domain f] [[:audio    converge-audio!]
-                        [:keyboard converge-keyboard!]
-                        [:system   converge-system!]
-                        [:clock    converge-clock!]]]
-      (try (f settings)
-           (catch Throwable e
-             (log/error "converge: domain failed" {:domain domain :error (ex-message e)})))))
+  (let [values (map-vals :effective settings)]
+    (shell/with-timeout command-timeout-ms
+      (doseq [[domain f] [[:audio    converge-audio!]
+                          [:keyboard converge-keyboard!]
+                          [:system   converge-system!]
+                          [:clock    converge-clock!]]]
+        (try (f values)
+             (catch Throwable e
+               (log/error "converge: domain failed" {:domain domain :error (ex-message e)}))))))
   settings)

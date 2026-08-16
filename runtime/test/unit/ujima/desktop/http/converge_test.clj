@@ -3,6 +3,10 @@
             [ujima.desktop.http.converge :as converge]))
 
 
+(defn- ui [settings]
+  (converge/settings->ui (update-vals settings #(hash-map :effective %))))
+
+
 (def ^:private settings
   {[:audio :active]                :usb
    [:audio :usb :volume]           55
@@ -15,24 +19,24 @@
 (deftest settings->ui-projects-the-active-output
   (is (= {:audio    {:volume 55 :muted false :output :usb}
           :keyboard {:layout "us" :layouts ["us" "tz"] :next "tz"}}
-         (converge/settings->ui settings)))
-  (is (= 70 (get-in (converge/settings->ui (assoc settings [:audio :active] :hdmi))
+         (ui settings)))
+  (is (= 70 (get-in (ui (assoc settings [:audio :active] :hdmi))
                     [:audio :volume]))
       "volume follows the active class"))
 
 
 (deftest settings->ui-greys-out-without-an-active-output
   (is (= {:volume nil :muted false :output nil}
-         (:audio (converge/settings->ui (assoc settings [:audio :active] nil))))))
+         (:audio (ui (assoc settings [:audio :active] nil))))))
 
 
 (deftest settings->ui-computes-the-switcher-cycle
-  (is (= "us" (get-in (converge/settings->ui (assoc settings [:keyboard :layout] "tz"))
+  (is (= "us" (get-in (ui (assoc settings [:keyboard :layout] "tz"))
                       [:keyboard :next]))
       "wraps")
-  (is (= "us" (get-in (converge/settings->ui (assoc settings [:keyboard :layout] "il"))
+  (is (= "us" (get-in (ui (assoc settings [:keyboard :layout] "il"))
                       [:keyboard :next]))
       "unknown current -> first")
-  (is (nil? (get-in (converge/settings->ui (assoc settings [:keyboard :available-layouts] []))
+  (is (nil? (get-in (ui (assoc settings [:keyboard :available-layouts] []))
                     [:keyboard :next]))
       "no layouts -> no next"))

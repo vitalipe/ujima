@@ -119,8 +119,8 @@
                                    {:ip         (net/lan-ip facts)
                                     :interfaces facts}))
 
-               "system/hostname" #(get (control/settings) [:system :hostname])
-               "system/timezone" #(get (control/settings) [:system :timezone])
+               "system/hostname" #(:effective (control/setting [:system :hostname]))
+               "system/timezone" #(:effective (control/setting [:system :timezone]))
                "system/clock-ms" #(System/currentTimeMillis)
 
                "monitor/uptime-minutes" system/uptime-minutes
@@ -128,4 +128,4 @@
 
      (routes/queries
       {:base  "query"
-       :nodes {"settings" control/settings-records-tree}}))})
+       :nodes {"settings" #(queries/settings->tree (control/settings))}}))})

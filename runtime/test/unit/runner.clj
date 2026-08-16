@@ -12,6 +12,7 @@
 
             [lib.edn-test]
             [lib.io-test]
+            [lib.http.signature-test]
 
             [ujima.control.registry-test]
             [ujima.linux.converge-test]
@@ -48,6 +49,7 @@
 
     lib.edn-test
     lib.io-test
+    lib.http.signature-test
 
     ujima.control.registry-test
     ujima.linux.converge-test

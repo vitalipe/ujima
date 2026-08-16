@@ -46,8 +46,13 @@
 
 
 (defn generate!
-  "Rewrite the pins from ROOT's catalogs (a dev box or a mounted image rootfs)."
+  "Rewrite the pins from a mounted image ROOTFS. Never this host: verify! diffs the
+   pins against the image, so a host-derived pin can only ever fail the build — and
+   until it does, it promises the runtime catalogs the device hasn't got."
   [root]
+  (when (= "/" (.getCanonicalPath (io/file root)))
+    (throw (ex-info "pin from a mounted image rootfs, not this host — the pin describes the image"
+                    {:root (str root)})))
   (doseq [{:keys [ns file read!]} pins]
     (let [names (read! root)]
       (when (empty? names) (throw (ex-info "empty catalog" {:pin ns :root (str root)})))

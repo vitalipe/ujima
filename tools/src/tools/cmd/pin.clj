@@ -12,8 +12,9 @@
 (def ^:private usage
   "bb pin <what> — pull world-truth into the repo as a committed pin:
 
-  schema [root]     tz/xkb catalogs -> runtime/src/schema/build
-                    from a system root (default /; also: a mounted image rootfs)
+  schema <rootfs>   tz/xkb catalogs -> runtime/src/schema/build
+                    from a MOUNTED IMAGE ROOTFS — never this host: the build
+                    diffs the pin against the image
   deps              the bb-deps manifest -> os/build/deps-pin.edn
                     from deps.edn (resolved on the host)
   initramfs <ip>    kernel-matched initramfs -> os/pipeline/boot/initramfs/
@@ -38,7 +39,9 @@ Review the diff, commit. The build verifies every pin against the image.")
 
 (defn dispatch! [& args]
   (case (first args)
-    "schema"    (schema/generate! (or (second args) "/"))
+    "schema"    (if-let [root (second args)]
+                  (schema/generate! root)
+                  (throw (ex-info "bb pin schema <rootfs> — needs a mounted image rootfs" {})))
     "deps"      (deps/pin!)
     "initramfs" (if-let [ip (second args)]
                   (pin-initramfs! ip)

@@ -30,13 +30,6 @@
          (:audio (ui (assoc settings [:audio :active] nil))))))
 
 
-(deftest settings->ui-computes-the-switcher-cycle
-  (is (= "us" (get-in (ui (assoc settings [:keyboard :layout] "tz"))
-                      [:keyboard :next]))
-      "wraps")
-  (is (= "us" (get-in (ui (assoc settings [:keyboard :layout] "il"))
-                      [:keyboard :next]))
-      "unknown current -> first")
-  (is (nil? (get-in (ui (assoc settings [:keyboard :available-layouts] []))
-                    [:keyboard :next]))
-      "no layouts -> no next"))
+(deftest settings->ui-carries-the-switcher-cycle
+  (is (= "us" (get-in (ui (assoc settings [:keyboard :layout] "tz")) [:keyboard :next]))
+      "the cycle itself is queries/next-keyboard-layout's contract — this is the wiring"))

@@ -1,10 +1,10 @@
 (ns ujima.desktop.http.ui
   "The /ui verbs that are not a stream: the switcher's next layout as a one-shot
    read, and volume moves, where interaction is not state."
-  (:require [lib.util     :refer [next-of]]
-            [lib.throttle :refer [throttle-leading-trailing]]
+  (:require [lib.throttle :refer [throttle-leading-trailing]]
             [ujima.log          :as log]
             [ujima.control          :as control]
+            [ujima.control.queries  :as queries]
             [ujima.control.commands :as commands]))
 
 
@@ -36,10 +36,7 @@
 
 
 (defn keyboard-next
-  "The switcher's next layout, so the keybind needn't tap the state stream —
-   the same cycle order the state topic publishes."
+  "The switcher's next layout, so the keybind needn't tap the state stream."
   []
-  (let [s (control/settings)]
-    {:next (next-of (:effective (get s [:keyboard :available-layouts]))
-                    (:effective (get s [:keyboard :layout])))}))
+  {:next (queries/next-keyboard-layout (control/settings))})
 

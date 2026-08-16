@@ -2,21 +2,17 @@
   "The GUI's converge ports and the streams they feed. control hands it the
    whole settings plane, so this projects; the app layer projects before its
    targets run, so that one republishes as-is."
-  (:require [lib.util              :refer [next-of]]
-            [lib.http.ndjson       :as ndjson]
+  (:require [lib.http.ndjson       :as ndjson]
             [ujima.control.queries :as queries]))
 
 
 (defn settings->ui
-  "Settings records -> the UI blob. Presentation derivations belong here —
-   :next is the switcher's cycle order, not a domain fact."
+  "Settings records -> the UI blob."
   [settings]
-  (let [layout  (:effective (get settings [:keyboard :layout]))
-        layouts (:effective (get settings [:keyboard :available-layouts]))]
-    {:audio    (queries/audio-status settings)
-     :keyboard {:layout  layout
-                :layouts layouts
-                :next    (next-of layouts layout)}}))
+  {:audio    (queries/audio-status settings)
+   :keyboard {:layout  (:effective (get settings [:keyboard :layout]))
+              :layouts (:effective (get settings [:keyboard :available-layouts]))
+              :next    (queries/next-keyboard-layout settings)}})
 
 
 (defn converge-ui!   [settings _prv] (ndjson/publish! :ui/state (settings->ui settings)))

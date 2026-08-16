@@ -28,6 +28,17 @@
     (is (not (str/includes? (pr-str public) "deadbeef")) "the record goes, not just the value")))
 
 
+(deftest next-keyboard-layout-cycles-the-available-ones
+  (let [cycle* (fn [layout layouts]
+                 (queries/next-keyboard-layout
+                   (records {[:keyboard :layout]            layout
+                             [:keyboard :available-layouts] layouts})))]
+    (is (= "tz" (cycle* "us" ["us" "tz"])))
+    (is (= "us" (cycle* "tz" ["us" "tz"]))  "wraps")
+    (is (= "us" (cycle* "il" ["us" "tz"]))  "unknown current -> first")
+    (is (nil?   (cycle* "us" []))           "no layouts -> no next")))
+
+
 (deftest settings->tree-nests-the-path-keys
   (is (= {:audio {:usb  {:volume {:effective 40}}
                   :muted        {:effective false}}

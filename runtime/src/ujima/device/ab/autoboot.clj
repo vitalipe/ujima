@@ -43,20 +43,19 @@
                       :b (format "%08x-%02x" ujima-mbr-disk-id 6)})
 
 
-;; the installed system's identity: a file at the settings-partition ROOT — above the
-;; slot dirs, so it follows the disk across slot installs (and boards; serial is the
-;; board fact)
-(def ^:private system-id-file "system-id")
+;; the disk's identity: a file at the settings-partition root, above the slot
+;; dirs — survives slot installs and board swaps
+(def ^:private system-disk-id-file "system-disk-id")
 
 
-(defn- read-system-id [root]
-  (some-> (slurp-text (fs/path root system-id-file) nil) str/trim not-empty))
+(defn- read-system-disk-id [root]
+  (some-> (slurp-text (fs/path root system-disk-id-file) nil) str/trim not-empty))
 
 
-(defn- probe-for-system-id [config-partition]
+(defn- probe-for-system-disk-id [config-partition]
  (try
-   (with-mounted-ext4 [cfg-mnt config-partition] 
-     (read-system-id cfg-mnt))
+   (with-mounted-ext4 [cfg-mnt config-partition]
+     (read-system-disk-id cfg-mnt))
    (catch Exception _ nil)))
 
 
@@ -116,7 +115,7 @@
                :type    :ab
                :storage storage
                :config  config
-               :system-id (probe-for-system-id config)
+               :system-disk-id (probe-for-system-disk-id config)
                :slots   {:a (assoc a :ujima-os meta-a)
                          :b (assoc b :ujima-os meta-b)}
 
@@ -199,19 +198,19 @@
     nil)
 
 
-  (system-id! [_]
+  (system-disk-id! [_]
     (require-ab-partition-layout! device)
     (let [{config :config} (device->partitions-by-name device)]
       (with-mounted-ext4 [cfg-mnt config]
-        (or (read-system-id cfg-mnt)
+        (or (read-system-disk-id cfg-mnt)
             (let [id (str (java.util.UUID/randomUUID))]
               ;; root-owned partition root; install(1) like pack's manifest write
-              (fs/with-temp-dir [tmp {:prefix "ujima-system-id-"}]
-                (spit (str (fs/path tmp system-id-file)) (str id "\n"))
+              (fs/with-temp-dir [tmp {:prefix "ujima-system-disk-id-"}]
+                (spit (str (fs/path tmp system-disk-id-file)) (str id "\n"))
                 (sudo$! install -m "0644"
-                        (fs/path tmp system-id-file)
-                        (fs/path cfg-mnt system-id-file)))
-              (log/info "system id stamped" {:id id})
+                        (fs/path tmp system-disk-id-file)
+                        (fs/path cfg-mnt system-disk-id-file)))
+              (log/info "system-disk-id stamped" {:id id})
               id)))))) 
 
 

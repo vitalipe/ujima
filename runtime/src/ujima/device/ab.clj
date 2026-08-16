@@ -13,7 +13,7 @@
       :type    :ab
       :storage \"/dev/sda8\"
       :config  \"/dev/sda7\"
-      :system-id \"1b0c…\"
+      :system-disk-id \"1b0c…\"
       :slots {:a {:boot \"/dev/sda2\"
                   :root \"/dev/sda5\"
                   :ujima-os {:pack-version 1 :packed-at ... :installed-at ...}}
@@ -24,9 +24,9 @@
       :boot-slot :a
       :try-boot-slot :b}
 
-     :try-boot-slot -> nil when no trial boot is pending.
-     :system-id     -> the installed ujima system's identity it follows the disk
-                       across slot installs and board swaps.")
+     :try-boot-slot  -> nil when no trial boot is pending.
+     :system-disk-id -> the disk's identity, nil when never stamped; lives on the
+                        config partition, so it survives slot installs and board swaps.")
 
 
   (write-ujima-layout! [this]
@@ -51,9 +51,9 @@
     "Set a pending trial boot slot. or `nil` to clear try-boot")
 
 
-  (system-id! [this]
-    "The disk's system-id, created on first call on a freshly provisioned disk;
-     an existing id is never rewritten. Reads: ujima-disk-info's :system-id."))
+  (system-disk-id! [this]
+    "The disk's id, created on first call on a freshly provisioned disk; an
+     existing one is never rewritten. Read-only: ujima-disk-info's :system-disk-id."))
 
 
 

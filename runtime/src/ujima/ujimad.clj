@@ -26,7 +26,7 @@
   (let [env         (io/slurp-config "config" "ujimad")
         deploy      (io/slurp-edn    "config/env.edn")   ; deploy-stamped facts (nil on hosts)
         disk        (device/system->disk)                ; nil on hosts
-        machine-id  (when disk (ab/system-id! disk))     ; first boot stamps here
+        machine-id  (when disk (ab/system-disk-id! disk))     ; first boot stamps here
         disk-info   (when disk (ab/ujima-disk-info disk))
         app-cfg     (get-in env [:desktop :app])
         app-catalog (app/load-catalog (:catalog app-cfg) (:fallback-icon app-cfg))

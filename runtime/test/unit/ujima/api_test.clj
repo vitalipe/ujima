@@ -71,10 +71,10 @@
       "no ujima disk (a host run) = the shape with honest nils"))
 
 
-(deftest the-id-is-the-system-stamp
+(deftest the-id-is-the-disk-stamp
   (fresh!)
   (is (= {:id "1b0c-test"} (GET "/api/query/machine/id" {:id "1b0c-test"}))
-      "cfg :id (system-id! at startup) answers the id leaf")
+      "cfg :id (system-disk-id! at startup) answers the id leaf")
   (is (= {:id nil} (GET "/api/query/machine/id"))
       "no stamped system = an honest nil (a host run)"))
 

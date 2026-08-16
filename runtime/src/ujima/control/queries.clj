@@ -1,17 +1,23 @@
 (ns ujima.control.queries
-  "Read-side projections over the settings records — pure, the caller reads.
-   The [:audio :active] setting IS the truth for \"which output\".")
+  "Read-side projections over the settings records — pure, the caller reads."
+  (:require [lib.util              :refer [map-vals]]
+            [schema.ujima.settings :as defs]))
 
 
-(defn- effective [settings key] (:effective (get settings key)))
+(defn public-settings
+  "Settings a surface may be shown — a :secret? setting is absent, not masked."
+  [settings]
+  (let [secrets (into #{} (comp (filter :secret?) (map :key)) defs/settings)]
+    (apply dissoc settings secrets)))
 
 
 (defn audio-status
   "Volume is nil when no output is active (widgets grey out)."
   [settings]
-  (let [output (effective settings [:audio :active])]
-    {:volume (when output (effective settings [:audio output :volume]))
-     :muted  (effective settings [:audio :muted])
+  (let [settings (map-vals :effective settings)
+        output   (settings [:audio :active])]
+    {:volume (when output (settings [:audio output :volume]))
+     :muted  (settings [:audio :muted])
      :output output}))
 
 

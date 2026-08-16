@@ -132,4 +132,6 @@
 
      (routes/queries
       {:base  "query"
-       :nodes {"settings" #(queries/settings->tree (control/settings))}}))})
+       :nodes {"settings" #(-> (control/settings)
+                             (queries/public-settings)
+                             (queries/settings->tree))}}))})

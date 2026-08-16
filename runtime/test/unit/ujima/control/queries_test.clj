@@ -1,5 +1,6 @@
 (ns ujima.control.queries-test
   (:require [clojure.test :refer [deftest is]]
+            [clojure.string :as str]
             [ujima.control.queries :as queries]))
 
 
@@ -17,6 +18,14 @@
                                          [:audio :usb :volume] 55
                                          [:audio :muted]       true})))
       "no active output -> nil volume, widgets grey out"))
+
+
+(deftest public-settings-drops-the-secrets
+  (let [public (queries/public-settings (records {[:circle :token]      "deadbeef"
+                                                  [:audio :muted]       false
+                                                  [:system :hostname]   "meru-01"}))]
+    (is (= #{[:audio :muted] [:system :hostname]} (set (keys public))))
+    (is (not (str/includes? (pr-str public) "deadbeef")) "the record goes, not just the value")))
 
 
 (deftest settings->tree-nests-the-path-keys

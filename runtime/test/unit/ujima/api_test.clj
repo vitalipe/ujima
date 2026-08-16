@@ -9,6 +9,7 @@
             [ujima.control      :as control]
             [ujima.linux.system :as system]
             [ujima.api          :as api]
+            [schema.ujima.settings  :as defs]
             [schema.ujima.api.query :as query]))
 
 
@@ -39,12 +40,16 @@
       "every node together has to make the shape the contract promises"))
 
 
-(deftest every-settings-leaf-is-a-record
+(deftest every-settings-leaf-is-a-record-and-secrets-are-not-served
   (fresh!)
-  (let [tree (GET "/api/query/settings")
-        recs (map #(get-in tree %) (keys (control/settings)))]
-    (is (= (count (control/settings)) (count recs)) "one leaf per setting")
-    (is (nil? (first (keep (partial drift query/settings-record) recs))))))
+  (let [tree    (GET "/api/query/settings")
+        secret? (into #{} (comp (filter :secret?) (map :key)) defs/settings)
+        shown   (remove secret? (keys (control/settings)))
+        recs    (map #(get-in tree %) shown)]
+    (is (seq secret?) "a secret exists to be withheld")
+    (is (= (count shown) (count recs)) "one leaf per non-secret setting")
+    (is (nil? (first (keep (partial drift query/settings-record) recs))))
+    (is (every? #(nil? (get-in tree %)) secret?) "a :secret? setting has no leaf at all")))
 
 
 (deftest a-slice-of-the-machine-tree-is-the-shape-a-write-reports

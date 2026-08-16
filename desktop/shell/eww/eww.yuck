@@ -1,10 +1,10 @@
-;; UjimaOS desktop shell — wired to ujimad's desktop tier on 127.0.0.1:1336 (the
-;; signed /api tier on :1337 is for other machines; the desktop never speaks it):
-;; widget state arrives on pushed streams (deflisten — snapshot on
-;; connect, then a line per real change; settings on /ui/state, running apps on
-;; /ui/apps), the launcher tiles render the app catalog (/app/catalog — immutable per
-;; session, hence a poll), and clicks are plain fire-and-forget POSTs through
-;; bin/ujima-ui.
+;; UjimaOS desktop shell — wired to ujimad's desktop tier, mounted at ujima-desktop
+;; on 127.0.0.1:1336 (the signed /api tier on :1337 is for other machines; the
+;; desktop never speaks it): widget state arrives on pushed streams (deflisten —
+;; snapshot on connect, then a line per real change; settings on stream/state,
+;; running apps on stream/apps), the launcher tiles render the app catalog
+;; (app/catalog — immutable per session, hence a poll), and clicks are plain
+;; fire-and-forget POSTs through bin/ujima-desktop, which owns the mount.
 
 (defpoll clock :interval "10s" "date +%H:%M")
 
@@ -19,20 +19,20 @@
 ;; ujimad restart drops the connection, 1s later the snapshot line rehydrates us
 (deflisten state
   :initial "{\"audio\":{\"volume\":null,\"muted\":false,\"output\":null},\"keyboard\":{\"layout\":\"--\",\"layouts\":[],\"next\":null}}"
-  "while true; do curl -sN http://127.0.0.1:1336/ui/state; sleep 1; done")
+  "while true; do curl -sN http://127.0.0.1:1336/ujima-desktop/stream/state; sleep 1; done")
 
 ;; the running apps (derived from the i3 tree) — same push contract as `state`
 (deflisten apps
   :initial "{\"apps\":[],\"current\":null}"
-  "while true; do curl -sN http://127.0.0.1:1336/ui/apps; sleep 1; done")
+  "while true; do curl -sN http://127.0.0.1:1336/ujima-desktop/stream/apps; sleep 1; done")
 
 ;; the launchable-app catalog: immutable per session — fetched ONCE (retry until the
 ;; API answers, emit, then hold the pipe open: eww drops a listener's line when the
 ;; script exits straight after it). If the catalog ever goes mutable it moves into
-;; settings and arrives via the /ui/state converge, not a poll.
+;; settings and arrives via the stream/state converge, not a poll.
 (deflisten catalog
   :initial "{\"apps\":[]}"
-  "until curl -sf http://127.0.0.1:1336/app/catalog; do sleep 1; done; echo; exec sleep infinity")
+  "until curl -sf http://127.0.0.1:1336/ujima-desktop/app/catalog; do sleep 1; done; echo; exec sleep infinity")
 
 
 ;; --- top pane (v0.9 spec 33a): flat, 48px, app icon · App — Title · close (✕).
@@ -50,7 +50,7 @@
       (label :class "title" :halign "start" :hexpand true :text {apps.current?.title ?: ""})
       (button :class "close" :valign "center" :timeout "2s"
         :visible {(apps.current?.id ?: "") != ""}
-        :onclick "ujima-ui POST /ui/app/close >/dev/null"
+        :onclick "ujima-desktop POST commands/app/close >/dev/null"
         "✕"))))
 
 ;; --- launcher (v0.9, design 25c): apps grouped into category TRAYS — a soft
@@ -60,7 +60,7 @@
 ;; --- collapses the hidden ones, so no gaps); jq drives the open indicator.
 (defwidget traytile [entry cat]
   (button :class "tile" :timeout "2s" :visible {entry.category == cat}
-    :onclick "ujima-ui POST /ui/app/open '{\"app\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
+    :onclick "ujima-desktop POST commands/app/open '{\"app\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
     (overlay
       (box :class {"chip" + (jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")") ? " on cat-" + cat : "")} :halign "center" :valign "center"
         (image :path "${entry.icon}" :image-width 46 :image-height 46))
@@ -94,7 +94,7 @@
     (box)))
 
 ;; --- bottom: launcher tile left (lit when home), running apps centered (the
-;; --- /ui/apps stream), tray right. A dock click is the same verb as a launcher
+;; --- stream/apps), tray right. A dock click is the same verb as a launcher
 ;; --- tile: run = ensure-open = focus
 (defwidget dock []
   (centerbox :class "dock"
@@ -103,12 +103,12 @@
     ;; the app tiles: exactly one thing selected at a time (home, or the active app).
     (box :halign "start" :space-evenly false :spacing 6
       (button :class {(apps.current?.id ?: "") == "" ? "home active" : "home"} :timeout "2s"
-        :onclick "ujima-ui POST /ui/app/home >/dev/null"
+        :onclick "ujima-desktop POST commands/app/home >/dev/null"
         (image :path "/ujima/desktop/shell/icons/launcher.svg" :image-width 25 :image-height 25))
       ;; files: hidden from the launcher (its 'system' category) — pinned next to home. It's an
       ;; ACTION like the launcher (not an app), so it shares .home: bare at rest, frost when focused.
       (button :class {(apps.current?.id ?: "") == "files" ? "home active" : "home"} :timeout "2s"
-        :onclick "ujima-ui POST /ui/app/open '{\"app\": \"files\"}' >/dev/null"
+        :onclick "ujima-desktop POST commands/app/open '{\"app\": \"files\"}' >/dev/null"
         (image :path "/ujima/apps/files/icon.svg" :image-width 26 :image-height 26)))
     ;; running apps: every open app carries a very subtle hint of its category; the ACTIVE one
     ;; blooms to the full category fill + ring
@@ -116,13 +116,13 @@
       (for a in {apps.apps}
         (button :class {"win cat-" + (a.category ?: "none") + (a.id == (apps.current?.id ?: "") ? " active" : "")} :timeout "2s"
           :visible {a.category != "system"}   ; system apps (files) are pinned on the left, not shown here
-          :onclick "ujima-ui POST /ui/app/open '{\"app\": \"${a.id}\"}' >/dev/null"
+          :onclick "ujima-desktop POST commands/app/open '{\"app\": \"${a.id}\"}' >/dev/null"
           (image :path "${a.icon}" :image-width 32 :image-height 32))))
     (box :class "tray" :halign "end" :space-evenly false :spacing 4
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
       ; the label flips when the push lands
       (button :class "kbd" :timeout "2s"
-        :onclick "ujima-ui POST /ui/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
+        :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
         (label :text {state.keyboard.layout}))
       (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
         (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 19 :image-height 19))
@@ -131,7 +131,7 @@
 
 ;; --- volume overlay: slider moves are fire-and-forget (ujimad throttles the
 ;; --- drag); mute posts the DESIRED state; everything reflects back via the
-;; --- /ui/state push. Greyed when no output classifies (output null).
+;; --- stream/state push. Greyed when no output classifies (output null).
 ;; `vol` is eww-local interaction state: the number/knob track the finger
 ;; instantly instead of waiting for the push round-trip; -1 = untouched, follow
 ;; ujimad. Once touched it pins to the last local value — fine while the
@@ -144,9 +144,9 @@
     (scale :class {(state.audio.volume ?: -1) == -1 ? "volscale off" : "volscale"}
            :orientation "v" :flipped true :vexpand true :min 0 :max 101 :timeout "1s"
            :value {vol < 0 ? (state.audio.volume ?: 0) : vol}
-           :onchange "${ewwcmd} update vol={} ; ujima-ui POST /ui/volume/move '{\"value\": {}}' >/dev/null")
+           :onchange "${ewwcmd} update vol={} ; ujima-desktop POST ui/volume/move '{\"value\": {}}' >/dev/null")
     (button :class "volmute" :timeout "2s"
-      :onclick "ujima-ui POST /ui/audio/muted '{\"value\": ${!state.audio.muted}}' >/dev/null"
+      :onclick "ujima-desktop POST commands/audio/muted '{\"value\": ${!state.audio.muted}}' >/dev/null"
       (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 22 :image-height 22))))
 
 

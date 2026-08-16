@@ -32,7 +32,7 @@
   (log/info "opening ujima shell" cfg)
 
   (launcher-init!  (:launcher cfg)
-                    "http://127.0.0.1:1336/launcher/")
+                    "http://127.0.0.1:1336/ujima-desktop/assets/launcher/")
 
 
   (eww/init!! (:eww cfg))) 

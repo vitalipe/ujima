@@ -127,7 +127,7 @@
 (defn catalog-listing [] (catalog/listing @catalog*))
 
 (defn icon-path
-  "The catalog-resolved icon path for ID (nil for an unknown app) — the /app/icon/<id> route
+  "The catalog-resolved icon path for ID (nil for an unknown app) — the assets/app-icon/<id> route
    serves this file, so the webview launcher never touches the filesystem layout."
   [id]
   (get-in @catalog* [:by-id id :icon]))

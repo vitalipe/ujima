@@ -4,7 +4,7 @@
             [ujima.desktop.eww :as eww]))
 
 
-;; a /ui/apps snapshot: current = the focused app entry (or nil)
+;; a stream/apps snapshot: current = the focused app entry (or nil)
 (defn- snap [current] {:apps (if current [current] []) :current current})
 (def ^:private launcher (snap nil))
 (def ^:private tux-fs   (snap {:id :tuxtype :fullscreen true}))

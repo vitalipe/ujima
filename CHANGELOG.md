@@ -52,9 +52,10 @@ version truth; branch names and build labels may disagree.
   `metadata.edn` + `install.edn`): pack version, packed-at, installed-at.
 - The device API on :1337 has one shape: reads under `/api/query/`, writes under
   `/api/commands/`. The old per-subject paths are gone.
-- The desktop's own surface — `/ui`, the app catalog and icons, the launcher's
-  files — now answers on `127.0.0.1:1336` and is no longer reachable from the
-  LAN; `:1337` serves `/api` only.
+- The desktop's own surface — its streams, verbs, app catalog and files — now
+  answers on `127.0.0.1:1336` under `/ujima-desktop/`, and is no longer
+  reachable from the LAN; `:1337` serves `/api` only. Per-app icons moved from
+  `GET /app/icon/<id>` to `GET /ujima-desktop/assets/app-icon/<id>`.
 
 ### Fixed
 

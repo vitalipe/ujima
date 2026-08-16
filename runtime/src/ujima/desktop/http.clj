@@ -1,7 +1,8 @@
 (ns ujima.desktop.http
-  "The shell module, mounted at the root of the loopback listener: the /ui streams
-   and verbs, the app catalog and icon, and the launcher's files. The verbs mirror
-   /api's for this machine only — no :scope, because /ui IS the session."
+  "The desktop module — mounted at ujima-desktop on the loopback listener, one base
+   per concern: pushed projections, verbs, the widget-shaped reads and gestures that
+   are not domain state, the catalog, and files. The verbs mirror /api's for this
+   machine only — no :scope, because this tier IS the session."
   (:require [ujima.api.routes            :as routes]
             [ujima.control.commands      :as effects]
             [ujima.desktop.app           :as app]
@@ -37,13 +38,10 @@
                       :params  [:map [:layout [:string {:min 1}]]]
                       :handler (fn [{:keys [layout]}] (effects/change-keyboard-layout! layout :session))}
 
+   ;; a named verb, not settings/**: the generic write stays on the signed tier
    "audio/muted"  {:doc     "Mute or unmute this machine."
                    :params  [:map [:value :boolean]]
-                   :handler (fn [{:keys [value]}] (effects/change-setting! [:audio :muted] value :session))}
-
-   "volume/move"  {:doc     "Record a slider position; coalesced, the last value wins."
-                   :params  [:map [:value [:or :int :double]]]
-                   :handler (fn [{:keys [value]}] (ui/volume-moved! value))}})
+                   :handler (fn [{:keys [value]}] (effects/change-setting! [:audio :muted] value :session))}})
 
 
 ;; --- what this module serves ---------------------------------------------
@@ -54,16 +52,21 @@
 
    :routes
    (merge
-     (routes/commands {:base "ui" :commands verbs})
+     (routes/commands {:base "commands" :commands verbs})
 
-     {"GET  /ui/state"                 (fn [req] (converge/stream-ui   req))
-      "GET  /ui/apps"                  (fn [req] (converge/stream-apps req))
+     ;; the authoritative projections, pushed
+     {"GET  /stream/state"  (fn [req] (converge/stream-ui   req))
+      "GET  /stream/apps"   (fn [req] (converge/stream-apps req))
+
+      ;; interaction, not state: a coalesced gesture and a read the stream doesn't carry
+      "POST /ui/volume/move"           (fn [{body :body}] (ui/volume-moved! (:value body))
+                                                          {:status 202 :body {}})
       "GET  /ui/keyboard/layout/next"  (fn [_] {:status 200 :body (ui/keyboard-next)})
 
       "GET  /app/catalog"  (fn [_] {:status 200 :body {:apps (app/catalog-listing)}})
-      "GET  /app/icon/*"   (fn [{[id] :path-params}] (files/icon-file id))
 
-      "GET  /launcher/**"  (fn [{[tail] :path-params}] (files/static-file static-root "launcher" tail))
-      "GET  /icons/**"     (fn [{[tail] :path-params}] (files/static-file static-root "icons" tail))
-      "GET  /wall.png"     (fn [_] (files/wall static-root "wall.png"))
-      "GET  /wall.svg"     (fn [_] (files/wall static-root "wall.svg"))})})
+      "GET  /assets/launcher/**"  (fn [{[tail] :path-params}] (files/static-file static-root "launcher" tail))
+      "GET  /assets/icons/**"     (fn [{[tail] :path-params}] (files/static-file static-root "icons" tail))
+      "GET  /assets/app-icon/*"   (fn [{[id]   :path-params}] (files/icon-file id))
+      "GET  /assets/wall.png"     (fn [_] (files/wall static-root "wall.png"))
+      "GET  /assets/wall.svg"     (fn [_] (files/wall static-root "wall.svg"))})})

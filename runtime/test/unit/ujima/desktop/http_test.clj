@@ -22,35 +22,35 @@
 
 
 (defn- GET [root uri]
-  ((http/app {:endpoints {"" (shell/endpoints {:static-root root})} :log (fn [& _])})
+  ((http/app {:endpoints {"ujima-desktop" (shell/endpoints {:static-root root})} :log (fn [& _])})
    {:request-method :get :uri uri}))
 
 (defn- POST
   ([uri] (POST uri nil))
   ([uri body]
-   ((http/app {:endpoints {"" (shell/endpoints {:static-root "/nowhere"})} :log (fn [& _])})
+   ((http/app {:endpoints {"ujima-desktop" (shell/endpoints {:static-root "/nowhere"})} :log (fn [& _])})
     (cond-> {:request-method :post :uri uri}
       body (assoc :body (edn->json body))))))
 
 
 (deftest the-shell-tree-is-served
   (let [root (tree)]
-    (is (= 200 (:status (GET root "/launcher/index.html"))))
-    (is (= 200 (:status (GET root "/launcher/"))) "an empty tail is index.html")
-    (is (= 200 (:status (GET root "/wall.png"))))
-    (is (= 404 (:status (GET root "/launcher/nope.html"))))))
+    (is (= 200 (:status (GET root "/ujima-desktop/assets/launcher/index.html"))))
+    (is (= 200 (:status (GET root "/ujima-desktop/assets/launcher/"))) "an empty tail is index.html")
+    (is (= 200 (:status (GET root "/ujima-desktop/assets/wall.png"))))
+    (is (= 404 (:status (GET root "/ujima-desktop/assets/launcher/nope.html"))))))
 
 
 (deftest nothing-outside-it-is
   (let [root (tree)]
-    (is (= 404 (:status (GET root "/launcher/../ESCAPED"))) "climbing out")
-    (is (= 404 (:status (GET root "/icons/../launcher/index.html")))
+    (is (= 404 (:status (GET root "/ujima-desktop/assets/launcher/../ESCAPED"))) "climbing out")
+    (is (= 404 (:status (GET root "/ujima-desktop/assets/icons/../launcher/index.html")))
         "even climbing out and back to a file that IS servable")
-    (is (= 404 (:status (GET root "/launcher/leak")))
+    (is (= 404 (:status (GET root "/ujima-desktop/assets/launcher/leak")))
         "a symlink out of the tree — no .. in the url, so only containment catches it")))
 
 
-(deftest the-ui-verbs-reach-the-same-effects-api-does
+(deftest the-command-verbs-reach-the-same-effects-api-does
   (let [seen (atom [])]
     (with-redefs [app/run!           (fn [id]  (swap! seen conj [:open id]))
                   app/close-focused! (fn []    (swap! seen conj [:close]))
@@ -58,31 +58,31 @@
                   app/open-url!      (fn [url] (swap! seen conj [:url url]))
                   app/cycle!         (fn [n]   (swap! seen conj [:cycle n]))]
       (is (every? #(= 202 (:status %))
-                  [(POST "/ui/app/open" {:app "files"})
-                   (POST "/ui/app/close")
-                   (POST "/ui/app/home")
-                   (POST "/ui/app/open-url" {:url "https://ujima.lan"})
-                   (POST "/ui/app/next")
-                   (POST "/ui/app/prev")]))
+                  [(POST "/ujima-desktop/commands/app/open" {:app "files"})
+                   (POST "/ujima-desktop/commands/app/close")
+                   (POST "/ujima-desktop/commands/app/home")
+                   (POST "/ujima-desktop/commands/app/open-url" {:url "https://ujima.lan"})
+                   (POST "/ujima-desktop/commands/app/next")
+                   (POST "/ujima-desktop/commands/app/prev")]))
       (is (= [[:open :files] [:close] [:home] [:url "https://ujima.lan"] [:cycle 1] [:cycle -1]]
              @seen)))))
 
 
-(deftest a-ui-verb-never-names-a-scope
+(deftest a-command-never-names-a-scope
   (let [seen (atom nil)]
     (with-redefs [effects/change-keyboard-layout! (fn [code scope] (reset! seen [code scope]))]
-      (is (= 202 (:status (POST "/ui/keyboard/layout" {:layout "il"}))))
+      (is (= 202 (:status (POST "/ujima-desktop/commands/keyboard/layout" {:layout "il"}))))
       (is (= ["il" :session] @seen) "the tier IS the session; the caller has no scope to get wrong"))
     (with-redefs [effects/change-setting! (fn [path value scope] (reset! seen [path value scope]))]
-      (is (= 202 (:status (POST "/ui/audio/muted" {:value true}))))
+      (is (= 202 (:status (POST "/ujima-desktop/commands/audio/muted" {:value true}))))
       (is (= [[:audio :muted] true :session] @seen)
           "a named verb, not the generic settings write"))))
 
 
-(deftest a-ui-verb-still-checks-its-params
-  (is (= 400 (:status (POST "/ui/app/open" {}))))
-  (is (= 400 (:status (POST "/ui/app/open-url" {:url ""}))))
-  (is (= 400 (:status (POST "/ui/audio/muted" {:value "maybe"})))))
+(deftest a-command-still-checks-its-params
+  (is (= 400 (:status (POST "/ujima-desktop/commands/app/open" {}))))
+  (is (= 400 (:status (POST "/ujima-desktop/commands/app/open-url" {:url ""}))))
+  (is (= 400 (:status (POST "/ujima-desktop/commands/audio/muted" {:value "maybe"})))))
 
 
 (deftest the-desktop-listener-has-no-api-tier

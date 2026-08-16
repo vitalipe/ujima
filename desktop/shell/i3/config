@@ -40,17 +40,17 @@ gaps bottom 68
 # and the next converge would snap it back.
 bindsym Mod4+space exec --no-startup-id ujima-kbd-next
 
-# app chords — every chord is a dumb key->ujimad-verb map (ujima-ui), NEVER a raw i3 command:
+# app chords — every chord is a dumb key->ujimad-verb map (ujima-desktop), NEVER a raw i3 command:
 # ujimad stays the single policy gate (a future lesson-pin refuses keyboard, dock and LAN
 # alike), and the X-level grabs land even over fullscreen windows (where the bars hide) and
 # inside kiosk chromium. Alt+F4 rides the topbar ✕'s exact close path (incl. the 1-3s ✕✕
 # force window); Alt+Tab cycles the RUNNING apps in catalog (= dock) order — home is not a stop;
 # Alt+Esc goes home — the one NON-destructive keyboard exit when a sole fullscreen app hides the
 # bars (Alt+Tab no-ops on a ring of one; the app keeps running on its workspace).
-bindsym Mod1+F4        exec --no-startup-id ujima-ui POST /ui/app/close >/dev/null
-bindsym Mod1+Tab       exec --no-startup-id ujima-ui POST /ui/app/next >/dev/null
-bindsym Mod1+Shift+Tab exec --no-startup-id ujima-ui POST /ui/app/prev >/dev/null
-bindsym Mod1+Escape    exec --no-startup-id ujima-ui POST /ui/app/home >/dev/null
+bindsym Mod1+F4        exec --no-startup-id ujima-desktop POST commands/app/close >/dev/null
+bindsym Mod1+Tab       exec --no-startup-id ujima-desktop POST commands/app/next >/dev/null
+bindsym Mod1+Shift+Tab exec --no-startup-id ujima-desktop POST commands/app/prev >/dev/null
+bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home >/dev/null
 
 # desktop background: the launcher's gradient (desktop/shell/wall.svg, rasterized to wall.png by
 # os.desktop) set on the X root. i3 draws over it, so empty workspaces show the gradient

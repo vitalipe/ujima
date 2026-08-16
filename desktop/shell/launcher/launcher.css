@@ -71,7 +71,7 @@ body{
 
 .tiles{display:flex; flex-wrap:wrap; gap:10px; max-width:302px}
 /* 49b tinted launcher: every tile carries a faint hint of its category (--cat, set per .cat),
-   blooming to a full fill+ring when the app is OPEN (.open, driven live by /ui/apps). */
+   blooming to a full fill+ring when the app is OPEN (.open, driven live by stream/apps). */
 .tile{
   width:68px; height:68px; border-radius:18px; flex:none;
   display:flex; align-items:center; justify-content:center;

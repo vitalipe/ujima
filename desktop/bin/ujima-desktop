@@ -1,0 +1,12 @@
+#!/bin/sh
+# eww / i3 -> ujimad's desktop tier, mounted at ujima-desktop on 127.0.0.1:1336.
+# Paths are mount-relative — the mount lives here, not at every call site. The
+# signed /api tier on :1337 is for OTHER machines; the desktop never speaks it.
+#   ujima-desktop POST commands/app/home                   # writes are 202, no body
+#   ujima-desktop POST commands/app/open '{"app": "files"}'
+#   ujima-desktop GET  app/catalog                         # prints the response
+set -eu
+method=$1
+path=$2
+body=${3:-}
+curl -sf --max-time 3 -X "$method" ${body:+-d "$body"} "http://127.0.0.1:1336/ujima-desktop/$path"

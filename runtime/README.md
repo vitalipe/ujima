@@ -19,7 +19,7 @@ The ujimad stage deploys this tree to `/ujima/ujimad`; on-device consumers beyon
 daemon (the installer) run from the same deploy.
 
 ujimad is session-scoped, not a system daemon: i3 execs it inside the X session, so
-app/window lifecycle and both HTTP tiers (`/api` on `:1337`, the desktop's own `/ui` and
-launcher files on loopback `:1336`) run with the session's environment.
+app/window lifecycle and both HTTP tiers (`/api` on `:1337`, the desktop's own surface
+at `/ujima-desktop` on loopback `:1336`) run with the session's environment.
 `ujima.service` runs and supervises the whole session — its `Restart=always` *is* the
 recovery story (the unit file carries the full rationale).

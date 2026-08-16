@@ -57,7 +57,7 @@
                           :log       log/log!}))
 
     (http/listen! (merge ui-http
-                         {:endpoints {"" (shell-http/endpoints ui-http)}
+                         {:endpoints {"ujima-desktop" (shell-http/endpoints ui-http)}
                           :log       log/log!}))
 
     (try

@@ -4,8 +4,7 @@
 # to the domain setter (idempotent; two reads of the same state collapse into one
 # advance). Absorb into ujimactl when that lands.
 set -eu
-next=$(curl -sf --max-time 2 http://127.0.0.1:1336/ui/keyboard/layout/next \
+next=$(ujima-desktop GET ui/keyboard/layout/next \
        | sed -n 's/.*"next":"\([^"]*\)".*/\1/p')
 [ -n "$next" ] || exit 0   # no layouts configured -> nothing to cycle
-exec curl -sf --max-time 3 -o /dev/null -X POST \
-     -d "{\"layout\": \"$next\"}" http://127.0.0.1:1336/ui/keyboard/layout
+exec ujima-desktop POST commands/keyboard/layout "{\"layout\": \"$next\"}" >/dev/null

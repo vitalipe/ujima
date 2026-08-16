@@ -36,7 +36,15 @@
   (into [:enum {:error/message "not an XKB layout ujima knows"}] xkb/names))
 
 
-(def settings [{:key     [:circle :token]
+(def settings [{:key     [:circle :name]
+                :doc     "The circle's label; an AP-mode hub snapshots it as its ESSID at install"
+                :default "UjimaOS"
+                :scopes  #{:circle}
+                ;; ASCII-only, so the character bound IS the SSID's 32-byte one
+                :shape   [:re {:error/message "1-32 letters, numbers, spaces, dashes or underscores, starting and ending with a letter or number"}
+                          #"^[A-Za-z0-9]([A-Za-z0-9 _-]{0,30}[A-Za-z0-9])?$"]}
+
+               {:key     [:circle :token]
                 :doc     "Shared admin token — every machine in the circle holds the same one"
                 :default "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
                 :secret? true

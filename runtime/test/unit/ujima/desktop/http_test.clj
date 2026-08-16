@@ -85,6 +85,17 @@
   (is (= 400 (:status (POST "/ujima-desktop/commands/audio/muted" {:value "maybe"})))))
 
 
+(deftest a-verbs-own-errors-are-named-here-too
+  (let [boom (fn [kw] (fn [& _] (throw (ex-info "nope" {:error kw}))))]
+    (with-redefs [effects/change-keyboard-layout! (boom :keyboard/unknown-layout)]
+      (is (= 409 (:status (POST "/ujima-desktop/commands/keyboard/layout" {:layout "de"})))
+          "the same status /api gives — an unnamed error would be a silent 500"))
+    (with-redefs [app/run! (boom :app/unknown-app)]
+      (is (= 404 (:status (POST "/ujima-desktop/commands/app/open" {:app "nope"})))))
+    (with-redefs [app/open-url! (boom :app/bad-url)]
+      (is (= 400 (:status (POST "/ujima-desktop/commands/app/open-url" {:url "ftp://x"})))))))
+
+
 (deftest the-desktop-listener-has-no-api-tier
   (is (= 404 (:status (POST "/api/commands/app/open" {:app "files"})))
       "/api is another machine's door — it is not on this socket at all"))

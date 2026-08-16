@@ -47,8 +47,10 @@
 ;; --- what this module serves ---------------------------------------------
 
 (defn endpoints [{:keys [static-root]}]
-  {:errors {:app/unknown-app 404
-            :app/bad-url     400}
+  ;; every error a verb here can raise — an unnamed one is a 500
+  {:errors {:app/unknown-app         404
+            :app/bad-url             400
+            :keyboard/unknown-layout 409}
 
    :routes
    (merge

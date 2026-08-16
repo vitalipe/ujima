@@ -16,7 +16,7 @@ body{
      so it lines up exactly with the root bg behind the transparent top bar + on empty workspaces.
      Opaque (not a see-through window) → correct text AA + no hover-repaint artifact on tiles. */
   background-color:#14171b;
-  background-image:url("/wall.png");
+  background-image:url("/ujima-desktop/assets/wall.png");
   background-repeat:no-repeat;
   background-position:0 -48px;
   background-size:100vw calc(100vh + 116px);   /* full screen = launcher (100vh) + top bar 48 + dock 68 */

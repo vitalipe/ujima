@@ -19,13 +19,6 @@
       "no active output -> nil volume, widgets grey out"))
 
 
-(deftest keyboard-status-is-domain-facts-only
-  (is (= {:layout "tz" :layouts ["us" "tz"]}
-         (queries/keyboard-status (records {[:keyboard :layout]            "tz"
-                                            [:keyboard :available-layouts] ["us" "tz"]})))
-      "no presentation fields — :next lives in the UI projection"))
-
-
 (deftest settings->tree-nests-the-path-keys
   (is (= {:audio {:usb  {:volume {:effective 40}}
                   :muted        {:effective false}}

@@ -45,7 +45,7 @@
                       [:running [:maybe desktop-entry]]
                       [:catalog [:vector desktop-entry]]]]
      [:audio    audio]
-     [:keyboard [:map [:layout :string] [:layouts [:vector :string]]]]
+     [:keyboard [:map [:layout :string] [:available-layouts [:vector :string]]]]
      [:net      [:map [:ip [:maybe :string]]
                       [:interfaces [:map-of :keyword interface]]]]
      [:system   [:map [:hostname [:maybe :string]]

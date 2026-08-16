@@ -15,13 +15,6 @@
      :output output}))
 
 
-(defn keyboard-status
-  "Domain facts only — the switcher's cycle order lives in the UI projection."
-  [settings]
-  {:layout  (effective settings [:keyboard :layout])
-   :layouts (effective settings [:keyboard :available-layouts])})
-
-
 (defn settings->tree
   "Records keyed by path vector -> the nested tree the query routes address."
   [settings]

@@ -15,9 +15,9 @@
 (def settings-record
   [:map
    [:effective :any]
-   [:via       [:enum :device :session :activity :default]]
+   [:via       [:enum :circle :device :session :activity :default]]
    [:default   :any]
-   [:scopes    [:map-of [:enum :device :session :activity] :any]]])
+   [:scopes    [:map-of [:enum :circle :device :session :activity] :any]]])
 
 
 (def machine

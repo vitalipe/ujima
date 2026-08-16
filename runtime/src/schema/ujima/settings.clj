@@ -1,6 +1,6 @@
 (ns schema.ujima.settings
   "The settings vocabulary — pure data, one entry = the whole description:
-   key, doc, default, scopes, and the value :shape (malli, as data).
+   key, doc, default, scopes, :secret?, and the value :shape (malli, as data).
    Entries require nothing outside the data plane; machinery and enforcement
    live outside it."
   (:require [schema.build.timezones   :as tz]
@@ -12,7 +12,11 @@
 (def schema 1)
 
 
-(def scopes [{:key     :device
+(def scopes [{:key     :circle
+              :doc     "The circle this machine belongs to — the same on every member; joined at setup"
+              :persist? true}
+
+             {:key     :device
               :doc     "Persistent per-device config and policy"
               :persist? true}
 
@@ -32,7 +36,14 @@
   (into [:enum {:error/message "not an XKB layout ujima knows"}] xkb/names))
 
 
-(def settings [{:key     [:system :hostname]
+(def settings [{:key     [:circle :token]
+                :doc     "Shared admin token — every machine in the circle holds the same one"
+                :default "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+                :secret? true
+                :scopes  #{:circle}
+                :shape   [:re {:error/message "must be 64 hex characters"} #"^[0-9a-f]{64}$"]}
+
+               {:key     [:system :hostname]
                 :doc     "LAN hostname for this machine (single label, not an FQDN)"
                 ;; nil = keep the baked /etc/hostname (tools base.clj). A set value renames at
                 ;; converge — every boot, overlayroot resets /etc (harmless: X runs -ac); clearing

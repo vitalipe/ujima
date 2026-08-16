@@ -113,8 +113,8 @@
                "desktop/running" #(:current (desktop/current-apps-state))
                "desktop/catalog" desktop/catalog-listing
 
-               "audio"    queries/audio-status
-               "keyboard" queries/keyboard-status
+               "audio"    #(queries/audio-status    (control/settings))
+               "keyboard" #(queries/keyboard-status (control/settings))
                "net"      (fn [] (let [facts (net/interface-facts)]
                                    {:ip         (net/lan-ip facts)
                                     :interfaces facts}))

@@ -196,7 +196,7 @@
   (i3/switch-workspace! (name id))
   (when-not (systemd/active? id)
     (try
-      (systemd/spawn-scoped! id (into (app->runnable @bins* app) extra) dir)
+      (systemd/spawn-scoped! id (into (app->runnable @bins* app) extra) dir nil)
       (log/info "app launched" {:app id})
       (catch Throwable e
         (log/error "app launch failed" {:app id :error (ex-message e)})

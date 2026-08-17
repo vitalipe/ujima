@@ -70,8 +70,10 @@
                 i3/command?           (fn [& args] (swap! fx* conj (into [:cmd] args)))
                 i3/emit!              (fn [ev] (app/handle-event! ev))
                 systemd/active?       (fn [id] (contains? (:scopes @world*) id))
-                systemd/spawn-scoped! (fn [id exec _dir] (swap! world* update :scopes conj id)
-                                                         (swap! fx* conj [:spawn id (vec exec)]))
+                systemd/spawn-scoped! (fn [id exec _dir opts]
+                                        (swap! world* update :scopes conj id)
+                                        (swap! fx* conj [:spawn id (vec exec)])
+                                        (when opts (swap! fx* conj [:spawn-opts id opts])))
                 systemd/stop!         (fn [id] (swap! world* update :scopes disj id)
                                               (swap! fx* conj [:stop id]))
                 shell/sh              (fn [& args] (swap! fx* conj [:sh (vec (rest args))]))]
@@ -382,3 +384,4 @@
     #(do (is (thrown? clojure.lang.ExceptionInfo (app/run! :nope)))
          (is (thrown? clojure.lang.ExceptionInfo (app/switch-to! :nope)))))
   (is (= {:apps [] :current nil} (app/current-apps-state))))
+

@@ -18,16 +18,22 @@
 
 
 (defn spawn-scoped!
-  "Launch EXEC (argv vector) detached into a fresh scope for ID, with DIR as the process cwd
-   (the app dir: relative paths in an app's argv resolve there — plain exec semantics, nil =
-   inherit). setpriv --no-new-privs: setuid can never elevate again inside the scope or
-   anything it spawns — an IDE terminal can't sudo (accident-belt for the rw partitions;
-   NoNewPrivileges= is an exec property scopes don't have, so the flag is set in the forked
-   process itself). --scope blocks, so never deref. TimeoutStopSec=3: stop escalates
-   SIGTERM -> 3s -> SIGKILL, so a SIGTERM-catcher (TuxPaint) still dies promptly on
-   force-close instead of riding systemd's 90s default."
-  [id exec dir]
-  (apply shell/sh {:out :inherit :err :inherit :dir dir}
+  "Launch EXEC (argv vector) into a fresh scope for ID; DIR is the process cwd, nil inherits.
+   --no-new-privs: nothing in the scope, or anything it spawns, can regain privilege through
+   setuid — so a spawned shell cannot sudo.
+
+   --scope blocks, so never deref this. And the flag is set by setpriv in the forked process
+   because a scope has no NoNewPrivileges= property — systemd accepts one and ignores it.
+
+   OPTS are spawn options, merged over the defaults:
+
+     (spawn-scoped! :console [\"ujima-console\"] \"/ujima/apps/console\"
+                    {:extra-env {\"UJIMA_CIRCLE_TOKEN\" token}})
+
+   Keep secrets out of EXEC: systemd-run copies the command line into the scope's
+   Description, and systemd logs that to the journal."
+  [id exec dir opts]
+  (apply shell/sh (merge {:out :inherit :err :inherit :dir dir} opts)
          :systemd-run :--user :--scope :--collect
          (str "--unit=" prefix (name id) "-" (System/currentTimeMillis))
          "--property=TimeoutStopSec=3"

@@ -385,3 +385,35 @@
          (is (thrown? clojure.lang.ExceptionInfo (app/switch-to! :nope)))))
   (is (= {:apps [] :current nil} (app/current-apps-state))))
 
+
+
+;; --- per-app env: set out of band, applied to every launch ---
+
+(deftest an-app-env-reaches-its-launches-and-only-its-own
+  (setup! [] "1")
+  (app/reset-app-env! :paint {"UJIMA_CIRCLE_TOKEN" "deadbeef"})
+  (stubbed #(app/run! :paint))
+  (is (= [[:spawn-opts :paint {:extra-env {"UJIMA_CIRCLE_TOKEN" "deadbeef"}}]] (fx-of :spawn-opts)))
+
+  (setup! [] "1")
+  (stubbed #(app/run! :web))
+  (is (empty? (fx-of :spawn-opts)) "another app gets nothing"))
+
+
+(deftest an-app-env-survives-a-relaunch
+  ;; closed and reopened from the bar is the same launch path — it must still be handed the env
+  (setup! [] "1")
+  (app/reset-app-env! :paint {"T" "1"})
+  (stubbed #(app/run! :paint))
+  (reset! world* {:wins [] :focused-ws "1" :scopes #{}})   ; the scope is gone, the env is not
+  (reset! fx* [])
+  (stubbed #(app/run! :paint))
+  (is (= [[:spawn-opts :paint {:extra-env {"T" "1"}}]] (fx-of :spawn-opts))))
+
+
+(deftest clearing-an-app-env-stops-it-reaching-the-spawn
+  (setup! [] "1")
+  (app/reset-app-env! :paint {"T" "1"})
+  (app/reset-app-env! :paint nil)
+  (stubbed #(app/run! :paint))
+  (is (empty? (fx-of :spawn-opts)) "no env = no opts at all, not an empty :extra-env"))

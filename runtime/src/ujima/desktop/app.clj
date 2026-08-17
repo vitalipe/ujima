@@ -19,6 +19,7 @@
 (defonce ^:private prev*    (atom nil))   ; last snapshot, the prv of (next prv)
 (defonce ^:private targets* (atom []))
 (defonce ^:private close*   (atom nil))   ; last ✕: {:con :app :at} — drives con-id go-home + ✕✕
+(defonce ^:private app-env* (atom {}))    ; app-id -> extra-env, applied to every launch
 
 
 (def ^:private home-ws     "1")
@@ -120,8 +121,17 @@
   (reset! prev*    nil)
   (reset! close*   nil)
   (reset! targets* (vec converge-targets))
+  (reset! app-env* {})
   (reset! bins*    (select-keys cfg [:open-web-app-bin :serve-web-app-bin]))
   catalog)
+
+
+(defn reset-app-env!
+  "Set (or clear, with nil) the extra environment every launch of ID gets — it applies to
+   relaunches too, so an app closed and reopened is handed the same thing."
+  [id env]
+  (swap! app-env* (fn [m] (if env (assoc m id env) (dissoc m id))))
+  nil)
 
 
 (defn catalog-listing [] (catalog/listing @catalog*))
@@ -196,7 +206,8 @@
   (i3/switch-workspace! (name id))
   (when-not (systemd/active? id)
     (try
-      (systemd/spawn-scoped! id (into (app->runnable @bins* app) extra) dir nil)
+      (systemd/spawn-scoped! id (into (app->runnable @bins* app) extra) dir
+                             (when-some [env (get @app-env* id)] {:extra-env env}))
       (log/info "app launched" {:app id})
       (catch Throwable e
         (log/error "app launch failed" {:app id :error (ex-message e)})

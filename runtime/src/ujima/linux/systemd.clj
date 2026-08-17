@@ -25,6 +25,9 @@
    --scope blocks, so never deref this. And the flag is set by setpriv in the forked process
    because a scope has no NoNewPrivileges= property — systemd accepts one and ignores it.
 
+   --expand-environment=no keeps EXEC literal: app.edn is external data, and systemd warns it
+   will start expanding $VAR in scope command lines in a future release.
+
    OPTS are spawn options, merged over the defaults:
 
      (spawn-scoped! :console [\"ujima-console\"] \"/ujima/apps/console\"
@@ -37,6 +40,7 @@
          :systemd-run :--user :--scope :--collect
          (str "--unit=" prefix (name id) "-" (System/currentTimeMillis))
          "--property=TimeoutStopSec=3"
+         "--expand-environment=no"
          "--" :setpriv :--no-new-privs exec))
 
 

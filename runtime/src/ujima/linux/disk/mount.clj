@@ -2,7 +2,7 @@
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
             [lib.shell :refer [$?]]
-            [ujima.linux.sudo :refer [sudo$!]]))
+            [ujima.linux.sudo :refer [sudo$! sudo$?]]))
 
 
 (defn mount-point? [mnt]
@@ -32,8 +32,24 @@
   (sudo$! umount [mnt]))
 
 
-(defn mount! [fs-type device mnt]
-  (sudo$! mount -t [fs-type] [device] [mnt]))
+(defn umount-lazy!
+  "Detach now, release when the last user lets go — the umount that survives a yanked device,
+   where a plain one can block forever. Returns ok?; an empty mount point is not an error."
+  [mnt]
+  (:ok? (sudo$? umount -l [mnt])))
+
+
+(defn mount!
+  "OPTS is a coll of -o flags or a ready comma string; DEVICE may be a map, glued to one token:
+
+     (mount! \"vfat\" {:UUID \"6962-5E15\"} \"/mnt/x\" [\"ro\" \"nosuid\"])
+     -> mount -t vfat -o ro,nosuid UUID=6962-5E15 /mnt/x"
+  ([fs-type device mnt] (mount! fs-type device mnt nil))
+  ([fs-type device mnt opts]
+   (cond
+     (string? opts) (sudo$! mount -t [fs-type] -o [opts] [device] [mnt])
+     (seq opts)     (sudo$! mount -t [fs-type] -o (str/join "," opts) [device] [mnt])
+     :no-opts       (sudo$! mount -t [fs-type] [device] [mnt]))))
 
 
 (defn wait-until-unmounted-or-fail! [mnt]

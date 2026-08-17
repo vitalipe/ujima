@@ -104,11 +104,8 @@
   (str scheme " " (str/join " " (for [[k v] params] (str (name k) "=" v)))))
 
 
-(defn request-header-value
-  "KEY-ID names which key signed — it lets a peer say which one it disagrees
-   with rather than only that the signature failed."
-  [{:keys [key-id ts nonce sig]}]
-  (header-value [[:key key-id] [:ts ts] [:nonce nonce] [:sig sig]]))
+(defn request-header-value [{:keys [ts nonce sig]}]
+  (header-value [[:ts ts] [:nonce nonce] [:sig sig]]))
 
 
 (defn response-header-value [{:keys [nonce sig]}]

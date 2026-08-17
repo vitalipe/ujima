@@ -17,18 +17,24 @@
   (let [dir (str (fs/create-temp-dir))]
     (control/init! {:storage dir :tmp dir :converge-targets []})))
 
+(defn- call
+  "One request through the real edge; BODY is json text or nil."
+  [method uri body cfg]
+  ;; identity: the gate has its own ns and its own tests — these are the shapes
+  (let [app (http/app {:endpoints {"api" (api/endpoints (assoc cfg :gate identity))}
+                       :log (fn [& _])})]
+    (app (cond-> {:request-method method :uri uri :query-string "format=edn"}
+           body (assoc :body body :raw-body body)))))
+
 (defn- GET
   ([uri] (GET uri {}))
   ([uri cfg]
-   (let [app (http/app {:endpoints {"api" (api/endpoints cfg)} :log (fn [& _])})]
-     (read-string (:body (app {:request-method :get :uri uri :query-string "format=edn"}))))))
+   (read-string (:body (call :get uri nil cfg)))))
 
 (defn- POST
   ([uri] (POST uri nil))
   ([uri body]
-   (let [app  (http/app {:endpoints {"api" (api/endpoints {})} :log (fn [& _])})
-         resp (app (cond-> {:request-method :post :uri uri :query-string "format=edn"}
-                     body (assoc :body (edn->json body))))]
+   (let [resp (call :post uri (some-> body edn->json) {})]
      {:status (:status resp) :body (some-> (:body resp) read-string)})))
 
 (defn- drift [shape v] (some->> (m/explain shape v) me/humanize))

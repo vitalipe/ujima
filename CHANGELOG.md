@@ -56,6 +56,8 @@ version truth; branch names and build labels may disagree.
   answers on `127.0.0.1:1336` under `/ujima-desktop/`, and is no longer
   reachable from the LAN; `:1337` serves `/api` only. Per-app icons moved from
   `GET /app/icon/<id>` to `GET /ujima-desktop/assets/app-icon/<id>`.
+- The device API answers commands and settings reads only to a signed request,
+  and signs every response; machine facts under `/api/query/machine/` stay open.
 
 ### Fixed
 

@@ -112,10 +112,10 @@
 
 (deftest headers-round-trip
   (testing "request"
-    (let [h (sig/request-header-value {:key-id "a3f1c2d40e91" :ts 1755290417331
+    (let [h (sig/request-header-value {:ts 1755290417331
                                        :nonce "b7c1e2f4a91d6035" :sig "abc123"})]
-      (is (= "HMAC1 key=a3f1c2d40e91 ts=1755290417331 nonce=b7c1e2f4a91d6035 sig=abc123" h))
-      (is (= {:key "a3f1c2d40e91" :ts "1755290417331"
+      (is (= "HMAC1 ts=1755290417331 nonce=b7c1e2f4a91d6035 sig=abc123" h))
+      (is (= {:ts "1755290417331"
               :nonce "b7c1e2f4a91d6035" :sig "abc123"}
              (sig/parse-header h)))))
 
@@ -127,7 +127,7 @@
 
 (deftest ts-stays-a-string
   ;; re-signed exactly as it arrived: coercing would make "007" and "7" disagree
-  (is (= "007" (:ts (sig/parse-header "HMAC1 key=k ts=007 nonce=n sig=s")))))
+  (is (= "007" (:ts (sig/parse-header "HMAC1 ts=007 nonce=n sig=s")))))
 
 
 (deftest a-foreign-header-is-not-ours

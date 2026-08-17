@@ -85,16 +85,28 @@
 
 ;; ── the routes ──────────────────────────────────────────────────────────────
 
-;; :disk = ujima-disk-info, queried once at boot; only the space numbers are live
-(defn endpoints [{:keys [version id] system-disk :disk}]
-  
+(defn endpoints
+  [{:keys [version id gate] system-disk :disk}]
+  (assert gate "no :gate — pass identity to serve unauthenticated")
+
   {:errors errors
    :routes
-   (merge
-     (routes/commands
-      {:base     "commands"
-       :commands commands})
 
+   (merge
+
+     ;; gated
+     (gate
+      (routes/commands
+       {:base     "commands"
+        :commands commands}))
+
+     (gate
+      (routes/queries
+       {:base  "query"
+        :nodes {"settings" #(-> (control/settings)
+                              (queries/public-settings)
+                              (queries/settings->tree))}}))
+     ;; open
      (routes/queries
       {:base  "query/machine"
        :nodes {"schema"   (constantly 1)
@@ -106,7 +118,7 @@
                                   :slot     (:boot-slot system-disk)
                                   :storage  (disk/device->space (:storage system-disk))
                                   :settings (disk/device->space (:config system-disk))})
-               
+
                "apps"     desktop/catalog-listing
 
                "desktop/locked"  (constantly false)
@@ -114,11 +126,11 @@
                "desktop/catalog" desktop/catalog-listing
 
                "audio"    #(queries/audio-status (control/settings))
-               
+
                "keyboard" (fn [] (let [s (control/settings)]
                                    {:layout            (:effective (get s [:keyboard :layout]))
                                     :available-layouts (:effective (get s [:keyboard :available-layouts]))}))
-               
+
                "net"      (fn [] (let [facts (net/interface-facts)]
                                    {:ip         (net/lan-ip facts)
                                     :interfaces facts}))
@@ -128,10 +140,5 @@
                "system/clock-ms" #(System/currentTimeMillis)
 
                "monitor/uptime-minutes" system/uptime-minutes
-               "monitor/messages"       (constantly [])}})
+               "monitor/messages"       (constantly [])}}))})
 
-     (routes/queries
-      {:base  "query"
-       :nodes {"settings" #(-> (control/settings)
-                             (queries/public-settings)
-                             (queries/settings->tree))}}))})

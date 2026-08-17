@@ -8,8 +8,9 @@
             [ujima.linux.converge :as linux]
             [lib.shell :as shell]
 
-            [lib.http  :as http]
-            [ujima.api :as api]
+            [lib.http       :as http]
+            [ujima.api      :as api]
+            [ujima.api.auth :as auth]
 
             [ujima.desktop          :as desktop]
             [ujima.desktop.eww      :as eww]
@@ -25,9 +26,7 @@
 
   (let [env         (io/slurp-config "config" "ujimad")
         deploy      (io/slurp-edn    "config/env.edn")   ; deploy-stamped facts (nil on hosts)
-        disk        (device/system->disk)                ; nil on hosts
-        machine-id  (when disk (ab/system-disk-id! disk))     ; first boot stamps here
-        disk-info   (when disk (ab/ujima-disk-info disk))
+        disk        (device/system->disk)                ; nil on hosts, FIXME: make autodetect fallback, put in config
         app-cfg     (get-in env [:desktop :app])
         app-catalog (app/load-catalog (:catalog app-cfg) (:fallback-icon app-cfg))
         api-http    (get-in env [:api :http] {})
@@ -48,13 +47,23 @@
 
     (events/init! (get-in env [:events] {}))
 
-    ;; the machine edge: ujimad composes the tiers, the edge knows neither's vocabulary.
-    ;; one listener each — the remote tier is LAN-bound, the desktop's is loopback-only
-    (http/listen! (merge api-http
-                         {:endpoints {"api" (api/endpoints {:version (:version deploy)
-                                                            :id      machine-id
-                                                            :disk    disk-info})}
-                          :log       log/log!}))
+
+    (when disk
+      (ab/system-disk-id! disk)) ; first boot stamps here
+
+
+    (let [{system-disk-id :system-disk-id :as disk-info} (when disk (ab/ujima-disk-info disk))
+          auth-cfg (merge (get-in env [:api :auth] {})
+                          {:key     (:effective (control/setting [:circle :token]))
+                           :self-id system-disk-id})]
+
+      (http/listen! (merge api-http
+                           {:endpoints {"api" (api/endpoints {:version (:version deploy)
+                                                              :id      system-disk-id
+                                                              :gate    (auth/->gate auth-cfg)
+                                                              :disk    disk-info})}
+                            :log       log/log!
+                            :sign      (auth/->sign auth-cfg)})))
 
     (http/listen! (merge ui-http
                          {:endpoints {"ujima-desktop" (shell-http/endpoints ui-http)}

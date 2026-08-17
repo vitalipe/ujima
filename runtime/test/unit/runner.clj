@@ -27,6 +27,7 @@
             [ujima.linux.i3-test]
             [ujima.linux.net-test]
             [ujima.linux.systemd-test]
+            [ujima.linux.disk.block-test]
             [lib.http-test]
             [ujima.desktop.http-test]
             [ujima.desktop.http.converge-test]
@@ -65,6 +66,7 @@
     ujima.linux.i3-test
     ujima.linux.net-test
     ujima.linux.systemd-test
+    ujima.linux.disk.block-test
     lib.http-test
     ujima.desktop.http-test
     ujima.desktop.http.converge-test

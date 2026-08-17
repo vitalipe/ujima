@@ -2,13 +2,11 @@
   (:require [clojure.core.async :as async]
             [ujima.log          :as log]
 
-            [ujima.linux.usb     :as usb]
             [ujima.linux.audio   :as audio]
             [ujima.linux.i3      :as i3]
             [ujima.linux.systemd :as systemd]
 
             [ujima.desktop.app  :as app]
-            [ujima.events.token :as token-events]
             [ujima.events.audio :as audio-events]
             [ujima.events.clock :as clock-events]))
 
@@ -41,10 +39,8 @@
            (audio/watch-sinks! {:interval-ms (:audio-poll-ms cfg 1000)})
            audio-events/on-sinks-changed!)
 
-  ;; admin surface follows the admin token on usb storage
-  (listen! :usb-storage
-           (usb/watch-storage!)
-           token-events/on-storage-changed!)
+  ;; WIP: removable storage moves to the ujima.storage plane, which owns the block watcher
+  ;; and pushes to the admin-token policy as a converge target — nothing watches it here yet
 
   ;; the app plane derives from the i3 tree — window events are its ticks
   (listen! :i3-windows

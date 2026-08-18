@@ -4,6 +4,8 @@
  :control {:storage "/ujima/settings/"
            :tmp     "/ujima/run/session"}
 
+ :storage {:mounts-dir "/ujima/run/storage"}
+
  :events  {:audio-poll-ms 1000
            :clock-save-ms 600000}
 

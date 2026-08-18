@@ -17,6 +17,8 @@
             [ujima.desktop.http     :as shell-http]
             [ujima.desktop.http.converge :as shell-http-converge]
             [ujima.desktop.app      :as app]
+            [ujima.storage          :as storage]
+            [ujima.events.token     :as token-events]
             [ujima.events           :as events]))
 
 
@@ -44,6 +46,11 @@
 
     (app/init! (merge (select-keys app-cfg [:open-web-app-bin :serve-web-app-bin])
                       {:catalog app-catalog :converge-targets [shell-http-converge/converge-apps! eww/converge!]}))
+
+    ;; the console follows a circle token on removable storage; before events/init!, so the
+    ;; app plane is live before the first partition scan can fire app/run!
+    (storage/init! (merge (get-in env [:storage] {})
+                          {:converge-targets [token-events/on-storage!]}))
 
     (events/init! (get-in env [:events] {}))
 

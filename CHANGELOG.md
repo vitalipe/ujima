@@ -36,6 +36,9 @@ version truth; branch names and build labels may disagree.
   shared mock world (replaces `bb circle mock|world`).
 - The OS image boots as-is — `dd` it to a card for a system without A/B, where
   settings and storage are not persistent.
+- A usb stick carrying an admin token opens the Console: removable partitions are
+  mounted read-only under `/ujima/run/storage/<uuid>` and scanned for it, and pulling
+  the stick closes the Console after a few seconds.
 
 ### Changed
 

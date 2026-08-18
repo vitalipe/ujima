@@ -367,6 +367,20 @@
   (stubbed #(app/handle-event! {:type :window/change}))
   (is (= [] (fx-of :cmd)) "already on its workspace — idempotent"))
 
+(deftest the-launcher-is-routed-home
+  ;; an app opened before the shell is up (a token stick at boot) maps the launcher on the app's
+  ;; workspace, leaving home empty
+  (setup! [(win "sky" :focused? true :con 9 :class "ujima-launcher")] "sky" :scopes #{:sky})
+  (stubbed #(app/handle-event! {:type :window/change}))
+  (is (= [[:cmd "[con_id=9]" "move" "container" "to" "workspace" "1"]] (fx-of :cmd))))
+
+
+(deftest the-launcher-at-home-is-left-alone
+  (setup! [(win "1" :focused? true :con 9 :class "ujima-launcher")] "1")
+  (stubbed #(app/handle-event! {:type :window/change}))
+  (is (= [] (fx-of :cmd)) "already home — idempotent"))
+
+
 (deftest app-dialog-is-routed-by-class
   ;; an app's own dialog (e.g. Inkscape's startup dialog, which maps before its main window) must
   ;; land on the app's workspace too — skipping it strands the app on home (the original bug)

@@ -24,6 +24,7 @@
 
 (def ^:private home-ws     "1")
 (def ^:private browser-app :web)
+(def ^:private launcher-class "ujima-launcher")   ; the shell's own window: not an app, lives home
 (def force-lo-ms 1000)                     ; a 2nd ✕ sooner = accidental double-click (ignore)
 (def force-hi-ms 3000)                     ; a 2nd ✕ later = a fresh close, not an escalation
 
@@ -285,17 +286,21 @@
 
 (defn- route-windows!
   "The orphan backstop: a window that mapped on the wrong workspace (focus moved away during the
-   launch) is moved to its app's workspace, matched by WM_CLASS — INCLUDING the app's own dialogs
+   launch) is moved where it belongs, matched by WM_CLASS — INCLUDING the app's own dialogs
    (e.g. Inkscape's startup dialog, which maps before its main window), which must land with their
-   app, not strand on home. Only class-matching windows move, so non-app dialogs are untouched.
-   No focus change, so it goes to its place while the kid stays put; idempotent (home = no-op)."
+   app, not strand on home. The launcher is not an app, so the catalog cannot place it: without
+   its own rule it inherits whatever was focused when it mapped, and an app opened before the
+   shell is up (a token stick at boot) leaves home empty. Only class-matching windows move; no
+   focus change; idempotent."
   [{:keys [ws->wins]}]
   (let [by-class (:by-class @catalog*)]
     (doseq [[ws wins] ws->wins
             {:keys [con-id class]} wins
-            :let  [target (get by-class class)]
-            :when (and target (not= ws (name target)))]
-      (i3/command? (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" (name target)))))
+            :let  [target (if (= launcher-class class)
+                            home-ws
+                            (some-> (get by-class class) name))]
+            :when (and target (not= ws target))]
+      (i3/command? (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" target))))
 
 
 (defn handle-event! [ev]

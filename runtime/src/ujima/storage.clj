@@ -95,10 +95,16 @@
 
 (defn- ->mount-task [fstype uuid mnt]
   (flow :storage/mount
+    
     (fs/create-dirs mnt)
+    
     (mount/umount-lazy! mnt)
     (mount/mount! fstype {:UUID uuid} mnt ["ro" "nosuid" "nodev" "noexec"])
-    {:mount mnt :tokens (sweep mnt)}))
+
+    ;; departed while we were mounting: observe! released the point before we took it
+    (if (@partitions* uuid)
+      {:mount mnt :tokens (sweep mnt)}
+      (do (release-mount! mnt) nil))))
 
 
 (defn- start-mount! [uuid {:keys [fstype]}]

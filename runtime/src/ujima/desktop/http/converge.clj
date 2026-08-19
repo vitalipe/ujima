@@ -5,6 +5,8 @@
   (:require [lib.http.ndjson       :as ndjson]
             [ujima.control.queries :as queries]))
 
+(def pinned-app-order {:files   0   ; the one a user reaches for — it must not move
+                       :console 1})
 
 (defn settings->ui
   "Settings records -> the UI blob."
@@ -16,14 +18,15 @@
 
 
 (defn apps->ui
-  "The app snapshot -> the shell's blob. Spelled out, not assoc'd: this is the wire contract."
+  "The app snapshot -> the shell's blob. This is the wire contract."
   [{:keys [running catalog current]}]
   {:running running
    :current current
    :pinned  (->> catalog
              (remove :hidden)
              (filter (fn [{category :category}] (= category :system)))
-             (map #(select-keys % [:id :label :icon])))})
+             (map #(select-keys % [:id :label :icon]))
+             (sort-by #(pinned-app-order (:id %) 99)))})
 
 
 (defn converge-ui!   [settings _prv] (ndjson/publish! :ui/state (settings->ui settings)))

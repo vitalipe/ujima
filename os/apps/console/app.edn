@@ -1,0 +1,4 @@
+{:label "Console" :category :system   ; system = no launcher tile, pinned in the dock
+ :hidden true                         ; until a circle token unhides it (events/token)
+ :exec ["sh" "app/run.sh"]            ; one scope holds the backend + the window, so a stop reaps both
+ :class "ujima-console"}              ; chromium --class, set in run.sh

@@ -52,9 +52,17 @@
 
 (deftest unhiding-puts-an-app-in-the-dock
   (let [shown (mapv #(cond-> % (= :console (:id %)) (assoc :hidden false)) catalog)]
-    (is (= [:console :files]
+    (is (= [:files :console]
            (mapv :id (:pinned (converge/apps->ui {:running [] :catalog shown :current nil}))))
-        "catalog order — abc on id, so console lands LEFT of files")))
+        "declared order, NOT catalog order: a token arriving must not shift the Files icon")))
+
+
+(deftest an-unlisted-pinned-app-goes-last
+  ;; nil sorts BEFORE numbers, so an unknown id must not fall to the front of the dock
+  (let [shown (conj (mapv #(cond-> % (= :console (:id %)) (assoc :hidden false)) catalog)
+                    {:id :zzz :label "Z" :icon "z.svg" :category :system :hidden false})]
+    (is (= [:files :console :zzz]
+           (mapv :id (:pinned (converge/apps->ui {:running [] :catalog shown :current nil})))))))
 
 
 (deftest the-wire-shape-is-exactly-three-keys

@@ -1,0 +1,2 @@
+;; the kiosk window; the backend is bb, from the base stage
+{:apt ["chromium"]}

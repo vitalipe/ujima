@@ -1,8 +1,9 @@
 (ns ujima.api
   "The /api tier: query/machine a node per source, query/settings one node over control's
-   records, commands the verbs below. A verb keeps :doc, :params and :handler together; the
-   query side's reply shapes are pure data, in schema.ujima.api.query."
-  (:require [ujima.api.routes       :as routes]
+   records, commands the verbs. The contract — docs, params, errors, reply shapes — is pure
+   data in schema.ujima.api.*; this ns binds an effect to each verb."
+  (:require [schema.ujima.api.commands :as defs]
+            [ujima.api.routes       :as routes]
             [ujima.control          :as control]
             [ujima.control.queries  :as queries]
             [ujima.control.commands :as effects]
@@ -13,74 +14,42 @@
             [ujima.linux.system     :as system]))
 
 
-;; ex-info {:error kw} -> status (:request/malformed is lib.http's)
-(def errors
-  {:audio/no-output         409
-   :keyboard/unknown-layout 409
-   :settings/unknown        404
-   :app/unknown-app         404
-   :app/bad-url             400})
-
-
-;; :device is config, not a moment
-(def ^:private runtime-scope [:enum :session :activity])
-(def ^:private scope         [:enum :device :session :activity])
-
-
 ;; ── the verbs ───────────────────────────────────────────────────────────────
 
+(defn- with-handlers
+  "Each spec bound to this tier's handler. A spec with no handler, or a handler with no
+   spec, fails here — at load — rather than at request time."
+  [specs handlers]
+  (assert (= (set (keys specs)) (set (keys handlers)))
+          (str "command table drift — spec with no handler: " (sort (remove handlers (keys specs)))
+               ", handler with no spec: "                     (sort (remove specs (keys handlers)))))
+  (into {} (for [[path spec] specs] [path (assoc spec :handler (handlers path))])))
+
+
 (def commands
-  {"app/open"     {:doc     "Open an app by catalog id."
-                   :params  [:map [:app [:string {:min 1}]]]
-                   :handler (fn [{:keys [app]}] (desktop/run! (keyword app)))}
+  (with-handlers defs/commands
+    {"app/open"     (fn [{:keys [app]}] (desktop/run! (keyword app)))
+     "app/switch"   (fn [{:keys [app]}] (desktop/switch-to! (keyword app)))
+     "app/close"    (fn [_] (desktop/close-focused!))
+     "app/home"     (fn [_] (desktop/go-home!))
+     "app/open-url" (fn [{:keys [url]}] (desktop/open-url! url))
 
-   "app/switch"   {:doc     "Focus an app that is already open."
-                   :params  [:map [:app [:string {:min 1}]]]
-                   :handler (fn [{:keys [app]}] (desktop/switch-to! (keyword app)))}
+     "audio/volume"    (fn [{:keys [scope value]}]  (effects/change-current-volume! value scope))
+     "keyboard/layout" (fn [{:keys [scope layout]}] (effects/change-keyboard-layout! layout scope))
 
-   "app/close"    {:doc     "Close the focused app."
-                   :handler (fn [_] (desktop/close-focused!))}
+     "settings/**"     (fn [{:keys [path value scope]}] (effects/change-setting! path value scope))
 
-   "app/home"     {:doc     "Go to the home workspace."
-                   :handler (fn [_] (desktop/go-home!))}
+     "clear/:scope/**" (fn [{:keys [scope path]}]
+                         (if (seq path)
+                           (effects/clear-setting! path scope)
+                           (effects/clear-scope! scope)))
 
-   "app/open-url" {:doc     "Open a URL in the Web app."
-                   :params  [:map [:url [:string {:min 1}]]]
-                   :handler (fn [{:keys [url]}] (desktop/open-url! url))}
+     "system/clock"    (fn [{:keys [epoch]}]
+                         (system/clock! epoch)
+                         (effects/change-setting! [:system :clock :epoch-floor] epoch :device))
 
-   ;; not settings/**: the output is resolved at write time
-   "audio/volume" {:doc     "Set the ACTIVE output's volume; the effect clamps to 0-100."
-                   :params  [:map [:scope runtime-scope] [:value [:or :int :double]]]
-                   :handler (fn [{:keys [scope value]}] (effects/change-current-volume! value scope))}
-
-   ;; not settings/**: narrows against another setting's value
-   "keyboard/layout" {:doc     "Set the layout; only codes in available-layouts are accepted."
-                      :params  [:map [:scope runtime-scope] [:layout [:string {:min 1}]]]
-                      :handler (fn [{:keys [scope layout]}] (effects/change-keyboard-layout! layout scope))}
-
-   "settings/**"  {:doc     "Set any setting by its path; the def decides the legal scopes and values."
-                   :params  [:map [:path [:vector :keyword]] [:scope scope] [:value :any]]
-                   :handler (fn [{:keys [path value scope]}] (effects/change-setting! path value scope))}
-
-   ;; a clear carries no body: the URL is the whole operation
-   "clear/:scope/**" {:doc     "Release SCOPE's hold on the setting at path — with no path, everything it holds. Runtime scopes only."
-                      :params  [:map [:scope runtime-scope] [:path [:vector :keyword]]]
-                      :handler (fn [{:keys [scope path]}]
-                                 (if (seq path)
-                                   (effects/clear-setting! path scope)
-                                   (effects/clear-scope! scope)))}
-
-   "system/clock"    {:doc     "Set the wall clock to EPOCH (ms); records it as the new floor."
-                      :params  [:map [:epoch [:int {:min 0}]]]
-                      :handler (fn [{:keys [epoch]}]
-                                 (system/clock! epoch)
-                                 (effects/change-setting! [:system :clock :epoch-floor] epoch :device))}
-
-   "system/restart"  {:doc     "Reboot this machine."
-                      :handler (fn [_] (system/reboot!))}
-
-   "system/poweroff" {:doc     "Power this machine off."
-                      :handler (fn [_] (system/shutdown!))}})
+     "system/restart"  (fn [_] (system/reboot!))
+     "system/poweroff" (fn [_] (system/shutdown!))}))
 
 
 ;; ── the routes ──────────────────────────────────────────────────────────────
@@ -89,7 +58,7 @@
   [{:keys [version id gate] system-disk :disk}]
   (assert gate "no :gate — pass identity to serve unauthenticated")
 
-  {:errors errors
+  {:errors defs/errors
    :routes
 
    (merge
@@ -141,4 +110,3 @@
 
                "monitor/uptime-minutes" system/uptime-minutes
                "monitor/messages"       (constantly [])}}))})
-

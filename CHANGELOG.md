@@ -67,6 +67,8 @@ version truth; branch names and build labels may disagree.
 - Wifi power saving is off on every connection: dozing turned ~10ms LAN round
   trips into 40-100ms medians with seconds-scale outliers, for at most ~0.2W on
   mains-powered machines.
+- Setting a machine's clock can carry its timezone, so one call moves both; a
+  zone the machine does not know is refused and the clock is left untouched.
 
 ### Fixed
 

@@ -60,7 +60,8 @@
   (assert handler (str "no :handler for " path))
   (let [slugs (slugs-in path)
         tail? (str/ends-with? path "**")
-        gate  (if shape (partial conform! shape (set slugs)) identity)]
+        ;; compiled once here, not per request — a closed-list param is expensive to rebuild
+        gate  (if shape (partial conform! (m/schema shape) (set slugs)) identity)]
     (fn [req]
       (when-some [params (gate (->params req slugs tail?))]
         (if reply

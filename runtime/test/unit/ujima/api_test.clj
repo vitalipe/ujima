@@ -129,6 +129,24 @@
       (is (= 400 (:status (POST "/api/commands/system/clock" {})))))))
 
 
+(deftest the-clock-verb-carries-an-optional-timezone
+  (fresh!)
+  (let [set-to (atom nil)]
+    (with-redefs [system/clock! (fn [ms] (reset! set-to ms))]
+      (is (= 202 (:status (POST "/api/commands/system/clock"
+                                {:epoch 1755264000000 :timezone "Europe/Berlin"}))))
+      (is (= {:effective "Europe/Berlin" :via :device}
+             (select-keys (GET "/api/query/settings/system/timezone") [:effective :via]))
+          "one call moves the zone as well as the instant")
+
+      (reset! set-to nil)
+      (is (= 400 (:status (POST "/api/commands/system/clock"
+                                {:epoch 1755264000001 :timezone "Mars/Olympus"}))))
+      (is (nil? @set-to) "a zone off the closed list dies at the edge — the handler never runs")
+      (is (= "Europe/Berlin" (:effective (GET "/api/query/settings/system/timezone")))
+          "and it left the zone it had"))))
+
+
 (deftest clear-rejects-what-it-must
   (fresh!)
   (is (= 404 (:status (POST "/api/commands/clear/banana/audio/muted"))) "unknown scope is not an address")

@@ -44,7 +44,10 @@
                            (effects/clear-setting! path scope)
                            (effects/clear-scope! scope)))
 
-     "system/clock"    (fn [{:keys [epoch]}]
+     ;; timezone first: a bad zone is refused before the clock moves
+     "system/clock"    (fn [{:keys [epoch timezone]}]
+                         (when timezone
+                           (effects/change-setting! [:system :timezone] timezone :device))
                          (system/clock! epoch)
                          (effects/change-setting! [:system :clock :epoch-floor] epoch :device))
 

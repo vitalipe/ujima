@@ -1,7 +1,8 @@
 (ns schema.ujima.api.commands
   "The verbs /api/commands accepts — the frozen v1 contract. One entry per verb: what it does
    and the params it takes. Handlers belong to the tier that serves them, so a fake fleet can
-   share this contract without the daemon's dependencies.")
+   share this contract without the daemon's dependencies."
+  (:require [schema.ujima.settings :as settings]))
 
 
 ;; :device is config, not a moment
@@ -47,8 +48,10 @@
    "clear/:scope/**" {:doc    "Release SCOPE's hold on the setting at path — with no path, everything it holds. Runtime scopes only."
                       :params [:map [:scope runtime-scope] [:path [:vector :keyword]]]}
 
-   "system/clock"    {:doc    "Set the wall clock to EPOCH (ms); records it as the new floor."
-                      :params [:map [:epoch [:int {:min 0}]]]}
+   ;; the timezone rides along so one call moves a machine's whole clock; the setting's own
+   ;; closed list is the shape, so an unknown zone dies at the edge and no handler runs
+   "system/clock"    {:doc    "Set the wall clock to EPOCH (ms); records it as the new floor. A timezone, when given, is applied first."
+                      :params [:map [:epoch [:int {:min 0}]] [:timezone {:optional true} settings/timezone]]}
 
    "system/restart"  {:doc "Reboot this machine."}
 

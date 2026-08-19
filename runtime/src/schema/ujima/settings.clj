@@ -29,7 +29,8 @@
               :persist? false}])
 
 
-(def ^:private timezone
+;; public: /api's clock verb narrows its param to this same closed list
+(def timezone
   (into [:enum {:error/message "not a timezone ujima knows"}] tz/names))
 
 (def ^:private xkb-layout

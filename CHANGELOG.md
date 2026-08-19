@@ -15,6 +15,8 @@ version truth; branch names and build labels may disagree.
   serves it on :1338, `bb circle world` is a TUI that drives the mock world.
 - The OS image boots as-is — `dd` it to a card for a system without A/B, where
   settings and storage are not persistent.
+- Desktop windows fade in on open and out on close (~130ms), as do the shell's
+  popovers and the bars hiding for a fullscreen app.
 
 ### Changed
 

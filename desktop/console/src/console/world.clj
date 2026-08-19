@@ -1,6 +1,6 @@
 (ns console.world
   "Dev TUI that drives the mock world file: add/drop random machines, jump to
-   set counts. Edits tmp/console/world.edn in place — the running mock server
+   set counts. Edits tmp/world.edn in place — the running mock server
    re-reads it every tick, so changes land in the panels within ~2s. Separate
    process from the server: last writer wins, same contract as hand-editing."
   (:require [clojure.edn      :as edn]
@@ -10,8 +10,8 @@
             [console.mock     :as mock]))
 
 
-(def ^:private seed-path "desktop/console/dev/world.edn")
-(def ^:private live-path "tmp/console/world.edn")
+(def ^:private seed-path "dev/world.edn")
+(def ^:private live-path "tmp/world.edn")
 
 (def ^:private name-pool
   ["Kobe" "Ndege" "Samaki" "Nyoka" "Kanga" "Kima" "Fisi" "Mbuni" "Kiboko"

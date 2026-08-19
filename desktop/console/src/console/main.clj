@@ -5,13 +5,15 @@
             [console.http :as http]))
 
 
-(def ^:private seed-path "desktop/console/dev/world.edn")
-(def ^:private live-path "tmp/console/world.edn")
+(def ^:private seed-path "dev/world.edn")
+(def ^:private live-path "tmp/world.edn")
+
+(def ^:private ui-root "ui")
 
 (def ^:private ui-roots
-  {:console "desktop/console/ui"
-   :circle  "desktop/circle/ui"
-   :setup   "desktop/setup/ui"})
+  {:console ui-root
+   :circle  (str ui-root "/circle")
+   :setup   (str ui-root "/setup")})
 
 
 (defn -main [& _]

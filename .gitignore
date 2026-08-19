@@ -1,5 +1,6 @@
 pad.md
 /tmp/
+desktop/console/tmp/
 /out/
 runtime/config/*.local.edn
 tools/config/*.local.edn

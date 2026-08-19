@@ -63,6 +63,9 @@ version truth; branch names and build labels may disagree.
   `GET /app/icon/<id>` to `GET /ujima-desktop/assets/app-icon/<id>`.
 - The device API answers commands and settings reads only to a signed request,
   and signs every response; machine facts under `/api/query/machine/` stay open.
+- Wifi power saving is off on every connection: dozing turned ~10ms LAN round
+  trips into 40-100ms medians with seconds-scale outliers, for at most ~0.2W on
+  mains-powered machines.
 
 ### Fixed
 

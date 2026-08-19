@@ -64,4 +64,6 @@ exec --no-startup-id ujimad
 
 # compositor: picom (xrender — no GL on the Pi) gives real transparency, so floating eww overlays
 # (the volume popover) show the dock/content through them instead of painting a black block.
-exec_always --no-startup-id picom --backend xrender --unredir-if-possible
+# fading (~130ms) softens window open/close and the popovers; workspace switches stay hard cuts —
+# picom keeps window state across unmap, so a re-shown window is not an "open".
+exec_always --no-startup-id picom --backend xrender --unredir-if-possible --fading --fade-in-step 0.08 --fade-out-step 0.08 --fade-delta 10

@@ -39,6 +39,8 @@ version truth; branch names and build labels may disagree.
 - A usb stick carrying an admin token opens the Console: removable partitions are
   mounted read-only under `/ujima/run/storage/<uuid>` and scanned for it, and pulling
   the stick closes the Console after a few seconds.
+- Desktop windows fade in on open and out on close (~130ms), as do the shell's
+  popovers and the bars hiding for a fullscreen app.
 
 ### Changed
 

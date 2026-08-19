@@ -3,7 +3,7 @@
    strips the first-boot machinery, disables cloud-init, and provisions the login user
    (passwordless console autologin + passwordless sudo) — a clean, bootable, logged-in machine
    that the ujimad/desktop layers build on. Static files live in os/pipeline/base/<concern>/ (login,
-   identity, x11); this script is the pulls + the actions. (fstab + boot units → the ujimaify stage.)
+   identity, x11, network); this script is the pulls + the actions. (fstab + boot units → the ujimaify stage.)
 
    Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
 
@@ -74,7 +74,12 @@
     (files/install! project "base/x11/Xwrapper.config" "/etc/X11/Xwrapper.config")
     (files/install! project "base/x11/99-vc4.conf" "/etc/X11/xorg.conf.d/99-vc4.conf")
 
-    ;; 6. A/B disk mount points + bind targets — rootfs layout is build content, so every
+    ;; 6. wifi powersave off for every connection — dozing costs seconds-scale
+    ;;    latency outliers for ≤~0.2W on mains-powered machines (numbers in the conf)
+    (files/install! project "base/network/wifi-powersave.conf"
+                    "/etc/NetworkManager/conf.d/ujima-wifi-powersave.conf")
+
+    ;; 7. A/B disk mount points + bind targets — rootfs layout is build content, so every
     ;;    image carries its own. The per-slot fstab that references them is written at
     ;;    install time (ujima.device.ab.autoboot/slot->fstab). /mnt/settings is the one
     ;;    path outside /ujima; never target the /ujima root itself — only named children.

@@ -15,8 +15,19 @@
               :next    (queries/next-keyboard-layout settings)}})
 
 
+(defn apps->ui
+  "The app snapshot -> the shell's blob. Spelled out, not assoc'd: this is the wire contract."
+  [{:keys [running catalog current]}]
+  {:running running
+   :current current
+   :pinned  (->> catalog
+             (remove :hidden)
+             (filter (fn [{category :category}] (= category :system)))
+             (map #(select-keys % [:id :label :icon])))})
+
+
 (defn converge-ui!   [settings _prv] (ndjson/publish! :ui/state (settings->ui settings)))
-(defn converge-apps! [snapshot _prv] (ndjson/publish! :ui/apps  snapshot))
+(defn converge-apps! [snapshot _prv] (ndjson/publish! :ui/apps  (apps->ui snapshot)))
 
 (defn stream-ui   [req] (ndjson/subscribe! :ui/state req))
 (defn stream-apps [req] (ndjson/subscribe! :ui/apps  req))
@@ -26,4 +37,4 @@
   "Declare the topics before anything serves or converges."
   []
   (ndjson/topic! :ui/state)
-  (ndjson/topic! :ui/apps {:apps [] :current nil}))
+  (ndjson/topic! :ui/apps {:running [] :pinned [] :current nil}))

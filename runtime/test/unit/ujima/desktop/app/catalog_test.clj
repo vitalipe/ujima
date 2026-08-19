@@ -19,9 +19,9 @@
 
 (deftest listing-projects-in-order-icon-as-resolved
   ;; :icon is whatever the loader resolved (a path on device) — no name defaulting here
-  (is (= [{:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category nil}
-          {:id :write     :label "Write"     :icon "write"     :category nil}
-          {:id :draw      :label "Draw"      :icon nil         :category nil}]
+  (is (= [{:id :wikipedia :label "Wikipedia" :icon "wikipedia" :category nil :hidden false}
+          {:id :write     :label "Write"     :icon "write"     :category nil :hidden false}
+          {:id :draw      :label "Draw"      :icon nil         :category nil :hidden false}]
          (catalog/listing cat))))
 
 

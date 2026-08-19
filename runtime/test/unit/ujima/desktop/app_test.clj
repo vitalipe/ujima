@@ -15,7 +15,11 @@
 (def ^:private catalog-apps               ; dir name = :id (the scanner's contract)
   {"paint" {:label "Paint" :exec ["tuxpaint" "--nolockfile"] :class "TuxPaint.TuxPaint"}
    "web"   {:label "Web"   :exec ["chromium"] :class "ujima-web"}
-   "sky"   {:label "Sky"   :exec ["stellarium"] :mode :fullscreen :class "stellarium"}})
+   "sky"   {:label "Sky"   :exec ["stellarium"] :mode :fullscreen :class "stellarium"}
+   ;; :system = no launcher tile, pinned in the dock instead. console pins only once a token
+   ;; unhides it, so it ships hidden.
+   "files"   {:label "Files"   :category :system :exec ["pcmanfm"] :class "pcmanfm"}
+   "console" {:label "Console" :category :system :hidden true :exec ["sh" "run.sh"] :class "ujima-console"}})
 
 (defn- scan-root!
   "Materialize {dir-name spec} as a temp scan root: <root>/<dir>/app.edn per entry."
@@ -81,7 +85,7 @@
 
 (defn- fx-of [k] (filterv #(= k (first %)) @fx*))
 (defn- snap  [] (last @pushed*))
-(defn- open-ids [] (mapv :id (:apps (snap))))
+(defn- open-ids [] (mapv :id (:running (snap))))
 (defn- current-id [] (:id (:current (snap))))
 
 
@@ -397,7 +401,7 @@
   (stubbed
     #(do (is (thrown? clojure.lang.ExceptionInfo (app/run! :nope)))
          (is (thrown? clojure.lang.ExceptionInfo (app/switch-to! :nope)))))
-  (is (= {:apps [] :current nil} (app/current-apps-state))))
+  (is (= {:running [] :catalog [] :current nil} (app/current-apps-state))))
 
 
 
@@ -405,8 +409,8 @@
 
 (deftest an-app-env-reaches-its-launches-and-only-its-own
   (setup! [] "1")
-  (app/reset-app-env! :paint {"UJIMA_CIRCLE_TOKEN" "deadbeef"})
-  (stubbed #(app/run! :paint))
+  (stubbed #(do (app/update-app! :paint {:env {"UJIMA_CIRCLE_TOKEN" "deadbeef"}})
+                (app/run! :paint)))
   (is (= [[:spawn-opts :paint {:extra-env {"UJIMA_CIRCLE_TOKEN" "deadbeef"}}]] (fx-of :spawn-opts)))
 
   (setup! [] "1")
@@ -417,8 +421,8 @@
 (deftest an-app-env-survives-a-relaunch
   ;; closed and reopened from the bar is the same launch path — it must still be handed the env
   (setup! [] "1")
-  (app/reset-app-env! :paint {"T" "1"})
-  (stubbed #(app/run! :paint))
+  (stubbed #(do (app/update-app! :paint {:env {"T" "1"}})
+                (app/run! :paint)))
   (reset! world* {:wins [] :focused-ws "1" :scopes #{}})   ; the scope is gone, the env is not
   (reset! fx* [])
   (stubbed #(app/run! :paint))
@@ -427,7 +431,31 @@
 
 (deftest clearing-an-app-env-stops-it-reaching-the-spawn
   (setup! [] "1")
-  (app/reset-app-env! :paint {"T" "1"})
-  (app/reset-app-env! :paint nil)
-  (stubbed #(app/run! :paint))
+  (stubbed #(do (app/update-app! :paint {:env {"T" "1"}})
+                (app/update-app! :paint {:env nil})
+                (app/run! :paint)))
   (is (empty? (fx-of :spawn-opts)) "no env = no opts at all, not an empty :extra-env"))
+
+
+;; --- runtime entry changes: one door, and the launch sees them ---
+
+(deftest an-entry-change-lands-on-the-listener-thread
+  (setup! [] "1")
+  (stubbed #(app/update-app! :console {:hidden false}))
+  (is (false? (:hidden (first (filter #(= :console (:id %)) (app/catalog-listing)))))
+      "the verb only emits — the handler is what writes the catalog"))
+
+
+(deftest changes-to-different-fields-do-not-clobber-each-other
+  (setup! [] "1")
+  (stubbed #(do (app/update-app! :console {:env {"T" "1"}})
+                (app/update-app! :console {:hidden false})))
+  (stubbed #(app/run! :console))
+  (is (= [[:spawn-opts :console {:extra-env {"T" "1"}}]] (fx-of :spawn-opts))
+      "the second change carried only :hidden — it must not drop the env the first one set"))
+
+
+(deftest an-unknown-app-cannot-be-changed
+  (setup! [] "1")
+  (is (thrown? Exception (app/update-app! :nope {:hidden false}))
+      "resolve! at emit time, like every other verb"))

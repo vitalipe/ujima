@@ -57,19 +57,19 @@
 (deftest opening-hands-the-console-the-key-then-runs-it
   (let [calls* (atom [])]
     (with-redefs [systemd/active?    (constantly false)
-                  app/reset-app-env! (fn [id env] (swap! calls* conj [:env id env]))
+                  app/update-app! (fn [id changes] (swap! calls* conj [:update id changes]))
                   app/run!           (fn [id]     (swap! calls* conj [:run id]))]
       (is (= :open (token/on-storage! (mounted secret) nil)))
-      (is (= [[:env :console {"UJIMA_CIRCLE_TOKEN" "abc"}]
+      (is (= [[:update :console {:env {"UJIMA_CIRCLE_TOKEN" "abc"} :hidden false}]
               [:run :console]]
              @calls*)
-          "env must be set BEFORE run! — the launch reads it"))))
+          "env + unhide must land BEFORE run! — the launch captures the entry"))))
 
 
 (deftest a-quiet-storage-event-touches-nothing
   (let [calls* (atom [])]
     (with-redefs [systemd/active?    (constantly false)
-                  app/reset-app-env! (fn [& _] (swap! calls* conj :env))
+                  app/update-app! (fn [& _] (swap! calls* conj :entry))
                   app/run!           (fn [& _] (swap! calls* conj :run))]
       (is (nil? (token/on-storage! (mounted secret) (mounted secret))))
       (is (= [] @calls*) "the token was already there — no workspace switch"))))
@@ -81,7 +81,7 @@
   (let [stopped* (atom [])]
     (with-redefs [token/eject-grace-ms 60
                   systemd/active?      (constantly false)
-                  app/reset-app-env!   (fn [& _] nil)
+                  app/update-app!  (fn [& _] nil)
                   app/run!             (fn [& _] nil)
                   systemd/stop!        (fn [id] (swap! stopped* conj id))]
       (is (= :close (token/on-storage! [] (mounted secret))))
@@ -93,7 +93,7 @@
   (let [stopped* (atom [])]
     (with-redefs [token/eject-grace-ms 60
                   systemd/active?      (constantly false)
-                  app/reset-app-env!   (fn [& _] nil)
+                  app/update-app!  (fn [& _] nil)
                   app/run!             (fn [& _] nil)
                   systemd/stop!        (fn [id] (swap! stopped* conj id))]
       (token/on-storage! [] (mounted secret))            ; yanked -> close armed
@@ -108,7 +108,7 @@
   (let [calls* (atom [])]
     (with-redefs [token/eject-grace-ms 5000                  ; the close never gets to fire
                   systemd/active?      (constantly true)     ; the console is still up
-                  app/reset-app-env!   (fn [& _] nil)
+                  app/update-app!  (fn [& _] nil)
                   app/run!             (fn [id] (swap! calls* conj id))]
       (token/on-storage! [] (mounted secret))                ; bad contact drops it
       (is (= :open (token/on-storage! (mounted secret) []))) ; and it comes straight back

@@ -34,9 +34,10 @@
 
 
 (defn listing
-  "The launcher's projection: [{:id :label :icon :category}] in catalog order."
+  "The shell's view of the catalog: [{:id :label :icon :category :hidden}] in catalog order."
   [catalog]
   (mapv (fn [id]
           (let [a (get-in catalog [:by-id id])]
-            {:id id :label (:label a) :icon (:icon a) :category (:category a)}))
+            {:id id :label (:label a) :icon (:icon a) :category (:category a)
+             :hidden (boolean (:hidden a))}))
         (:order catalog)))

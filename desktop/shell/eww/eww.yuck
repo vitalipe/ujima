@@ -23,13 +23,11 @@
 
 ;; the running apps (derived from the i3 tree) — same push contract as `state`
 (deflisten apps
-  :initial "{\"apps\":[],\"current\":null}"
+  :initial "{\"running\":[],\"pinned\":[],\"current\":null}"
   "while true; do curl -sN http://127.0.0.1:1336/ujima-desktop/stream/apps; sleep 1; done")
 
-;; the launchable-app catalog: immutable per session — fetched ONCE (retry until the
-;; API answers, emit, then hold the pipe open: eww drops a listener's line when the
-;; script exits straight after it). If the catalog ever goes mutable it moves into
-;; settings and arrives via the stream/state converge, not a poll.
+;; launcher tiles: fetched ONCE (the sleep holds the pipe open — eww drops a listener's
+;; line if the script exits). Runtime :hidden changes reach the dock, not this. Dynamic soon.
 (deflisten catalog
   :initial "{\"apps\":[]}"
   "until curl -sf http://127.0.0.1:1336/ujima-desktop/app/catalog; do sleep 1; done; echo; exec sleep infinity")
@@ -62,10 +60,10 @@
   (button :class "tile" :timeout "2s" :visible {entry.category == cat}
     :onclick "ujima-desktop POST commands/app/open '{\"app\": \"${entry.id}\"}' >/dev/null; ${wakebars}"
     (overlay
-      (box :class {"chip" + (jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")") ? " on cat-" + cat : "")} :halign "center" :valign "center"
+      (box :class {"chip" + (jq(apps.running, "any(.[]; .id == \"" + entry.id + "\")") ? " on cat-" + cat : "")} :halign "center" :valign "center"
         (image :path "${entry.icon}" :image-width 46 :image-height 46))
       (box :class "opendot cat-${cat}" :halign "end" :valign "start"
-        :visible {jq(apps.apps, "any(.[]; .id == \"" + entry.id + "\")")}))))
+        :visible {jq(apps.running, "any(.[]; .id == \"" + entry.id + "\")")}))))
 
 (defwidget tray [cat name]
   (box :class "tray cat-${cat}" :orientation "v" :space-evenly false :valign "start"
@@ -105,15 +103,16 @@
       (button :class {(apps.current?.id ?: "") == "" ? "home active" : "home"} :timeout "2s"
         :onclick "ujima-desktop POST commands/app/home >/dev/null"
         (image :path "/ujima/desktop/shell/icons/launcher.svg" :image-width 25 :image-height 25))
-      ;; files: hidden from the launcher (its 'system' category) — pinned next to home. It's an
-      ;; ACTION like the launcher (not an app), so it shares .home: bare at rest, frost when focused.
-      (button :class {(apps.current?.id ?: "") == "files" ? "home active" : "home"} :timeout "2s"
-        :onclick "ujima-desktop POST commands/app/open '{\"app\": \"files\"}' >/dev/null"
-        (image :path "/ujima/apps/files/icon.svg" :image-width 26 :image-height 26)))
+      ;; pinned: ujimad decides the list (files always, console once a token unhides it); this
+      ;; only renders it. ACTIONS like the launcher, not apps, so they share .home.
+      (for p in {apps.pinned}
+        (button :class {p.id == (apps.current?.id ?: "") ? "home active" : "home"} :timeout "2s"
+          :onclick "ujima-desktop POST commands/app/open '{\"app\": \"${p.id}\"}' >/dev/null"
+          (image :path "${p.icon}" :image-width 26 :image-height 26))))
     ;; running apps: every open app carries a very subtle hint of its category; the ACTIVE one
     ;; blooms to the full category fill + ring
     (box :halign "center" :space-evenly false :spacing 6
-      (for a in {apps.apps}
+      (for a in {apps.running}
         (button :class {"win cat-" + (a.category ?: "none") + (a.id == (apps.current?.id ?: "") ? " active" : "")} :timeout "2s"
           :visible {a.category != "system"}   ; system apps (files) are pinned on the left, not shown here
           :onclick "ujima-desktop POST commands/app/open '{\"app\": \"${a.id}\"}' >/dev/null"

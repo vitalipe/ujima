@@ -48,7 +48,7 @@
 
 (defn- open! [token before]
   (swap! eject-gen* inc)                          ; a pending close is now stale
-  (app/reset-app-env! console {token-env token})
+  (app/update-app! console {:env {token-env token} :hidden false})
   (when before
     (log/warn "circle token replaced — a console already running keeps the old one until it closes"))
   ;; app/run! switches workspace BEFORE its own active? gate, so ask here: a stick that
@@ -65,7 +65,7 @@
     (future
       (Thread/sleep eject-grace-ms)
       (when (= gen @eject-gen*)                   ; nothing re-armed us in the meantime
-        (app/reset-app-env! console nil)
+        (app/update-app! console {:env nil :hidden true})
         (systemd/stop! console)))))
 
 

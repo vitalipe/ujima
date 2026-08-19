@@ -19,7 +19,6 @@
 (defonce ^:private prev*    (atom nil))   ; last snapshot, the prv of (next prv)
 (defonce ^:private targets* (atom []))
 (defonce ^:private close*   (atom nil))   ; last ✕: {:con :app :at} — drives con-id go-home + ✕✕
-(defonce ^:private app-env* (atom {}))    ; app-id -> extra-env, applied to every launch
 
 
 (def ^:private home-ws     "1")
@@ -122,17 +121,8 @@
   (reset! prev*    nil)
   (reset! close*   nil)
   (reset! targets* (vec converge-targets))
-  (reset! app-env* {})
   (reset! bins*    (select-keys cfg [:open-web-app-bin :serve-web-app-bin]))
   catalog)
-
-
-(defn reset-app-env!
-  "Set (or clear, with nil) the extra environment every launch of ID gets — it applies to
-   relaunches too, so an app closed and reopened is handed the same thing."
-  [id env]
-  (swap! app-env* (fn [m] (if env (assoc m id env) (dissoc m id))))
-  nil)
 
 
 (defn catalog-listing [] (catalog/listing @catalog*))
@@ -175,13 +165,14 @@
 
 (defn- projection [{:keys [focused-ws ws->wins]}]
   (let [open (mapv #(entry % ws->wins) (open-apps ws->wins))]
-    {:apps    open
+    {:running open
+     :catalog (catalog/listing @catalog*)     ; listing, not raw entries — those hold :env
      :current (when-let [id (app-of-ws focused-ws)] (entry id ws->wins))}))
 
 
 (defn- converge! [snapshot]
-  (let [prv @prev*]
-    (reset! prev* snapshot)
+  ;; swap-vals! so two threads can't claim the same prev; ORDER still needs the one listener
+  (let [prv (first (swap-vals! prev* (constantly snapshot)))]
     (doseq [t @targets*] (t snapshot prv))))
 
 
@@ -208,7 +199,7 @@
   (when-not (systemd/active? id)
     (try
       (systemd/spawn-scoped! id (into (app->runnable @bins* app) extra) dir
-                             (when-some [env (get @app-env* id)] {:extra-env env}))
+                             (when-some [env (:env app)] {:extra-env env}))
       (log/info "app launched" {:app id})
       (catch Throwable e
         (log/error "app launch failed" {:app id :error (ex-message e)})
@@ -321,6 +312,7 @@
                           (systemd/stop! app)
                           (go-home-if-empty! app w)))))
     :scope/died   (go-home-if-empty! (:app-id ev) (observe!))   ; crash / self-quit backstop
+    :catalog/update-app (swap! catalog* update-in [:by-id (:id ev)] merge (:changes ev))
     nil)
 
   (let [w (observe!)]
@@ -335,6 +327,15 @@
   (or (get-in @catalog* [:by-id id])
       (throw (ex-info "unknown app" {:error :app/unknown-app :id id}))))
 
+(defn update-app!
+  "Merge CHANGES into ID's catalog entry (:env for launches, :hidden for the shell). Emits like
+   every verb, so the listener thread is the only writer; the event carries the changes, not a
+   whole entry, so two of them can't clobber each other. A boot reloads the catalog, resetting all."
+  [id changes]
+  (resolve! id)
+  (i3/emit! {:type :catalog/update-app :id id :changes changes}))
+
+
 (defn run!           [id] (i3/emit! {:type :app/run    :app (resolve! id)}))
 (defn switch-to!     [id] (i3/emit! {:type :app/switch :app (resolve! id)}))
 (defn close-focused! []   (i3/emit! {:type :app/close}))
@@ -346,4 +347,4 @@
     (throw (ex-info "not an http url" {:error :app/bad-url :url (str url)})))
   (i3/emit! {:type :app/open-url :app (resolve! browser-app) :url url}))
 
-(defn current-apps-state [] (or @prev* {:apps [] :current nil}))
+(defn current-apps-state [] (or @prev* {:running [] :catalog [] :current nil}))

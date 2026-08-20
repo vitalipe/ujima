@@ -61,6 +61,10 @@ bb dev click <ip> <x> <y>                             synthetic input on the dev
 bb dev type <ip> <text>
 bb dev key <ip> <chord>
 
+bb circle sim up --range <a.b.c.x-y>                  fake a circle of machines on real LAN addresses (needs root)
+bb circle sim cleanup                                 release addresses a killed sim left claimed
+bb circle console up <self-ip>                        the Console panels on :1338, sweeping that machine's subnet
+
 bb loopback attach <img> [--readonly]                 loop-device utility
 bb loopback detach <img|loopdev>
 bb loopback list
@@ -154,7 +158,7 @@ install packages, so anything that needs a new binary is an image rebuild (the
 failure mode is a quiet "won't open": the spawn throws on the missing binary).
 
 
-## The device
+## Disk layout
 
 **The A/B harness** — the card layout, owned by the installer: a control partition,
 boot + root **slot pairs**, and two partitions that belong to no slot — **settings**
@@ -180,4 +184,48 @@ the journal. On a running device:
 /ujima/storage     shared storage — files, apps     (persists)
 /ujima/run         ephemeral runtime state          (resets)
 /ujima/dev         the dev kit                      (dev images only)
+```
+
+
+## Development
+
+### A running device
+
+A `--dev` image ships the dev kit, so a device on the network can be watched and
+driven from here without reflashing it: mirror its screen, pull a single frame,
+send synthetic input, or deploy the daemon and restart its session in place.
+
+```
+bb dev view <ip>                              # interactive VNC mirror of the screen
+bb dev screenshot <ip>                        # one frame -> tmp/screen/ujima-screen.png
+bb dev click <ip> 640 400                     # synthetic input on :0
+bb dev push <ip> ujimad                       # deploy the daemon, restart the session
+```
+
+### Circle
+
+Two terminals give you a classroom without one. The sim claims real addresses on
+the LAN and answers on them exactly as a machine does, so the Console finds them by
+sweeping — its argument is the machine it administers, and that machine's subnet is
+the one swept, so pointing it at a real device instead makes the fakes that device's
+circle. Both default `--token` to the baked circle key, and the sim needs root to
+claim addresses; ctrl-c releases them.
+
+```
+bb circle sim up --range 192.168.1.200-229    # 30 fake machines
+bb circle console up 192.168.1.200            # the panels on :1338, sweeping that /24
+```
+
+### Pins
+
+World-truth the build cannot resolve for itself is committed as a pin, and the
+consumer verifies it: the bb library closure, the timezone and keyboard catalogs,
+and a kernel-matched initramfs. Two have to come from somewhere other than this
+host — schema from a mounted image rootfs, initramfs from a dev Pi with its overlay
+off.
+
+```
+bb pin deps                                   # deps.edn -> os/build/deps-pin.edn
+bb pin schema <rootfs>                        # tz/xkb catalogs from a mounted image rootfs
+bb pin initramfs <ip>                         # on a dev Pi, overlay off first
 ```

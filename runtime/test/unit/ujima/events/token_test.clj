@@ -1,5 +1,7 @@
 (ns ujima.events.token-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [babashka.fs         :as fs]
+            [ujima.control       :as control]
             [ujima.desktop.app   :as app]
             [ujima.linux.systemd :as systemd]
             [ujima.events.token :as token]))
@@ -10,6 +12,14 @@
 
 
 (def ^:private secret {:type :circle/secret :value {:key "abc" :circle "room-1"}})
+
+;; the stick is only a token when its key is the one THIS machine holds
+(defn- circle-holds! [token]
+  (let [dir (str (fs/create-temp-dir))]
+    (control/init! {:storage dir :tmp dir :converge-targets []})
+    (control/settings! :circle [:circle :token] token)))
+
+(use-fixtures :each (fn [run] (circle-holds! "abc") (run)))
 
 
 ;; --- what counts as a token -------------------------------------------------
@@ -115,3 +125,15 @@
       (is (= [] @calls*)
           "app/run! switches workspace before its own gate, so calling it here would steal
            focus from whoever is typing, once per flap"))))
+
+
+(deftest a-stick-from-another-circle-is-ignored
+  (let [calls* (atom [])
+        other  {:type :circle/secret :value {:key "not-ours"}}]
+    (with-redefs [systemd/active? (constantly false)
+                  app/update-app! (fn [& _] (swap! calls* conj :update))
+                  app/run!        (fn [& _] (swap! calls* conj :run))]
+      (is (nil? (token/on-storage! (mounted other) nil)))
+      (is (empty? @calls*) "no env reaches the console, and it never launches")
+      (is (= :open (token/on-storage! (mounted secret) (mounted other)))
+          "our own key arriving after a foreign one still opens"))))

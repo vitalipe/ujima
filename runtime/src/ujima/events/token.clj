@@ -7,6 +7,7 @@
    level-triggered 'token present -> run!' would yank whoever is working to the console
    every time any partition changes."
   (:require [clojure.string      :as str]
+            [ujima.control       :as control]
             [ujima.log           :as log]
             [ujima.desktop.app   :as app]
             [ujima.linux.systemd :as systemd]))
@@ -32,6 +33,18 @@
        (filter string?)
        (remove str/blank?)
        (first)))
+
+
+;; a plain =: whoever holds the stick can read the key off it, so there is no
+;; timing channel worth defending
+(defn- ours? [token]
+  (= token (:effective (control/setting [:circle :token]))))
+
+(defn- our-token
+  "The stick's key, but only when it is this circle's."
+  [entries]
+  (when-let [token (circle-token entries)]
+    (when (ours? token) token)))
 
 
 (defn transition
@@ -72,9 +85,12 @@
 (defn on-storage!
   "Storage converge target. Returns the transition — the decision, for tests."
   [next prev]
-  (let [before (circle-token prev)
-        after  (circle-token next)
+  (let [seen   (circle-token next)
+        before (our-token prev)
+        after  (our-token next)
         move   (transition before after)]
+    (when (and seen (nil? after) (not= seen (circle-token prev)))
+      (log/warn "token is not this circle's — ignoring the stick"))
     (case move
       :open  (open! after before)
       :close (close-soon!)

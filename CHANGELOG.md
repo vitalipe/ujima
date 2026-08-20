@@ -37,9 +37,10 @@ version truth; branch names and build labels may disagree.
 - The OS image boots as-is — `dd` it to a card for a system without A/B, where
   settings and storage are not persistent.
 - A usb stick carrying an admin token opens the Console: removable partitions are
-  mounted read-only under `/ujima/run/storage/<uuid>` and scanned for it, the Console
-  pins beside Files in the dock while the token is in — closing its window leaves the
-  icon, a tap reopens it — and pulling the stick closes the Console after a few seconds.
+  mounted read-only under `/ujima/run/storage/<uuid>` and scanned for it, the token has
+  to be this machine's own circle key or the stick is ignored, the Console pins beside
+  Files in the dock while the token is in — closing its window leaves the icon, a tap
+  reopens it — and pulling the stick closes the Console after a few seconds.
 - Desktop windows fade in on open and out on close (~130ms), as do the shell's
   popovers and the bars hiding for a fullscreen app.
 

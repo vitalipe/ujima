@@ -47,13 +47,9 @@
     (app/init! (merge (select-keys app-cfg [:open-web-app-bin :serve-web-app-bin])
                       {:catalog app-catalog :converge-targets [shell-http-converge/converge-apps! eww/converge!]}))
 
-    ;; the console follows a circle token on removable storage; before events/init!, so the
-    ;; app plane is live before the first partition scan can fire app/run!
+    ;; the console follows a circle token on removable storage
     (storage/init! (merge (get-in env [:storage] {})
                           {:converge-targets [token-events/on-storage!]}))
-
-    (events/init! (get-in env [:events] {}))
-
 
     (when disk
       (ab/system-disk-id! disk)) ; first boot stamps here
@@ -75,6 +71,9 @@
     (http/listen! (merge ui-http
                          {:endpoints {"ujima-desktop" (shell-http/endpoints ui-http)}
                           :log       log/log!}))
+
+    ;; the taps, last: a handler may touch any surface above — the console needs /api serving
+    (events/init! (get-in env [:events] {}))
 
     (try
       (desktop/init!! (get-in env [:desktop] {}))

@@ -1,7 +1,8 @@
 (ns console.circle
   "Circle's slice of the console edge: the verb whitelist the panel POSTs,
    per-verb arg validation, and the one composed view it polls."
-  (:require [console.jobs :as jobs]))
+  (:require [console.fleet :as fleet]
+            [console.jobs  :as jobs]))
 
 
 (defn- malformed! [message]
@@ -11,6 +12,7 @@
 (def verb-routes
   {["circle" "mute"]      :mute
    ["circle" "unmute"]    :unmute
+   ["circle" "release"]   :release
    ["circle" "volume"]    :volume
    ["circle" "close-app"] :close-app
    ["circle" "open-app"]  :open-app
@@ -40,11 +42,12 @@
     {}))
 
 
-(defn act! [transport verb body]
-  (jobs/act! transport :circle verb (targets body) (verb-args verb body)))
+(defn act! [verb body]
+  (jobs/act! fleet/send! :circle verb (targets body) (verb-args verb body)))
 
-(defn view [transport]
+(defn view []
   {:schema 1
-   :self   ((:self transport))
-   :peers  ((:peers transport))
+   :self   (fleet/self)
+   :peers  (fleet/peers)
+   :scan   (fleet/scan)
    :panel  {:action (jobs/active-action :circle)}})

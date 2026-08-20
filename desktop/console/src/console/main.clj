@@ -1,12 +1,9 @@
 (ns console.main
-  "Dev entry: the console (Circle + Setup panels) over the file-backed mock
-   fleet."
-  (:require [console.mock :as mock]
-            [console.http :as http]))
+  "Circle and Setup over the real circle. The token arrives in the environment,
+   never argv. UJIMA_SELF is the machine we administer — its subnet is the one swept."
+  (:require [console.fleet :as fleet]
+            [console.http  :as http]))
 
-
-(def ^:private seed-path "dev/world.edn")
-(def ^:private live-path "tmp/world.edn")
 
 (def ^:private ui-root "ui")
 
@@ -17,8 +14,10 @@
 
 
 (defn -main [& _]
-  (mock/seed! seed-path live-path)
-  (http/init! {:ui-roots ui-roots :transport (mock/transport live-path)})
-  (println "console: mock fleet at http://localhost:1338 — world:" live-path)
-  (println "  circle http://localhost:1338/circle/   setup http://localhost:1338/setup/")
-  @(promise))
+  (let [key (System/getenv "UJIMA_CIRCLE_TOKEN")]
+    (when-not key
+      (println "console: no UJIMA_CIRCLE_TOKEN — nothing can be signed, the fleet stays empty"))
+    (fleet/init! {:key key :self-addr (or (System/getenv "UJIMA_SELF") "127.0.0.1")})
+    (http/init! {:ui-roots ui-roots})
+    (println "console: http://127.0.0.1:1338/   circle /circle/   setup /setup/")
+    @(promise)))

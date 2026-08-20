@@ -1,5 +1,5 @@
 (ns console.jobs
-  "Jobs over a fleet transport. One act = one lib.task: per-target replies
+  "Jobs over a send fn. One act = one lib.task: per-target replies
    append :peer-result events as they arrive, and the reply deadline appends
    :noreply for the silent ones. A job view is a reduce of that timeline —
    per-verb meaning (restart's :ok reads as :accepted) lives only here.
@@ -46,7 +46,7 @@
 
 (defn act!
   "Starts verb against targets on an async thread; returns the job id."
-  [{send! :send!} app verb targets args]
+  [send! app verb targets args]
   (let [t (task/->task verb (fanout send! verb targets args))]
     (swap! jobs* (fn [jobs]
                    (->> (assoc jobs (:id t) {:task t :verb verb :targets targets :app app})

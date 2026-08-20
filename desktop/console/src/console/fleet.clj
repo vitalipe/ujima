@@ -1,14 +1,9 @@
 (ns console.fleet
-  "The circle as this console sees it: who is out there, what each machine is doing,
-   and the one place a panel's verb becomes a request.
+  "Who is out there, what each machine is doing, and where a verb becomes a request.
 
-   Discovery is a sweep, not a subscription — once at startup, then only when a
-   person asks. The roster grows from a sweep and never shrinks under one: a machine
-   that stops answering keeps its last tree and reads offline, so a class list does
-   not thin out mid-lesson. Only a person removes a machine.
-
-   Nothing here persists. The console runs while the token is in, and the fleet it
-   knows dies with it."
+   Discovery is a sweep — at startup, then when a person asks. It only ever adds:
+   a machine that stops answering keeps its last tree and reads offline, so a class
+   list never thins out mid-lesson. Only a person removes one. Nothing persists."
   (:require [clojure.string :as str]
             [console.api    :as api]
             [lib.task       :as task])
@@ -65,8 +60,7 @@
     (map #(long->ip (+ base %)) (range 1 (dec span)))))
 
 (defn- our-network
-  "The address and prefix of the machine we run on, asked of that machine — the
-   console has no local network syscalls, and this is the subnet a class shares."
+  "Asked of the machine we administer — babashka has no NetworkInterface."
   [key self-addr]
   (let [{:keys [status data]} (api/machine {:key key :addr self-addr})
         ip                    (get-in data [:net :ip])]
@@ -76,14 +70,12 @@
        :prefix (some (fn [[_ i]] (when (= ip (:ip i)) (:prefix i)))
                      (get-in data [:net :interfaces]))})))
 
-(defn- adopt!
-  "A machine answered and its answer verified — it holds our key, so it is ours."
-  [id addr]
+;; it verified, so it holds our key
+(defn- adopt! [id addr]
   (swap! roster* update id merge {:addr addr :online true}))
 
 (defn- sweep!
-  "Probe the subnet, twice for the addresses that said nothing — on a loaded AP a
-   single dropped probe is the difference between a machine and a support call."
+  "Probe the subnet, twice for the silent — a dropped probe is a missing machine."
   []
   (let [{:keys [key self-addr]} @cfg*
         {:keys [id ip prefix]}  (our-network key self-addr)]
@@ -99,7 +91,7 @@
             foreign (count (filter (fn [[_ r]] (= :auth/bad-response (:reason (:data r)))) answers))]
         (locking lock
           (doseq [[addr id] ours] (adopt! id addr)))
-        ;; pull their trees now: a machine found is a machine the ring can draw
+        ;; found is drawable: pull the trees now
         (doall (in-waves refresh! (map second ours)))
         {:found (count ours) :foreign foreign}))))
 
@@ -117,8 +109,7 @@
      :foreign foreign}))
 
 (defn rescan!
-  "Sweep. A request that arrives while one is running joins it and is told so —
-   there is never a second sweep."
+  "Sweep, or hand back the one already running — never two."
   []
   (locking lock
     (when-not (sweeping?)
@@ -147,7 +138,7 @@
 ;; ── verbs ───────────────────────────────────────────────────────────────────
 
 (defn- epoch-ms
-  "The panel sends a wall time and the zone to read it in; the wire takes an instant."
+  "The panel sends wall time and a zone; the wire takes an instant."
   [{:keys [tz date time]}]
   (-> (LocalDateTime/parse (str date "T" time))
       (.atZone (ZoneId/of tz))
@@ -155,9 +146,8 @@
       (.toEpochMilli)))
 
 (defn- ->request
-  "A console verb -> [command-path body]. Circle's live verbs write :activity, so
-   the machine's own bar (which writes :session) cannot answer back; unmute clears
-   that hold rather than pinning false. Nil is a verb this console cannot send."
+  "Verb -> [command-path body], nil for one we cannot send. Circle writes :activity,
+   over the :session the machine's own bar writes — so unmute clears, never pins."
   [verb args]
   (case verb
     :mute      ["settings/audio/muted"        {:scope "activity" :value true}]
@@ -188,9 +178,8 @@
                         {:scope "device" :value value}))))
 
 (defn send!
-  "One verb against one machine, blocking — console.jobs fans it out and holds the
-   deadline. A reply that landed is refetched at once, so the panels do not wait
-   out a poll to see what they just did."
+  "One verb, one machine, blocking — jobs fans out and holds the deadline. An :ok
+   refetches at once, so a panel never waits out a poll to see what it just did."
   [id verb args]
   (if-let [peer (peer-of id)]
     (let [reply (if (= :settings/write verb)
@@ -208,25 +197,42 @@
 
 (defn self [] @self*)
 
+(defn- tail [id] (subs id (max 0 (- (count id) 4))))
+
+(defn- labelled
+  "Hostname; its id's tail when it has none; both when two machines share a name.
+   Needs the whole roster, so it is not a fact about one peer."
+  [peers]
+  (let [shared (->> peers
+                    (keep #(some-> (get-in % [:system :hostname]) str/lower-case))
+                    frequencies
+                    (keep (fn [[name n]] (when (> n 1) name)))
+                    set)]
+    (mapv (fn [{:keys [id] :as p}]
+            (let [host (get-in p [:system :hostname])]
+              (assoc p :label (cond (str/blank? host)                  (tail id)
+                                    (shared (str/lower-case host))     (str host " " (tail id))
+                                    :otherwise                          host))))
+          peers)))
+
 (defn peers
-  "Every machine we know: its tree as it last answered, plus the two facts a
-   machine cannot report about itself."
+  "Each tree as it last answered, plus what a machine cannot say about itself."
   []
   (->> @roster*
        (keep (fn [[id {:keys [tree addr online]}]]
                (when tree (assoc tree :id id :addr addr :online (boolean online)))))
        (sort-by :id)
-       vec))
+       vec
+       labelled))
 
 (defn forget!
-  "Drop a machine from the roster. It returns if it boots and someone sweeps."
+  "Drop it. It returns if it boots and someone sweeps."
   [id]
   (swap! roster* dissoc id)
   {:removed id})
 
 (defn init!
-  "Start polling and sweep once — the server probes before any panel exists, so a
-   window that opens mid-sweep already has machines to draw."
+  "Poll, and sweep once — before any panel exists, so a window opens onto machines."
   [{:keys [key self-addr] :or {self-addr "127.0.0.1"}}]
   (reset! cfg* {:key key :self-addr self-addr})
   (poll-loop!)

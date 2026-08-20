@@ -44,9 +44,6 @@ const LAYCAT = [
 ];
 const SND = [{k:'hdmi',n:'Screen'},{k:'usb',n:'USB speaker'}];
 
-const CHECKS = [['gateway','Gateway'],['internet','Internet'],['peers','Other machines'],
-                ['storage','Storage'],['clock','Clock']];
-
 let S   = null;          // last /ui/setup payload
 let cur = null, tab = 'settings';
 let workLay = [];
@@ -55,6 +52,7 @@ let inflight = 0;        // jobs in flight on the CURRENT machine (drives the he
 let headRes  = null;     // 'ok' | 'noreply' — the head glyph's settled state
 let detailKey = '';      // cur|tab|online — the pane rebuilds only when this moves
 let scanning  = false;   // a sweep is running: rail shows the hint, the page locks
+const SCAN_LIMIT = 30000;   // never hold the page on a server that stopped answering
 let revealing = false;   // the render right after a sweep staggers the rows in
 let fanout    = null;    // a running/settled send-to-all, shown on the rail:
                          // {key url body total peers:{id:status} live} — greens
@@ -87,11 +85,16 @@ const self = () => byId(S.self);
 const layName = k => { const l = LAYCAT.find(x => x.k === k); return l ? l.n : k; };
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-const sys      = m => m.system || {};
-const layouts  = m => (m.keyboard && m.keyboard.layouts) || [];
+const sys      = m => m.system  || {};
+const dev      = m => m.device  || {};
+const dsk      = m => m.disk    || {};
+const net      = m => m.net     || {};
+const mon      = m => m.monitor || {};
+const layouts  = m => (m.keyboard && m.keyboard.availableLayouts) || [];
 const locked   = m => !!(m.desktop && m.desktop.locked);
 const fmtUp    = min => min == null ? '—' : `${Math.floor(min/60)}h ${String(min%60).padStart(2,'0')}m`;
-const fmtStore = pct => pct == null ? '—' : pct + '%';
+const fmtFree  = d => (d && d.storage && d.storage.totalMb)
+  ? Math.round(100 * d.storage.freeMb / d.storage.totalMb) + '%' : '—';
 const splitNow = now => (now || 'T').split('T');   // "2026-08-08T13:05" -> [date, time]
 
 /* the shipped machine glyph, verbatim geometry from circle.js monSvg() */
@@ -189,9 +192,9 @@ function renderRail(){
     return `
     <div class="mrow ${glyphCls(m, state)} ${m.id===cur?'on':''} ${m.online?'':'off'} ${revealing?'appear':''}"
          style="--i:${i}" onclick="pick('${m.id}')">
-      ${monSvg()}<span class="nm">${esc(m.name)}</span>
+      ${monSvg()}<span class="nm">${esc(m.label)}</span>
       ${m.id === S.self ? `<span class="tag">this</span>` : ''}
-      ${retry ? `<button class="rowretry" title="Try ${esc(m.name)} again"
+      ${retry ? `<button class="rowretry" title="Try ${esc(m.label)} again"
                    onclick="retryRow(event,'${m.id}')">${ic('boot')}</button>` : ''}
     </div>`;
   }).join('');
@@ -207,14 +210,14 @@ function headGlyphCls(m){
   return glyphCls(m, state);
 }
 function statusText(m){
-  return m.online ? `on · up ${fmtUp(sys(m).upMin)}` : 'off';
+  return m.online ? `on · up ${fmtUp(mon(m).uptimeMinutes)}` : 'off';
 }
 function renderDetail(){
   const m = byId(cur);
   const head = `
     <div class="dhead ${headGlyphCls(m)}" id="dhead">
       ${monSvg()}
-      <h2 id="dname">${esc(m.name)}</h2>
+      <h2 id="dname">${esc(m.label)}</h2>
       ${m.id === S.self ? `<span class="selftag">this computer</span>` : ''}
       <span class="st" id="dstatus">${statusText(m)}</span>
       <span class="grow"></span>
@@ -226,7 +229,7 @@ function renderDetail(){
   if (!m.online){
     $('detail').innerHTML = head + `
       <div class="scard"><span class="sc-title">${ic('pwr')}Off</span>
-        <p class="hint">${esc(m.name)} is off or not reachable. Check power and the network cable —
+        <p class="hint">${esc(m.label)} is off or not reachable. Check power and the network cable —
         it appears here again when it starts.</p>
         ${m.id === S.self ? '' : `<div class="frow"><span class="grow"></span>
           <button class="btn dangerf" onclick="confirmRemove('${m.id}')">${ic('x')}Remove from list</button>
@@ -243,7 +246,7 @@ function refreshGates(m){
 /* between rebuilds the poll only touches what can't hold a draft */
 function patchDetail(m){
   const st = $('dstatus'); if (st) st.textContent = statusText(m);
-  const nm = $('dname');   if (nm && nm.textContent !== m.name) nm.textContent = m.name;
+  const nm = $('dname');   if (nm && nm.textContent !== m.label) nm.textContent = m.label;
   if (tab === 'settings') refreshGates(m);
 }
 function refreshHead(){
@@ -271,7 +274,7 @@ function settingsHtml(m){
   <div class="scard">
     <span class="sc-title">${ic('tag')}Name</span>
     <div class="frow">
-      <input class="field grow" id="f-name" value="${esc(m.name)}" maxlength="16"
+      <input class="field grow" id="f-name" value="${esc(sys(m).hostname || '')}" maxlength="16"
         oninput="refreshSave('name')">
       ${saveBtn('b-name','Save','','primary',"saveSec('name')")}
     </div>
@@ -290,7 +293,7 @@ function settingsHtml(m){
         oninput="refreshSave('clock')">
     </div>
     <div class="frow">
-      ${isSelf ? '' : `<button class="btn quiet" onclick="copyClock()">${ic('clock')}Use ${esc(self().name)}’s time</button>`}
+      ${isSelf ? '' : `<button class="btn quiet" onclick="copyClock()">${ic('clock')}Use ${esc(self().label)}’s time</button>`}
       <span class="grow"></span>
       ${isSelf ? saveBtn('b-all-clock','Send to all machines','cast','quiet',"sendAll('clock')") : ''}
       ${saveBtn('b-clock','Save','','primary',"saveSec('clock')")}
@@ -302,7 +305,7 @@ function settingsHtml(m){
 
   <div class="scard">
     <span class="sc-title">${ic('snd')}Sound output</span>
-    ${SND.map(s => `<button class="optrow snd ${(m.audio && m.audio.out)===s.k?'on':''}" data-k="${s.k}"
+    ${SND.map(s => `<button class="optrow snd ${(m.audio && m.audio.output)===s.k?'on':''}" data-k="${s.k}"
         onclick="pickSnd(this)">${ic('snd')}${s.n}</button>`).join('')}
     <div class="frow"><span class="grow"></span>
       ${saveBtn('b-snd','Save','','primary',"saveSec('snd')")}
@@ -372,10 +375,10 @@ function copyClock(){
    time keeps moving — what matters is whether the user touched it) */
 function cardDirty(key){
   const m = byId(cur);
-  if (key === 'name')    return $('f-name').value.trim() !== m.name;
+  if (key === 'name')    return $('f-name').value.trim() !== (sys(m).hostname || '');
   if (key === 'snd'){
     const on = document.querySelector('.optrow.snd.on');
-    return !!on && on.dataset.k !== (m.audio && m.audio.out);
+    return !!on && on.dataset.k !== (m.audio && m.audio.output);
   }
   if (key === 'layouts'){
     const saved = layouts(m);
@@ -520,7 +523,7 @@ function sendBtnSettle(bid, machine){
   const bad = failedIds();
   if (bad.length){
     setBtn(bid, 'fail', `${fanout.total - bad.length} of ${fanout.total}`,
-           bad.map(id => (byId(id) || {name: id}).name).join(', ')
+           bad.map(id => (byId(id) || {label: id}).label).join(', ')
            + ' did not reply — click to try again');
   } else {
     setBtn(bid, 'ok', `Done on ${fanout.total}`); relax(bid, machine);
@@ -583,86 +586,26 @@ function refreshSend(key){
 }
 
 /* ── diagnostics tab ─────────────────────────────────────────────────────── */
+/* checks and log are parked: no gateway/internet probe, no journal lines yet */
 function diagHtml(m){
-  const s = sys(m);
+  const warns = mon(m).messages || [];
   return `
   <div class="scard">
     <span class="sc-title">${ic('cpu')}Identity</span>
-    <div class="drow"><span class="k">Serial</span><span class="v mono">${esc(s.serial || '—')}</span></div>
-    <div class="drow"><span class="k">Image</span><span class="v">v0.4.0 · slot ${esc(s.slot || '?')}</span></div>
-    <div class="drow"><span class="k">Address</span><span class="v mono">${esc(s.ip || '—')}</span></div>
-    <div class="drow"><span class="k">Up</span><span class="v">${fmtUp(s.upMin)}</span></div>
-    <div class="drow"><span class="k">Storage free</span><span class="v">${fmtStore(s.storeFree)}</span></div>
-    <div class="drow"><span class="k">Machine time</span><span class="v">${esc((s.now || '').replace('T',' '))}</span></div>
-  </div>
-
-  <div class="scard">
-    <span class="sc-title">${ic('act')}Checks</span>
-    ${CHECKS.map(([k, label]) => `<div class="drow"><span class="k">${label}</span><span class="v" id="ck-${k}">–</span></div>`).join('')}
-    <div class="frow"><span class="grow"></span>
-      <button class="btn primary" id="b-checks" data-idle="Run checks" data-icx="act" onclick="runChecks()">${ic('act')}Run checks</button>
-    </div>
+    <div class="drow"><span class="k">Serial</span><span class="v mono">${esc(dev(m).serial || '—')}</span></div>
+    <div class="drow"><span class="k">Image</span><span class="v">${esc((m.image && m.image.version) || '—')} · slot ${esc(dsk(m).slot || '?')}</span></div>
+    <div class="drow"><span class="k">Address</span><span class="v mono">${esc(net(m).ip || '—')}</span></div>
+    <div class="drow"><span class="k">Up</span><span class="v">${fmtUp(mon(m).uptimeMinutes)}</span></div>
+    <div class="drow"><span class="k">Storage free</span><span class="v">${fmtFree(dsk(m))}</span></div>
+    <div class="drow"><span class="k">Machine time</span><span class="v">${esc((sys(m).now || '').replace('T',' '))}</span></div>
   </div>
 
   <div class="scard">
     <span class="sc-title">${ic('alert')}Warnings</span>
-    ${(m.warns && m.warns.length)
-      ? m.warns.map(w => `<div class="warnline"><span class="wd"></span>${esc(w)}</div>`).join('')
+    ${warns.length
+      ? warns.map(w => `<div class="warnline"><span class="wd"></span>${esc(w.label ?? w)}</div>`).join('')
       : `<span class="nowarn">No warnings.</span>`}
-  </div>
-
-  <div class="scard">
-    <span class="sc-title">${ic('file')}Log</span>
-    <div class="log">${logLines(m)}</div>
-    <div class="frow"><span class="grow"></span>
-      ${saveBtn('b-log','Copy','copy','quiet',"copyLog()")}
-    </div>
   </div>`;
-}
-function logLines(m){
-  const s = sys(m);
-  return [
-    `11:58:41 boot slot ${s.slot || 'A'} ok`,
-    `11:58:49 net link up (10.0.0.1)`,
-    `11:58:52 ujimad converge ok (machine settings)`,
-    `11:59:03 desktop session start (guest)`,
-    `12:03:12 peers ${Math.max(S.peers.filter(p => p.online).length - 1, 0)} found`,
-    `12:41:07 session reset (admin)`,
-    `13:02:55 app open gcompris`,
-  ].join('\n');
-}
-async function runChecks(){
-  const machine = cur;
-  CHECKS.forEach(([k]) => { $('ck-' + k).innerHTML = `<span class="spin"></span>`; });
-  setBtn('b-checks', 'pending');
-  inflight++; headRes = null; refreshHead();
-  const sent = await postJob('/setup/checks', {targets: [machine]});
-  const job  = sent.job != null ? await pollJob(sent.job) : null;
-  if (!jobDone(machine)) return;
-  setBtn('b-checks', null);
-  if (tab !== 'diag') return;
-  const st = job && job.peers && job.peers[machine];
-  if (st !== 'ok'){
-    headRes = 'noreply'; refreshHead();
-    CHECKS.forEach(([k]) => { const el = $('ck-' + k);
-      if (el) el.innerHTML = `<span class="chip noreply">No reply</span>`; });
-    return;
-  }
-  headRes = 'ok'; refreshHead();
-  setTimeout(() => {
-    if (cur === machine && headRes === 'ok' && !inflight){ headRes = null; refreshHead(); }
-  }, LINGER);
-  for (const c of ((job.data || {})[machine] || {}).checks || []){
-    const el = $('ck-' + c.id);
-    if (el) el.innerHTML =
-      `<span class="chip ${esc(c.status)}" ${c.note ? `title="${esc(c.note)}"` : ''}>${esc(c.label)}</span>`;
-  }
-}
-function copyLog(){
-  const txt = document.querySelector('.log').textContent;
-  (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject())
-    .then(() => { setBtn('b-log', 'ok', 'Copied'); relax('b-log', cur); })
-    .catch(() => { setBtn('b-log', 'fail', 'Failed'); });
 }
 
 /* ── sheets: self power, remove ──────────────────────────────────────────── */
@@ -693,7 +636,7 @@ async function selfGo(kind){
 function confirmRemove(id){
   const m = byId(id);
   openSheet(`
-    <h2>Remove ${esc(m.name)} from the list?</h2>
+    <h2>Remove ${esc(m.label)} from the list?</h2>
     <p>Only the list changes — nothing happens to the machine. If it’s on the
     network again, it comes back after a rescan.</p>
     <div class="sfoot">
@@ -717,11 +660,16 @@ async function rescanNow(){
   scanning = true;
   $('rescan').classList.add('scanning');   // held until the reveal settles
   render();
-  try { await fetch('/setup/rescan', {method: 'POST'}); } catch (e) {}
-  try {
-    const s = await (await fetch('/ui/setup')).json();
+  try { await fetch('/console/rescan', {method: 'POST'}); } catch (e) {}
+  // the server owns the sweep: watch until it says it is done
+  const until = Date.now() + SCAN_LIMIT;
+  for (;;){
+    await new Promise(r => setTimeout(r, 300));
+    let s = null;
+    try { s = await (await fetch('/ui/setup')).json(); } catch (e) {}
     if (s && s.peers) S = s;               // degraded reply — keep last frame
-  } catch (e) {}
+    if (Date.now() > until || !(s && s.scan && s.scan.running)) break;
+  }
   if (!byId(cur)) { cur = S.self; detailKey = ''; }
   scanning = false;
   $('rescan').classList.remove('scanning');

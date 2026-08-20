@@ -34,19 +34,19 @@ let run  = null;          // computed from lastAction on each render
    reveal staggers machines in as they are "found" (mock fakes the delay) */
 let scanning  = true;
 let revealing = false;
-let scanTimer = null;
 
-function rescanNow(){
+/* the server owns the sweep; setting `scanning` after the POST lands means a
+   poll can never catch a stale not-running */
+async function rescanNow(){
   if (scanning || busyNow()) return;
   hint = '';
   clearSettled();
   sel.clear();
+  try { await fetch('/console/rescan', {method: 'POST'}); } catch (e) {}
   scanning = true;
   render();
-  scanTimer = setTimeout(finishScan, 1100);
 }
 function finishScan(){
-  scanTimer = null;
   scanning  = false;
   revealing = true;
   render();
@@ -61,14 +61,14 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g,
 
 const model = p => ({
   id:      p.id,
-  name:    p.name,
+  name:    p.label,
   online:  !!p.online,
   self:    p.id === S.self,
   locked:  !!(p.desktop && p.desktop.locked),
   muted:   !!(p.audio && p.audio.muted),
-  app:     (p.apps && p.apps.running)
-             ? {n: p.apps.running.name, c: p.apps.running.category} : null,
-  catalog: (p.apps && p.apps.catalog) || []});
+  app:     (p.desktop && p.desktop.running)
+             ? {n: p.desktop.running.label, c: p.desktop.running.category} : null,
+  catalog: (p.desktop && p.desktop.catalog) || []});
 
 async function poll(){
   let s;
@@ -91,7 +91,7 @@ async function poll(){
     const m = byId(id);
     if (!m || !m.online) sel.delete(id);
   }
-  if (scanning && !scanTimer) return finishScan();
+  if (scanning && !(s.scan && s.scan.running)) return finishScan();
   render();
 }
 

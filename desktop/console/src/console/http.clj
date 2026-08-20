@@ -2,6 +2,7 @@
   "The console's HTTP edge (http-kit). Transport only:
      POST /circle/<verb>       circle's command tier -> 202 {:job id}
      POST /setup/<op>          setup's commands (jobs) + panel ops (sync)
+     POST /console/rescan      sweep the subnet — console-plane, either panel
      GET  /ui/circle, /ui/setup   the composed views the panels poll
      GET  /console/job[/<id>]  the shared job inspection tier
    plus statics: / the chooser, /circle/* and /setup/* the panels."
@@ -9,6 +10,7 @@
             [clojure.java.io    :as io]
             [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json json->edn]]
+            [console.fleet      :as fleet]
             [console.jobs       :as jobs]
             [console.circle     :as circle]
             [console.setup      :as setup]))
@@ -56,18 +58,16 @@
         (serve-file (get ui-roots (keyword app)) name)))))
 
 
-(defn- setup-route [transport op body]
+(defn- setup-route [op body]
   (case op
-    "settings" (json 202 {:job (setup/settings-job! transport body)})
-    "clock"    (json 202 {:job (setup/clock-job! transport body)})
-    "checks"   (json 202 {:job (setup/checks-job! transport body)})
-    "restart"  (json 202 {:job (setup/power-job! transport :restart body)})
-    "poweroff" (json 202 {:job (setup/power-job! transport :poweroff body)})
-    "remove"   (json 200 (setup/remove! transport body))
-    "rescan"   (json 200 (setup/rescan! transport))
+    "settings" (json 202 {:job (setup/settings-job! body)})
+    "clock"    (json 202 {:job (setup/clock-job! body)})
+    "restart"  (json 202 {:job (setup/power-job! :restart body)})
+    "poweroff" (json 202 {:job (setup/power-job! :poweroff body)})
+    "remove"   (json 200 (setup/remove! body))
     nil))
 
-(defn- handler [{:keys [ui-roots transport]} req]
+(defn- handler [{:keys [ui-roots]} req]
   (try
     (let [method (:request-method req)
           parts  (->> (str/split (str (:uri req)) #"/") (remove str/blank?) vec)]
@@ -75,17 +75,20 @@
         (and (= :post method) (circle/verb-routes parts))
         (let [verb (circle/verb-routes parts)
               body (body-edn req)]
-          (json 202 {:job (circle/act! transport verb body)}))
+          (json 202 {:job (circle/act! verb body)}))
 
         (and (= :post method) (= 2 (count parts)) (= "setup" (first parts)))
-        (or (setup-route transport (second parts) (body-edn req))
+        (or (setup-route (second parts) (body-edn req))
             (json 404 {:error "not found"}))
 
         (and (= :get method) (= ["ui" "circle"] parts))
-        (json 200 (circle/view transport))
+        (json 200 (circle/view))
 
         (and (= :get method) (= ["ui" "setup"] parts))
-        (json 200 (setup/view transport))
+        (json 200 (setup/view))
+
+        (and (= :post method) (= ["console" "rescan"] parts))
+        (json 200 (fleet/rescan!))
 
         (and (= :get method) (= ["console" "job"] parts))
         (json 200 {:jobs (jobs/jobs)})
@@ -113,6 +116,6 @@
 
 (defn init!
   "Starts the server; returns http-kit's stop fn. A taken port throws."
-  [{:keys [host port ui-roots transport] :or {host "127.0.0.1" port 1338}}]
-  (http/run-server (partial handler {:ui-roots ui-roots :transport transport})
+  [{:keys [host port ui-roots] :or {host "127.0.0.1" port 1338}}]
+  (http/run-server (partial handler {:ui-roots ui-roots})
                    {:ip host :port port}))

@@ -3,12 +3,13 @@
    plane's language: POST /setup/settings carries {:targets :writes} where
    writes are settings-path pairs validated against the whitelist below —
    a new writable setting is one entry here, not a new route. Clock stays a
-   named verb (timezone is a setting, wall time is an edge action), checks
-   and power are true actions. Remove/rescan are panel-plane: they touch the
-   remembered list, never a machine."
+   named verb (timezone is a setting, wall time is an edge action) and power is a
+   true action. Remove/rescan are panel-plane: they touch the roster this console
+   holds, never a machine."
   (:require [clojure.string :as str]
+            [console.fleet  :as fleet]
             [console.jobs   :as jobs])
-  (:import  [java.time Duration Instant LocalDate LocalTime ZoneId ZonedDateTime]
+  (:import  [java.time Instant LocalDate LocalTime ZoneId ZonedDateTime]
             [java.time.format DateTimeFormatter]))
 
 
@@ -69,61 +70,54 @@
     (try (LocalTime/parse time) (catch Exception _ (malformed! (str "bad time: " time))))
     {:tz tz :date date :time time}))
 
-(defn- self-only! [transport ts]
-  (let [self ((:self transport))]
-    (when-not (= ts [self])
-      (malformed! "only this computer — other machines restart from Circle"))))
+(defn- self-only! [ts]
+  (when-not (= ts [(fleet/self)])
+    (malformed! "only this computer — other machines restart from Circle")))
 
 
 ;; ── jobs ───────────────────────────────────────────────────────────────────
-(defn settings-job! [transport body]
-  (jobs/act! transport :setup :settings/write (targets body) {:writes (parse-writes body)}))
+(defn settings-job! [body]
+  (jobs/act! fleet/send! :setup :settings/write (targets body) {:writes (parse-writes body)}))
 
-(defn clock-job! [transport body]
-  (jobs/act! transport :setup :clock/set (targets body) (clock-args body)))
+(defn clock-job! [body]
+  (jobs/act! fleet/send! :setup :clock/set (targets body) (clock-args body)))
 
-(defn checks-job! [transport body]
-  (jobs/act! transport :setup :checks/run (targets body) {}))
-
-(defn power-job! [transport verb body]
+(defn power-job! [verb body]
   (let [ts (targets body)]
-    (self-only! transport ts)
-    (jobs/act! transport :setup verb ts {})))
+    (self-only! ts)
+    (jobs/act! fleet/send! :setup verb ts {})))
 
 
 ;; ── panel-plane ops ────────────────────────────────────────────────────────
-(defn remove! [transport body]
+(defn remove! [body]
   (let [id   (:id body)
-        peer (first (filter #(= id (:id %)) ((:peers transport))))]
+        peer (first (filter #(= id (:id %)) (fleet/peers)))]
     (cond
-      (not (string? id))         (malformed! "remove needs a peer :id")
-      (nil? peer)                (malformed! "unknown machine")
-      (= id ((:self transport))) (malformed! "this computer cannot be removed")
-      (:online peer)             (malformed! "only machines that are off can be removed")
-      :otherwise                 (do ((:remove! transport) id) {:removed id}))))
+      (not (string? id))    (malformed! "remove needs a peer :id")
+      (nil? peer)           (malformed! "unknown machine")
+      (= id (fleet/self))   (malformed! "this computer cannot be removed")
+      (:online peer)        (malformed! "only machines that are off can be removed")
+      :otherwise            (fleet/forget! id))))
 
-(defn rescan! [transport]
-  ((:rescan! transport)))
 
 
 ;; ── the composed view ──────────────────────────────────────────────────────
 (def ^:private now-fmt (DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm"))
 
 (defn- machine-now
-  "The peer's wall clock: actual now + its drift, in its own timezone. The
-   offset is mock bookkeeping — the wire carries only the resulting :now."
-  [{:keys [timezone clock-off-min]}]
-  (-> (Instant/now)
-      (.plus (Duration/ofMinutes (or clock-off-min 0)))
-      (ZonedDateTime/ofInstant (ZoneId/of (or timezone "Africa/Dar_es_Salaam")))
-      (.format now-fmt)))
+  "The peer's own wall clock: the instant it last reported, read in its own zone.
+   Minute resolution, so a poll tick of staleness never shows."
+  [{:keys [timezone clock-ms]}]
+  (when clock-ms
+    (-> (Instant/ofEpochMilli clock-ms)
+        (ZonedDateTime/ofInstant (ZoneId/of (or timezone "UTC")))
+        (.format now-fmt))))
 
 (defn- wire-peer [peer]
-  (update peer :system #(-> %
-                            (assoc :now (machine-now %))
-                            (dissoc :clock-off-min))))
+  (update peer :system #(assoc % :now (machine-now %))))
 
-(defn view [transport]
+(defn view []
   {:schema 1
-   :self   ((:self transport))
-   :peers  (mapv wire-peer ((:peers transport)))})
+   :self   (fleet/self)
+   :peers  (mapv wire-peer (fleet/peers))
+   :scan   (fleet/scan)})

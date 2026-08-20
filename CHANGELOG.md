@@ -26,14 +26,15 @@ version truth; branch names and build labels may disagree.
 - The image bakes ujima's bb libraries into `/ujima/m2` (pinned, sha-verified
   at build); like packages, they never change on a live deploy.
 
-- Ujima Circle App (dev-only, not wired yet): a fleet control panel for teachers —
-  runs against a file-backed mock fleet.
-- Ujima Setup App (dev-only, not wired yet): per-machine setup over the same
-  fleet — name, clock (timezone + wall time), keyboard layouts, sound output,
-  diagnostics with derived checks, remove/rescan.
-- One console backend serves both panels: `bb console mock` on :1338 (`/` picks
-  a panel, `/circle/`, `/setup/`), `bb console world` is the TUI driving the
-  shared mock world (replaces `bb circle mock|world`).
+- Ujima Circle App: a fleet control panel for teachers — every machine in the
+  circle, what each one is running, and sound, apps and power over a selection.
+- Ujima Setup App: per-machine setup over the same circle — name, clock (timezone
+  + wall time), keyboard layouts and sound output, plus a machine's identity,
+  address, uptime, storage and warnings.
+- The Console finds its circle by sweeping the local subnet: a machine that answers
+  and holds the same admin token joins the list, one that stops answering stays on
+  it marked off, and Rescan sweeps again. Machines on the network that belong to
+  another circle are counted, never listed.
 - The OS image boots as-is — `dd` it to a card for a system without A/B, where
   settings and storage are not persistent.
 - A usb stick carrying an admin token opens the Console: removable partitions are

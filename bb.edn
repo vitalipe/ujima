@@ -43,19 +43,13 @@
    :task (apply cli/-main "loopback" *command-line-args*)}
 
   console
-  {:doc "Console dev (Circle + Setup panels): mock (server, :1338) | world (mock-world TUI)"
-   ;; runs with cwd = desktop/console so its paths are console-root relative (`ui`, `dev/`) —
-   ;; the same layout a plain cp puts at /ujima/console. --config keeps :paths/:deps anchored
-   ;; at the repo root.
-   :task (let [cfg  (str (System/getProperty "user.dir") "/bb.edn")
-               run! (fn [main] (shell {:dir "desktop/console"} "bb" "--config" cfg "-m" main))]
-           (case (first *command-line-args*)
-             "mock"  (run! "console.main")
-             "world" (run! "console.world")
-             (do (println "usage: bb console <mode>")
-                 (println "  mock   console server on the mock fleet (http://localhost:1338)")
-                 (println "  world  TUI driving desktop/console/tmp/world.edn (add/drop, set counts)")
-                 (println "  real   (later) console server against live ujima peers"))))}
+  {:doc "Console (Circle + Setup panels) on :1338, against a real circle"
+   ;; runs with cwd = desktop/console so its paths are console-root relative (`ui`) —
+   ;; the same layout a plain cp puts at /ujima/desktop/console. --config keeps
+   ;; :paths/:deps anchored at the repo root. UJIMA_SELF names the machine to
+   ;; administer (its subnet is the one swept); UJIMA_CIRCLE_TOKEN is the key.
+   :task (let [cfg (str (System/getProperty "user.dir") "/bb.edn")]
+           (shell {:dir "desktop/console"} "bb" "--config" cfg "-m" "console.main"))}
 
   repl
   {:doc "Start Ujima dev REPL"

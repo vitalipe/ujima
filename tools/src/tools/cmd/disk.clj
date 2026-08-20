@@ -65,14 +65,6 @@
     (println "created" scheme "A/B layout ->" target)))
 
 
-(defn ab!
-  "Dispatch `disk ab <verb> …` — create today; future A/B ceremonies join here."
-  [{:keys [verb] :as opts}]
-  (case verb
-    "create" (ab-create! opts)
-    (throw (ex-info (str "unknown ab verb: " verb) {:expected #{"create"}}))))
-
-
 (defn slot!
   "Dispatch `disk slot <A|B> <verb> …`:
    from-pack <pack> <target> | from-image <img> <target> | activate <target>."

@@ -86,12 +86,12 @@
 
    "disk"
    {"ab"
-    {:usage "Usage: disk ab create <scheme> <img|blockdev>"
-     :target disk/ab!
-     :args [:verb :scheme :target]
-     :spec {:verb   {:desc "A/B verb (create)" :require true}
-            :scheme {:desc "Boot scheme (autoboot)" :require true}
-            :target {:desc "Disk target: .img file or block device" :require true}}}
+    {"create"
+     {:usage "Usage: disk ab create <scheme> <img|blockdev>"
+      :target disk/ab-create!
+      :args [:scheme :target]
+      :spec {:scheme {:desc "Boot scheme (autoboot)" :require true}
+             :target {:desc "Disk target: .img file or block device" :require true}}}}
 
     "slot"
     {:usage "Usage: disk slot <A|B> from-pack <pack> <img|blockdev>\n       disk slot <A|B> from-image <img> <img|blockdev>\n       disk slot <A|B> activate <img|blockdev>"
@@ -108,25 +108,7 @@
      :args [:target]
      :spec {:target {:desc "Disk target: .img file or block device" :require true}}}}
 
-   "circle"
-   {"console"
-    {:usage "Usage: circle console up <self-ip> [--token <hex>]"
-     :target circle/console!
-     :args [:verb :self]
-     :spec {:verb  {:desc "up" :require true :coerce :string}
-            :self  {:desc "Machine this console administers — its subnet is the one swept" :coerce :string}
-            :token {:desc "Circle token (default: the baked one)" :coerce :string}}}
-
-    "sim"
-    {:usage "Usage: circle sim up --range 192.168.1.200-229 [--token <hex>] [--seed n] [--pool p] [--skip-occupied]\n       circle sim cleanup"
-     :target circle/sim!
-     :args [:verb]
-     :spec {:verb          {:desc "up | cleanup" :require true :coerce :string}
-            :range         {:desc "Addresses to claim, e.g. 192.168.1.200-229" :coerce :string}
-            :token         {:desc "Circle token the fakes hold (default: the baked one)" :coerce :string}
-            :seed          {:desc "Seeds ids, serials and uptimes" :coerce :string}
-            :pool          {:desc "Roster file" :coerce :string}
-            :skip-occupied {:desc "Claim what is free instead of refusing" :coerce :boolean}}}}
+   "circle" circle/command-tree
 
    "dev"
    {"push"

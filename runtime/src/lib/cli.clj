@@ -1,8 +1,9 @@
 (ns lib.cli
   "Small command-tree wrapper around babashka.cli.
 
-   Defines a simple nested command map format and turns it into a
-   babashka.cli dispatch table.
+   Defines a nested command map and turns it into a babashka.cli dispatch table.
+   Nesting is arbitrary: a node with a :target is a command, anything else groups
+   commands, so `noun verb` and `noun sub verb` are both expressible.
 
    Example:
 
@@ -82,18 +83,24 @@
   (str/replace-first usage #"^Usage:\s*" ""))
 
 
-(defn command-tree->command-rows [tree]
-  (->> tree
-       (mapcat
-         (fn [[domain commands]]
-           (map
-             (fn [[command {:keys [usage desc]}]]
-               {:domain (name domain)
-                :command (name command)
-                :path (str (name domain) " " (name command))
-                :usage (usage-command usage)
-                :desc desc})
-             commands)))))
+(defn command-node?
+  "A leaf. Anything with a :target is a command; anything else is a group of them,
+   at whatever depth — the tree is walked, not assumed to be two deep."
+  [x]
+  (and (map? x) (contains? x :target)))
+
+
+(defn command-tree->command-rows
+  ([tree] (command-tree->command-rows [] tree))
+  ([path tree]
+   (mapcat (fn [[k node]]
+             (let [path (conj path (name k))]
+               (if (command-node? node)
+                 [{:path  (str/join " " path)
+                   :usage (usage-command (:usage node))
+                   :desc  (:desc node)}]
+                 (command-tree->command-rows path node))))
+           tree)))
 
 
 (defn command-tree->help-message [tree]
@@ -186,15 +193,15 @@
                        (target (assoc (:opts m) :extra-args (:args m))))))}
       coerce (assoc :coerce coerce))))
 
-(defn command-tree->dispatch-table [tree]
-  (->> tree
-       (mapcat
-         (fn [[domain commands]]
-           (map
-             (fn [[command command-config]]
-               (command-entry [(name domain) (name command)] command-config))
-             commands)))
-       vec))
+(defn command-tree->dispatch-table
+  ([tree] (command-tree->dispatch-table [] tree))
+  ([path tree]
+   (vec (mapcat (fn [[k node]]
+                  (let [cmds (conj path (name k))]
+                    (if (command-node? node)
+                      [(command-entry cmds node)]
+                      (command-tree->dispatch-table cmds node))))
+                tree))))
 
 (defn get-command-subtree [tree dispatch]
   (reduce
@@ -204,15 +211,11 @@
     tree
     dispatch))
 
-(defn command-node? [x]
-  (and (map? x)
-       (:target x)
-       (:usage x)))
-
 (defn print-command-usages! [node]
   (doseq [[_ child] node]
-    (when (command-node? child)
-      (println " " (:usage child)))))
+    (if (command-node? child)
+      (println " " (:usage child))
+      (print-command-usages! child))))
 
 (defn print-input-exhausted! [tree e]
   (let [{:keys [dispatch all-commands]} (ex-data e)

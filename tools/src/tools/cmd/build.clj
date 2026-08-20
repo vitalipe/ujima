@@ -61,3 +61,16 @@
     (doseq [f [os-img pack-out disk-out]]
       (println " " f))
     {:os os-img :pack pack-out :disk disk-out}))
+
+
+;; ── the CLI ─────────────────────────────────────────────────────────────────
+
+(def cli
+  {"build"
+   {"run"
+    {:usage "Usage: build <target> [--dev]"
+     :target build!
+     :args [:target]
+     :spec {:target {:desc "Build target (rpi-os)" :require true}
+            :dev    {:coerce :boolean
+                     :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}}})

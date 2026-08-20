@@ -10,7 +10,7 @@
     [clojure.string :as str]
     [babashka.fs :as fs]
     [babashka.process :as p]
-    [lib.cli :as cli]
+    [lib.cli :as lib-cli]
     [lib.task.flow :refer [flow]]
     [lib.shell :refer [sh! require-root! $!]]
     [ujima.linux.disk :as linux-disk]
@@ -97,7 +97,7 @@
   (fs/create-dirs vendor-dir)
   (let [tmp (str vendor ".building")]
     (fs/delete-if-exists tmp)
-    (cli/run-and-display! (fetch! {:url url :out tmp :sha256 sha256}))
+    (lib-cli/run-and-display! (fetch! {:url url :out tmp :sha256 sha256}))
     ;; grow the rootfs BEFORE the install script runs: the app packages (libreoffice, chromium,
     ;; inkscape, …) and the fetched TurboWarp payload install into THIS image, and the stock
     ;; raspios root (~2.4G) can't hold them. HARD CAP at the 10GiB A/B root slot
@@ -152,3 +152,18 @@
 
 
 (defn rpi-os! [opts] (stage! "rpi-os" opts))
+
+
+(defn- stage-target! [{:keys [target] :as opts}]
+  (stage! target opts))
+
+
+;; ── the CLI ─────────────────────────────────────────────────────────────────
+
+(def cli
+  {"stage"
+   {"run"
+    {:usage "Usage: stage <target>"
+     :target stage-target!
+     :args [:target]
+     :spec {:target {:desc "Pinned base target (rpi-os)" :require true}}}}})

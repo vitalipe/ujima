@@ -25,3 +25,28 @@
 (defn schema!    [{:keys [rootfs]}] (schema/generate! rootfs))
 (defn deps!      [_]               (deps/pin!))
 (defn initramfs! [{:keys [ip]}]    (pin-initramfs! ip))
+
+
+;; ── the CLI ─────────────────────────────────────────────────────────────────
+
+(def cli
+  {"pin"
+   {"schema"
+    {:usage "Usage: pin schema <rootfs>"
+     :desc  "tz/xkb catalogs -> runtime/src/schema/build, read from a MOUNTED IMAGE ROOTFS — never this host: the build diffs the pin against the image"
+     :target schema!
+     :args [:rootfs]
+     :spec {:rootfs {:desc "Mounted image rootfs to read the catalogs from" :require true :coerce :string}}}
+
+    "deps"
+    {:usage "Usage: pin deps"
+     :desc  "the bb-deps manifest -> os/build/deps-pin.edn, resolved from deps.edn on this host"
+     :target deps!
+     :spec {}}
+
+    "initramfs"
+    {:usage "Usage: pin initramfs <ip>"
+     :desc  "kernel-matched initramfs -> os/pipeline/boot/initramfs/, built natively on a dev Pi (its overlay must be off: lock-fs disable + reboot first)"
+     :target initramfs!
+     :args [:ip]
+     :spec {:ip {:desc "Dev Pi address" :require true :coerce :string}}}}})

@@ -36,3 +36,30 @@
     (println (case format 
                "edn" (pr-str meta)
                "json" (edn/edn->json meta)))))
+
+
+;; ── the CLI ─────────────────────────────────────────────────────────────────
+
+(def cli
+  {"pack"
+   {"make"
+    {:usage "Usage: pack <img|blockdev> <out-pack>"
+     :target make!
+     :args [:src :out]
+     :spec {:src {:desc "Source OS image file or block device" :require true}
+            :out {:desc "Output .pack path" :require true}}}
+
+    "validate"
+    {:usage "Usage: pack validate <pack>"
+     :target validate-pack!
+     :args [:ujima-pack-path]
+     :spec {:ujima-pack-path {:desc "Ujima pack path" :require true}}}
+
+    "meta"
+    {:usage "Usage: pack meta <pack> [--format edn|json]"
+     :target print-pack-meta!
+     :args [:ujima-pack-path]
+     :spec {:ujima-pack-path {:desc "Ujima pack path" :require true}
+            :format {:desc "Output format: edn or json"
+                     :default "edn"
+                     :validate #{"edn" "json"}}}}}})

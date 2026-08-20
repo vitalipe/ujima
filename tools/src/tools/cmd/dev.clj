@@ -276,3 +276,94 @@
   (xdo! opts (str "key --clearmodifiers " (sh-quote chord)))
   (println (str "key " chord))
   {:key chord})
+
+
+;; ── the CLI ─────────────────────────────────────────────────────────────────
+
+(def cli
+  {"dev"
+   {"push"
+    {:usage "Usage: dev push <ip> ujimad [--user ujima] [--password ujima] [--port 22]"
+     :target push!
+     :args [:ip :target]
+     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
+            :target   {:desc "What to push (ujimad)" :require true :coerce :string}
+            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
+            :password {:desc "SSH password" :default "ujima" :coerce :string}
+            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
+
+    "script"
+    {:usage "Usage: dev script <ip> <name> [--user ujima] [--password ujima] [--port 22]"
+     :target script!
+     :args [:ip :script]
+     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
+            :script   {:desc "pipeline script to run live on the device" :require true :coerce :string}
+            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
+            :password {:desc "SSH password" :default "ujima" :coerce :string}
+            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
+
+    "view"
+    {:usage "Usage: dev view <ip> [--rfbport 5900] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target view!
+     :args [:ip]
+     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
+            :rfbport  {:desc "VNC/RFB port (tunneled over ssh)" :default "5900" :coerce :string}
+            :display  {:desc "X display to mirror" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
+            :password {:desc "SSH password" :default "ujima" :coerce :string}
+            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
+
+    "screenshot"
+    {:usage "Usage: dev screenshot <ip> [--out tmp/screen/ujima-screen.png] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target screenshot!
+     :args [:ip]
+     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
+            :out      {:desc "Host PNG output path" :default "tmp/screen/ujima-screen.png"}
+            :display  {:desc "X display to grab" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
+            :password {:desc "SSH password" :default "ujima" :coerce :string}
+            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
+
+    "click"
+    {:usage "Usage: dev click <ip> <x> <y> [--button 1] [--count 1] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target click!
+     :args [:ip :x :y]
+     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
+            :x        {:desc "X coordinate on :0 (screenshot px = xdotool coord)" :require true :coerce :string}
+            :y        {:desc "Y coordinate on :0" :require true :coerce :string}
+            :button   {:desc "Mouse button (1=left 2=mid 3=right)" :default "1" :coerce :string}
+            :count    {:desc "Click count (2 = double-click)" :default "1" :coerce :string}
+            :display  {:desc "X display" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
+            :password {:desc "SSH password" :default "ujima" :coerce :string}
+            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
+
+    "type"
+    {:usage "Usage: dev type <ip> <text> [--delay 40] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target type!
+     :args [:ip :text]
+     ;; :coerce :string or babashka.cli parses digit-only args as numbers — `dev type <ip> 42`
+     ;; then dies in the arg handling instead of typing "42"
+     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
+            :text     {:desc "Literal text to type on :0" :require true :coerce :string}
+            :delay    {:desc "ms between keystrokes" :default "40" :coerce :string}
+            :display  {:desc "X display" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
+            :password {:desc "SSH password" :default "ujima" :coerce :string}
+            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
+
+    "key"
+    {:usage "Usage: dev key <ip> <chord> [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
+     :target key!
+     :args [:ip :chord]
+     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
+            :chord    {:desc "Key or chord, e.g. ctrl+f, Return, super+2" :require true :coerce :string}
+            :display  {:desc "X display" :default ":0"}
+            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
+            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
+            :password {:desc "SSH password" :default "ujima" :coerce :string}
+            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}}})

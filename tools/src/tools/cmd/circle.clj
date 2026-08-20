@@ -16,27 +16,28 @@
            "-m" "console.main"))
 
 
-(def command-tree
-  {"console"
-   {"up"
-    {:usage "Usage: circle console up <self-ip> [--token <hex>]"
-     :target console-up!
-     :args [:self]
-     :spec {:self  {:desc "Machine this console administers — its subnet is the one swept"
-                    :require true :coerce :string}
-            :token {:desc "Circle token (default: the baked one)" :coerce :string}}}}
+(def cli
+  {"circle"
+   {"console"
+    {"up"
+     {:usage "Usage: circle console up <self-ip> [--token <hex>]"
+      :target console-up!
+      :args [:self]
+      :spec {:self  {:desc "Machine this console administers — its subnet is the one swept"
+                     :require true :coerce :string}
+             :token {:desc "Circle token (default: the baked one)" :coerce :string}}}}
 
-   "sim"
-   {"up"
-    {:usage "Usage: circle sim up --range 192.168.1.200-229 [--token <hex>] [--seed n] [--pool p] [--skip-occupied]"
-     :target sim/up!
-     :spec {:range         {:desc "Addresses to claim, e.g. 192.168.1.200-229" :require true :coerce :string}
-            :token         {:desc "Circle token the fakes hold (default: the baked one)" :coerce :string}
-            :seed          {:desc "Seeds ids, serials and uptimes" :coerce :string}
-            :pool          {:desc "Roster file" :coerce :string}
-            :skip-occupied {:desc "Claim what is free instead of refusing" :coerce :boolean}}}
+    "sim"
+    {"up"
+     {:usage "Usage: circle sim up --range 192.168.1.200-229 [--token <hex>] [--seed n] [--pool p] [--skip-occupied]"
+      :target sim/up!
+      :spec {:range         {:desc "Addresses to claim, e.g. 192.168.1.200-229" :require true :coerce :string}
+             :token         {:desc "Circle token the fakes hold (default: the baked one)" :coerce :string}
+             :seed          {:desc "Seeds ids, serials and uptimes" :coerce :string}
+             :pool          {:desc "Roster file" :coerce :string}
+             :skip-occupied {:desc "Claim what is free instead of refusing" :coerce :boolean}}}
 
-    "cleanup"
-    {:usage "Usage: circle sim cleanup"
-     :target sim/cleanup!
-     :spec {}}}})
+     "cleanup"
+     {:usage "Usage: circle sim cleanup"
+      :target sim/cleanup!
+      :spec {}}}}})

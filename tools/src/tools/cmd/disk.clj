@@ -111,3 +111,31 @@
     (if info
       (pprint info)
       (println "not a ujima A/B disk:" target))))
+
+
+;; ── the CLI ─────────────────────────────────────────────────────────────────
+
+(def cli
+  {"disk"
+   {"ab"
+    {"create"
+     {:usage "Usage: disk ab create <scheme> <img|blockdev>"
+      :target ab-create!
+      :args [:scheme :target]
+      :spec {:scheme {:desc "Boot scheme (autoboot)" :require true}
+             :target {:desc "Disk target: .img file or block device" :require true}}}}
+
+    "slot"
+    {:usage "Usage: disk slot <A|B> from-pack <pack> <img|blockdev>\n       disk slot <A|B> from-image <img> <img|blockdev>\n       disk slot <A|B> activate <img|blockdev>"
+     :target slot!
+     :args [:slot :verb :a :b]
+     :spec {:slot {:desc "Slot: A or B" :require true}
+            :verb {:desc "from-pack | activate" :require true}
+            :a    {:desc "from-pack: the .pack | activate: the disk target" :require true}
+            :b    {:desc "from-pack: the disk target"}}}
+
+    "info"
+    {:usage "Usage: disk info <img|blockdev>"
+     :target info!
+     :args [:target]
+     :spec {:target {:desc "Disk target: .img file or block device" :require true}}}}})

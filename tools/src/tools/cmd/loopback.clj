@@ -30,3 +30,27 @@
     (->> (loopback/loopback-devices)
       (map #(str (:name %) " -> " (:back-file %)))
       (clojure.string/join "\n"))))
+
+
+;; ── the CLI ─────────────────────────────────────────────────────────────────
+
+(def cli
+  {"loopback"
+   {"attach"
+    {:usage "Usage: loopback attach <img-file-path> [--readonly]"
+     :target attach-loopback!
+     :args [:img-file-path]
+     :spec {:img-file-path {:desc "Image file path" :require true}
+            :readonly {:coerce :boolean :desc "Attach image read-only"}}}
+
+    "detach"
+    {:usage "Usage: loopback detach <img-file-or-loop-device>"
+     :target detach-loopback!
+     :args [:img-file-or-loop-device]
+     :spec {:img-file-or-loop-device {:desc "Image path or loop device path" :require true}}}
+
+    "list"
+    {:usage "Usage: loopback list"
+     :target list-loopbacks!
+     :args []
+     :spec {}}}})

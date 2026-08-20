@@ -1,8 +1,10 @@
 (ns tools.cli
   "The host CLI, one bb task per noun: build (the whole pipeline), stage (an image from the
    pinned base), os (the 2-partition rootfs image), pack (the .pack artifact), disk (the full
-   A/B disk), dev (a RUNNING device over ssh), loopback (loop-device utility). Each task passes
-   its noun as the first token; the tree below is the whole surface.
+   A/B disk), dev (a RUNNING device over ssh), loopback (loop-device utility), circle (the
+   console dev loop). Each noun's surface lives with its own tools.cmd.* ns as `cli` and is
+   merged here; os is the exception, its verbs belonging to the image builder. Nesting is
+   free — a node with a :target is a command, anything else groups them.
    `bb pack <src> <out>` sugars to `pack make` (see pack-defaulted)."
   (:require
     [clojure.walk       :as walk]
@@ -21,223 +23,51 @@
     [tools.cmd.circle   :as circle]))
 
 
-(defn- stage-target! [{:keys [target] :as opts}]
-  (stage/stage! target opts))
+(defn- merge-nouns
+  "Each tools.cmd.* ns contributes exactly one noun. A map handed over at the wrong depth
+   merges silently — its inner keys just become nouns nothing dispatches — which is how
+   `bb circle` once came up with an empty command list. Fail at load instead."
+  [& contributions]
+  (doseq [c contributions]
+    (assert (and (map? c) (= 1 (count c)))
+            (str "a command ns must contribute exactly one noun, got " (pr-str (keys c)))))
+  (let [dupes (->> contributions (mapcat keys) frequencies (keep (fn [[n c]] (when (> c 1) n))))]
+    (assert (empty? dupes) (str "two namespaces claim the same noun: " (pr-str (vec dupes)))))
+  (apply merge contributions))
 
 
 (def command-tree
-  {"build"
-   {"run"
-    {:usage "Usage: build <target> [--dev]"
-     :target build/build!
-     :args [:target]
-     :spec {:target {:desc "Build target (rpi-os)" :require true}
-            :dev    {:coerce :boolean
-                     :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}}
+  (merge-nouns
+    build/cli
+    stage/cli
+    pack/cli
+    disk/cli
+    circle/cli
+    dev/cli
+    pin/cli
+    loopback/cli
 
-   "stage"
-   {"run"
-    {:usage "Usage: stage <target>"
-     :target stage-target!
-     :args [:target]
-     :spec {:target {:desc "Pinned base target (rpi-os)" :require true}}}}
+    ;; os is the exception: its verbs are the image builder's, so there is no
+    ;; tools.cmd.os to carry them
+    {"os"
+     {"apply"
+      {:usage "Usage: os apply <img> [--dev]"
+       :target image/apply!
+       :args [:img]
+       :spec {:img {:desc "Staged OS image to apply the ujima content chain into" :require true}
+              :dev {:coerce :boolean
+                    :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}
 
-   "os"
-   {"apply"
-    {:usage "Usage: os apply <img> [--dev]"
-     :target image/apply!
-     :args [:img]
-     :spec {:img {:desc "Staged OS image to apply the ujima content chain into" :require true}
-            :dev {:coerce :boolean
-                  :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}
+      "script"
+      {:usage "Usage: os script <img> <name>"
+       :target image/script! :args [:img :script]
+       :spec {:img    {:desc "OS image to customize" :require true}
+              :script {:desc "pipeline script to run inside the chroot" :require true}}}
 
-    "script"
-    {:usage "Usage: os script <img> <name>"
-     :target image/script! :args [:img :script]
-     :spec {:img    {:desc "OS image to customize" :require true}
-            :script {:desc "pipeline script to run inside the chroot" :require true}}}
-
-    "chroot"
-    {:usage "Usage: os chroot <img>"
-     :target image/chroot-shell! :args [:img]
-     :spec {:img {:desc "OS image to open an interactive chroot into" :require true}}}}
-
-   "pack"
-   {"make"
-    {:usage "Usage: pack <img|blockdev> <out-pack>"
-     :target pack/make!
-     :args [:src :out]
-     :spec {:src {:desc "Source OS image file or block device" :require true}
-            :out {:desc "Output .pack path" :require true}}}
-
-    "validate"
-    {:usage "Usage: pack validate <pack>"
-     :target pack/validate-pack!
-     :args [:ujima-pack-path]
-     :spec {:ujima-pack-path {:desc "Ujima pack path" :require true}}}
-
-    "meta"
-    {:usage "Usage: pack meta <pack> [--format edn|json]"
-     :target pack/print-pack-meta!
-     :args [:ujima-pack-path]
-     :spec {:ujima-pack-path {:desc "Ujima pack path" :require true}
-            :format {:desc "Output format: edn or json"
-                     :default "edn"
-                     :validate #{"edn" "json"}}}}}
-
-   "disk"
-   {"ab"
-    {"create"
-     {:usage "Usage: disk ab create <scheme> <img|blockdev>"
-      :target disk/ab-create!
-      :args [:scheme :target]
-      :spec {:scheme {:desc "Boot scheme (autoboot)" :require true}
-             :target {:desc "Disk target: .img file or block device" :require true}}}}
-
-    "slot"
-    {:usage "Usage: disk slot <A|B> from-pack <pack> <img|blockdev>\n       disk slot <A|B> from-image <img> <img|blockdev>\n       disk slot <A|B> activate <img|blockdev>"
-     :target disk/slot!
-     :args [:slot :verb :a :b]
-     :spec {:slot {:desc "Slot: A or B" :require true}
-            :verb {:desc "from-pack | activate" :require true}
-            :a    {:desc "from-pack: the .pack | activate: the disk target" :require true}
-            :b    {:desc "from-pack: the disk target"}}}
-
-    "info"
-    {:usage "Usage: disk info <img|blockdev>"
-     :target disk/info!
-     :args [:target]
-     :spec {:target {:desc "Disk target: .img file or block device" :require true}}}}
-
-   "circle" circle/command-tree
-
-   "dev"
-   {"push"
-    {:usage "Usage: dev push <ip> ujimad [--user ujima] [--password ujima] [--port 22]"
-     :target dev/push!
-     :args [:ip :target]
-     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :target   {:desc "What to push (ujimad)" :require true :coerce :string}
-            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
-            :password {:desc "SSH password" :default "ujima" :coerce :string}
-            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
-
-    "script"
-    {:usage "Usage: dev script <ip> <name> [--user ujima] [--password ujima] [--port 22]"
-     :target dev/script!
-     :args [:ip :script]
-     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :script   {:desc "pipeline script to run live on the device" :require true :coerce :string}
-            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
-            :password {:desc "SSH password" :default "ujima" :coerce :string}
-            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
-
-    "view"
-    {:usage "Usage: dev view <ip> [--rfbport 5900] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
-     :target dev/view!
-     :args [:ip]
-     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :rfbport  {:desc "VNC/RFB port (tunneled over ssh)" :default "5900" :coerce :string}
-            :display  {:desc "X display to mirror" :default ":0"}
-            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
-            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
-            :password {:desc "SSH password" :default "ujima" :coerce :string}
-            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
-
-    "screenshot"
-    {:usage "Usage: dev screenshot <ip> [--out tmp/screen/ujima-screen.png] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
-     :target dev/screenshot!
-     :args [:ip]
-     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :out      {:desc "Host PNG output path" :default "tmp/screen/ujima-screen.png"}
-            :display  {:desc "X display to grab" :default ":0"}
-            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
-            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
-            :password {:desc "SSH password" :default "ujima" :coerce :string}
-            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
-
-    "click"
-    {:usage "Usage: dev click <ip> <x> <y> [--button 1] [--count 1] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
-     :target dev/click!
-     :args [:ip :x :y]
-     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :x        {:desc "X coordinate on :0 (screenshot px = xdotool coord)" :require true :coerce :string}
-            :y        {:desc "Y coordinate on :0" :require true :coerce :string}
-            :button   {:desc "Mouse button (1=left 2=mid 3=right)" :default "1" :coerce :string}
-            :count    {:desc "Click count (2 = double-click)" :default "1" :coerce :string}
-            :display  {:desc "X display" :default ":0"}
-            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
-            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
-            :password {:desc "SSH password" :default "ujima" :coerce :string}
-            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
-
-    "type"
-    {:usage "Usage: dev type <ip> <text> [--delay 40] [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
-     :target dev/type!
-     :args [:ip :text]
-     ;; :coerce :string or babashka.cli parses digit-only args as numbers — `dev type <ip> 42`
-     ;; then dies in the arg handling instead of typing "42"
-     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :text     {:desc "Literal text to type on :0" :require true :coerce :string}
-            :delay    {:desc "ms between keystrokes" :default "40" :coerce :string}
-            :display  {:desc "X display" :default ":0"}
-            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
-            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
-            :password {:desc "SSH password" :default "ujima" :coerce :string}
-            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}
-
-    "key"
-    {:usage "Usage: dev key <ip> <chord> [--display :0] [--xauth /home/ujima/.Xauthority] [--user ujima] [--password ujima] [--port 22]"
-     :target dev/key!
-     :args [:ip :chord]
-     :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :chord    {:desc "Key or chord, e.g. ctrl+f, Return, super+2" :require true :coerce :string}
-            :display  {:desc "X display" :default ":0"}
-            :xauth    {:desc "Xauthority path on the device" :default "/home/ujima/.Xauthority"}
-            :user     {:desc "SSH user"     :default "ujima" :coerce :string}
-            :password {:desc "SSH password" :default "ujima" :coerce :string}
-            :port     {:desc "SSH port"     :default "22"    :coerce :string}}}}
-
-   "pin"
-   {"schema"
-    {:usage "Usage: pin schema <rootfs>"
-     :desc  "tz/xkb catalogs -> runtime/src/schema/build, read from a MOUNTED IMAGE ROOTFS — never this host: the build diffs the pin against the image"
-     :target pin/schema!
-     :args [:rootfs]
-     :spec {:rootfs {:desc "Mounted image rootfs to read the catalogs from" :require true :coerce :string}}}
-
-    "deps"
-    {:usage "Usage: pin deps"
-     :desc  "the bb-deps manifest -> os/build/deps-pin.edn, resolved from deps.edn on this host"
-     :target pin/deps!
-     :spec {}}
-
-    "initramfs"
-    {:usage "Usage: pin initramfs <ip>"
-     :desc  "kernel-matched initramfs -> os/pipeline/boot/initramfs/, built natively on a dev Pi (its overlay must be off: lock-fs disable + reboot first)"
-     :target pin/initramfs!
-     :args [:ip]
-     :spec {:ip {:desc "Dev Pi address" :require true :coerce :string}}}}
-
-   "loopback"
-   {"attach"
-    {:usage "Usage: loopback attach <img-file-path> [--readonly]"
-     :target loopback/attach-loopback!
-     :args [:img-file-path]
-     :spec {:img-file-path {:desc "Image file path" :require true}
-            :readonly {:coerce :boolean :desc "Attach image read-only"}}}
-
-    "detach"
-    {:usage "Usage: loopback detach <img-file-or-loop-device>"
-     :target loopback/detach-loopback!
-     :args [:img-file-or-loop-device]
-     :spec {:img-file-or-loop-device {:desc "Image path or loop device path" :require true}}}
-
-    "list"
-    {:usage "Usage: loopback list"
-     :target loopback/list-loopbacks!
-     :args []
-     :spec {}}}})
+      "chroot"
+      {:usage "Usage: os chroot <img>"
+       :target image/chroot-shell! :args [:img]
+       :spec {:img {:desc "OS image to open an interactive chroot into" :require true}}}}}))
 
 
 ;; ----------------------------------------------------------------------------

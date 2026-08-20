@@ -1,4 +1,4 @@
-(ns tools.cmd.fake-circle
+(ns tools.circle.sim
   "A fake circle on the LAN: N machines that answer /api the way ujimad does, so the console
    can be driven against a classroom instead of one Pi. Never installed on an image.
 
@@ -19,8 +19,8 @@
 
 
 (def ^:private port         1337)
-(def ^:private default-key  "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
-(def ^:private default-pool "tools/fake-circle/pool.edn")
+(def default-token  "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+(def ^:private default-pool "tools/config/pool.edn")
 (def ^:private state-file   (str (fs/path (or (System/getenv "XDG_RUNTIME_DIR") "/tmp")
                                           "ujima-fake-circle.edn")))
 (def ^:private reboot-ms    15000)
@@ -272,8 +272,8 @@
 ;; ── the verbs ───────────────────────────────────────────────────────────────
 
 (defn up!
-  [{:keys [range key seed pool skip-occupied]
-    :or   {key default-key seed "1" pool default-pool}}]
+  [{:keys [range token seed pool skip-occupied]
+    :or   {token default-token seed "1" pool default-pool}}]
   (when-let [{:keys [pid] :as held} (read-state)]
     (if (alive? pid)
       (throw (ex-info (str "a fake circle is already running (pid " pid ") holding "
@@ -313,11 +313,11 @@
                                       [ip (machine {:seed seed :catalog apps :now now} i ip entry)])
                                     (map vector taken roster))))
       ;; the app closes over the machine's id, so it is built after the fleet exists
-      (doseq [ip taken] (update-machine! ip assoc :app (->app ip apps key)))
+      (doseq [ip taken] (update-machine! ip assoc :app (->app ip apps token)))
 
       (http/run-server dispatch {:ip "0.0.0.0" :port port})
       (println (str "fake circle up: " (count taken) " machines on " (first taken) "-"
-                    (last (str/split (last taken) #"\.")) ", key " (subs key 0 8) "…"))
+                    (last (str/split (last taken) #"\.")) ", token " (subs token 0 8) "…"))
       (doseq [[ip m] (sort-by first @fleet*)]
         (println (format "  %-15s %-10s %s%s" ip (effective m [:system :hostname])
                          (or (some-> m :running :label) "—") (if (:off? m) "  (off)" ""))))
@@ -327,7 +327,7 @@
       @(promise))))
 
 
-(defn clean!
+(defn cleanup!
   [_]
   (if-let [{:keys [pid] :as held} (read-state)]
     (if (alive? pid)

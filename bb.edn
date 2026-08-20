@@ -37,24 +37,15 @@
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "dev" *command-line-args*)}
 
-  fake-circle
-  {:doc "A fake circle on the LAN: up --range <a-b> | clean"
+  circle
+  {:doc "The console dev loop: console up <self-ip> | sim up --range <a-b> | sim cleanup"
    :requires ([tools.cli :as cli])
-   :task (apply cli/-main "fake-circle" *command-line-args*)}
+   :task (apply cli/-main "circle" *command-line-args*)}
 
   loopback
   {:doc "Loop-device utility: attach | detach | list"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "loopback" *command-line-args*)}
-
-  console
-  {:doc "Console (Circle + Setup panels) on :1338, against a real circle"
-   ;; runs with cwd = desktop/console so its paths are console-root relative (`ui`) —
-   ;; the same layout a plain cp puts at /ujima/desktop/console. --config keeps
-   ;; :paths/:deps anchored at the repo root. UJIMA_SELF names the machine to
-   ;; administer (its subnet is the one swept); UJIMA_CIRCLE_TOKEN is the key.
-   :task (let [cfg (str (System/getProperty "user.dir") "/bb.edn")]
-           (shell {:dir "desktop/console"} "bb" "--config" cfg "-m" "console.main"))}
 
   repl
   {:doc "Start Ujima dev REPL"

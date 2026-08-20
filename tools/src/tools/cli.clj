@@ -17,7 +17,7 @@
     [tools.cmd.stage    :as stage]
     [tools.cmd.build    :as build]
     [tools.cmd.dev      :as dev]
-    [tools.cmd.fake-circle :as fake-circle]))
+    [tools.cmd.circle   :as circle]))
 
 
 (defn- stage-target! [{:keys [target] :as opts}]
@@ -108,20 +108,25 @@
      :args [:target]
      :spec {:target {:desc "Disk target: .img file or block device" :require true}}}}
 
-   "fake-circle"
-   {"up"
-    {:usage "Usage: fake-circle up --range 192.168.1.200-229 [--key <hex>] [--seed n] [--pool p] [--skip-occupied]"
-     :target fake-circle/up!
-     :spec {:range         {:desc "Addresses to claim, e.g. 192.168.1.200-229" :require true :coerce :string}
-            :key           {:desc "Circle key the fakes hold (default: the baked one)" :coerce :string}
+   "circle"
+   {"console"
+    {:usage "Usage: circle console up <self-ip> [--token <hex>]"
+     :target circle/console!
+     :args [:verb :self]
+     :spec {:verb  {:desc "up" :require true :coerce :string}
+            :self  {:desc "Machine this console administers — its subnet is the one swept" :coerce :string}
+            :token {:desc "Circle token (default: the baked one)" :coerce :string}}}
+
+    "sim"
+    {:usage "Usage: circle sim up --range 192.168.1.200-229 [--token <hex>] [--seed n] [--pool p] [--skip-occupied]\n       circle sim cleanup"
+     :target circle/sim!
+     :args [:verb]
+     :spec {:verb          {:desc "up | cleanup" :require true :coerce :string}
+            :range         {:desc "Addresses to claim, e.g. 192.168.1.200-229" :coerce :string}
+            :token         {:desc "Circle token the fakes hold (default: the baked one)" :coerce :string}
             :seed          {:desc "Seeds ids, serials and uptimes" :coerce :string}
             :pool          {:desc "Roster file" :coerce :string}
-            :skip-occupied {:desc "Claim what is free instead of refusing" :coerce :boolean}}}
-
-    "clean"
-    {:usage "Usage: fake-circle clean"
-     :target fake-circle/clean!
-     :spec {}}}
+            :skip-occupied {:desc "Claim what is free instead of refusing" :coerce :boolean}}}}
 
    "dev"
    {"push"
@@ -262,7 +267,7 @@
   {"pack"  {:verb "make" :subs #{"make" "validate" "meta"}}
    "build" {:verb "run" :subs #{"run"}}
    "stage" {:verb "run"  :subs #{"run"}}
-   "fake-circle" {:verb "up" :subs #{"up" "clean"}}})
+})
 
 (defn- with-default-verb [[noun sub :as args]]
   (let [{:keys [verb subs]} (get default-verbs noun)]

@@ -10,10 +10,10 @@
             [clojure.java.io    :as io]
             [org.httpkit.server :as http]
             [lib.edn            :refer [edn->json json->edn]]
-            [console.fleet      :as fleet]
-            [console.jobs       :as jobs]
-            [console.circle     :as circle]
-            [console.setup      :as setup]))
+            [console.jobs         :as jobs]
+            [console.circle       :as circle]
+            [console.panel.circle :as circle-panel]
+            [console.panel.setup  :as setup-panel]))
 
 
 (defn- json [status body]
@@ -60,11 +60,11 @@
 
 (defn- setup-route [op body]
   (case op
-    "settings" (json 202 {:job (setup/settings-job! body)})
-    "clock"    (json 202 {:job (setup/clock-job! body)})
-    "restart"  (json 202 {:job (setup/power-job! :restart body)})
-    "poweroff" (json 202 {:job (setup/power-job! :poweroff body)})
-    "remove"   (json 200 (setup/remove! body))
+    "settings" (json 202 {:job (setup-panel/settings-job! body)})
+    "clock"    (json 202 {:job (setup-panel/clock-job! body)})
+    "restart"  (json 202 {:job (setup-panel/power-job! :restart body)})
+    "poweroff" (json 202 {:job (setup-panel/power-job! :poweroff body)})
+    "remove"   (json 200 (setup-panel/remove! body))
     nil))
 
 (defn- handler [{:keys [ui-roots]} req]
@@ -72,23 +72,23 @@
     (let [method (:request-method req)
           parts  (->> (str/split (str (:uri req)) #"/") (remove str/blank?) vec)]
       (cond
-        (and (= :post method) (circle/verb-routes parts))
-        (let [verb (circle/verb-routes parts)
+        (and (= :post method) (circle-panel/verb-routes parts))
+        (let [verb (circle-panel/verb-routes parts)
               body (body-edn req)]
-          (json 202 {:job (circle/act! verb body)}))
+          (json 202 {:job (circle-panel/act! verb body)}))
 
         (and (= :post method) (= 2 (count parts)) (= "setup" (first parts)))
         (or (setup-route (second parts) (body-edn req))
             (json 404 {:error "not found"}))
 
         (and (= :get method) (= ["ui" "circle"] parts))
-        (json 200 (circle/view))
+        (json 200 (circle-panel/view))
 
         (and (= :get method) (= ["ui" "setup"] parts))
-        (json 200 (setup/view))
+        (json 200 (setup-panel/view))
 
         (and (= :post method) (= ["console" "rescan"] parts))
-        (json 200 (fleet/rescan!))
+        (json 200 (circle/rescan!))
 
         (and (= :get method) (= ["console" "job"] parts))
         (json 200 {:jobs (jobs/jobs)})

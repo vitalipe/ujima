@@ -1,7 +1,7 @@
 (ns console.main
   "Circle and Setup over the real circle. The token arrives in the environment,
    never argv. UJIMA_SELF is the machine we administer — its subnet is the one swept."
-  (:require [console.fleet :as fleet]
+  (:require [console.circle :as circle]
             [console.http  :as http]))
 
 
@@ -16,8 +16,8 @@
 (defn -main [& _]
   (let [key (System/getenv "UJIMA_CIRCLE_TOKEN")]
     (when-not key
-      (println "console: no UJIMA_CIRCLE_TOKEN — nothing can be signed, the fleet stays empty"))
-    (fleet/init! {:key key :self-addr (or (System/getenv "UJIMA_SELF") "127.0.0.1")})
+      (println "console: no UJIMA_CIRCLE_TOKEN — nothing can be signed, the circle stays empty"))
+    (circle/init! {:key key :self-addr (or (System/getenv "UJIMA_SELF") "127.0.0.1")})
     (http/init! {:ui-roots ui-roots})
     (println "console: http://127.0.0.1:1338/   circle /circle/   setup /setup/")
     @(promise)))

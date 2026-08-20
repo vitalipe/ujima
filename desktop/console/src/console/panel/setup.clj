@@ -1,4 +1,4 @@
-(ns console.setup
+(ns console.panel.setup
   "Setup's slice of the console edge. Machine writes speak the settings
    plane's language: POST /setup/settings carries {:targets :writes} where
    writes are settings-path pairs validated against the whitelist below —
@@ -7,7 +7,7 @@
    true action. Remove/rescan are panel-plane: they touch the roster this console
    holds, never a machine."
   (:require [clojure.string :as str]
-            [console.fleet  :as fleet]
+            [console.circle :as circle]
             [console.jobs   :as jobs])
   (:import  [java.time Instant LocalDate LocalTime ZoneId ZonedDateTime]
             [java.time.format DateTimeFormatter]))
@@ -71,33 +71,33 @@
     {:tz tz :date date :time time}))
 
 (defn- self-only! [ts]
-  (when-not (= ts [(fleet/self)])
+  (when-not (= ts [(circle/self)])
     (malformed! "only this computer — other machines restart from Circle")))
 
 
 ;; ── jobs ───────────────────────────────────────────────────────────────────
 (defn settings-job! [body]
-  (jobs/act! fleet/send! :setup :settings/write (targets body) {:writes (parse-writes body)}))
+  (jobs/act! circle/send! :setup :settings/write (targets body) {:writes (parse-writes body)}))
 
 (defn clock-job! [body]
-  (jobs/act! fleet/send! :setup :clock/set (targets body) (clock-args body)))
+  (jobs/act! circle/send! :setup :clock/set (targets body) (clock-args body)))
 
 (defn power-job! [verb body]
   (let [ts (targets body)]
     (self-only! ts)
-    (jobs/act! fleet/send! :setup verb ts {})))
+    (jobs/act! circle/send! :setup verb ts {})))
 
 
 ;; ── panel-plane ops ────────────────────────────────────────────────────────
 (defn remove! [body]
   (let [id   (:id body)
-        peer (first (filter #(= id (:id %)) (fleet/peers)))]
+        peer (first (filter #(= id (:id %)) (circle/peers)))]
     (cond
       (not (string? id))    (malformed! "remove needs a peer :id")
       (nil? peer)           (malformed! "unknown machine")
-      (= id (fleet/self))   (malformed! "this computer cannot be removed")
+      (= id (circle/self))   (malformed! "this computer cannot be removed")
       (:online peer)        (malformed! "only machines that are off can be removed")
-      :otherwise            (fleet/forget! id))))
+      :otherwise            (circle/forget! id))))
 
 
 
@@ -118,6 +118,6 @@
 
 (defn view []
   {:schema 1
-   :self   (fleet/self)
-   :peers  (mapv wire-peer (fleet/peers))
-   :scan   (fleet/scan)})
+   :self   (circle/self)
+   :peers  (mapv wire-peer (circle/peers))
+   :scan   (circle/scan)})

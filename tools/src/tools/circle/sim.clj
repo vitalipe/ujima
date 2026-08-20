@@ -315,7 +315,9 @@
       ;; the app closes over the machine's id, so it is built after the fleet exists
       (doseq [ip taken] (update-machine! ip assoc :app (->app ip apps token)))
 
-      (http/run-server dispatch {:ip "0.0.0.0" :port port})
+      ;; one server for the whole fleet, so its pool is the fleet's: http-kit's default 4
+      ;; workers queue a 254-address sweep past the console's probe timeout
+      (http/run-server dispatch {:ip "0.0.0.0" :port port :thread 64})
       (println (str "fake circle up: " (count taken) " machines on " (first taken) "-"
                     (last (str/split (last taken) #"\.")) ", token " (subs token 0 8) "…"))
       (doseq [[ip m] (sort-by first @fleet*)]

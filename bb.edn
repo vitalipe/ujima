@@ -37,6 +37,11 @@
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "dev" *command-line-args*)}
 
+  fake-circle
+  {:doc "A fake circle on the LAN: up --range <a-b> | clean"
+   :requires ([tools.cli :as cli])
+   :task (apply cli/-main "fake-circle" *command-line-args*)}
+
   loopback
   {:doc "Loop-device utility: attach | detach | list"
    :requires ([tools.cli :as cli])

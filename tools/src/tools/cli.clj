@@ -16,7 +16,8 @@
     [tools.cmd.disk     :as disk]
     [tools.cmd.stage    :as stage]
     [tools.cmd.build    :as build]
-    [tools.cmd.dev      :as dev]))
+    [tools.cmd.dev      :as dev]
+    [tools.cmd.fake-circle :as fake-circle]))
 
 
 (defn- stage-target! [{:keys [target] :as opts}]
@@ -106,6 +107,21 @@
      :target disk/info!
      :args [:target]
      :spec {:target {:desc "Disk target: .img file or block device" :require true}}}}
+
+   "fake-circle"
+   {"up"
+    {:usage "Usage: fake-circle up --range 192.168.1.200-229 [--key <hex>] [--seed n] [--pool p] [--skip-occupied]"
+     :target fake-circle/up!
+     :spec {:range         {:desc "Addresses to claim, e.g. 192.168.1.200-229" :require true :coerce :string}
+            :key           {:desc "Circle key the fakes hold (default: the baked one)" :coerce :string}
+            :seed          {:desc "Seeds ids, serials and uptimes" :coerce :string}
+            :pool          {:desc "Roster file" :coerce :string}
+            :skip-occupied {:desc "Claim what is free instead of refusing" :coerce :boolean}}}
+
+    "clean"
+    {:usage "Usage: fake-circle clean"
+     :target fake-circle/clean!
+     :spec {}}}
 
    "dev"
    {"push"
@@ -245,7 +261,8 @@
 (def ^:private default-verbs
   {"pack"  {:verb "make" :subs #{"make" "validate" "meta"}}
    "build" {:verb "run" :subs #{"run"}}
-   "stage" {:verb "run"  :subs #{"run"}}})
+   "stage" {:verb "run"  :subs #{"run"}}
+   "fake-circle" {:verb "up" :subs #{"up" "clean"}}})
 
 (defn- with-default-verb [[noun sub :as args]]
   (let [{:keys [verb subs]} (get default-verbs noun)]

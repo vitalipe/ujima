@@ -1,0 +1,45 @@
+;; The fake circle's roster — one entry per machine, in address order: the first entry
+;; takes the first address of --range. Everything not named here is generated from the
+;; run's seed (id, serial, uptime, disk, layouts), so restarting the tool brings the same
+;; machines back at the same addresses.
+;;
+;;   :name   the machine's hostname. Kobe appears TWICE on purpose — two machines
+;;           answering to one name is what makes the console's label rule show an id
+;;           suffix, and a rig that never exercises it never catches a regression in it.
+;;   :app    catalog id it comes up running, nil for a machine sitting at home
+;;   :muted  starts muted
+;;   :off    starts powered off — it answers nothing until someone powers it on
+;;
+;; Names are Swahili animals, the pool the old world TUI used.
+
+{:machines
+ [{:name "Kobe"     :app :kolibri}
+  {:name "Ndege"    :app :turbowarp}
+  {:name "Samaki"}
+  {:name "Nyoka"    :app :write}
+  {:name "Kanga"    :app :draw}
+  {:name "Kima"}
+  {:name "Fisi"     :app :geany     :muted true}
+  {:name "Mbuni"    :app :kolibri}
+  {:name "Kiboko"}
+  {:name "Sungura"  :app :tuxtype}
+  {:name "Paka"     :app :excalidraw}
+  {:name "Mbwa"}
+  {:name "Korongo"  :app :stellarium}
+  {:name "Tai"      :app :marble}
+  {:name "Popo"                     :off true}
+  {:name "Panya"    :app :calc}
+  {:name "Kuku"     :app :wikipedia}
+  {:name "Bata"}
+  {:name "Njiwa"    :app :thonny}
+  {:name "Kasuku"   :app :gimp}
+  {:name "Kunguru"                  :off true}
+  {:name "Mjusi"    :app :web}
+  {:name "Chura"    :app :xaos}
+  {:name "Nge"      :app :godot}
+  {:name "Buibui"   :muted true}
+  {:name "Nzige"    :app :impress}
+  {:name "Kipepeo"  :app :inkscape}
+  {:name "Siafu"}
+  {:name "Nyuki"    :app :onlyoffice}
+  {:name "Kobe"     :app :files}]}

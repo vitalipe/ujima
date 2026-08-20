@@ -54,8 +54,8 @@
 
   pin
   {:doc "Pin world-truth into the repo: bb pin <schema|deps|initramfs> …"
-   :requires ([tools.cmd.pin :as pin])
-   :task (apply pin/dispatch! *command-line-args*)}
+   :requires ([tools.cli :as cli])
+   :task (apply cli/-main "pin" *command-line-args*)}
 
   test:unit
   {:doc "Run unit tests"

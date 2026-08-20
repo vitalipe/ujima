@@ -17,6 +17,7 @@
     [tools.cmd.stage    :as stage]
     [tools.cmd.build    :as build]
     [tools.cmd.dev      :as dev]
+    [tools.cmd.pin      :as pin]
     [tools.cmd.circle   :as circle]))
 
 
@@ -196,6 +197,27 @@
             :user     {:desc "SSH user"     :default "ujima" :coerce :string}
             :password {:desc "SSH password" :default "ujima" :coerce :string}
             :port     {:desc "SSH port"     :default "22"    :coerce :string}}}}
+
+   "pin"
+   {"schema"
+    {:usage "Usage: pin schema <rootfs>"
+     :desc  "tz/xkb catalogs -> runtime/src/schema/build, read from a MOUNTED IMAGE ROOTFS — never this host: the build diffs the pin against the image"
+     :target pin/schema!
+     :args [:rootfs]
+     :spec {:rootfs {:desc "Mounted image rootfs to read the catalogs from" :require true :coerce :string}}}
+
+    "deps"
+    {:usage "Usage: pin deps"
+     :desc  "the bb-deps manifest -> os/build/deps-pin.edn, resolved from deps.edn on this host"
+     :target pin/deps!
+     :spec {}}
+
+    "initramfs"
+    {:usage "Usage: pin initramfs <ip>"
+     :desc  "kernel-matched initramfs -> os/pipeline/boot/initramfs/, built natively on a dev Pi (its overlay must be off: lock-fs disable + reboot first)"
+     :target pin/initramfs!
+     :args [:ip]
+     :spec {:ip {:desc "Dev Pi address" :require true :coerce :string}}}}
 
    "loopback"
    {"attach"

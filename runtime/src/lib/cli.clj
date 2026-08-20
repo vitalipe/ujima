@@ -65,6 +65,11 @@
   (and (babashka-cli-error? e)
        (= :input-exhausted (:cause (ex-data e)))))
 
+(defn no-match-error?
+  [e]
+  (and (babashka-cli-error? e)
+       (= :no-match (:cause (ex-data e)))))
+
 ;; ----------------------------------------------------------------------------
 ;; Help
 ;; ----------------------------------------------------------------------------
@@ -220,6 +225,26 @@
       (println " " (:usage child))
       (print-command-usages! child))))
 
+(defn- print-choices!
+  "What could have followed DISPATCH: the subtree's usages when we can find it,
+   the names babashka.cli offered when we cannot."
+  [tree dispatch all-commands]
+  (let [node (get-command-subtree tree dispatch)]
+    (if (and (map? node) (not (command-node? node)))
+      (do (println "Available commands:")
+          (print-command-usages! node))
+      (do (println "Available subcommands:")
+          (doseq [cmd all-commands]
+            (println " " (name cmd)))))))
+
+
+(defn print-no-match! [tree e]
+  (let [{:keys [dispatch wrong-input all-commands]} (ex-data e)]
+    (println (str "Unknown command: " (str/join " " (concat dispatch [wrong-input]))))
+    (println)
+    (print-choices! tree dispatch all-commands)))
+
+
 (defn print-input-exhausted! [tree e]
   (let [{:keys [dispatch all-commands]} (ex-data e)
         node (get-command-subtree tree dispatch)]
@@ -290,6 +315,9 @@
          (cond           
            (input-exhausted-error? e)
            (print-input-exhausted! tree e)
+
+           (no-match-error? e)
+           (print-no-match! tree e)
 
            (babashka-cli-error? e)
            (println

@@ -236,7 +236,7 @@
   [tree]
   (walk/postwalk
     (fn [node]
-      (if (and (map? node) (:target node))
+      (if (cli/command-node? node)
         (update node :target wrap-target)
         node))
     tree))

@@ -84,10 +84,13 @@
 
 
 (defn command-node?
-  "A leaf. Anything with a :target is a command; anything else is a group of them,
-   at whatever depth — the tree is walked, not assumed to be two deep."
+  "A leaf. A node whose :target is a FUNCTION is a command; anything else groups them,
+   at whatever depth — the tree is walked, not assumed to be two deep.
+
+   The fn? matters: a spec is free to declare an option called :target (several do),
+   and a walker that only looked for the key would mistake that spec for a command."
   [x]
-  (and (map? x) (contains? x :target)))
+  (and (map? x) (fn? (:target x))))
 
 
 (defn command-tree->command-rows

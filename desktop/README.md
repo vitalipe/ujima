@@ -5,5 +5,5 @@ desktop stage (`bb dev script <ip> desktop` iterates it live).
 
 - `shell/` — the chrome: i3 config, eww bars, the launcher home surface, icons, wallpaper.
 - `bin/` — the desktop's programs (url handler, web-app wrappers, …); on the session PATH.
-- `circle/`, `setup/` — the panel apps (UI only).
-- `console/` — the chooser, and the backend that serves the panels.
+- `console/` — the chooser and the one backend behind both panels (`src/console/`),
+  with the panel apps themselves at `ui/circle` and `ui/setup`.

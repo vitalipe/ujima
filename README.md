@@ -29,7 +29,7 @@ The split is by type of work — product source, system definition, host tooling
 - **`runtime/`** — the ujima core codebase: shared `lib/` + the `ujima/` runtime. Runs on the device as ujimad; tools and the os build link it on the host.
 - **`desktop/`** — the desktop product: the shell, its programs, and the panel apps.
 - **`os/`** — the system definition: `pipeline/` (the build stages, each with the static files it stages), `build/` (the machinery that runs them), `apps/` (third-party software packaged for ujima).
-- **`tools/`** — the host CLI behind the `bb` tasks: pipeline orchestration, image/pack/disk work, the live dev loop.
+- **`tools/`** — the host CLI behind the `bb` tasks: pipeline orchestration, image/pack/disk work, and the dev loops — a live device over ssh, a simulated circle on the LAN.
 
 
 ## CLI

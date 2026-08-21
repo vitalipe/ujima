@@ -117,6 +117,12 @@
   (fs/delete-if-exists state-file)
   (count addresses))
 
+(defn claimed
+  "The addresses a live sim holds, in claim order — nothing when none is running."
+  []
+  (when-let [claim (read-state)]
+    (when (ours? claim) (:addresses claim))))
+
 
 ;; ── the fleet ───────────────────────────────────────────────────────────────
 

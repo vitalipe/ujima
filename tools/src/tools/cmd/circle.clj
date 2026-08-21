@@ -9,22 +9,28 @@
 (defn- console-up!
   "The console in dev. The device hands it these two in the environment; here the CLI does."
   [{:keys [self token]}]
-  (p/shell {:dir "desktop/console"
-            :extra-env {"UJIMA_SELF"          self
-                        "UJIMA_CIRCLE_TOKEN" (or token sim/default-token)}}
-           "bb" "--config" (str (System/getProperty "user.dir") "/bb.edn")
-           "-m" "console.main"))
+  (let [self (or self
+                 (when-let [fake (first (sim/claimed))]
+                   (println (str "self: " fake " — the sim's first machine"))
+                   fake))]
+    (when-not self
+      (throw (ex-info "no <self-ip>, and no sim running to borrow one from" {})))
+    (p/shell {:dir "desktop/console"
+              :extra-env {"UJIMA_SELF"          self
+                          "UJIMA_CIRCLE_TOKEN" (or token sim/default-token)}}
+             "bb" "--config" (str (System/getProperty "user.dir") "/bb.edn")
+             "-m" "console.main")))
 
 
 (def cli
   {"circle"
    {"console"
     {"up"
-     {:usage "Usage: circle console up <self-ip> [--token <hex>]"
+     {:usage "Usage: circle console up [<self-ip>] [--token <hex>]"
       :target console-up!
       :args [:self]
-      :spec {:self  {:desc "Machine this console administers — its subnet is the one swept"
-                     :require true :coerce :string}
+      :spec {:self  {:desc "Machine this console administers — its subnet is the one swept (default: a running sim's first machine)"
+                     :coerce :string}
              :token {:desc "Circle token (default: the baked one)" :coerce :string}}}}
 
     "sim"

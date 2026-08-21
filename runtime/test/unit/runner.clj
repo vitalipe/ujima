@@ -17,6 +17,7 @@
             [ujima.control.registry-test]
             [ujima.linux.converge-test]
             [ujima.control-test]
+            [ujima.importer-test]
             [ujima.control.commands-test]
             [ujima.control.queries-test]
             [ujima.api-test]

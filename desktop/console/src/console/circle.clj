@@ -146,12 +146,13 @@
       (.toEpochMilli)))
 
 (defn- ->request
-  "Verb -> [command-path body], nil for one we cannot send. Circle writes :activity,
-   over the :session the machine's own bar writes — so unmute clears, never pins."
+  "Verb -> [command-path body], nil for one we cannot send. Circle writes :activity, over
+   the :session the machine's own bar writes — unmute pins false, since a clear would
+   leave a machine its own user muted still muted. :release hands the machine back."
   [verb args]
   (case verb
     :mute      ["settings/audio/muted"        {:scope "activity" :value true}]
-    :unmute    ["clear/activity/audio/muted"  nil]
+    :unmute    ["settings/audio/muted"        {:scope "activity" :value false}]
     :release   ["clear/activity"              nil]
     :volume    ["audio/volume"                {:scope "activity" :value (:value args)}]
     :open-app  ["app/open"                    {:app (:app args)}]

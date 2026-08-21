@@ -17,6 +17,12 @@
     [tools.cmd.disk  :as disk]))
 
 
+(defn image-facts
+  "The platform facts apply! stamps into /ujima/image.edn."
+  [platform]
+  {:platform platform :base (get stage/targets platform)})
+
+
 (defn- stage-and-pack!
   "stage -> os apply -> pack make. Returns {:os <img-path> :pack <pack-path>}."
   [{:keys [out dev] :as opts}]
@@ -29,7 +35,7 @@
                   os-img)
         pack-out (or out (str/replace os-img #"\.img$" ".pack"))]
 
-    (image/apply! {:img os-img :dev dev})
+    (image/apply! {:img os-img :dev dev :image (image-facts "rpi")})
 
     (println (str "== pack -> " pack-out))
     (pack/make! {:src os-img :out pack-out})

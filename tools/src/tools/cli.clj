@@ -52,7 +52,7 @@
     {"os"
      {"apply"
       {:usage "Usage: os apply <img> [--dev]"
-       :target image/apply!
+       :target (fn [opts] (image/apply! (assoc opts :image (build/image-facts "rpi"))))
        :args [:img]
        :spec {:img {:desc "Staged OS image to apply the ujima content chain into" :require true}
               :dev {:coerce :boolean

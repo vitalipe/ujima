@@ -67,7 +67,7 @@
 (deftest the-version-is-the-deploy-stamp
   (fresh!)
   (is (= {:version "v9.9-test"} (GET "/api/query/machine/image" {:version "v9.9-test"}))
-      "cfg :version (config/env.edn on device) answers the image node")
+      "cfg :version (the env base layer — /ujima/image.edn on device) answers the image node")
   (is (= {:version nil} (GET "/api/query/machine/image"))
       "no stamp = an honest nil, not a fake"))
 

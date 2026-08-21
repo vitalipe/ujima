@@ -14,7 +14,7 @@
             [build.schema :as schema]))
 
 
-(defn run! [{:keys [project version]}]
+(defn run! [{:keys [project]}]
   (with-console-out
     (let [dst "/ujima/ujimad"]
       (fs/create-dirs (str dst "/config"))
@@ -28,8 +28,9 @@
       ;; the catalogs gate: this rootfs must match the pinned tz/xkb lists exactly
       (println "catalogs" (schema/verify! "/"))
 
-      ;; deploy-stamped facts, threaded back in as config by ujimad (/api/query/machine/image
-      ;; answers :version); last, so only a completed deploy stamps
-      (when version
-        (spit (str dst "/config/env.edn") (str "{:version " (pr-str version) "}\n"))
-        (println "version" version)))))
+      ;; the image's identity -> ujimad's env base layer; last, so only a completed
+      ;; deploy stamps
+      (when-not (fs/exists? "/ujima/image.edn")
+        (throw (ex-info "no /ujima/image.edn — not a stamped image" {})))
+      ($! cp "/ujima/image.edn" (str dst "/config/env.edn"))
+      (println "env" (slurp "/ujima/image.edn")))))

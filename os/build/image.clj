@@ -106,14 +106,33 @@
 (def ^:private content-scripts ["boot" "base" "ujimad" "desktop" "ujimaify"])
 
 
+(defn- stamp-image-facts!
+  "Write /ujima/image.edn — the image's identity, canonical inside the image. The ujimad
+   stage cp's it into ujimad's config as the env base layer."
+  [img facts]
+  (loopback/with-loopback-device [dev img]
+    (let [[_boot root] (linux-disk/device->partitions dev)]
+      (mount/with-mounted-ext4 [mnt root]
+        (fs/create-dirs (str mnt "/ujima"))
+        (spit (str mnt "/ujima/image.edn")
+              (str (pr-str (assoc facts
+                                  :version  (scripts/version)
+                                  :built-at (str (java.time.Instant/now))))
+                   "\n"))))))
+
+
 (defn apply!
-  "Run the whole script chain against an existing staged image.
+  "Run the whole script chain against an existing staged image, stamping
+   /ujima/image.edn first. `image` is the caller's platform facts ({:platform :base});
    --dev bakes the dev rig and skips cleanup; the default is a release image."
-  [{:keys [img dev]}]
+  [{:keys [img dev image]}]
   (require-root!)
+  (assert (:platform image) "apply! needs :image platform facts ({:platform :base})")
   (let [scripts (conj content-scripts (if dev "dev" "cleanup"))]
     (doseq [s scripts]                                  ; whole chain up front, so a typo or a
       (scripts/require-script! s))                       ; missing script never runs half of it
+    (println (str "== image.edn -> " img))
+    (stamp-image-facts! img (assoc image :dev (boolean dev)))
     (doseq [s scripts]
       (println (str "== os script " s " -> " img))
       (script! {:img img :script s}))

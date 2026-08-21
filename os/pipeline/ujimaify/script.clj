@@ -34,8 +34,4 @@
     ;; overlay root. The overlay already gives us a writable / (the tmpfs upper), so the service is
     ;; redundant: mask it. Pairs with the boot stage's cmdline: without one of `overlayroot=tmpfs` or
     ;; `rw` there, / mounts read-only and nothing ever remounts it.
-    ($! ln -sf "/dev/null" "/etc/systemd/system/systemd-remount-fs.service")
-
-    ;; build marker
-    (spit "/etc/ujima-release"
-          (str "built-at=" (java.time.Instant/now) "\n"))))
+    ($! ln -sf "/dev/null" "/etc/systemd/system/systemd-remount-fs.service")))

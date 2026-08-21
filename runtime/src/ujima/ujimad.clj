@@ -27,7 +27,7 @@
 (defn -main [& args]
 
   (let [env         (io/slurp-config "config" "ujimad")
-        deploy      (io/slurp-edn    "config/env.edn")   ; deploy-stamped facts (nil on hosts)
+        deploy      (io/slurp-config "config" "env")     ; image facts; hosts see env.dev.edn
         disk        (device/system->disk)                ; nil on hosts, FIXME: make autodetect fallback, put in config
         app-cfg     (get-in env [:desktop :app])
         app-catalog (app/load-catalog (:catalog app-cfg) (:fallback-icon app-cfg))

@@ -43,7 +43,7 @@
   (str root "/runtime/src:" root "/os"))
 
 
-(defn- version
+(defn version
   "`git describe` over the v* tag family (v0.3.0, v0.3.0-127-g252ed12, …-dirty) —
    computed host-side: neither the chroot rootfs nor the dev-push stage carries git."
   []
@@ -52,12 +52,9 @@
 
 (defn run-args
   "The bb argv tail that runs a script against a repo root — classpath, entry, project
-   bind, version stamp. Everything shell-safe by construction (fixed paths, a
-   require-script!-validated name, git-describe output), so an executor may splice it
-   into an argv or str/join it into one ssh string."
+   bind. Everything shell-safe by construction (fixed paths, a require-script!-validated
+   name), so an executor may splice it into an argv or str/join it into one ssh string."
   [script root]
-  (let [v (version)]
-    (cond-> ["--classpath" (classpath root)
-             "-x" (str (script-ns script) "/run!")
-             "--project" root]
-      (seq v) (conj "--version" v))))
+  ["--classpath" (classpath root)
+   "-x" (str (script-ns script) "/run!")
+   "--project" root])

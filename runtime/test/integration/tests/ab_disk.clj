@@ -178,7 +178,7 @@
 
 
 (defn test-install! [disk* pack-file slot expected-installed-slots]
-  (let [expected-metadata (pack/metadata pack-file)]
+  (let [expected-metadata (pack/manifest pack-file)]
     (ab/install-into-slot! disk* pack-file slot)
     (let [info (require-disk-info! disk*)]
       (doseq [installed-slot expected-installed-slots]

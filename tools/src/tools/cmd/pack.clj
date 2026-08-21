@@ -32,7 +32,7 @@
 
 
 (defn print-pack-meta! [{:keys [ujima-pack-path format]}]
-  (let [meta (pack/metadata ujima-pack-path)]
+  (let [meta (pack/manifest ujima-pack-path)]
     (println (case format 
                "edn" (pr-str meta)
                "json" (edn/edn->json meta)))))

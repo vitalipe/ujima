@@ -84,7 +84,7 @@
   (println "  ($! bb tools loopback list)")
   (println "  (+loop/list-loopbacks! {})")
   (println "  (+pack/validate-pack! {:ujima-pack-path \"tmp/u.pack\"})")
-  (println "  (pack/metadata \"tmp/u.pack\")")
+  (println "  (pack/manifest \"tmp/u.pack\")")
   (println "  (disk/device->partitions \"/dev/loop0\")")
   (println "  (ls)")
   (println "  (ls \"e2e\")")

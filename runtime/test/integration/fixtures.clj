@@ -1,7 +1,7 @@
 (ns integration.fixtures
   "Synthetic .pack artifacts for the integration suite.
 
-   A pack is metadata.edn + boot.img + root.img in a zstd tarball. Nothing in the install path
+   A pack is manifest.edn + boot.img + root.img in a zstd tarball. Nothing in the install path
    boots or inspects OS content, so the images only have to satisfy what that path actually
    touches: validate!'s three entries, a dd into the slot partitions, e2fsck + resize2fs on root,
    and a mounted /etc/passwd for the per-slot settings chown (autoboot/rootfs-owner). Boot needs
@@ -24,10 +24,13 @@
        "ujima:x:1000:1000:Ujima:/home/ujima:/bin/bash\n"))
 
 
-(def metadata
-  ;; fixed :packed-at so the fixture stays byte-identical run to run
-  {:pack-version pack/pack-version
-   :packed-at    "2026-01-01T00:00:00Z"})
+(def image-facts
+  ;; frozen — the manifest's :image for a synthetic pack
+  {:version  "v0.0.0-fixture"
+   :platform "rpi"
+   :built-at "2026-01-01T00:00:00Z"
+   :dev      false
+   :base     {:url "fixture" :sha256 "fixture"}})
 
 
 (defn pack!
@@ -40,12 +43,19 @@
 
       (fs/create-dirs (fs/path root-tree "etc"))
       (spit (str (fs/path root-tree "etc/passwd")) passwd)
-      (spit-edn! (fs/path work "metadata.edn") metadata)
 
       ;; deliberately tiny — both are dd'd into far larger slot partitions (512 MiB boot,
       ;; 10 GiB root) and install grows root to fill its partition with resize2fs
       ($! :mkfs.vfat -C [boot-image] 32768)  ;; 1 KiB blocks -> 32 MiB
       ($! mke2fs -q -t "ext4" -d [root-tree] -F [root-image] "128M")
 
-      ($! tar --zstd -cf [path] -C [work] "metadata.edn" "boot.img" "root.img")))
+      ;; frozen :packed-at; the member entries are computed, so they stay honest
+      (spit-edn! (fs/path work pack/manifest-member)
+                 {:pack-version pack/pack-version
+                  :packed-at    "2026-01-01T00:00:00Z"
+                  :image        image-facts
+                  :members      {:boot (pack/member-entry "boot.img" boot-image)
+                                 :root (pack/member-entry "root.img" root-image)}})
+
+      ($! tar --zstd -cf [path] -C [work] [pack/manifest-member] "boot.img" "root.img")))
   path)

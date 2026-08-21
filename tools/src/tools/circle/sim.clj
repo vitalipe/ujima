@@ -36,6 +36,8 @@
   []
   (let [route (:out (sudo? :ip :route :get "1.1.1.1"))
         iface (second (re-find #"dev (\S+)" (str route)))
+        _     (when-not iface
+                (throw (ex-info "no default route — nothing to claim addresses on" {})))
         addr  (:out (sudo? :ip "-4" "-br" :addr :show iface))]
     {:iface  iface
      :prefix (or (second (re-find #"/(\d+)" (str addr))) "24")}))
@@ -51,8 +53,18 @@
 
 ;; arping exit 0 = something answered. NB this is Habets' arping, where -D means
 ;; "print dots", NOT duplicate address detection — the plain exit code is the check.
-(defn- taken? [iface ip]
+(defn- answers? [iface ip]
   (:ok? (sudo? :arping "-c" "2" "-w" "2" "-I" iface ip)))
+
+(defn- local
+  "Every address already on this box. arping never finds these — the kernel does not
+   ARP-reply to itself — so claiming one succeeds nowhere and the release takes the
+   host's own address off the interface."
+  []
+  (->> (str (:out (sudo? :ip "-4" "-o" :addr :show)))
+       (re-seq #"inet (\d+\.\d+\.\d+\.\d+)")
+       (map second)
+       set))
 
 (defn- claim! [iface prefix ip]
   (sudo! :ip :addr :add (str ip "/" prefix) :dev iface))
@@ -72,6 +84,20 @@
 
 (defn- write-state! [state]
   (spit state-file (pr-str state)))
+
+(defn- claim-all!
+  "One at a time, each recorded as it lands. A record of an address the sim does not
+   own is what deletes it from the interface on the next release — and that address
+   can be the host's own."
+  [{:keys [iface prefix] :as state} ips]
+  (write-state! (assoc state :addresses []))
+  (reduce (fn [held ip]
+            (claim! iface prefix ip)
+            (let [held (conj held ip)]
+              (write-state! (assoc state :addresses held))
+              held))
+          []
+          ips))
 
 (defn- release-all! [{:keys [iface prefix addresses]}]
   (doseq [ip addresses] (release! iface prefix ip))
@@ -287,7 +313,8 @@
         wanted   (hosts range)
         roster   (:machines (edn/read-string (slurp pool)))
         _        (println (str "probing " (count wanted) " addresses on " iface "..."))
-        occupied (vec (filter (partial taken? iface) wanted))
+        mine     (local)
+        occupied (vec (filter #(or (mine %) (answers? iface %)) wanted))
         free     (remove (set occupied) wanted)]
 
     (when (seq occupied)
@@ -307,9 +334,11 @@
       (when (< (count crew) (count roster))
         (println (str "room for " (count crew) " of the " (count roster) " machines in " pool
                       " — running the first " (count crew))))
-      (write-state! {:pid (.pid (java.lang.ProcessHandle/current))
-                     :iface iface :prefix prefix :addresses taken})
-      (doseq [ip taken] (claim! iface prefix ip))
+      ;; armed before the first claim: a run that dies part-way still releases what it took
+      (.addShutdownHook (Runtime/getRuntime)
+                        (Thread. #(some-> (read-state) release-all!)))
+      (claim-all! {:pid (.pid (java.lang.ProcessHandle/current)) :iface iface :prefix prefix}
+                  taken)
 
       (reset! fleet*
               (into {} (map-indexed (fn [i [ip entry]]
@@ -327,8 +356,6 @@
         (println (format "  %-15s %-10s %s%s" ip (effective m [:system :hostname])
                          (or (some-> m :running :label) "—") (if (:off? m) "  (off)" ""))))
       (println "ctrl-c to release the addresses")
-      (.addShutdownHook (Runtime/getRuntime)
-                        (Thread. #(some-> (read-state) release-all!)))
       @(promise))))
 
 

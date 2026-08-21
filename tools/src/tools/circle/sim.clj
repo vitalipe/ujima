@@ -12,6 +12,7 @@
             [babashka.fs      :as fs]
             [org.httpkit.server :as http]
             [lib.http         :as lib-http]
+            [ujima.api        :as ujimad]
             [ujima.api.auth   :as auth]
             [ujima.api.routes :as routes]
             [ujima.linux.sudo :refer [sudo! sudo?]]
@@ -279,6 +280,35 @@
                ", handler with no spec: " (sort (remove specs (keys hs)))))
   (into {} (for [[path spec] specs] [path (assoc spec :handler (hs path))])))
 
+(def ^:private unfaked
+  ;; the gated settings tier answers out of a control plane, which a fake does not have
+  #{"GET /query/**"})
+
+(def ^:private ujimad-surface
+  ;; once, not per machine: a real route table is compiled malli and there are thirty of these
+  (delay {:routes (set (keys (:routes (ujimad/endpoints {:gate identity}))))
+          :nodes  (set (keys (ujimad/machine-nodes {})))}))
+
+(defn- no-drift! [what real fake]
+  (assert (= real fake)
+          (str "the fake is out of step with ujimad — " what " it does not answer: "
+               (sort (remove fake real)) ", " what " ujimad does not have: "
+               (sort (remove real fake)))))
+
+(defn- with-nodes
+  "The machine tier, held to ujimad's own. A node the fake never grew reads as null on
+   every machine in the circle, with nothing to say the fleet was lying."
+  [nodes]
+  (no-drift! "nodes" (:nodes @ujimad-surface) (set (keys nodes)))
+  nodes)
+
+(defn- with-routes
+  "The same for the tiers: the command table is zipped to the contract already, this is
+   what catches a whole surface ujimad grew and the fake did not."
+  [routes]
+  (no-drift! "routes" (:routes @ujimad-surface) (into unfaked (keys routes)))
+  routes)
+
 (defn- ->app
   "This machine's whole HTTP surface: ujimad's routes, ujimad's gate, its own key."
   [addr apps key]
@@ -289,9 +319,11 @@
        :sign (auth/->sign cfg)
        :endpoints
        {"api" {:errors api/errors
-               :routes (merge (gate (routes/commands {:base "commands"
-                                                      :commands (with-handlers api/commands (handlers addr apps))}))
-                              (routes/queries {:base "query/machine" :nodes (nodes addr apps)}))}}})))
+               :routes (with-routes
+                         (merge (gate (routes/commands {:base "commands"
+                                                        :commands (with-handlers api/commands (handlers addr apps))}))
+                                (routes/queries {:base "query/machine"
+                                                 :nodes (with-nodes (nodes addr apps))})))}}})))
 
 
 ;; ── the one listener ────────────────────────────────────────────────────────

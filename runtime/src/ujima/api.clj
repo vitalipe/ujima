@@ -57,8 +57,46 @@
 
 ;; ── the routes ──────────────────────────────────────────────────────────────
 
+(defn machine-nodes
+  "The open machine tier, one node per source. A var, not a literal inside endpoints, so
+   the sim can hold its fake tier to this one's shape."
+  [{:keys [version id] system-disk :disk}]
+  {"schema"   (constantly 1)
+   "id"       (constantly id)
+   "device"   (fn [] {:serial (devicetree/serial)
+                      :model  (devicetree/model)})
+   "image"    (constantly {:version version})
+   "disk"     (fn [] {:type     (:type system-disk)
+                      :slot     (:boot-slot system-disk)
+                      :storage  (disk/device->space (:storage system-disk))
+                      :settings (disk/device->space (:config system-disk))})
+
+   "apps"     desktop/catalog-listing
+
+   "desktop/locked"  (constantly false)
+   "desktop/running" #(:current (desktop/current-apps-state))
+   "desktop/catalog" desktop/catalog-listing
+
+   "audio"    #(queries/audio-status (control/settings))
+
+   "keyboard" (fn [] (let [s (control/settings)]
+                       {:layout            (:effective (get s [:keyboard :layout]))
+                        :available-layouts (:effective (get s [:keyboard :available-layouts]))}))
+
+   "net"      (fn [] (let [facts (net/interface-facts)]
+                       {:ip         (net/lan-ip facts)
+                        :interfaces facts}))
+
+   "system/hostname" #(:effective (control/setting [:system :hostname]))
+   "system/timezone" #(:effective (control/setting [:system :timezone]))
+   "system/clock-ms" #(System/currentTimeMillis)
+
+   "monitor/uptime-minutes" system/uptime-minutes
+   "monitor/messages"       (constantly [])})
+
+
 (defn endpoints
-  [{:keys [version id gate] system-disk :disk}]
+  [{:keys [gate] :as opts}]
   (assert gate "no :gate — pass identity to serve unauthenticated")
 
   {:errors defs/errors
@@ -81,35 +119,4 @@
      ;; open
      (routes/queries
       {:base  "query/machine"
-       :nodes {"schema"   (constantly 1)
-               "id"       (constantly id)
-               "device"   (fn [] {:serial (devicetree/serial)
-                                  :model  (devicetree/model)})
-               "image"    (constantly {:version version})
-               "disk"     (fn [] {:type     (:type system-disk)
-                                  :slot     (:boot-slot system-disk)
-                                  :storage  (disk/device->space (:storage system-disk))
-                                  :settings (disk/device->space (:config system-disk))})
-
-               "apps"     desktop/catalog-listing
-
-               "desktop/locked"  (constantly false)
-               "desktop/running" #(:current (desktop/current-apps-state))
-               "desktop/catalog" desktop/catalog-listing
-
-               "audio"    #(queries/audio-status (control/settings))
-
-               "keyboard" (fn [] (let [s (control/settings)]
-                                   {:layout            (:effective (get s [:keyboard :layout]))
-                                    :available-layouts (:effective (get s [:keyboard :available-layouts]))}))
-
-               "net"      (fn [] (let [facts (net/interface-facts)]
-                                   {:ip         (net/lan-ip facts)
-                                    :interfaces facts}))
-
-               "system/hostname" #(:effective (control/setting [:system :hostname]))
-               "system/timezone" #(:effective (control/setting [:system :timezone]))
-               "system/clock-ms" #(System/currentTimeMillis)
-
-               "monitor/uptime-minutes" system/uptime-minutes
-               "monitor/messages"       (constantly [])}}))})
+       :nodes (machine-nodes opts)}))})

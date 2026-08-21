@@ -59,10 +59,13 @@
 
 (defn build-disk!
   "The pack, then `disk autoboot from-pack` onto the target."
-  [{:keys [target wipe] :as opts}]
-  (let [{:keys [os pack]} (stage-and-pack! (dissoc opts :target :wipe))]
+  [{:keys [target settings wipe] :as opts}]
+  (when settings                                 ; a typo'd path must not cost a full build
+    (when-not (fs/regular-file? settings)
+      (throw (ex-info "settings file not found" {:settings settings}))))
+  (let [{:keys [os pack]} (stage-and-pack! (dissoc opts :target :settings :wipe))]
     (println (str "== disk -> " target))
-    (lib-cli/run-and-display! (disk/from-pack! {:pack pack :target target :wipe wipe}))
+    (lib-cli/run-and-display! (disk/from-pack! {:pack pack :target target :settings settings :wipe wipe}))
     (print-outputs! [os pack target])
     {:os os :pack pack :disk target}))
 
@@ -81,11 +84,12 @@
                    :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}
 
      "disk"
-     {:usage "Usage: build rpi disk <img|blockdev> [--dev] [--wipe]"
+     {:usage "Usage: build rpi disk <img|blockdev> [settings.edn] [--dev] [--wipe]"
       :target build-disk!
-      :args [:target]
-      :spec {:target {:desc "Disk target: .img file or block device" :require true}
-             :dev    {:coerce :boolean
-                      :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}
-             :wipe   {:coerce :boolean
-                      :desc "Destroy existing partitions on a block device"}}}}}})
+      :args [:target :settings]
+      :spec {:target   {:desc "Disk target: .img file or block device" :require true}
+             :settings {:desc "Settings command file, applied by the slot's own runtime"}
+             :dev      {:coerce :boolean
+                        :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}
+             :wipe     {:coerce :boolean
+                        :desc "Destroy existing partitions on a block device"}}}}}})

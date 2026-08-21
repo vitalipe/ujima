@@ -35,8 +35,8 @@ The split is by type of work — product source, system definition, host tooling
 ## CLI
 
 ```
-bb build rpi pack [<out.pack>] [--dev]                build the artifact: stage -> os apply -> pack
-bb build rpi disk <img|blockdev> [--dev] [--wipe]     the same, then provision: layout -> slot A -> activate
+bb build rpi pack [<out.pack>] [--dev]                          build the artifact: stage -> os apply -> pack
+bb build rpi disk <img|blockdev> [settings.edn] [--dev] [--wipe] the same, then provision: layout -> slot A -> seed -> activate
 
 bb stage <target>                                     stage an OS image from the pinned base (vendor-cached)
 
@@ -48,12 +48,12 @@ bb pack <img|blockdev> <out.pack>                     pack an OS image into a .p
 bb pack validate <pack>
 bb pack meta <pack> [--format edn|json]
 
-bb disk autoboot empty <img|blockdev> [--wipe]                write an empty A/B layout
-bb disk autoboot from-pack <pack> <img|blockdev> [--wipe]     the installer: layout -> slot A -> activate
-bb disk autoboot slot <A|B> from-pack <pack> <img|blockdev>   install a pack into a slot
-bb disk autoboot slot <A|B> from-image <img> <img|blockdev>   install an OS image into a slot (packs to a temp file)
-bb disk autoboot slot <A|B> activate <img|blockdev>           set the boot slot
-bb disk info <img|blockdev>                                   slots, install metadata, boot selection
+bb disk autoboot empty <img|blockdev> [--wipe]                             write an empty A/B layout
+bb disk autoboot from-pack <pack> <img|blockdev> [settings.edn] [--wipe]   the installer: layout -> slot A -> seed -> activate
+bb disk autoboot slot <A|B> from-pack <pack> <img|blockdev> [settings.edn] install a pack into a slot
+bb disk autoboot slot <A|B> from-image <img> <img|blockdev> [settings.edn] install an OS image into a slot (packs to a temp file)
+bb disk autoboot slot <A|B> activate <img|blockdev>                        set the boot slot
+bb disk info <img|blockdev>                                                slots, install metadata, boot selection
 
 bb dev push <ip> ujimad                               deploy the daemon + restart the session
 bb dev script <ip> <name>                             run pipeline script <name> live on the device

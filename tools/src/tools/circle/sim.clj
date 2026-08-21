@@ -75,8 +75,20 @@
 
 ;; ── what we hold, so a crash can be cleaned up ──────────────────────────────
 
-(defn- alive? [pid]
-  (and pid (fs/exists? (str "/proc/" pid))))
+(defn- process [pid]
+  (some-> pid java.lang.ProcessHandle/of (.orElse nil)))
+
+(defn- started-at [ph]
+  (some-> ph .info .startInstant (.orElse nil) .toEpochMilli))
+
+(defn- ours?
+  "Is the claim's process still the one that wrote it? A pid outlives nothing — the number
+   is reused — and a dev tool has no business killing, or standing aside for, a stranger
+   that inherited it. A claim from before this check carries no start time: take its word."
+  [{:keys [pid started]}]
+  (when-let [ph (process pid)]
+    (and (.isAlive ph)
+         (or (nil? started) (= started (started-at ph))))))
 
 (defn- read-state []
   (when (fs/exists? state-file)
@@ -302,7 +314,7 @@
   [{:keys [range token seed pool skip-occupied]
     :or   {token default-token seed "1" pool default-pool}}]
   (when-let [{:keys [pid] :as held} (read-state)]
-    (if (alive? pid)
+    (if (ours? held)
       (throw (ex-info (str "a sim is already running (pid " pid ") holding "
                            (count (:addresses held)) " addresses — `bb circle sim down`")
                       {:pid pid}))
@@ -337,8 +349,9 @@
       ;; armed before the first claim: a run that dies part-way still releases what it took
       (.addShutdownHook (Runtime/getRuntime)
                         (Thread. #(some-> (read-state) release-all!)))
-      (claim-all! {:pid (.pid (java.lang.ProcessHandle/current)) :iface iface :prefix prefix}
-                  taken)
+      (let [me (java.lang.ProcessHandle/current)]
+        (claim-all! {:pid (.pid me) :started (started-at me) :iface iface :prefix prefix}
+                    taken))
 
       (reset! fleet*
               (into {} (map-indexed (fn [i [ip entry]]
@@ -361,21 +374,21 @@
 
 (defn- stop!
   "SIGTERM, then wait: the sim's own shutdown hook releases as it goes."
-  [pid]
-  (some-> (.orElse (java.lang.ProcessHandle/of pid) nil) .destroy)
+  [{:keys [pid] :as claim}]
+  (some-> (process pid) .destroy)
   (loop [waited 0]
-    (when (and (alive? pid) (< waited stop-timeout-ms))
+    (when (and (ours? claim) (< waited stop-timeout-ms))
       (Thread/sleep 100)
       (recur (+ waited 100)))))
 
 (defn down!
   "Stops a running sim, and clears what one that died hard left claimed."
   [_]
-  (if-let [{:keys [pid addresses]} (read-state)]
-    (do (when (alive? pid)
+  (if-let [{:keys [pid addresses] :as claim} (read-state)]
+    (do (when (ours? claim)
           (println "stopping pid" pid "...")
-          (stop! pid))
-        (if (alive? pid)
+          (stop! claim))
+        (if (ours? claim)
           (println (str "pid " pid " will not stop — it still holds " (count addresses) " addresses"))
           ;; its own hook usually got there first, and took the state file with it
           (println "released" (if-let [left (read-state)] (release-all! left) (count addresses))

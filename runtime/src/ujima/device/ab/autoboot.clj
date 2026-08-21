@@ -107,8 +107,8 @@
     (when (ujima-ab-partition-layout? device)
       (let [{:keys [a b config storage control]} (device->partitions-by-name device)]
         (with-mounted-vfat [ctl-mnt control]
-          (let [meta-a (pack/installed-metadata (:root a))
-                meta-b (pack/installed-metadata (:root b))]
+          (let [meta-a (pack/install-record (:root a))
+                meta-b (pack/install-record (:root b))]
 
             (when-let [{boot-idx :boot try-boot-idx :try-boot} (autoboot/autoboot ctl-mnt)]
               {:device  device
@@ -141,7 +141,7 @@
     (let [{cfg-blk :config storage-blk :storage :as parts} (device->partitions-by-name device)
           {:keys [root boot]}         (get parts slot)]
 
-      (pack/unpack! ujima-pack-path boot root)
+      (pack/unpack! ujima-pack-path boot root {:slot slot})
 
       ;; re-point `root` at this slot; the rest of the line is the pack's own
       (with-mounted-vfat [boot-mnt boot]

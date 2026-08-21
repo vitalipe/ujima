@@ -7,19 +7,34 @@
             
             [lib.shell              :refer [$ $! $? result-or-fail!]]
             [ujima.linux.sudo       :refer [sudo$ sudo$!]]
-            [ujima.linux.disk        :refer [require-block-device! device->partitions]]
+            [ujima.linux.disk        :refer [require-block-device! device->partitions
+                                             partition->info]]
             [ujima.linux.disk.mount  :refer [with-mounted-ext4]]))
 
 
-(defn- unpack-to-partition! [pack-path member partition-path]
-  (-> ($ tar --zstd -xOf [pack-path] [member])
-      (sudo$ dd {:of partition-path :bs "4M" :conv "fsync"})
-      (result-or-fail!)))
+(defn- unpack-to-partition!
+  "Stream MEMBER into the partition, hashing in flight. A mismatch throws AFTER the
+   write — nothing is activated yet, and the hash also catches an upstream tar that
+   died mid-stream (dd only sees EOF)."
+  [pack-path member partition-path expected-sha]
+  (let [digest (java.security.MessageDigest/getInstance "SHA-256")
+        tar    ($ tar --zstd -xOf [pack-path] [member])
+        hashed (java.security.DigestInputStream. (:out tar) digest)]
+    (-> (sudo$ {:in hashed} dd {:of partition-path :bs "4M" :conv "fsync"})
+        (result-or-fail!))
+    (let [actual (format "%064x" (BigInteger. 1 (.digest digest)))]
+      (when-not (= expected-sha actual)
+        (throw
+          (ex-info "Pack member checksum mismatch after write"
+                   {:member    member
+                    :partition (str partition-path)
+                    :expected  expected-sha
+                    :actual    actual}))))))
 
 
 (def pack-version 1)
 (def manifest-member "manifest.edn")
-(def installed-metadata-path "ujima/system/pack.edn")
+(def install-record-path "ujima/install.edn")
 
 
 (defn manifest [ujima-pack-path]
@@ -42,11 +57,11 @@
    :bytes  (fs/size path)})
 
 
-(defn installed-metadata [root-device]
+(defn install-record [root-device]
   (try
     (with-mounted-ext4 [mnt root-device]
-      (when (fs/exists? (fs/path mnt installed-metadata-path))
-        (slurp-edn (fs/path mnt installed-metadata-path) {})))
+      (when (fs/exists? (fs/path mnt install-record-path))
+        (slurp-edn (fs/path mnt install-record-path) {})))
     (catch Exception _ nil)))
 
 
@@ -146,26 +161,50 @@
 
 
 (defn unpack!
-  [ujima-pack-path boot-partition-path root-partition-path]
-  (validate! ujima-pack-path)
+  "Write the pack's members into the two partitions and stamp /ujima/install.edn —
+   the manifest + :installed-at + whatever the harness passes as `record-extra`
+   (e.g. {:slot :a} — pack itself has no slot vocabulary)."
+  ([ujima-pack-path boot-partition-path root-partition-path]
+   (unpack! ujima-pack-path boot-partition-path root-partition-path {}))
 
-  (require-block-device! boot-partition-path)
-  (require-block-device! root-partition-path)
+  ([ujima-pack-path boot-partition-path root-partition-path record-extra]
+   (validate! ujima-pack-path)
 
-  (unpack-to-partition! ujima-pack-path "boot.img" boot-partition-path)
-  (unpack-to-partition! ujima-pack-path "root.img" root-partition-path)
+   (require-block-device! boot-partition-path)
+   (require-block-device! root-partition-path)
 
-  (sudo$! e2fsck    -fn [root-partition-path]) ;; fail on fs errors, don't attempt to fix
-  (sudo$! resize2fs -f  [root-partition-path]) ;; -f: we checked it read-only above; skip resize2fs's own "run e2fsck -f first" gate (s_lastcheck<s_mtime after staging)
-  (sudo$! sync)
+   (let [mf (manifest ujima-pack-path)]
 
-  (with-mounted-ext4 [mnt-root root-partition-path]
-    (fs/with-temp-dir [tmp-dir {:prefix "ujima-install-manifest-"}]
-      (let [installed (assoc (manifest ujima-pack-path)
-                             :installed-at (str (java.time.Instant/now)))]
-        (spit-edn! (fs/path tmp-dir "pack.edn") installed)
-        (sudo$! install -D -m "0644"
-                (fs/path tmp-dir "pack.edn")
-                (fs/path mnt-root installed-metadata-path)))))
+     ;; fit-check the manifest's byte sizes against the real partitions — an
+     ;; oversized member fails HERE, not as a broken pipe mid-dd
+     (doseq [[member partition] [[:boot boot-partition-path] [:root root-partition-path]]]
+       (let [need (get-in mf [:members member :bytes])
+             have (:size-bytes (partition->info partition))]
+         (when (> need have)
+           (throw
+             (ex-info "Pack member does not fit the target partition"
+                      {:member member
+                       :partition (str partition)
+                       :member-bytes need
+                       :partition-bytes have})))))
 
-  nil)
+     (unpack-to-partition! ujima-pack-path "boot.img" boot-partition-path
+                           (get-in mf [:members :boot :sha256]))
+     (unpack-to-partition! ujima-pack-path "root.img" root-partition-path
+                           (get-in mf [:members :root :sha256]))
+
+     (sudo$! e2fsck    -fn [root-partition-path]) ;; fail on fs errors, don't attempt to fix
+     (sudo$! resize2fs -f  [root-partition-path]) ;; -f: we checked it read-only above; skip resize2fs's own "run e2fsck -f first" gate (s_lastcheck<s_mtime after staging)
+     (sudo$! sync)
+
+     (with-mounted-ext4 [mnt-root root-partition-path]
+       (fs/with-temp-dir [tmp-dir {:prefix "ujima-install-record-"}]
+         (let [installed (merge mf
+                                {:installed-at (str (java.time.Instant/now))}
+                                record-extra)]
+           (spit-edn! (fs/path tmp-dir "install.edn") installed)
+           (sudo$! install -D -m "0644"
+                   (fs/path tmp-dir "install.edn")
+                   (fs/path mnt-root install-record-path))))))
+
+   nil))

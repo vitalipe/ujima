@@ -73,7 +73,10 @@
                   installed)
     (assert= "Installed metadata should carry the pack's own metadata"
              expected-metadata
-             (dissoc installed :installed-at))
+             (dissoc installed :installed-at :slot))
+    (assert= "Install record should carry its slot"
+             slot
+             (:slot installed))
     (assert-some! "Installed metadata should include :installed-at"
                   (:installed-at installed))))
 

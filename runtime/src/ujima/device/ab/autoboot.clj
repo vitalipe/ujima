@@ -219,7 +219,9 @@
   UjimaBootRuntime
 
   (try-boot! [_]
-    (sudo$! reboot 0 tryboot))
+    ;; ONE argument — the firmware parses "0 tryboot"; two args is reboot(8)'s
+    ;; "Too many arguments." (found on first real invocation)
+    (sudo$! reboot "0 tryboot"))
 
   (in-try-boot? [_]
     (not (zero? (file->uint-be "/proc/device-tree/chosen/bootloader/tryboot")))))

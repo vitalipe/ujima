@@ -1,31 +1,24 @@
 (ns tools.cmd.disk
-  "The full-disk column: create an A/B layout, install packs into slots, activate a slot,
-   inspect. Every verb takes the disk TARGET last — an .img file (loopback-attached) or a
-   real block device, the same object either way. The installer flow is these verbs in
-   order: ab create -> slot A from-pack -> slot A activate."
+  "The full-disk column, one subtree per boot scheme (autoboot today): every verb
+   takes the disk TARGET last — an .img file (loopback-attached) or a real block
+   device, the same object either way. `autoboot from-pack` is the installer:
+   layout -> slot A -> activate, rendered as one task."
   (:require
     [clojure.string :as str]
     [clojure.pprint :refer [pprint]]
     [babashka.fs :as fs]
     [lib.shell :refer [$! require-root!]]
-    [ujima.linux.disk :refer [block-device?]]
+    [lib.task.flow :refer [flow <step!]]
+    [ujima.linux.disk :refer [block-device? device->partitions]]
     [ujima.linux.disk.loop :as loopback]
+    [ujima.pack :as ujima-pack]
     [ujima.device.ab :as ab]
     [ujima.device.ab.autoboot :as ab-auto]
     [tools.cmd.pack :as pack]))
 
 
-;; boot-scheme registry — `bb disk ab create <scheme>`; uefi lands beside autoboot as one
-;; entry + a UjimaSystemDisk record. image-bytes is a constant per scheme (28 GiB fits a
-;; real 32 GB card; the storage partition fills the rest).
-(def ^:private schemes
-  {"autoboot" {:->disk ab-auto/->disk :image-bytes 30064771072}})
-
-
-(defn- resolve-scheme [scheme]
-  (or (get schemes scheme)
-      (throw (ex-info "Unknown boot scheme"
-                      {:expected (set (keys schemes)) :actual scheme}))))
+;; 28 GiB fits a real 32 GB card; the storage partition fills the actual medium.
+(def ^:private image-bytes 30064771072)
 
 
 (defn- with-disk*
@@ -43,30 +36,72 @@
       (throw (ex-info "slot must be A or B" {:actual s}))))
 
 
-;; only one scheme exists, so verbs construct its record directly; every A/B operation
-;; gates on the actual partition layout and fails loudly on a non-ujima disk. Scheme
-;; detection replaces this when a second scheme lands.
+;; this file IS the autoboot subtree, so verbs construct its record directly;
+;; A/B operations still gate on the disk's actual layout.
 (defn- ->disk [dev]
   (ab-auto/->disk {:device dev}))
 
 
-(defn ab-create!
-  "Write an empty A/B layout onto the target. A missing/existing .img target is
-   (re)created sparse at the scheme's size; a block device must be partitionless
-   (write-ujima-layout! refuses otherwise)."
-  [{:keys [scheme target]}]
+(defn- prepare-media!
+  "An .img target is (re)created sparse; a block device with partitions refuses
+   without `wipe`."
+  [target wipe]
+  (if (block-device? target)
+    (when (seq (device->partitions target))
+      (when-not wipe
+        (throw (ex-info "device already has partitions — pass --wipe to destroy them"
+                        {:target target})))
+      ($! wipefs -a [target])
+      ($! partprobe [target])
+      ($! udevadm settle))
+    (do (fs/delete-if-exists target)
+        ($! truncate -s (str image-bytes) (str target)))))
+
+
+(defn empty!
+  "Write an empty autoboot A/B layout onto blank media."
+  [{:keys [target wipe]}]
   (require-root!)
-  (let [{:keys [image-bytes]} (resolve-scheme scheme)]
-    (when-not (block-device? target)
-      (fs/delete-if-exists target)
-      ($! truncate -s (str image-bytes) (str target)))
+  (prepare-media! target wipe)
+  (with-disk* target
+    (fn [dev] (ab/write-ujima-layout! (->disk dev))))
+  (println "created autoboot A/B layout ->" target))
+
+
+(defn from-pack!
+  "The installer: layout -> slot A -> activate, as a cold flow the CLI wrapper
+   runs + renders."
+  [{:keys [pack target wipe]}]
+  (require-root!)
+  (flow :install
+    (<step! 5 :preflight
+      (progress! 0 "validating pack")
+      (ujima-pack/validate! pack))
+
+    (<step! 10 :media
+      (progress! 0 "preparing target media")
+      (prepare-media! target wipe))
+
     (with-disk* target
-      (fn [dev] (ab/write-ujima-layout! (->disk dev))))
-    (println "created" scheme "A/B layout ->" target)))
+      (fn [dev]
+        (let [disk (->disk dev)]
+          (<step! 20 :layout
+            (progress! 0 "writing A/B layout")
+            (ab/write-ujima-layout! disk))
+
+          (<step! 95 :slot
+            (progress! 0 "installing slot A (boot + root, ~10.5G)")
+            (ab/install-into-slot! disk pack :a))
+
+          (<step! 100 :activate
+            (progress! 0 "activating slot A")
+            (ab/set-boot-slot! disk :a)))))
+
+    {:pack (str pack) :target (str target) :slot :a}))
 
 
 (defn slot!
-  "Dispatch `disk slot <A|B> <verb> …`:
+  "Dispatch `disk autoboot slot <A|B> <verb> …`:
    from-pack <pack> <target> | from-image <img> <target> | activate <target>."
   [{:keys [slot verb a b]}]
   (require-root!)
@@ -74,17 +109,14 @@
     (case verb
       "from-pack"
       (do (when-not (and a b)
-            (throw (ex-info "usage: disk slot <A|B> from-pack <pack> <img|blockdev>" {})))
+            (throw (ex-info "usage: disk autoboot slot <A|B> from-pack <pack> <img|blockdev>" {})))
           (with-disk* b (fn [dev] (ab/install-into-slot! (->disk dev) a slot)))
           (println "installed" a "-> slot" (name slot) "on" b))
 
-      ;; SLOW: packs to a throwaway file and installs that, because unpack! only reads tar
-      ;; members. Costs a full pack (time + ~1.5x the image in temp space) and stamps the slot
-      ;; with pack/make!'s default metadata. Teaching unpack! to read partitions directly
-      ;; replaces this.
+      ;; SLOW by choice: packs to a throwaway file, because unpack! only reads tar members.
       "from-image"
       (do (when-not (and a b)
-            (throw (ex-info "usage: disk slot <A|B> from-image <img> <img|blockdev>" {})))
+            (throw (ex-info "usage: disk autoboot slot <A|B> from-image <img> <img|blockdev>" {})))
           (fs/with-temp-dir [work {:prefix "ujima-from-image-"}]
             (let [tmp-pack (str (fs/path work "image.pack"))]
               (println "packing" a "-> temp pack")
@@ -94,7 +126,7 @@
 
       "activate"
       (do (when (or (nil? a) b)
-            (throw (ex-info "usage: disk slot <A|B> activate <img|blockdev>" {})))
+            (throw (ex-info "usage: disk autoboot slot <A|B> activate <img|blockdev>" {})))
           (with-disk* a (fn [dev] (ab/set-boot-slot! (->disk dev) slot)))
           (println "boot slot ->" (name slot) "on" a))
 
@@ -117,22 +149,32 @@
 
 (def cli
   {"disk"
-   {"ab"
-    {"create"
-     {:usage "Usage: disk ab create <scheme> <img|blockdev>"
-      :target ab-create!
-      :args [:scheme :target]
-      :spec {:scheme {:desc "Boot scheme (autoboot)" :require true}
-             :target {:desc "Disk target: .img file or block device" :require true}}}}
+   {"autoboot"
+    {"empty"
+     {:usage "Usage: disk autoboot empty <img|blockdev> [--wipe]"
+      :target empty!
+      :args [:target]
+      :spec {:target {:desc "Disk target: .img file or block device" :require true}
+             :wipe   {:coerce :boolean
+                      :desc "Destroy existing partitions on a block device"}}}
 
-    "slot"
-    {:usage "Usage: disk slot <A|B> from-pack <pack> <img|blockdev>\n       disk slot <A|B> from-image <img> <img|blockdev>\n       disk slot <A|B> activate <img|blockdev>"
-     :target slot!
-     :args [:slot :verb :a :b]
-     :spec {:slot {:desc "Slot: A or B" :require true}
-            :verb {:desc "from-pack | activate" :require true}
-            :a    {:desc "from-pack: the .pack | activate: the disk target" :require true}
-            :b    {:desc "from-pack: the disk target"}}}
+     "from-pack"
+     {:usage "Usage: disk autoboot from-pack <pack> <img|blockdev> [--wipe]"
+      :target from-pack!
+      :args [:pack :target]
+      :spec {:pack   {:desc "The .pack artifact" :require true}
+             :target {:desc "Disk target: .img file or block device" :require true}
+             :wipe   {:coerce :boolean
+                      :desc "Destroy existing partitions on a block device"}}}
+
+     "slot"
+     {:usage "Usage: disk autoboot slot <A|B> from-pack <pack> <img|blockdev>\n       disk autoboot slot <A|B> from-image <img> <img|blockdev>\n       disk autoboot slot <A|B> activate <img|blockdev>"
+      :target slot!
+      :args [:slot :verb :a :b]
+      :spec {:slot {:desc "Slot: A or B" :require true}
+             :verb {:desc "from-pack | from-image | activate" :require true}
+             :a    {:desc "from-pack/from-image: the source | activate: the disk target" :require true}
+             :b    {:desc "from-pack/from-image: the disk target"}}}}
 
     "info"
     {:usage "Usage: disk info <img|blockdev>"

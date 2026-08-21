@@ -1,18 +1,15 @@
 (ns tools.cmd.build
-  "The whole pipeline as one command — pure composition of the four nouns:
+  "Build artifacts — pure composition of the other nouns:
 
-     stage -> os apply -> pack -> disk (ab create + slot A from-pack + activate)
+     build rpi pack  ->  stage -> os apply -> pack make
+     build rpi disk  ->  the same, then `disk autoboot from-pack`
 
-   The script chain inside `os apply` is os.clj's business, not ours. The pack is a
-   deliverable, not an intermediate (it is what installs into a slot later), so it is
-   packed explicitly and kept rather than going through `disk slot from-image`.
-
-   The vendor cache (out/cache) is READ here and built only when absent
-   (tools.cmd.stage, temp-then-atomic-move) — no code path in build deletes or
-   overwrites an existing vendor; rebuilding stays the manual documented rm."
+   rpi names the PLATFORM (it determines the boot scheme); a new platform is one
+   subtree here + a base in stage/targets + a scheme subtree in cmd/disk."
   (:require
     [clojure.string :as str]
     [babashka.fs :as fs]
+    [lib.cli :as lib-cli]
     [lib.shell :refer [require-root!]]
     [tools.cmd.stage :as stage]
     [build.image :as image]
@@ -20,57 +17,69 @@
     [tools.cmd.disk  :as disk]))
 
 
-;; per-target build facts; a new target (debian-uefi …) is one entry here + one in
-;; stage/targets + its scheme in cmd/disk
-(def ^:private target-info
-  {"rpi-os" {:scheme "autoboot"}})
-
-
-(defn build!
-  "Run the full pipeline for `target`. --dev bakes the dev rig (ssh/vnc) and skips
-   cleanup; the default is a release artifact. Outputs auto-name beside the staged
-   image: <name>.img, <name>.pack, <name>-disk.img."
-  [{:keys [target dev] :as opts}]
-  (let [{:keys [scheme]}
-        (or (get target-info target)
-            (throw (ex-info "Unknown build target"
-                            {:expected (set (keys target-info)) :actual target})))
-
-        _ (require-root!)
-        {os-img :out} (stage/stage! target opts)
+(defn- stage-and-pack!
+  "stage -> os apply -> pack make. Returns {:os <img-path> :pack <pack-path>}."
+  [{:keys [out dev] :as opts}]
+  (require-root!)
+  (let [{os-img :out} (stage/stage! "rpi" opts)
         os-img  (if dev
                   (let [d (str/replace os-img #"\.img$" "-dev.img")]
                     (fs/move os-img d {:replace-existing true})
                     d)
                   os-img)
-        pack-out (str/replace os-img #"\.img$" ".pack")
-        disk-out (str/replace os-img #"\.img$" "-disk.img")]
+        pack-out (or out (str/replace os-img #"\.img$" ".pack"))]
 
     (image/apply! {:img os-img :dev dev})
 
     (println (str "== pack -> " pack-out))
     (pack/make! {:src os-img :out pack-out})
+    {:os os-img :pack pack-out}))
 
-    (println (str "== disk -> " disk-out))
-    (disk/ab-create! {:scheme scheme :target disk-out})
-    (disk/slot! {:slot "a" :verb "from-pack" :a pack-out :b disk-out})
-    (disk/slot! {:slot "a" :verb "activate" :a disk-out})
 
-    (println)
-    (println "build done:")
-    (doseq [f [os-img pack-out disk-out]]
-      (println " " f))
-    {:os os-img :pack pack-out :disk disk-out}))
+(defn- print-outputs! [outputs]
+  (println)
+  (println "build done:")
+  (doseq [f outputs]
+    (println " " f)))
+
+
+(defn build-pack!
+  "`out` defaults beside the staged image (branch+sha named)."
+  [opts]
+  (let [{:keys [os pack] :as result} (stage-and-pack! opts)]
+    (print-outputs! [os pack])
+    result))
+
+
+(defn build-disk!
+  "The pack, then `disk autoboot from-pack` onto the target."
+  [{:keys [target wipe] :as opts}]
+  (let [{:keys [os pack]} (stage-and-pack! (dissoc opts :target :wipe))]
+    (println (str "== disk -> " target))
+    (lib-cli/run-and-display! (disk/from-pack! {:pack pack :target target :wipe wipe}))
+    (print-outputs! [os pack target])
+    {:os os :pack pack :disk target}))
 
 
 ;; ── the CLI ─────────────────────────────────────────────────────────────────
 
 (def cli
   {"build"
-   {"run"
-    {:usage "Usage: build <target> [--dev]"
-     :target build!
-     :args [:target]
-     :spec {:target {:desc "Build target (rpi-os)" :require true}
-            :dev    {:coerce :boolean
-                     :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}}})
+   {"rpi"
+    {"pack"
+     {:usage "Usage: build rpi pack [<out.pack>] [--dev]"
+      :target build-pack!
+      :args [:out]
+      :spec {:out {:desc "Output .pack path (default: out/ujima-<branch>-<sha>.pack)"}
+             :dev {:coerce :boolean
+                   :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}}}
+
+     "disk"
+     {:usage "Usage: build rpi disk <img|blockdev> [--dev] [--wipe]"
+      :target build-disk!
+      :args [:target]
+      :spec {:target {:desc "Disk target: .img file or block device" :require true}
+             :dev    {:coerce :boolean
+                      :desc "Bake the dev rig (ssh/vnc/xdotool) and skip cleanup"}
+             :wipe   {:coerce :boolean
+                      :desc "Destroy existing partitions on a block device"}}}}}})

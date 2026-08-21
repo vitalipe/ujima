@@ -1,8 +1,8 @@
 (ns tools.cli
-  "The host CLI, one bb task per noun: build (the whole pipeline), stage (an image from the
-   pinned base), os (the 2-partition rootfs image), pack (the .pack artifact), disk (the full
-   A/B disk), dev (a RUNNING device over ssh), loopback (loop-device utility), circle (the
-   console dev loop). Each noun's surface lives with its own tools.cmd.* ns as `cli` and is
+  "The host CLI, one bb task per noun: build (artifacts: a pack, or a provisioned disk),
+   stage (an image from the pinned base), os (the 2-partition rootfs image), pack (the .pack
+   artifact), disk (the full A/B disk, one subtree per boot scheme), dev (a RUNNING device
+   over ssh), loopback (loop-device utility), circle (the console dev loop). Each noun's surface lives with its own tools.cmd.* ns as `cli` and is
    merged here; os is the exception, its verbs belonging to the image builder. Nesting is
    free — a node with a :target is a command, anything else groups them.
    `bb pack <src> <out>` sugars to `pack make` (see pack-defaulted)."
@@ -94,12 +94,11 @@
     tree))
 
 
-;; bare-noun sugar: `bb pack <src> <out>` / `bb build <target>` — a first argument that
+;; bare-noun sugar: `bb pack <src> <out>` / `bb stage <target>` — a first argument that
 ;; is not a known subcommand dispatches to the noun's make-verb. Subcommand sets are
 ;; explicit; anything else is treated as the default verb's first positional.
 (def ^:private default-verbs
   {"pack"  {:verb "make" :subs #{"make" "validate" "meta"}}
-   "build" {:verb "run" :subs #{"run"}}
    "stage" {:verb "run"  :subs #{"run"}}
 })
 

@@ -35,7 +35,8 @@ The split is by type of work — product source, system definition, host tooling
 ## CLI
 
 ```
-bb build <target> [--dev]                             the whole pipeline, one command
+bb build rpi pack [<out.pack>] [--dev]                build the artifact: stage -> os apply -> pack
+bb build rpi disk <img|blockdev> [--dev] [--wipe]     the same, then provision: layout -> slot A -> activate
 
 bb stage <target>                                     stage an OS image from the pinned base (vendor-cached)
 
@@ -47,11 +48,12 @@ bb pack <img|blockdev> <out.pack>                     pack an OS image into a .p
 bb pack validate <pack>
 bb pack meta <pack> [--format edn|json]
 
-bb disk ab create <scheme> <img|blockdev>             write an empty A/B layout (scheme: autoboot)
-bb disk slot <A|B> from-pack <pack> <img|blockdev>    install a pack into a slot
-bb disk slot <A|B> from-image <img> <img|blockdev>    install an OS image into a slot (packs to a temp file)
-bb disk slot <A|B> activate <img|blockdev>            set the boot slot
-bb disk info <img|blockdev>                           slots, install metadata, boot selection
+bb disk autoboot empty <img|blockdev> [--wipe]                write an empty A/B layout
+bb disk autoboot from-pack <pack> <img|blockdev> [--wipe]     the installer: layout -> slot A -> activate
+bb disk autoboot slot <A|B> from-pack <pack> <img|blockdev>   install a pack into a slot
+bb disk autoboot slot <A|B> from-image <img> <img|blockdev>   install an OS image into a slot (packs to a temp file)
+bb disk autoboot slot <A|B> activate <img|blockdev>           set the boot slot
+bb disk info <img|blockdev>                                   slots, install metadata, boot selection
 
 bb dev push <ip> ujimad                               deploy the daemon + restart the session
 bb dev script <ip> <name>                             run pipeline script <name> live on the device
@@ -90,30 +92,33 @@ loopback/chroot work, `binfmt_misc` with qemu-aarch64 registered (e.g.
 additionally wants `sshpass` and `rsync`.
 
 ```
-sudo bb build rpi-os          # release image
-sudo bb build rpi-os --dev    # dev image (`bb dev` commands require it)
+sudo bb build rpi pack          # release artifact
+sudo bb build rpi pack --dev    # dev artifact (`bb dev` commands require it)
 ```
 
 Dev images are wide open by design — ssh with the default `ujima/ujima` login and
-the VNC/input relay baked in. That is the public-access threat model (physical
-access already implies root); release images ship none of it.
+the VNC/input relay baked in. release images ship none of it.
 
 The first build fetches the pinned raspios base once into `out/cache/` and
 bakes the packages into it (the install stage).  **no command ever deletes it** — rebuilding it is a manual `rm out/cache/<name>.img`. Every later build starts from the cache:
-copy → content scripts in the chroot → pack → A/B disk.
+copy → content scripts in the chroot → pack.
 
 Outputs land in `out/` as `ujima-<branch>-<commit>[-dirty][-dev].*`:
 
 ```
 ….img         the OS image (2 partitions — what the chroot scripts mutate)
 ….pack        the shipping/install artifact (raw partitions + metadata, zstd)
-…-disk.img    the flashable A/B disk (slot A installed and activated)
 ```
 
-Flash the full build's A/B harness disk to an SD card (28 GiB — use a ≥32 GB card):
+`build rpi disk` runs that same pipeline and then provisions the target: A/B
+layout, the freshly built image installed into slot A, slot A activated. The
+target is an SD card (≥ 32 GB; the storage partition fills whatever the card
+offers) or a loopback .img for dev:
 
 ```
-sudo dd if=out/ujima-…-disk.img of=/dev/mmcblk0 bs=4M conv=fsync status=progress
+sudo bb build rpi disk /dev/mmcblk0 --wipe    # a bootable card, one command
+sudo bb build rpi disk out/u-disk.img         # the same onto a sparse 28 GiB disk image
+sudo bb disk autoboot from-pack out/ujima-….pack /dev/mmcblk0 --wipe   # skip the build, use an existing pack
 ```
 
 The granular verbs compose to the same result when you need only part of the
@@ -122,7 +127,7 @@ pipeline.
 ### Build an OS image
 
 ```
-sudo bb stage rpi-os                           # vendor (cached) -> out/ujima-<branch>-<sha>.img
+sudo bb stage rpi                              # vendor (cached) -> out/ujima-<branch>-<sha>.img
 sudo bb os apply out/ujima-….img --dev         # the script chain; or one at a time: bb os script <img> base
 ```
 
@@ -130,10 +135,10 @@ The image boots on its own — `dd` it to a card for a system with no A/B and no
 settings/storage partitions, so those paths land in the overlay's tmpfs and reset
 every boot.
 
-### Create a disk
+### Create an empty disk
 
 ```
-sudo bb disk ab create autoboot out/u-disk.img   # or a real device: /dev/mmcblk0
+sudo bb disk autoboot empty out/u-disk.img   # or a real device: /dev/mmcblk0 (--wipe if used)
 ```
 
 An empty A/B harness: control, boot A/B, root A/B, settings, storage.
@@ -142,8 +147,8 @@ An empty A/B harness: control, boot A/B, root A/B, settings, storage.
 
 ```
 sudo bb pack out/ujima-….img out/u.pack                  # the distributable
-sudo bb disk slot A from-pack out/u.pack out/u-disk.img
-sudo bb disk slot A activate out/u-disk.img
+sudo bb disk autoboot slot A from-pack out/u.pack out/u-disk.img
+sudo bb disk autoboot slot A activate out/u-disk.img
 sudo bb disk info out/u-disk.img                           # what's in each slot
 ```
 

@@ -54,12 +54,13 @@
         {:out (str out)}))))
 
 
-;; Pinned base images. Keep entries reproducible: dated URL + sha256 of the .xz.
+;; Pinned base images, keyed by platform. Keep entries reproducible: dated URL +
+;; sha256 of the .xz.
 (def targets
-  {"rpi-os"
+  {"rpi"
    {:url    "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-04-14/2026-04-13-raspios-trixie-arm64-lite.img.xz"
     :sha256 "5c9caff670594eb43b68afee2a156198cb4e4f58e5dec724b4520c53c0ab5aba"}
-   ;; "debian" {:url .. :sha256 ..}  ;; TODO: source undecided
+   ;; "x86" {:url .. :sha256 ..}  ;; TODO: source undecided
    })
 
 
@@ -151,7 +152,7 @@
     {:out out}))
 
 
-(defn rpi-os! [opts] (stage! "rpi-os" opts))
+(defn rpi! [opts] (stage! "rpi" opts))
 
 
 (defn- stage-target! [{:keys [target] :as opts}]
@@ -166,4 +167,4 @@
     {:usage "Usage: stage <target>"
      :target stage-target!
      :args [:target]
-     :spec {:target {:desc "Pinned base target (rpi-os)" :require true}}}}})
+     :spec {:target {:desc "Pinned base target (rpi)" :require true}}}}})

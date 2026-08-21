@@ -8,7 +8,7 @@
 
  :tasks
  {build
-  {:doc "Whole pipeline: vendor(cached) → os image → pack → A/B disk"
+  {:doc "Build artifacts: rpi pack [<out>] | rpi disk <img|blockdev>"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "build" *command-line-args*)}
 
@@ -28,7 +28,7 @@
    :task (apply cli/-main "pack" *command-line-args*)}
 
   disk
-  {:doc "The A/B disk: ab create | slot A|B from-pack/from-image/activate | info"
+  {:doc "The A/B disk: autoboot empty|from-pack | autoboot slot A|B from-pack/from-image/activate | info"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "disk" *command-line-args*)}
 

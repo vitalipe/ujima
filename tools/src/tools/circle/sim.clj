@@ -286,9 +286,6 @@
   (let [{:keys [iface prefix]} (lan)
         wanted   (hosts range)
         roster   (:machines (edn/read-string (slurp pool)))
-        _        (when (> (count roster) (count wanted))
-                   (throw (ex-info (str (count roster) " machines in " pool " but the range holds "
-                                        (count wanted)) {})))
         _        (println (str "probing " (count wanted) " addresses on " iface "..."))
         occupied (vec (filter (partial taken? iface) wanted))
         free     (remove (set occupied) wanted)]
@@ -299,12 +296,17 @@
         (throw (ex-info (str "occupied, claiming nothing: " (str/join " " occupied)
                              "\n  (--skip-occupied to take the rest)")
                         {:occupied occupied}))))
-    (when (< (count free) (count roster))
-      (throw (ex-info (str "only " (count free) " free addresses for " (count roster) " machines") {})))
+    (when (empty? free)
+      (throw (ex-info "no free address in the range" {:range range})))
 
     (let [apps  (catalog)
           now   (System/currentTimeMillis)
-          taken (vec (take (count roster) free))]
+          taken (vec (take (count roster) free))
+          crew  (take (count taken) roster)]
+      ;; a short range runs the head of the pool, never a silent one
+      (when (< (count crew) (count roster))
+        (println (str "room for " (count crew) " of the " (count roster) " machines in " pool
+                      " — running the first " (count crew))))
       (write-state! {:pid (.pid (java.lang.ProcessHandle/current))
                      :iface iface :prefix prefix :addresses taken})
       (doseq [ip taken] (claim! iface prefix ip))
@@ -312,7 +314,7 @@
       (reset! fleet*
               (into {} (map-indexed (fn [i [ip entry]]
                                       [ip (machine {:seed seed :catalog apps :now now} i ip entry)])
-                                    (map vector taken roster))))
+                                    (map vector taken crew))))
       ;; the app closes over the machine's id, so it is built after the fleet exists
       (doseq [ip taken] (update-machine! ip assoc :app (->app ip apps token)))
 

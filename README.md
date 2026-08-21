@@ -64,7 +64,7 @@ bb dev type <ip> <text>
 bb dev key <ip> <chord>
 
 bb circle sim up --range <a.b.c.x-y>                  fake a circle of machines on real LAN addresses (needs root)
-bb circle sim cleanup                                 release addresses a killed sim left claimed
+bb circle sim down                                    stop the sim and release its addresses
 bb circle console up <self-ip>                        the Console panels on :1338, sweeping that machine's subnet
 
 bb loopback attach <img> [--readonly]                 loop-device utility
@@ -214,7 +214,7 @@ the LAN and answers on them exactly as a machine does, so the Console finds them
 sweeping — its argument is the machine it administers, and that machine's subnet is
 the one swept, so pointing it at a real device instead makes the fakes that device's
 circle. Both default `--token` to the baked circle key, and the sim needs root to
-claim addresses; ctrl-c releases them.
+claim addresses; ctrl-c releases them, as does `bb circle sim down` from anywhere.
 
 ```
 bb circle sim up --range 192.168.1.200-229    # 30 fake machines

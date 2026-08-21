@@ -22,8 +22,9 @@
 (def default-token  "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 (def ^:private default-pool "tools/config/pool.edn")
 (def ^:private state-file   (str (fs/path (or (System/getenv "XDG_RUNTIME_DIR") "/tmp")
-                                          "ujima-fake-circle.edn")))
+                                          "ujima-circle-sim.edn")))
 (def ^:private reboot-ms    15000)
+(def ^:private stop-timeout-ms 5000)
 
 (defonce ^:private fleet* (atom {}))   ;; address -> machine
 
@@ -276,8 +277,8 @@
     :or   {token default-token seed "1" pool default-pool}}]
   (when-let [{:keys [pid] :as held} (read-state)]
     (if (alive? pid)
-      (throw (ex-info (str "a fake circle is already running (pid " pid ") holding "
-                           (count (:addresses held)) " addresses — stop it, or `bb fake-circle clean`")
+      (throw (ex-info (str "a sim is already running (pid " pid ") holding "
+                           (count (:addresses held)) " addresses — `bb circle sim down`")
                       {:pid pid}))
       (do (println "clearing a stale claim from pid" pid)
           (release-all! held))))
@@ -318,7 +319,7 @@
       ;; one server for the whole fleet, so its pool is the fleet's: http-kit's default 4
       ;; workers queue a 254-address sweep past the console's probe timeout
       (http/run-server dispatch {:ip "0.0.0.0" :port port :thread 64})
-      (println (str "fake circle up: " (count taken) " machines on " (first taken) "-"
+      (println (str "circle sim up: " (count taken) " machines on " (first taken) "-"
                     (last (str/split (last taken) #"\.")) ", token " (subs token 0 8) "…"))
       (doseq [[ip m] (sort-by first @fleet*)]
         (println (format "  %-15s %-10s %s%s" ip (effective m [:system :hostname])
@@ -329,11 +330,25 @@
       @(promise))))
 
 
-(defn cleanup!
+(defn- stop!
+  "SIGTERM, then wait: the sim's own shutdown hook releases as it goes."
+  [pid]
+  (some-> (.orElse (java.lang.ProcessHandle/of pid) nil) .destroy)
+  (loop [waited 0]
+    (when (and (alive? pid) (< waited stop-timeout-ms))
+      (Thread/sleep 100)
+      (recur (+ waited 100)))))
+
+(defn down!
+  "Stops a running sim, and clears what one that died hard left claimed."
   [_]
-  (if-let [{:keys [pid] :as held} (read-state)]
-    (if (alive? pid)
-      (println (str "pid " pid " is still running and holds " (count (:addresses held))
-                    " addresses — stop it first"))
-      (println "released" (release-all! held) "addresses"))
+  (if-let [{:keys [pid addresses]} (read-state)]
+    (do (when (alive? pid)
+          (println "stopping pid" pid "...")
+          (stop! pid))
+        (if (alive? pid)
+          (println (str "pid " pid " will not stop — it still holds " (count addresses) " addresses"))
+          ;; its own hook usually got there first, and took the state file with it
+          (println "released" (if-let [left (read-state)] (release-all! left) (count addresses))
+                   "addresses")))
     (println "nothing claimed")))

@@ -38,7 +38,7 @@
    :task (apply cli/-main "dev" *command-line-args*)}
 
   circle
-  {:doc "The console dev loop: console up <self-ip> | sim up --range <a-b> | sim cleanup"
+  {:doc "The console dev loop: console up <self-ip> | sim up --range <a-b> | sim down"
    :requires ([tools.cli :as cli])
    :task (apply cli/-main "circle" *command-line-args*)}
 

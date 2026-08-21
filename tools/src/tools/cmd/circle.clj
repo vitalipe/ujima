@@ -37,7 +37,7 @@
              :pool          {:desc "Roster file" :coerce :string}
              :skip-occupied {:desc "Claim what is free instead of refusing" :coerce :boolean}}}
 
-     "cleanup"
-     {:usage "Usage: circle sim cleanup"
-      :target sim/cleanup!
+     "down"
+     {:usage "Usage: circle sim down"
+      :target sim/down!
       :spec {}}}}})

@@ -17,6 +17,7 @@
             [ujima.desktop.http     :as shell-http]
             [ujima.desktop.http.converge :as shell-http-converge]
             [ujima.desktop.app      :as app]
+            [ujima.desktop.app.catalog.loader :as loader]
             [ujima.storage          :as storage]
             [ujima.events.token     :as token-events]
             [ujima.events           :as events]))
@@ -30,7 +31,7 @@
         deploy      (io/slurp-config "config" "env")     ; image facts; hosts see env.dev.edn
         disk        (device/system->disk)                ; nil on hosts, FIXME: make autodetect fallback, put in config
         app-cfg     (get-in env [:desktop :app])
-        app-catalog (app/load-catalog (:catalog app-cfg) (:fallback-icon app-cfg))
+        app-catalog (loader/load-catalog (:catalog app-cfg) (:fallback-icon app-cfg))
         api-http    (get-in env [:api :http] {})
         ui-http     (get-in env [:desktop :http] {})]
 

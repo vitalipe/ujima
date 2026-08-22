@@ -147,12 +147,11 @@
 
 (defn- ->request
   "Verb -> [command-path body], nil for one we cannot send. Circle writes :activity, over
-   the :session the machine's own bar writes — unmute pins false, since a clear would
-   leave a machine its own user muted still muted. :release hands the machine back."
+   the :session the machine's own bar writes"
   [verb args]
   (case verb
     :mute      ["settings/audio/muted"        {:scope "activity" :value true}]
-    :unmute    ["settings/audio/muted"        {:scope "activity" :value false}]
+    :unmute    ["settings/audio/muted"        {:scope "activity" :value false}] ;; a clear would leave a machine its own user muted still muted
     :release   ["clear/activity"              nil]
     :volume    ["audio/volume"                {:scope "activity" :value (:value args)}]
     :open-app  ["app/open"                    {:app (:app args)}]

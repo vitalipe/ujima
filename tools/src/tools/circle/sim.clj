@@ -250,7 +250,12 @@
 (defn- handlers
   "One per verb the contract declares — the zip below fails if that stops being true."
   [addr apps]
-  {"app/open"     (fn [{:keys [app]}] (update-machine! addr assoc :running (app-entry apps app)))
+  {"app/open"     (fn [{:keys [app mode]}]
+                    (update-machine! addr assoc :running
+                                     (some-> (app-entry apps app)
+                                             (assoc :fullscreen (= :solo mode)))))
+   "app/unsolo"   (fn [_] (update-machine! addr update :running
+                                           #(some-> % (assoc :fullscreen false))))
    "app/switch"   (fn [{:keys [app]}] (update-machine! addr assoc :running (app-entry apps app)))
    "app/close"    (fn [_] (update-machine! addr assoc :running nil))
    "app/home"     (fn [_] (update-machine! addr assoc :running nil))

@@ -124,7 +124,7 @@
                                      (filter :focused?)
                                      (remove :floating?)
                                      (first))]
-      (i3/command? (format "[con_id=%d]" con-id) "fullscreen" "toggle"))))
+      (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "toggle"))))
 
 
 (defn settle-floaters!
@@ -135,7 +135,7 @@
           {:keys [con-id floating? wtype]} wins
           :when (and (proj/app-of-ws world ws) floating?
                      (not (#{"dialog" "utility" "splash"} wtype)))]
-    (i3/command? (format "[con_id=%d]" con-id) "floating" "disable")))
+    (i3/try-command! (format "[con_id=%d]" con-id) "floating" "disable")))
 
 
 (defn route-windows!
@@ -150,4 +150,4 @@
                             home-ws
                             (some-> (get by-class class) name))]
             :when (and target (not= ws target))]
-      (i3/command? (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" target))))
+      (i3/try-command! (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" target))))

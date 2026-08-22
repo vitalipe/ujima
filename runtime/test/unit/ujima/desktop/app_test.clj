@@ -73,7 +73,7 @@
                 i3/switch-workspace!  (fn [ws] (swap! world* assoc :focused-ws ws)
                                                (swap! fx* conj [:switch ws]))
                 i3/kill-focused!      (fn [] (swap! fx* conj [:kill]))
-                i3/command?           (fn [& args] (swap! fx* conj (into [:cmd] args)))
+                i3/try-command!           (fn [& args] (swap! fx* conj (into [:cmd] args)))
                 systemd/active?       (fn [id] (contains? (:scopes @world*) id))
                 systemd/spawn-scoped! (fn [id exec _dir opts]
                                         (swap! world* update :scopes conj id)

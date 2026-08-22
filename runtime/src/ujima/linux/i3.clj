@@ -54,11 +54,11 @@
        (some #(when (:focused %) (:name %)))))
 
 
-(defn command!  [& args] (apply shell/sh!  :i3-msg args))
-(defn command?  [& args] (apply shell/sh?  :i3-msg args))   ; tolerant: a con can vanish mid-tick
+(defn command!      [& args] (apply shell/sh! :i3-msg args))
+(defn try-command!  [& args] (apply shell/sh? :i3-msg args))   ; tolerant: a con can vanish mid-tick
 
 (defn switch-workspace! [ws] (command! "workspace" ws))
-(defn kill-focused!     []   (command? "kill"))
+(defn kill-focused!     []   (try-command! "kill"))
 
 
 (defn watch-windows!

@@ -71,8 +71,6 @@
                       :storage  (disk/device->space (:storage system-disk))
                       :settings (disk/device->space (:config system-disk))})
 
-   "apps"     desktop/catalog-listing
-
    "desktop/locked"  (constantly false)
    "desktop/running" #(:current (desktop/current-apps-state))
    "desktop/catalog" (fn []

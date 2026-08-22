@@ -198,7 +198,6 @@
      "disk"     (constantly {:type "ab" :slot "a"
                              :storage  {:total-mb 5889 :free-mb 5542}
                              :settings {:total-mb 973  :free-mb 906}})
-     "apps"     (constantly apps)
 
      "desktop/locked"  (constantly false)
      "desktop/running" #(:running (m))

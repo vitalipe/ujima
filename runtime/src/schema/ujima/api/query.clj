@@ -21,8 +21,7 @@
 
 
 (def machine
-  (let [app-entry       [:map [:id :keyword] [:label [:maybe :string]]]
-        desktop-entry   [:map [:id :keyword] [:label [:maybe :string]] [:category [:maybe :keyword]]]
+  (let [desktop-entry   [:map [:id :keyword] [:label [:maybe :string]] [:category [:maybe :keyword]]]
         partition-space [:map [:total-mb :int] [:free-mb :int]]
         interface       [:map [:up :boolean]
                               [:ip [:maybe :string]]
@@ -40,7 +39,6 @@
                       [:slot     [:maybe :keyword]]
                       [:storage  [:maybe partition-space]]
                       [:settings [:maybe partition-space]]]]
-     [:apps     [:vector app-entry]]
      [:desktop  [:map [:locked  [:maybe :boolean]]
                       [:running [:maybe desktop-entry]]
                       [:catalog [:vector desktop-entry]]]]

@@ -14,9 +14,15 @@
 ;; --- the verbs -----------------------------------------------------------
 
 (def ^:private verbs
-  {"app/open"     {:doc     "Open an app by catalog id."
-                   :params  [:map [:app [:string {:min 1}]]]
-                   :handler (fn [{id :app}] (app/run! (keyword id)))}
+  {"app/open"     {:doc     "Open an app by catalog id; :mode :solo opens it soloed."
+                   :params  [:map [:app [:string {:min 1}]] [:mode {:optional true} [:enum :multi :solo]]]
+                   :handler (fn [{:keys [app mode]}]
+                              (if (= :solo mode)
+                                (app/enter-solo-mode! (keyword app))
+                                (app/run! (keyword app))))}
+
+   "app/unsolo"   {:doc     "Leave solo mode."
+                   :handler (fn [_] (app/exit-solo-mode!))}
 
    "app/close"    {:doc     "Close the focused app."
                    :handler (fn [_] (app/close-focused!))}

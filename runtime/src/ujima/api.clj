@@ -28,7 +28,11 @@
 
 (def commands
   (with-handlers defs/commands
-    {"app/open"     (fn [{:keys [app]}] (desktop/run! (keyword app)))
+    {"app/open"     (fn [{:keys [app mode]}]
+                      (if (= :solo mode)
+                        (desktop/enter-solo-mode! (keyword app))
+                        (desktop/run! (keyword app))))
+     "app/unsolo"   (fn [_] (desktop/exit-solo-mode!))
      "app/switch"   (fn [{:keys [app]}] (desktop/switch-to! (keyword app)))
      "app/close"    (fn [_] (desktop/close-focused!))
      "app/home"     (fn [_] (desktop/go-home!))

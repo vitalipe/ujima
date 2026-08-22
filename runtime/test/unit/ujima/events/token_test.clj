@@ -68,6 +68,7 @@
 (deftest opening-hands-the-console-the-key-then-runs-it
   (let [calls* (atom [])]
     (with-redefs [systemd/active?    (constantly false)
+                  app/exit-solo-mode! (fn [] nil)
                   catalog/merge-app! (fn [id changes] (swap! calls* conj [:update id changes]))
                   app/run!           (fn [id]     (swap! calls* conj [:run id]))]
       (is (= :open (token/on-storage! (mounted secret) nil)))
@@ -80,6 +81,7 @@
 (deftest a-quiet-storage-event-touches-nothing
   (let [calls* (atom [])]
     (with-redefs [systemd/active?    (constantly false)
+                  app/exit-solo-mode! (fn [] nil)
                   catalog/merge-app! (fn [& _] (swap! calls* conj :entry))
                   app/run!           (fn [& _] (swap! calls* conj :run))]
       (is (nil? (token/on-storage! (mounted secret) (mounted secret))))
@@ -92,6 +94,7 @@
   (let [stopped* (atom [])]
     (with-redefs [token/eject-grace-ms 60
                   systemd/active?      (constantly false)
+                  app/exit-solo-mode! (fn [] nil)
                   catalog/merge-app!  (fn [& _] nil)
                   app/run!             (fn [& _] nil)
                   systemd/stop!        (fn [id] (swap! stopped* conj id))]
@@ -104,6 +107,7 @@
   (let [stopped* (atom [])]
     (with-redefs [token/eject-grace-ms 60
                   systemd/active?      (constantly false)
+                  app/exit-solo-mode! (fn [] nil)
                   catalog/merge-app!  (fn [& _] nil)
                   app/run!             (fn [& _] nil)
                   systemd/stop!        (fn [id] (swap! stopped* conj id))]
@@ -119,6 +123,7 @@
   (let [calls* (atom [])]
     (with-redefs [token/eject-grace-ms 5000                  ; the close never gets to fire
                   systemd/active?      (constantly true)     ; the console is still up
+                  app/exit-solo-mode! (fn [] nil)
                   catalog/merge-app!  (fn [& _] nil)
                   app/run!             (fn [id] (swap! calls* conj id))]
       (token/on-storage! [] (mounted secret))                ; bad contact drops it
@@ -132,6 +137,7 @@
   (let [calls* (atom [])
         other  {:type :circle/secret :value {:key "not-ours"}}]
     (with-redefs [systemd/active? (constantly false)
+                  app/exit-solo-mode! (fn [] nil)
                   catalog/merge-app! (fn [& _] (swap! calls* conj :update))
                   app/run!        (fn [& _] (swap! calls* conj :run))]
       (is (nil? (token/on-storage! (mounted other) nil)))

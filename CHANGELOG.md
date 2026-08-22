@@ -26,6 +26,9 @@ version truth; branch names and build labels may disagree.
 - The image bakes ujima's bb libraries into `/ujima/m2` (pinned, sha-verified
   at build); like packages, they never change on a live deploy.
 
+- Solo mode: pin the machine to one app, fullscreen, with no switching or
+  closing and automatic relaunch if it exits — `app/open {:mode :solo}` to
+  enter, `app/unsolo` to leave, and inserting the circle token releases it.
 - F11 toggles the focused app's fullscreen — also the way out of an app that
   fullscreened itself.
 - Ujima Circle App: a fleet control panel for teachers — every machine in the

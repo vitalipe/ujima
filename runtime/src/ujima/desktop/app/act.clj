@@ -116,15 +116,33 @@
           (i3/switch-workspace! target))))))
 
 
-(defn fullscreen!
-  "Toggle i3 fullscreen on the focused window, if it is an app's tiled one."
+(defn- app-window
+  "The focused, tiled, non-dialog window on an app workspace — the app's real window, or nil."
   [{:keys [focused-ws ws->wins] :as world}]
   (when (proj/app-of-ws world focused-ws)
-    (when-let [{:keys [con-id]} (->> (get ws->wins focused-ws)
-                                     (filter :focused?)
-                                     (remove :floating?)
-                                     (first))]
-      (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "toggle"))))
+    (->> (get ws->wins focused-ws)
+         (filter :focused?)
+         (remove :floating?)
+         (remove #(#{"dialog" "utility" "splash"} (:wtype %)))
+         (first))))
+
+(defn fullscreen! [world]
+  (when-let [{:keys [con-id]} (app-window world)]
+    (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "toggle")))
+
+(defn keep-fullscreen!
+  "Fullscreen P's window if it isn't already — the solo invariant, re-run on every tick."
+  [world]
+  (when-let [{:keys [con-id fullscreen?]} (app-window world)]
+    (when-not fullscreen?
+      (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "enable"))))
+
+(defn unfullscreen!
+  "Drop P's fullscreen on leaving solo."
+  [world]
+  (when-let [{:keys [con-id fullscreen?]} (app-window world)]
+    (when fullscreen?
+      (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "disable"))))
 
 
 (defn settle-floaters!

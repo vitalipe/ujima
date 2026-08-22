@@ -9,18 +9,26 @@
             [ujima.desktop.app.projection :as proj :refer [home-ws]]))
 
 
-(defonce ^:private prev*    (atom nil))   ; last snapshot, the prv of (next prv)
-(defonce ^:private targets* (atom []))
-(defonce ^:private lock*    (Object.))    ; every pass holds this
+(defonce ^:private prev*     (atom nil))   ; last snapshot, the prv of (next prv)
+(defonce ^:private targets*  (atom []))
+(defonce ^:private lock*     (Object.))    ; every pass holds this
+(defonce ^:private mode*     (atom :multi)) ; :multi or [:solo <id>]
+(defonce ^:private relaunch* (atom 0))     ; last solo relaunch, ms — the crash-loop gate
 
 
 (def ^:private browser-app :web)
+(def ^:private relaunch-ms 3000)           ; a crashing P relaunches no faster than this
+
+
+(declare handle-event!)
 
 
 (defn init! [{:keys [catalog converge-targets] :as cfg}]
   (catalog/init! catalog)
-  (reset! prev*    nil)
-  (reset! targets* (vec converge-targets))
+  (reset! prev*     nil)
+  (reset! mode*     :multi)
+  (reset! relaunch* 0)
+  (reset! targets*  (vec converge-targets))
   (act/init! (select-keys cfg [:open-web-app-bin :serve-web-app-bin]))
   catalog)
 
@@ -38,7 +46,12 @@
 (defn- observe! []
   {:focused-ws (i3/focused-workspace)
    :ws->wins   (group-by :workspace (i3/window-facts (i3/get-tree!)))
-   :catalog    (catalog/current)})
+   :catalog    (catalog/current)
+   :mode       @mode*})
+
+
+(defn- solo-app [mode] (when (vector? mode) (second mode)))
+(defn- mode-kw  [mode] (if (vector? mode) :solo :multi))
 
 
 (defn- converge! [snapshot]
@@ -47,22 +60,65 @@
     (doseq [t @targets*] (t snapshot prv))))
 
 
+(defn- relaunch-solo!
+  "P (and only P) quit or crashed in solo: bring it back, but no faster than relaunch-ms —
+   a P that crashes instantly reschedules instead of spinning. The reschedule re-emits
+   :scope/died, so it re-dispatches on the mode current THEN (exited solo -> goes home)."
+  [w app-id]
+  (when (= app-id (solo-app (:mode w)))
+    (let [now     (System/currentTimeMillis)
+          elapsed (- now @relaunch*)]
+      (if (>= elapsed relaunch-ms)
+        (do (reset! relaunch* now)
+            (act/run! (catalog/resolve! app-id) []))
+        (future (Thread/sleep (- relaunch-ms elapsed))
+                (handle-event! {:type :scope/died :app-id app-id}))))))
+
+
+;; --- the modes: each a complete type->handler table; absent = refused ---
+
+(def ^:private multi
+  {:app/run        (fn [_ ev] (act/run! (:app ev) (:extra ev [])))
+   :app/switch     (fn [_ ev] (i3/switch-workspace! (name (:id (:app ev)))))
+   :app/open-url   (fn [_ ev] (act/open-url! (:app ev) (:url ev)))
+   :app/close      (fn [w _]  (act/close! w))
+   :app/home       (fn [_ _]  (i3/switch-workspace! home-ws))
+   :app/cycle      (fn [w ev] (act/cycle! w (:step ev)))
+   :app/fullscreen (fn [w _]  (act/fullscreen! w))
+   :window/closed  (fn [w ev] (act/window-closed! w (:con-id ev)))
+   :scope/died     (fn [w ev] (act/go-home-if-empty! w (:app-id ev)))})
+
+(def ^:private solo
+  {:scope/died     (fn [w ev] (relaunch-solo! w (:app-id ev)))
+   :window/changed (fn [w _]  (act/keep-fullscreen! w))})
+
+(def ^:private modes {:multi multi :solo solo})
+
+
+(defn- transition!
+  "The mode switch (both directions), run before the mode table so it works in either mode."
+  [ev]
+  (let [from @mode*
+        to?  (= :solo (:to ev))]
+    (reset! mode* (if to? [:solo (:id (:app ev))] :multi))
+    (cond
+      to?            (do (act/run! (:app ev) []) (act/keep-fullscreen! (observe!)))
+      (vector? from) (act/unfullscreen! (observe!)))))
+
+
+;; --- the loop: observe, act, re-observe, project ---
+
 (defn handle-event!
   "One pass, whole, under the lock: the verbs' check-then-act and converge!'s read-then-reset
-   of prev are only guards while a pass cannot interleave."
+   of prev are only guards while a pass cannot interleave. :app/mode rides ahead of the table
+   (a transition must run in either mode); everything else dispatches on the current mode."
   [ev]
   (locking lock*
-    (case (:type ev)
-      :app/run       (act/run! (:app ev) (:extra ev []))
-      :app/switch    (i3/switch-workspace! (name (:id (:app ev))))
-      :app/open-url  (act/open-url! (:app ev) (:url ev))
-      :app/close     (act/close! (observe!))
-      :app/home      (i3/switch-workspace! home-ws)
-      :app/cycle     (act/cycle! (observe!) (:step ev))
-      :app/fullscreen (act/fullscreen! (observe!))
-      :window/closed (act/window-closed! (observe!) (:con-id ev))
-      :scope/died    (act/go-home-if-empty! (observe!) (:app-id ev))   ; crash / self-quit
-      nil)
+    (if (= :app/mode (:type ev))
+      (transition! ev)
+      (let [w (observe!)]
+        (when-let [f (get-in modes [(mode-kw (:mode w)) (:type ev)])]
+          (f w ev))))
 
     (let [w (observe!)]
       (act/settle-floaters! w)
@@ -79,9 +135,13 @@
 (defn cycle!         [step] (handle-event! {:type :app/cycle :step step}))
 (defn toggle-fullscreen! [] (handle-event! {:type :app/fullscreen}))
 
+(defn enter-solo-mode! [id] (handle-event! {:type :app/mode :to :solo :app (catalog/resolve! id)}))
+(defn exit-solo-mode!  []   (handle-event! {:type :app/mode :to :multi}))
+(defn solo? [] (vector? @mode*))
+
 (defn open-url! [url]
   (when-not (re-matches #"https?://\S+" (str url))
     (throw (ex-info "not an http url" {:error :app/bad-url :url (str url)})))
   (handle-event! {:type :app/open-url :app (catalog/resolve! browser-app) :url url}))
 
-(defn current-apps-state [] (or @prev* {:running [] :catalog [] :current nil}))
+(defn current-apps-state [] (or @prev* {:mode :multi :running [] :catalog [] :current nil}))

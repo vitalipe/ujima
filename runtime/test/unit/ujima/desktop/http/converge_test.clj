@@ -65,10 +65,11 @@
            (mapv :id (:pinned (converge/apps->ui {:running [] :catalog shown :current nil})))))))
 
 
-(deftest the-wire-shape-is-exactly-three-keys
-  (let [out (converge/apps->ui {:running [{:id :paint}] :catalog catalog :current {:id :paint}})]
-    (is (= #{:running :pinned :current} (set (keys out)))
+(deftest the-wire-shape-is-exactly-four-keys
+  (let [out (converge/apps->ui {:mode :multi :running [{:id :paint}] :catalog catalog :current {:id :paint}})]
+    (is (= #{:mode :running :pinned :current} (set (keys out)))
         "spelled out, so an internal projection key can never leak to the shell")
+    (is (= :multi (:mode out)))
     (is (= [{:id :paint}] (:running out)))
     (is (= {:id :paint}   (:current out)))))
 

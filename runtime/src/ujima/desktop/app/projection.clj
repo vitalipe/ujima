@@ -25,7 +25,8 @@
      :fullscreen (boolean (some :fullscreen? wins))}))
 
 
-(defn projection [{:keys [focused-ws catalog] :as world}]
-  {:running (mapv #(entry world %) (open-apps world))
+(defn projection [{:keys [focused-ws catalog mode] :as world}]
+  {:mode    (if (vector? mode) :solo :multi)
+   :running (mapv #(entry world %) (open-apps world))
    :catalog (catalog/listing catalog)     ; listing, not raw entries — those hold :env
    :current (when-let [id (app-of-ws world focused-ws)] (entry world id))})

@@ -18,10 +18,11 @@
 
 
 (defn show-bar?
-  "Pure: bars shown unless the focused window is fullscreen."
+  "Pure: bars shown unless we're in solo, or the focused window is fullscreen."
   [snapshot]
-  (or (nil? (get-in snapshot [:current :id]))
-      (not (get-in snapshot [:current :fullscreen]))))
+  (and (not= :solo (:mode snapshot))
+       (or (nil? (get-in snapshot [:current :id]))
+           (not (get-in snapshot [:current :fullscreen])))))
 
 
 (defn converge!

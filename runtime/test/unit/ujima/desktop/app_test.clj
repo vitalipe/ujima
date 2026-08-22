@@ -333,12 +333,103 @@
 
 ;; --- verbs validate ---
 
+(defn- mode-of [] (:mode (snap)))
+
+(deftest solo-enter-cold-runs-and-fullscreens-P
+  (setup! [] "1")
+  (stubbed #(app/enter-solo-mode! :web))
+  (is (= [[:switch "web"]] (fx-of :switch)) "switched to P")
+  (is (= [[:spawn :web ["chromium"]]] (fx-of :spawn)) "launched P")
+  (is (= :solo (mode-of)) "projection reports solo"))
+
+(deftest solo-enter-warm-switches-only
+  (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
+  (stubbed #(app/enter-solo-mode! :web))
+  (is (= [[:switch "web"]] (fx-of :switch)))
+  (is (= [] (fx-of :spawn)) "P already up — no re-spawn")
+  ;; already-open P: enter fullscreens it now (not tiled/fs yet)
+  (is (= [[:cmd "[con_id=1]" "fullscreen" "enable"]] (fx-of :cmd))))
+
+(deftest solo-window-change-keeps-P-fullscreen
+  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web)      ; enter (fullscreens con 7)
+                (reset! fx* [])
+                (swap! world* assoc :wins [(win "web" :focused? true :con 7 :full? true)])
+                (app/handle-event! {:type :window/changed})))
+  (is (= [] (fx-of :cmd)) "already fullscreen -> no-op (the guard)"))
+
+(deftest solo-window-change-fullscreens-a-dropped-P
+  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web)
+                (reset! fx* [])
+                (app/handle-event! {:type :window/changed})))   ; P not fullscreen -> re-assert
+  (is (= [[:cmd "[con_id=7]" "fullscreen" "enable"]] (fx-of :cmd))))
+
+(deftest solo-scope-death-relaunches-P
+  (setup! [] "web" :scopes #{})
+  (stubbed #(do (app/enter-solo-mode! :web)       ; enter (scope now up)
+                (swap! world* update :scopes disj :web)   ; P died
+                (reset! fx* [])
+                (app/handle-event! {:type :scope/died :app-id :web})))
+  (is (= [[:spawn :web ["chromium"]]] (fx-of :spawn)) "P brought back"))
+
+(deftest solo-scope-death-of-another-app-is-ignored
+  (setup! [] "web" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web)
+                (reset! fx* [])
+                (app/handle-event! {:type :scope/died :app-id :paint})))   ; not P
+  (is (= [] (fx-of :spawn)) "only P relaunches"))
+
+(deftest solo-relaunch-is-rate-limited
+  ;; two deaths back-to-back: the first relaunches, the second is gated (rescheduled, no spawn now)
+  (setup! [] "web" :scopes #{})
+  (stubbed
+    #(with-redefs [app/relaunch-ms 999999]
+       (app/enter-solo-mode! :web)
+       (reset! app/relaunch* 0)                    ; first death relaunches
+       (swap! world* update :scopes disj :web)
+       (app/handle-event! {:type :scope/died :app-id :web})
+       (reset! fx* [])
+       (swap! world* update :scopes disj :web)      ; immediate second death
+       (app/handle-event! {:type :scope/died :app-id :web})))
+  (is (= [] (fx-of :spawn)) "second death within the interval does not respawn now"))
+
+(deftest solo-refuses-the-multi-verbs
+  (setup! [(win "web" :focused? true) (win "paint")] "web" :scopes #{:web :paint})
+  (stubbed
+    #(do (app/enter-solo-mode! :web)
+         (reset! fx* [])
+         (app/run! :paint)          ; open another app
+         (app/close-focused!)       ; close
+         (app/go-home!)             ; home
+         (app/cycle! 1)             ; cycle
+         (app/switch-to! :paint)))  ; switch
+  (is (= [] (fx-of :spawn)) "no new app opens in solo")
+  (is (= [] (fx-of :kill)) "no close in solo")
+  (is (= [] (filterv #(= [:switch "1"] %) (fx-of :switch))) "no go-home in solo"))
+
+(deftest solo-exit-unfullscreens-and-returns-to-multi
+  (setup! [(win "web" :focused? true :con 7 :full? true)] "web" :scopes #{:web})
+  (stubbed #(do (reset! world* {:wins [(win "web" :focused? true :con 7 :full? true)]
+                                :focused-ws "web" :scopes #{:web}})
+                (app/enter-solo-mode! :web)
+                (reset! fx* [])
+                (app/exit-solo-mode!)))
+  (is (= :multi (mode-of)))
+  (is (= [[:cmd "[con_id=7]" "fullscreen" "disable"]] (fx-of :cmd)) "P un-fullscreened"))
+
+(deftest exit-solo-when-already-multi-does-nothing
+  (setup! [(win "web" :focused? true :con 7 :full? true)] "web" :scopes #{:web})
+  (stubbed #(app/exit-solo-mode!))     ; never entered solo
+  (is (= [] (fx-of :cmd)) "an F11'd multi app is left fullscreen"))
+
+
 (deftest verbs-resolve-or-throw
   (setup! [] "1")
   (stubbed
     #(do (is (thrown? clojure.lang.ExceptionInfo (app/run! :nope)))
          (is (thrown? clojure.lang.ExceptionInfo (app/switch-to! :nope)))))
-  (is (= {:running [] :catalog [] :current nil} (app/current-apps-state))))
+  (is (= {:mode :multi :running [] :catalog [] :current nil} (app/current-apps-state))))
 
 
 

@@ -20,8 +20,10 @@
 
 
 (def commands
-  {"app/open"     {:doc    "Open an app by catalog id."
-                   :params [:map [:app [:string {:min 1}]]]}
+  {"app/open"     {:doc    "Open an app by catalog id; :mode :solo opens it soloed."
+                   :params [:map [:app [:string {:min 1}]] [:mode {:optional true} [:enum :multi :solo]]]}
+
+   "app/unsolo"   {:doc    "Leave solo mode."}
 
    "app/switch"   {:doc    "Focus an app that is already open."
                    :params [:map [:app [:string {:min 1}]]]}

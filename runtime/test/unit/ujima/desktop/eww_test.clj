@@ -16,6 +16,10 @@
   (is (true?  (eww/show-bar? tux-win))  "windowed app -> show")
   (is (false? (eww/show-bar? tux-fs))   "fullscreen -> hide"))
 
+(deftest show-bar?-is-hidden-in-solo
+  (is (false? (eww/show-bar? (assoc tux-win :mode :solo))) "solo -> hide, even a windowed P")
+  (is (true?  (eww/show-bar? (assoc tux-win :mode :multi))) "multi windowed -> show"))
+
 
 (deftest converge!-debounces-and-coalesces-to-the-settled-state
   (reset! @#'eww/shown? true)

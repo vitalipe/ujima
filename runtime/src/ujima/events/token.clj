@@ -62,6 +62,7 @@
 
 (defn- open! [token before]
   (swap! eject-gen* inc)                          ; a pending close is now stale
+  (app/exit-solo-mode!)                           ; the stick is the escape hatch (no-op if not solo)
   (catalog/merge-app! console {:env {token-env token} :hidden false})
   (when before
     (log/warn "circle token replaced — a console already running keeps the old one until it closes"))

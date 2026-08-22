@@ -19,8 +19,9 @@
 
 (defn apps->ui
   "The app snapshot -> the shell's blob. This is the wire contract."
-  [{:keys [running catalog current]}]
-  {:running running
+  [{:keys [running catalog current mode]}]
+  {:mode    mode
+   :running running
    :current current
    :pinned  (->> catalog
              (remove :hidden)

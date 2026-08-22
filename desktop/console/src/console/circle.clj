@@ -154,8 +154,10 @@
     :unmute    ["settings/audio/muted"        {:scope "activity" :value false}] ;; a clear would leave a machine its own user muted still muted
     :release   ["clear/activity"              nil]
     :volume    ["audio/volume"                {:scope "activity" :value (:value args)}]
-    :open-app  ["app/open"                    {:app (:app args)}]
-    :close-app ["app/close"                   nil]
+    :open-app  ["app/open"                    (cond-> {:app (:app args)}
+                                                (:solo args) (assoc :mode "solo"))]
+    ;; :close-app is two requests (unsolo then close) — see send!
+
     :open-url  ["app/open-url"                {:url (:url args)}]
     :lock      ["desktop/lock"                nil]   ;; not built yet — an honest 404
     :unlock    ["desktop/unlock"              nil]
@@ -182,8 +184,12 @@
    refetches at once, so a panel never waits out a poll to see what it just did."
   [id verb args]
   (if-let [peer (peer-of id)]
-    (let [reply (if (= :settings/write verb)
-                  (write-settings! peer (:writes args))
+    (let [reply (case verb
+                  :settings/write (write-settings! peer (:writes args))
+                  ;; close on a soloed machine must leave solo first (plain close is refused there);
+                  ;; unsolo is a no-op on a normal machine, so this is safe for all
+                  :close-app      (fold [(api/command! peer "app/unsolo" nil)
+                                         (api/command! peer "app/close" nil)])
                   (if-let [[path body] (try (->request verb args)
                                             (catch Exception _ nil))]
                     (api/command! peer path body)

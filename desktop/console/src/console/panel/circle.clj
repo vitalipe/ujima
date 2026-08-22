@@ -31,7 +31,7 @@
 (defn- verb-args [verb body]
   (case verb
     :open-app (if (string? (:app body))
-                {:app (:app body)}
+                {:app (:app body) :solo (boolean (:solo body))}
                 (malformed! "open-app needs an :app id"))
     :open-url (if (and (string? (:url body)) (seq (:url body)))
                 {:url (:url body)}

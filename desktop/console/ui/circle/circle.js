@@ -615,6 +615,7 @@ function openApps(){
         <span class="glyph">${esc((a.label || '?')[0])}</span><span class="an">${esc(a.label)}</span>
       </button>`).join('')}
     </div>
+    <label class="solochk"><input type="checkbox" id="soloc"> Keep to this app — no switching or closing</label>
     <div class="sfoot">
       <button class="btn quiet" onclick="closeSheet()">Cancel</button>
       <button class="btn primary" onclick="applyApp()">Open on ${sel.size} machine${sel.size>1?'s':''}</button>
@@ -625,7 +626,7 @@ function chooseApp(i){
   sheetApps.forEach((_,j) => $('ap'+j).classList.toggle('on', j === i));
 }
 function applyApp(){
-  if (pickApp) act('open-app', {app: pickApp.id});
+  if (pickApp) act('open-app', {app: pickApp.id, solo: $('soloc').checked});
 }
 
 function openUrl(){

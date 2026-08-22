@@ -29,6 +29,8 @@ version truth; branch names and build labels may disagree.
 - Solo mode: pin the machine to one app, fullscreen, with no switching or
   closing and automatic relaunch if it exits — `app/open {:mode :solo}` to
   enter, `app/unsolo` to leave, and inserting the circle token releases it.
+  The Circle app opens an app in solo with a "keep to this app" checkbox, and
+  Close app releases a soloed machine.
 - F11 toggles the focused app's fullscreen — also the way out of an app that
   fullscreened itself.
 - Ujima Circle App: a fleet control panel for teachers — every machine in the

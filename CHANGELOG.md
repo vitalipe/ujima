@@ -48,6 +48,8 @@ version truth; branch names and build labels may disagree.
   (nil = open network) name the network to join and `:mode` (`:peer` | `:off`) drives the
   radio — circle-wide, with a per-device override; seeded at install like any setting,
   re-asserted at every boot.
+- A wired link with no DHCP answer falls back to a zeroconf (169.254/16) address, so a
+  circle on a bare switch stays addressable.
 
 ### Changed
 

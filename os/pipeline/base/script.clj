@@ -78,6 +78,9 @@
     ;;    latency outliers for ≤~0.2W on mains-powered machines (numbers in the conf)
     (files/install! project "base/network/wifi-powersave.conf"
                     "/etc/NetworkManager/conf.d/ujima-wifi-powersave.conf")
+    ;;    and zeroconf when nobody hands out leases — a routerless circle stays addressable
+    (files/install! project "base/network/ipv4-link-local.conf"
+                    "/etc/NetworkManager/conf.d/ujima-ipv4-link-local.conf")
 
     ;; 7. A/B disk mount points + bind targets — rootfs layout is build content, so every
     ;;    image carries its own. The per-slot fstab that references them is written at

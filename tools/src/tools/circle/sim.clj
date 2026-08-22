@@ -189,7 +189,8 @@
 (defn- clock-ms [m] (+ (System/currentTimeMillis) (:offset m)))
 
 (defn- nodes [addr apps]
-  (let [m #(get @fleet* addr)]
+  (let [m       #(get @fleet* addr)
+        visible (mapv #(dissoc % :hidden) (remove :hidden apps))]
     {"schema"   (constantly 1)
      "id"       #(:id (m))
      "device"   #(hash-map :serial (:serial (m)) :model "Raspberry Pi 500 Rev 1.0")
@@ -201,7 +202,7 @@
 
      "desktop/locked"  (constantly false)
      "desktop/running" #(:running (m))
-     "desktop/catalog" (constantly apps)
+     "desktop/catalog" (constantly visible)
 
      "audio"    #(let [it (m)
                        out (effective it [:audio :active])]

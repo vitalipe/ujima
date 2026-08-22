@@ -612,7 +612,7 @@ function openApps(){
     <h2>Open an app</h2>
     <div class="appgrid">${sheetApps.map((a,i) => `
       <button class="apptile" style="--cat:${CAT[a.category] || '105,113,128'}" onclick="chooseApp(${i})" id="ap${i}">
-        <span class="glyph">${esc((a.name || '?')[0])}</span><span class="an">${esc(a.name)}</span>
+        <span class="glyph">${esc((a.label || '?')[0])}</span><span class="an">${esc(a.label)}</span>
       </button>`).join('')}
     </div>
     <div class="sfoot">

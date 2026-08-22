@@ -75,7 +75,10 @@
 
    "desktop/locked"  (constantly false)
    "desktop/running" #(:current (desktop/current-apps-state))
-   "desktop/catalog" desktop/catalog-listing
+   "desktop/catalog" (fn []
+                       (->> (desktop/catalog-listing)
+                         (remove :hidden)
+                         (mapv   #(dissoc % :hidden))))
 
    "audio"    #(queries/audio-status (control/settings))
 

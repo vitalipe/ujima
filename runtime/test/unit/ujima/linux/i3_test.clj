@@ -5,15 +5,15 @@
 
 
 (deftest normalize-collapses-window-events-to-ticks
-  (is (= {:type :window/close :con-id 7} (i3/normalize {:change "close" :container {:id 7}})))
-  (is (= {:type :window/change} (i3/normalize {:change "new"   :container {:id 42}})))
-  (is (= {:type :window/change} (i3/normalize {:change "title" :container {:id 7}})))
-  (is (= {:type :window/change} (i3/normalize {:change "focus" :container {:id 7}})))
-  (is (= {:type :window/change} (i3/normalize {:change "fullscreen_mode" :container {:id 7}}))))
+  (is (= {:type :window/closed :con-id 7} (i3/normalize {:change "close" :container {:id 7}})))
+  (is (= {:type :window/changed} (i3/normalize {:change "new"   :container {:id 42}})))
+  (is (= {:type :window/changed} (i3/normalize {:change "title" :container {:id 7}})))
+  (is (= {:type :window/changed} (i3/normalize {:change "focus" :container {:id 7}})))
+  (is (= {:type :window/changed} (i3/normalize {:change "fullscreen_mode" :container {:id 7}}))))
 
 
 (deftest normalize-surfaces-workspace-focus
-  (is (= {:type :workspace/focus} (i3/normalize {:change "focus" :current {:name "write"}})))
+  (is (= {:type :workspace/focused} (i3/normalize {:change "focus" :current {:name "write"}})))
   (is (nil? (i3/normalize {:change "init" :current {:name "write"}}))))
 
 

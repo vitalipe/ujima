@@ -12,16 +12,16 @@
 (defn normalize
   "A raw i3 event -> a bare tick the app layer reacts to, or nil to ignore. We carry no
    window details: every handler re-reads the tree, so the event only says 'something moved'.
-   :window/close is kept distinct because the go-home rule keys on it."
+   :window/closed is kept distinct because the go-home rule keys on it."
   [ev]
   (if-let [c (:container ev)]
     (case (:change ev)
-      "close" {:type :window/close :con-id (:id c)}
+      "close" {:type :window/closed :con-id (:id c)}
       ;; "floating" too: chromium --app floats itself AFTER mapping, so we must re-settle then
-      ("new" "title" "focus" "fullscreen_mode" "floating") {:type :window/change}
+      ("new" "title" "focus" "fullscreen_mode" "floating") {:type :window/changed}
       nil)
     (when (and (:current ev) (= "focus" (:change ev)))
-      {:type :workspace/focus})))
+      {:type :workspace/focused})))
 
 
 (defn- parse-line [line]

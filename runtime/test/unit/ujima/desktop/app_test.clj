@@ -271,7 +271,7 @@
     #(do (app/close-focused!)                            ; records con 7, WM_DELETE
          (swap! world* assoc :wins [])                   ; the window closed
          (reset! fx* [])
-         (app/handle-event! {:type :window/close :con-id 7})))
+         (app/handle-event! {:type :window/closed :con-id 7})))
   (is (= [[:stop :paint]] (fx-of :stop)) "scope stopped so it can't reopen")
   (is (= [[:switch "1"]] (fx-of :switch)) "and home"))
 
@@ -281,7 +281,7 @@
     #(do (app/close-focused!)                            ; ✕ con 7
          (swap! world* assoc :wins [(win "paint" :con 8)])  ; con 7 gone, con 8 remains
          (reset! fx* [])
-         (app/handle-event! {:type :window/close :con-id 7})))
+         (app/handle-event! {:type :window/closed :con-id 7})))
   (is (= [] (fx-of :stop)) "another window remains — the app stays")
   (is (= [] (fx-of :switch)) "no go-home"))
 
@@ -290,7 +290,7 @@
   (stubbed
     #(do (app/close-focused!)                            ; records con 7
          (reset! fx* [])
-         (app/handle-event! {:type :window/close :con-id 99})))  ; some other window
+         (app/handle-event! {:type :window/closed :con-id 99})))  ; some other window
   (is (= [] (fx-of :switch)) "not the con we asked to close — stay (this is the replace case)"))
 
 (deftest scope-death-goes-home-when-showing-it
@@ -328,7 +328,7 @@
 
 (deftest a-plain-tick-only-projects
   (setup! [(win "web" :focused? true)] "web" :scopes #{:web})
-  (stubbed #(app/handle-event! {:type :window/change}))
+  (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [] @fx*) "no world mutations")
   (is (= :web (current-id)))
   (is (= [:web] (open-ids))))
@@ -348,13 +348,13 @@
 
 (deftest floating-app-window-gets-tiled
   (setup! [(win "web" :focused? true :floating? true :con 7)] "web" :scopes #{:web})
-  (stubbed #(app/handle-event! {:type :window/change}))
+  (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [[:cmd "[con_id=7]" "floating" "disable"]] (fx-of :cmd))))
 
 (deftest tiled-windows-and-dialogs-left-alone
   (setup! [(win "web" :focused? true :con 9)
            (win "web" :floating? true :wtype "dialog" :con 10)] "web" :scopes #{:web})
-  (stubbed #(app/handle-event! {:type :window/change}))
+  (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [] (fx-of :cmd))))
 
 
@@ -363,25 +363,25 @@
 (deftest orphan-window-routed-to-its-workspace-by-class
   ;; the window mapped on home because focus moved during launch -> move it to its app ws by WM_CLASS
   (setup! [(win "1" :focused? true :con 7 :class "stellarium")] "1" :scopes #{:sky})
-  (stubbed #(app/handle-event! {:type :window/change}))
+  (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [[:cmd "[con_id=7]" "move" "container" "to" "workspace" "sky"]] (fx-of :cmd))))
 
 (deftest window-on-its-own-workspace-is-not-moved
   (setup! [(win "sky" :focused? true :con 7 :class "stellarium")] "sky" :scopes #{:sky})
-  (stubbed #(app/handle-event! {:type :window/change}))
+  (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [] (fx-of :cmd)) "already on its workspace — idempotent"))
 
 (deftest the-launcher-is-routed-home
   ;; an app opened before the shell is up (a token stick at boot) maps the launcher on the app's
   ;; workspace, leaving home empty
   (setup! [(win "sky" :focused? true :con 9 :class "ujima-launcher")] "sky" :scopes #{:sky})
-  (stubbed #(app/handle-event! {:type :window/change}))
+  (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [[:cmd "[con_id=9]" "move" "container" "to" "workspace" "1"]] (fx-of :cmd))))
 
 
 (deftest the-launcher-at-home-is-left-alone
   (setup! [(win "1" :focused? true :con 9 :class "ujima-launcher")] "1")
-  (stubbed #(app/handle-event! {:type :window/change}))
+  (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [] (fx-of :cmd)) "already home — idempotent"))
 
 
@@ -389,7 +389,7 @@
   ;; an app's own dialog (e.g. Inkscape's startup dialog, which maps before its main window) must
   ;; land on the app's workspace too — skipping it strands the app on home (the original bug)
   (setup! [(win "1" :focused? true :con 7 :class "stellarium" :wtype "dialog")] "1" :scopes #{:sky})
-  (stubbed #(app/handle-event! {:type :window/change}))
+  (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [[:cmd "[con_id=7]" "move" "container" "to" "workspace" "sky"]] (fx-of :cmd))
       "the app's own dialog routes to its workspace"))
 

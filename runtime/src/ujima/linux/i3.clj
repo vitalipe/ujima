@@ -61,25 +61,13 @@
 (defn kill-focused!     []   (command? "kill"))
 
 
-(defonce ^:private out* (atom nil))
-
-(defn emit!
-  "Put EV onto the live event stream so verbs ride the same single listener thread as window
-   events. Dropped loudly if no watch is active."
-  [ev]
-  (let [ch @out*]
-    (when-not (and ch (async/>!! ch ev))
-      (log/warn "emit!: no active window watch — event dropped" ev))))
-
-
 (defn watch-windows!
-  "Stream window + workspace events on the returned channel (plus verb events from emit!).
-   One initial tick forces a first converge; the subscription outlives the session."
+  "Stream window + workspace events on the returned channel. One initial tick forces a first
+   converge; the subscription outlives the session."
   []
   (let [ch   (async/chan 64)
         proc (shell/sh {:out :stream :err :stream :shutdown p/destroy-tree}
                        :i3-msg :-t "subscribe" :-m "[\"window\",\"workspace\"]")]
-    (reset! out* ch)
     (async/thread
       (try
         (async/>!! ch {:type :tick})

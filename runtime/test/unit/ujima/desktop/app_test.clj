@@ -10,9 +10,8 @@
             [ujima.desktop.app.catalog.loader :as loader]))
 
 
-;; The actor loop with i3 + scopes stubbed. world* holds the tree + focused ws + the set of live
-;; scopes; mutations land in fx*; converged snapshots in pushed*. Verbs and events route straight
-;; into handle-event! via the i3/emit! stub.
+;; The pass with i3 + scopes stubbed. world* holds the tree + focused ws + the set of live
+;; scopes; mutations land in fx*; converged snapshots in pushed*.
 
 
 (def ^:private catalog-apps               ; dir name = :id (the scanner's contract)
@@ -75,7 +74,6 @@
                                                (swap! fx* conj [:switch ws]))
                 i3/kill-focused!      (fn [] (swap! fx* conj [:kill]))
                 i3/command?           (fn [& args] (swap! fx* conj (into [:cmd] args)))
-                i3/emit!              (fn [ev] (app/handle-event! ev))
                 systemd/active?       (fn [id] (contains? (:scopes @world*) id))
                 systemd/spawn-scoped! (fn [id exec _dir opts]
                                         (swap! world* update :scopes conj id)

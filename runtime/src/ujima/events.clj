@@ -51,9 +51,8 @@
            (i3/watch-windows!)
            app/handle-event!)
 
-  ;; scope-death rides the SAME pipe (i3/emit!) so it's queue-ordered on the one listener thread:
-  ;; the crash/self-quit go-home backstop
-  (systemd/watch-scopes! {:interval-ms (:scope-poll-ms cfg 1000) :emit i3/emit!})
+  ;; scope death: the crash / self-quit backstop
+  (systemd/watch-scopes! {:interval-ms (:scope-poll-ms cfg 1000) :emit app/handle-event!})
 
   ;; the software RTC: witnessed time becomes the next boot's clock floor
   (clock-events/init! cfg))

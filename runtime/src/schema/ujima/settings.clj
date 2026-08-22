@@ -38,10 +38,9 @@
 
 
 (def settings [{:key     [:circle :name]
-                :doc     "The circle's label; an AP-mode hub snapshots it as its ESSID at install"
+                :doc     "The circle's label"
                 :default "UjimaOS"
                 :scopes  #{:circle}
-                ;; ASCII-only, so the character bound IS the SSID's 32-byte one
                 :shape   [:re {:error/message "1-32 letters, numbers, spaces, dashes or underscores, starting and ending with a letter or number"}
                           #"^[A-Za-z0-9]([A-Za-z0-9 _-]{0,30}[A-Za-z0-9])?$"]}
 
@@ -86,6 +85,28 @@
                 :default ["us" "tz"]
                 :scopes  #{:device}
                 :shape   [:sequential {:min 1} xkb-layout]}
+
+               {:key     [:network :wifi :mode]
+                :doc     "What the radio does: :peer joins the wifi network below, :off keeps it down"
+                :default :peer
+                :scopes  #{:circle :device}
+                :shape   [:enum :peer :off]}
+
+               {:key     [:network :wifi :essid]
+                :doc     "The wifi network to join; circle-wide, a device may override"
+                :default "ujima-default-circle"
+                :scopes  #{:circle :device}
+                ;; narrower than the spec's any-32-bytes: survives a keyfile and a UI untouched
+                :shape   [:re {:error/message "1-32 printable characters, not starting or ending with a space"}
+                          #"^[!-~]([ -~]{0,30}[!-~])?$"]}
+
+               {:key     [:network :wifi :psk]
+                :doc     "The network's WPA passphrase (nil = open network)"
+                :default nil
+                :secret? true
+                :scopes  #{:circle :device}
+                :shape   [:re {:error/message "8-63 printable characters, or 64 hex digits"}
+                          #"^([ -~]{8,63}|[0-9a-fA-F]{64})$"]}
 
                {:key     [:audio :active]
                 :doc     "Active output class (:usb | :hdmi, nil = none); written by the

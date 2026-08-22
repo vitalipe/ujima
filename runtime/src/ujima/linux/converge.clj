@@ -9,7 +9,8 @@
             [lib.util             :refer [map-vals]]
             [ujima.linux.system   :as system]
             [ujima.linux.keyboard :as keyboard]
-            [ujima.linux.audio    :as audio]))
+            [ujima.linux.audio    :as audio]
+            [ujima.linux.net.wifi :as wifi]))
 
 
 ;; converge runs inside control's critical section — a wedged tool must become a
@@ -56,6 +57,21 @@
         (apply! desired)))))
 
 
+(defn- converge-wifi!
+  ;; :off speaks for the radio only; the link itself is NM's business (autoconnect). The psk
+  ;; never reaches a log line.
+  [settings]
+  (let [on?     (= :peer (get settings [:network :wifi :mode]))
+        desired {:ssid (get settings [:network :wifi :essid])
+                 :psk  (get settings [:network :wifi :psk])}]
+    (when (not= on? (wifi/radio))
+      (log/info "converge: applying" {:setting [:network :wifi :mode] :value (if on? :peer :off)})
+      (wifi/radio! on?))
+    (when (and on? (not= desired (wifi/network)))
+      (log/info "converge: applying" {:setting [:network :wifi :essid] :value (:ssid desired)})
+      (wifi/join! desired))))
+
+
 (defn- converge-clock!
   ;; the floor only lifts — a clock already ahead (RTC held, NTP synced) is left alone
   [settings]
@@ -74,6 +90,7 @@
       (doseq [[domain f] [[:audio    converge-audio!]
                           [:keyboard converge-keyboard!]
                           [:system   converge-system!]
+                          [:wifi     converge-wifi!]
                           [:clock    converge-clock!]]]
         (try (f values)
              (catch Throwable e

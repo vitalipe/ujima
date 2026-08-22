@@ -3,7 +3,8 @@
             [ujima.linux.converge :as converge]
             [ujima.linux.audio    :as audio]
             [ujima.linux.keyboard :as keyboard]
-            [ujima.linux.system   :as system]))
+            [ujima.linux.system   :as system]
+            [ujima.linux.net.wifi :as wifi]))
 
 
 ;; Desired-vs-actual decision logic only (no OS): audio/full-topology and the setters are
@@ -26,18 +27,27 @@
    [:audio :muted]        false
    [:keyboard :layout]    "us"
    [:system :hostname]    "ujima"
-   [:system :timezone]    "Africa/Dar_es_Salaam"})
+   [:system :timezone]    "Africa/Dar_es_Salaam"
+   [:network :wifi :mode]  :peer
+   [:network :wifi :essid] "IOT"
+   [:network :wifi :psk]   "1337hax0r"})
+
+(def ^:private joined {:ssid "IOT" :psk "1337hax0r"})
 
 
 (defn- quiet-others
-  "Stub keyboard/system as already-in-sync so audio tests stay focused."
+  "Stub keyboard/system/wifi as already-in-sync so audio tests stay focused."
   [f]
   (with-redefs [keyboard/layout  (constantly "us")
                 keyboard/layout! (fn [_] (throw (ex-info "unexpected" {})))
                 system/hostname  (constantly "ujima")
                 system/hostname! (fn [_] (throw (ex-info "unexpected" {})))
                 system/timezone  (constantly "Africa/Dar_es_Salaam")
-                system/timezone! (fn [_] (throw (ex-info "unexpected" {})))]
+                system/timezone! (fn [_] (throw (ex-info "unexpected" {})))
+                wifi/radio       (constantly true)
+                wifi/radio!      (fn [_] (throw (ex-info "unexpected" {})))
+                wifi/network     (constantly joined)
+                wifi/join!       (fn [_] (throw (ex-info "unexpected" {})))]
     (f)))
 
 
@@ -87,7 +97,9 @@
                   system/hostname  (constantly "ujima")
                   system/hostname! (fn [_])
                   system/timezone  (constantly "Africa/Dar_es_Salaam")
-                  system/timezone! (fn [_])]
+                  system/timezone! (fn [_])
+                  wifi/radio       (constantly true)
+                  wifi/network     (constantly joined)]
       (is (= (records settings) (converge! settings)) "does not throw, returns settings"))
     (is (= "tz" @layout-applied) "keyboard converged despite audio throwing")))
 
@@ -102,10 +114,53 @@
                   system/hostname  (constantly "old-name")
                   system/hostname! (fn [v] (swap! calls conj [:hostname v]))
                   system/timezone  (constantly "Africa/Dar_es_Salaam")
-                  system/timezone! (fn [v] (swap! calls conj [:timezone v]))]
+                  system/timezone! (fn [v] (swap! calls conj [:timezone v]))
+                  wifi/radio       (constantly true)
+                  wifi/network     (constantly joined)
+                  wifi/join!       (fn [v] (swap! calls conj [:join v]))]
       (converge! base-settings))
     (is (= [[:hostname "ujima"]] @calls)
-        "only the drifted hostname converged; layout and timezone were in sync")))
+        "only the drifted hostname converged; layout, timezone and wifi were in sync")))
+
+
+(defn- wifi-calls
+  "Run converge over SETTINGS against a wifi world of RADIO + NETWORK; -> the wifi calls made."
+  [settings radio network]
+  (let [calls (atom [])]
+    (with-redefs [audio/full-topology  (constantly {:default nil :sinks {}})
+                  keyboard/layout      (constantly "us")
+                  system/hostname      (constantly "ujima")
+                  system/timezone      (constantly "Africa/Dar_es_Salaam")
+                  wifi/radio           (constantly radio)
+                  wifi/radio!          (fn [on?] (swap! calls conj [:radio on?]))
+                  wifi/network         (constantly network)
+                  wifi/join!           (fn [v] (swap! calls conj [:join v]))]
+      (converge! settings))
+    @calls))
+
+
+(deftest wifi-asserts-the-profile-only-on-difference
+  (is (= [] (wifi-calls base-settings true joined))
+      "radio on and the profile already holds the network: nothing to do")
+  (is (= [[:join joined]] (wifi-calls base-settings true nil))
+      "no profile yet: join")
+  (is (= [[:join {:ssid "IOT" :psk "other"}]]
+         (wifi-calls (assoc base-settings [:network :wifi :psk] "other") true joined))
+      "a changed psk is a changed network")
+  (is (= [[:join {:ssid "Open" :psk nil}]]
+         (wifi-calls (assoc base-settings [:network :wifi :essid] "Open" [:network :wifi :psk] nil)
+                     true joined))
+      "an open network is a profile without a psk"))
+
+
+(deftest wifi-radio-follows-mode-and-off-leaves-the-profile-alone
+  (is (= [[:radio true] [:join joined]] (wifi-calls base-settings false nil))
+      "radio down under :peer comes up, then the profile is asserted")
+  (is (= [[:radio false]]
+         (wifi-calls (assoc base-settings [:network :wifi :mode] :off) true nil))
+      ":off turns the radio off and says nothing about the profile")
+  (is (= [] (wifi-calls (assoc base-settings [:network :wifi :mode] :off) false nil))
+      "already off: nothing to do"))
 
 
 (deftest clock-lifts-only-a-lagging-clock

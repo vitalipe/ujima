@@ -13,7 +13,8 @@
 # session is stable.
 [Unit]
 Description=ujima desktop session
-After=systemd-user-sessions.service
+# NetworkManager: the boot converge asserts the wifi profile, and nothing retries it
+After=systemd-user-sessions.service NetworkManager.service
 Conflicts=getty@tty1.service
 
 [Service]

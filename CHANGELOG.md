@@ -44,6 +44,10 @@ version truth; branch names and build labels may disagree.
   reopens it — and pulling the stick closes the Console after a few seconds.
 - Desktop windows fade in on open and out on close (~130ms), as do the shell's
   popovers and the bars hiding for a fullscreen app.
+- Wifi is a setting: `[:network :wifi :essid]` (default `ujima-default-circle`) + `:psk`
+  (nil = open network) name the network to join and `:mode` (`:peer` | `:off`) drives the
+  radio — circle-wide, with a per-device override; seeded at install like any setting,
+  re-asserted at every boot.
 
 ### Changed
 

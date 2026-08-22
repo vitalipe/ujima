@@ -116,6 +116,17 @@
           (i3/switch-workspace! target))))))
 
 
+(defn fullscreen!
+  "Toggle i3 fullscreen on the focused window, if it is an app's tiled one."
+  [{:keys [focused-ws ws->wins] :as world}]
+  (when (proj/app-of-ws world focused-ws)
+    (when-let [{:keys [con-id]} (->> (get ws->wins focused-ws)
+                                     (filter :focused?)
+                                     (remove :floating?)
+                                     (first))]
+      (i3/command? (format "[con_id=%d]" con-id) "fullscreen" "toggle"))))
+
+
 (defn settle-floaters!
   "chromium --app floats itself after mapping (class/role arrive too late for i3's for_window).
    Un-float floating non-dialog windows on app workspaces. Idempotent."

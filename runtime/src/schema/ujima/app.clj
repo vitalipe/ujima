@@ -14,8 +14,7 @@
 (def ^:private common
   [[:label    [:string {:min 1}]]
    [:category {:optional true} category]
-   [:hidden   {:optional true} :boolean]
-   [:mode     {:optional true} [:enum :fullscreen]]])
+   [:hidden   {:optional true} :boolean]])
 
 (defn- kind [& entries]
   (into [:map {:closed true}] (concat common entries)))

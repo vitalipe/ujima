@@ -26,6 +26,8 @@ version truth; branch names and build labels may disagree.
 - The image bakes ujima's bb libraries into `/ujima/m2` (pinned, sha-verified
   at build); like packages, they never change on a live deploy.
 
+- F11 toggles the focused app's fullscreen — also the way out of an app that
+  fullscreened itself.
 - Ujima Circle App: a fleet control panel for teachers — every machine in the
   circle, what each one is running, and sound, apps and power over a selection.
 - Ujima Setup App: per-machine setup over the same circle — name, clock (timezone

@@ -17,7 +17,7 @@
 (def ^:private catalog-apps               ; dir name = :id (the scanner's contract)
   {"paint" {:kind :exec :label "Paint" :exec ["tuxpaint" "--nolockfile"] :class "TuxPaint.TuxPaint"}
    "web"   {:kind :exec :label "Web"   :exec ["chromium"] :class "ujima-web"}
-   "sky"   {:kind :exec :label "Sky"   :exec ["stellarium"] :mode :fullscreen :class "stellarium"}
+   "sky"   {:kind :exec :label "Sky"   :exec ["stellarium"] :class "stellarium"}
    ;; :system = no launcher tile, pinned in the dock instead. console pins only once a token
    ;; unhides it, so it ships hidden.
    "files"   {:kind :exec :label "Files"   :category :system :exec ["pcmanfm"] :class "pcmanfm"}
@@ -255,18 +255,33 @@
   (is (= :web (current-id)))
   (is (= [:web] (open-ids))))
 
-(deftest fullscreen-declared-or-detected
-  (setup! [(win "sky" :focused? true)] "sky" :scopes #{:sky})            ; :sky declares :mode
+(deftest fullscreen-is-detected-from-the-tree
+  (setup! [(win "web" :focused? true :full? true)] "web" :scopes #{:web})
   (stubbed #(app/handle-event! {:type :tick}))
-  (is (true? (:fullscreen (:current (snap)))) "declared hint")
+  (is (true? (:fullscreen (:current (snap)))))
 
-  (setup! [(win "web" :focused? true :full? true)] "web" :scopes #{:web}) ; detected from window
-  (stubbed #(app/handle-event! {:type :tick}))
-  (is (true? (:fullscreen (:current (snap)))) "detected fullscreen window")
-
-  (setup! [(win "web" :focused? true)] "web" :scopes #{:web})             ; neither
+  (setup! [(win "web" :focused? true)] "web" :scopes #{:web})
   (stubbed #(app/handle-event! {:type :tick}))
   (is (false? (:fullscreen (:current (snap))))))
+
+
+;; --- fullscreen: a toggle on the focused app window ---
+
+(deftest fullscreen-toggles-the-focused-app-window
+  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
+  (stubbed #(app/toggle-fullscreen!))
+  (is (= [[:cmd "[con_id=7]" "fullscreen" "toggle"]] (fx-of :cmd))))
+
+(deftest fullscreen-leaves-home-and-dialogs-alone
+  (setup! [(win "1" :focused? true :con 9 :class "ujima-launcher")] "1")
+  (stubbed #(app/toggle-fullscreen!))
+  (is (= [] (fx-of :cmd)) "the launcher is not an app window")
+
+  (setup! [(win "web" :con 7) (win "web" :focused? true :floating? true :wtype "dialog" :con 8)]
+          "web" :scopes #{:web})
+  (stubbed #(app/toggle-fullscreen!))
+  (is (= [] (fx-of :cmd)) "a focused dialog is not the app's window"))
+
 
 (deftest floating-app-window-gets-tiled
   (setup! [(win "web" :focused? true :floating? true :con 7)] "web" :scopes #{:web})

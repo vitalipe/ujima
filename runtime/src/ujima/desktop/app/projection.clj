@@ -22,8 +22,7 @@
         wins (get ws->wins (name id))]
     {:id id :label (:label a) :icon (:icon a) :category (:category a)
      :title (:title (or (first (filter :focused? wins)) (first wins)))
-     ;; detected, or declared (:mode) by an app that draws full-screen without setting the state
-     :fullscreen (boolean (or (some :fullscreen? wins) (= :fullscreen (:mode a))))}))
+     :fullscreen (boolean (some :fullscreen? wins))}))
 
 
 (defn projection [{:keys [focused-ws catalog] :as world}]

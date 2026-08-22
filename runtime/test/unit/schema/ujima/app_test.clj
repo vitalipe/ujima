@@ -12,7 +12,7 @@
   (is (m/validate app/spec {:kind :exec :label "Calc" :category :office :class "libreoffice-calc"
                             :exec ["libreoffice" "--calc"]}))
   (is (m/validate app/spec {:kind :exec :label "Console" :category :system :hidden true :exec ["sh" "app/run.sh"]}))
-  (is (m/validate app/spec {:kind :exec :label "Sky" :exec ["stellarium"] :mode :fullscreen}))
+  (is (m/validate app/spec {:kind :exec :label "Sky" :exec ["stellarium"]}))
   (is (m/validate app/spec {:kind :web-app :label "Board" :category :create :entry "index.html" :port 8090}))
   (is (m/validate app/spec {:kind :link :label "Kolibri" :category :learn :url "http://localhost:8080"})))
 

@@ -59,6 +59,7 @@
       :app/close     (act/close! (observe!))
       :app/home      (i3/switch-workspace! home-ws)
       :app/cycle     (act/cycle! (observe!) (:step ev))
+      :app/fullscreen (act/fullscreen! (observe!))
       :window/closed (act/window-closed! (observe!) (:con-id ev))
       :scope/died    (act/go-home-if-empty! (observe!) (:app-id ev))   ; crash / self-quit
       nil)
@@ -76,6 +77,7 @@
 (defn close-focused! []   (handle-event! {:type :app/close}))
 (defn go-home!       []   (handle-event! {:type :app/home}))
 (defn cycle!         [step] (handle-event! {:type :app/cycle :step step}))
+(defn toggle-fullscreen! [] (handle-event! {:type :app/fullscreen}))
 
 (defn open-url! [url]
   (when-not (re-matches #"https?://\S+" (str url))

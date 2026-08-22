@@ -34,6 +34,9 @@
    "app/prev"     {:doc     "Focus the previous open app."
                    :handler (fn [_] (app/cycle! -1))}
 
+   "app/fullscreen" {:doc     "Toggle the focused app window's fullscreen."
+                     :handler (fn [_] (app/toggle-fullscreen!))}
+
    "keyboard/layout" {:doc     "Set the layout; only codes in available-layouts are accepted."
                       :params  [:map [:layout [:string {:min 1}]]]
                       :handler (fn [{:keys [layout]}] (effects/change-keyboard-layout! layout :session))}

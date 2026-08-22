@@ -1,34 +1,21 @@
 (ns ujima.desktop.app.catalog
-  "App specs indexed by :id, and the one runtime write on them.")
+  "App specs indexed by :id, and the one runtime write on them."
+  (:require [lib.util :refer [distinct-by index-by map-vals]]))
 
 
 (defonce ^:private catalog* (atom nil))
 
 
-(defn validate-app!
-  "The identity core: a map with :id and :label. Launchability is the loader's check."
-  [{:keys [id label] :as app}]
-  (when-not (map? app) (throw (ex-info "app spec is not a map" {:app app})))
-  (when-not id    (throw (ex-info "app spec missing :id" {:app app})))
-  (when-not label (throw (ex-info "app spec missing :label" {:id id})))
-  app)
-
-
-(defn- validate! [apps]
-  (run! validate-app! apps)
-  (let [ids (map :id apps)]
-    (when (not= (count ids) (count (distinct ids)))
-      (throw (ex-info "catalog has duplicate app :id" {:ids ids}))))
-  apps)
-
-
 (defn ->catalog
-  "{:apps [...]} -> order, by-id, and by-class (WM_CLASS -> id, for routing an orphaned window)."
+  "{:apps [...]} -> order (abc on id), by-id (a repeated :id keeps its last entry), and
+   by-class (WM_CLASS -> id, for routing an orphaned window)."
   [raw]
-  (let [apps (validate! (vec (:apps raw)))]
-    {:order    (mapv :id apps)
-     :by-id    (into {} (map (juxt :id identity)) apps)
-     :by-class (into {} (keep (fn [a] (when (:class a) [(:class a) (:id a)]))) apps)}))
+  (let [apps (distinct-by :id (reverse (:apps raw)))]
+    {:order    (mapv :id (sort-by :id apps))
+     :by-id    (index-by :id apps)
+     :by-class (->> apps 
+                 (filter :class) 
+                 (index-by :class) (map-vals :id))}))
 
 
 (defn listing
@@ -41,7 +28,8 @@
         (:order catalog)))
 
 
-(defn init! [catalog] (reset! catalog* catalog))
+(defn init! [catalog] 
+  (reset! catalog* catalog))
 
 (defn current [] @catalog*)
 

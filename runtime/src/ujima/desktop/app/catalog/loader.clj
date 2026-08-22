@@ -47,8 +47,7 @@
           (as-> spec (if (#{:web-app :link} (:kind spec))
                        (assoc spec :class (str "ujima-" (name id)))
                        spec))
-          (validate-files!)
-          (catalog/validate-app!)))
+          (validate-files!)))
     (catch Throwable e
       (log/error "bad app.edn — app skipped" {:dir (str dir) :error (ex-message e)})
       nil)))
@@ -66,16 +65,12 @@
 
 
 (defn load-catalog
-  "ROOTS scanned in order, merged by :id — later root wins, so a storage app can override a
-   baked one; abc on id. An empty catalog is an error line, not a crash."
+  "ROOTS scanned in order; a later root's app overrides an earlier one's, so storage can
+   override baked. An empty catalog is an error line, not a crash."
   [roots fallback-icon]
-  (let [merged (reduce (fn [m {:keys [id] :as app}]
-                         (when (contains? m id)
-                           (log/info "app overridden by later root" {:app id}))
-                         (assoc m id app))
-                       {}
-                       (mapcat (partial scan-root fallback-icon) roots))
-        apps   (vec (sort-by (comp name :id) (vals merged)))]
+  (let [apps (into [] (mapcat (partial scan-root fallback-icon)) roots)]
+    (doseq [[id n] (frequencies (map :id apps)) :when (> n 1)]
+      (log/info "app overridden by later root" {:app id}))
     (when (empty? apps)
       (log/error "app catalog is empty" {:roots (mapv str roots)}))
     (catalog/->catalog {:apps apps})))

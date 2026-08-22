@@ -14,6 +14,7 @@
             [lib.io-test]
             [lib.http.signature-test]
 
+            [schema.ujima.app-test]
             [ujima.control.registry-test]
             [ujima.linux.converge-test]
             [ujima.control-test]
@@ -56,6 +57,7 @@
     lib.io-test
     lib.http.signature-test
 
+    schema.ujima.app-test
     ujima.control.registry-test
     ujima.linux.converge-test
     ujima.control-test

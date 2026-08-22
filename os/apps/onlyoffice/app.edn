@@ -1,4 +1,4 @@
 ;; launch via the /usr/bin wrapper (the raw binary skips Qt env)
-{:label "ONLYOFFICE" :category :office
+{:kind :exec :label "ONLYOFFICE" :category :office
  :exec ["onlyoffice-desktopeditors"]
  :class "ONLYOFFICE"}  ; res_class, xprop-verified

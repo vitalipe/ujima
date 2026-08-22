@@ -6,6 +6,7 @@ values). Split by author:
 
 - `ujima/` — hand-written. `schema.ujima.settings`: one entry per setting —
   key, doc, default, scopes, and the value `:shape` (malli, as data).
+  `schema.ujima.app`: what an `app.edn` may say, one closed map per `:kind`.
 - `build/` — machine-written, `build.schema` owns it wholesale (never edit):
   the tz/xkb catalogs, pinned with `bb pin schema <rootfs>` from a mounted image
   rootfs — never this host.

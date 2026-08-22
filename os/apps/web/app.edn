@@ -1,6 +1,6 @@
 ;; vanilla full-UI browser (not --app); open-url appends the link to this exec.
 ;; --guest: ephemeral session, no history/cookies kept — kiosk web apps deliberately
 ;; keep their profiles (excalidraw's drawings live in browser storage).
-{:label "Web" :category :explore
+{:kind :exec :label "Web" :category :explore
  :exec ["chromium" "--guest" "--class=ujima-web" "--user-data-dir=/tmp/ujima-web" "--no-first-run"]
  :class "ujima-web"}

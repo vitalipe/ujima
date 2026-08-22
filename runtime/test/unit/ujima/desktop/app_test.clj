@@ -15,13 +15,13 @@
 
 
 (def ^:private catalog-apps               ; dir name = :id (the scanner's contract)
-  {"paint" {:label "Paint" :exec ["tuxpaint" "--nolockfile"] :class "TuxPaint.TuxPaint"}
-   "web"   {:label "Web"   :exec ["chromium"] :class "ujima-web"}
-   "sky"   {:label "Sky"   :exec ["stellarium"] :mode :fullscreen :class "stellarium"}
+  {"paint" {:kind :exec :label "Paint" :exec ["tuxpaint" "--nolockfile"] :class "TuxPaint.TuxPaint"}
+   "web"   {:kind :exec :label "Web"   :exec ["chromium"] :class "ujima-web"}
+   "sky"   {:kind :exec :label "Sky"   :exec ["stellarium"] :mode :fullscreen :class "stellarium"}
    ;; :system = no launcher tile, pinned in the dock instead. console pins only once a token
    ;; unhides it, so it ships hidden.
-   "files"   {:label "Files"   :category :system :exec ["pcmanfm"] :class "pcmanfm"}
-   "console" {:label "Console" :category :system :hidden true :exec ["sh" "run.sh"] :class "ujima-console"}})
+   "files"   {:kind :exec :label "Files"   :category :system :exec ["pcmanfm"] :class "pcmanfm"}
+   "console" {:kind :exec :label "Console" :category :system :hidden true :exec ["sh" "run.sh"] :class "ujima-console"}})
 
 (defn- scan-root!
   "Materialize {dir-name spec} as a temp scan root: <root>/<dir>/app.edn per entry."
@@ -94,9 +94,9 @@
 ;; --- catalog scan: dirs with app.edn, abc order, app-OS split (bad content never throws) ---
 
 (deftest scan-ids-from-dir-names-in-abc-order
-  (let [root (scan-root! {"zebra" {:label "Z" :exec ["z"]}
-                          "alpha" {:label "A" :exec ["a"]}
-                          "mango" {:label "M" :exec ["m"]}})]
+  (let [root (scan-root! {"zebra" {:kind :exec :label "Z" :exec ["z"]}
+                          "alpha" {:kind :exec :label "A" :exec ["a"]}
+                          "mango" {:kind :exec :label "M" :exec ["m"]}})]
     (fs/create-dirs (fs/path root "payload-only"))            ; no app.edn -> not an app
     (spit (str (fs/path root "stray.txt")) "not a dir")
     (spit (str (fs/path root "alpha" "icon.svg")) "<svg/>")   ; alpha owns its face
@@ -110,11 +110,11 @@
     (fs/delete-tree root)))
 
 (deftest scan-skips-broken-apps-and-keeps-the-rest
-  (let [root (scan-root! {"good" {:label "Good" :exec ["x"]}})]
+  (let [root (scan-root! {"good" {:kind :exec :label "Good" :exec ["x"]}})]
     (fs/create-dirs (fs/path root "garbage"))
-    (spit (str (fs/path root "garbage" "app.edn")) "{:label \"oops\"")     ; truncated edn
+    (spit (str (fs/path root "garbage" "app.edn")) "{:kind :exec :label \"oops\"")     ; truncated edn
     (fs/create-dirs (fs/path root "specless"))
-    (spit (str (fs/path root "specless" "app.edn")) (pr-str {:label "NoExec"}))
+    (spit (str (fs/path root "specless" "app.edn")) (pr-str {:kind :exec :label "NoExec"}))
     (let [c (app/load-catalog [root] "fallback-launcher.svg")]
       (is (= [:good] (:order c)) "bad apps skipped loudly; the rest boot"))
     (fs/delete-tree root)))
@@ -124,10 +124,10 @@
     (is (= [] (:order c)) "no app content can stop the session")))
 
 (deftest scan-merges-roots-later-wins-position-stable
-  (let [base  (scan-root! {"paint" {:label "Paint" :exec ["p"]}
-                           "web"   {:label "Web"   :exec ["w"]}})
-        extra (scan-root! {"paint" {:label "Paint v2" :exec ["p2"]}
-                           "amp"   {:label "Amp"   :exec ["a"]}})]
+  (let [base  (scan-root! {"paint" {:kind :exec :label "Paint" :exec ["p"]}
+                           "web"   {:kind :exec :label "Web"   :exec ["w"]}})
+        extra (scan-root! {"paint" {:kind :exec :label "Paint v2" :exec ["p2"]}
+                           "amp"   {:kind :exec :label "Amp"   :exec ["a"]}})]
     (let [c (app/load-catalog [base extra] "fallback-launcher.svg")]
       (is (= [:amp :paint :web] (:order c)) "union, abc on id — an override keeps its position")
       (is (= "Paint v2" (get-in c [:by-id :paint :label])) "later root wins on :id")
@@ -136,7 +136,7 @@
     (fs/delete-tree extra)))
 
 (deftest scan-missing-second-root-is-not-fatal
-  (let [base (scan-root! {"paint" {:label "Paint" :exec ["p"]}})]
+  (let [base (scan-root! {"paint" {:kind :exec :label "Paint" :exec ["p"]}})]
     (let [c (app/load-catalog [base "/mnt/nope/apps"] "fallback-launcher.svg")]
       (is (= [:paint] (:order c)) "fresh storage = normal, baked apps unaffected"))
     (fs/delete-tree base)))
@@ -159,9 +159,9 @@
     (fs/create-dirs (fs/path root "mystery"))                 ; unknown kind -> skip (fwd compat)
     (spit (str (fs/path root "mystery" "app.edn")) (pr-str {:kind :flatpak :label "M"}))
     (fs/create-dirs (fs/path root "typo"))                    ; relative argv[0] absent -> skip
-    (spit (str (fs/path root "typo" "app.edn")) (pr-str {:label "T" :exec ["./nope"]}))
+    (spit (str (fs/path root "typo" "app.edn")) (pr-str {:kind :exec :label "T" :exec ["./nope"]}))
     (fs/create-dirs (fs/path root "payload"))                 ; relative argv[0] present -> in
-    (spit (str (fs/path root "payload" "app.edn")) (pr-str {:label "P" :exec ["./run.sh"]}))
+    (spit (str (fs/path root "payload" "app.edn")) (pr-str {:kind :exec :label "P" :exec ["./run.sh"]}))
     (spit (str (fs/path root "payload" "run.sh")) "#!/bin/sh\n")
     (let [c (app/load-catalog [root] "fallback-launcher.svg")]
       (is (= [:board :lib :payload] (:order c)) "broken/unknown skipped, valid kinds in")
@@ -174,8 +174,6 @@
   (let [bins {:open-web-app-bin "open-web-app" :serve-web-app-bin "serve-web-app"}]
     (is (= ["tuxpaint" "--nolockfile"]
            (act/app->runnable bins {:kind :exec :exec ["tuxpaint" "--nolockfile"] :dir "/x"})))
-    (is (= ["tuxpaint"] (act/app->runnable bins {:exec ["tuxpaint"] :dir "/x"}))
-        ":kind defaults to :exec")
     (is (= ["open-web-app" "http://x.local/" "ujima-lib"]
            (act/app->runnable bins {:kind :link :url "http://x.local/" :class "ujima-lib"})))
     (is (= ["serve-web-app" "/apps/board/app" "index.html" "8100" "ujima-board"]

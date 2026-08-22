@@ -6,8 +6,11 @@
    scope deaths ride one listener thread (i3/emit!)."
   (:require [babashka.fs :as fs]
             [clojure.string :as str]
+            [malli.core  :as m]
+            [malli.error :as me]
             [lib.io    :as io]
             [ujima.log :as log]
+            [schema.ujima.app :as defs]
             [ujima.linux.i3 :as i3]
             [ujima.desktop.app.catalog    :as catalog]
             [ujima.desktop.app.act        :as act]
@@ -21,47 +24,47 @@
 (def ^:private browser-app :web)
 
 
-(defn- validate-kind!
-  "Throw unless SPEC is launchable for its :kind (default :exec); catalog/validate-app! keeps
-   the identity core. Packaging errors fail at scan: a broken app is absent and logged. An
-   unknown :kind throws too — a future kind degrades to absent on an OS that doesn't know it."
-  [{:keys [kind exec entry port url dir] :as spec}]
-  (case (or kind :exec)
-    :exec    (do (when-not (and (vector? exec) (seq exec))
-                   (throw (ex-info "app spec missing :exec" {})))
-                 (let [argv0 (first exec)]
-                   ;; slash-relative argv[0] resolves against the app dir (spawn cwd) — verify
-                   ;; it exists; bare commands are PATH lookups and absolute paths are trusted
-                   (when (and (string? argv0)
-                              (str/includes? argv0 "/")
-                              (not (str/starts-with? argv0 "/"))
-                              (not (fs/exists? (fs/path dir argv0))))
-                     (throw (ex-info "relative argv[0] not in app dir" {:argv0 argv0})))))
-    :web-app (do (when-not (and entry port)
-                   (throw (ex-info "web-app needs :entry and :port" {})))
-                 (when-not (fs/exists? (fs/path dir "app" (str entry)))
-                   (throw (ex-info "web-app entry not found under app/" {:entry entry}))))
-    :link    (when-not url (throw (ex-info "link missing :url" {})))
-    (throw (ex-info "unknown app :kind" {:kind kind})))
+(defn- validate-shape!
+  "Throw, naming the fields, unless SPEC is an app.edn per schema.ujima.app."
+  [spec]
+  (when-not (m/validate defs/spec spec)
+    (throw (ex-info (str "invalid app.edn: " (pr-str (me/humanize (m/explain defs/spec spec)))) {})))
+  spec)
+
+
+(defn- validate-files!
+  "Throw unless what SPEC points at exists under its dir: a web-app's :entry, and a
+   slash-relative argv[0] (bare commands are PATH lookups, absolute paths are trusted).
+   Packaging errors fail at scan: a broken app is absent and logged."
+  [{:keys [kind exec entry dir] :as spec}]
+  (case kind
+    :exec    (let [argv0 (first exec)]
+               (when (and (str/includes? argv0 "/")
+                          (not (str/starts-with? argv0 "/"))
+                          (not (fs/exists? (fs/path dir argv0))))
+                 (throw (ex-info "relative argv[0] not in app dir" {:argv0 argv0}))))
+    :web-app (when-not (fs/exists? (fs/path dir "app" entry))
+               (throw (ex-info "web-app entry not found under app/" {:entry entry})))
+    :link    nil)
   spec)
 
 
 (defn- read-app
   "DIR/app.edn -> spec + what scanning resolves: :id = the dir name, :dir = the dir (spawn cwd),
    :icon = the dir's icon.svg or FALLBACK-ICON, and for the web kinds a derived :class
-   ujima-<id> (an authored :class is ignored). Bad content logs and returns nil — an app can
-   break itself, never the session."
+   ujima-<id>. Bad content logs and returns nil — an app can break itself, never the session."
   [fallback-icon dir]
   (try
     (let [icon (fs/path dir "icon.svg")
           id   (keyword (fs/file-name dir))]
       (-> (io/slurp-edn (str (fs/path dir "app.edn")))
+          (validate-shape!)
           (assoc :id id :dir (str dir)
                  :icon (if (fs/exists? icon) (str icon) fallback-icon))
           (as-> spec (if (#{:web-app :link} (:kind spec))
                        (assoc spec :class (str "ujima-" (name id)))
                        spec))
-          (validate-kind!)
+          (validate-files!)
           (catalog/validate-app!)))
     (catch Throwable e
       (log/error "bad app.edn — app skipped" {:dir (str dir) :error (ex-message e)})

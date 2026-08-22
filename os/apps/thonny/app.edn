@@ -1,3 +1,3 @@
-{:label "Thonny" :category :code
+{:kind :exec :label "Thonny" :category :code
  :exec ["python3" "app/run.py"]   ; UjimaOS launcher: simple-mode pin + patches (app/run.py)
  :class "Thonny"}  ; xprop-verified

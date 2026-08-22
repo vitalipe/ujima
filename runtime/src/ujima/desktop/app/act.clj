@@ -25,9 +25,9 @@
 (defn app->runnable
   "BINS + SPEC -> argv, at spawn time — the one seam where a kind becomes a process. :exec runs
    as-authored (cwd = the app dir); :web-app serves <dir>/app on :port; :link opens :url.
-   Trusts scan-time validate-kind!."
+   Trusts the scan's validation."
   [{:keys [open-web-app-bin serve-web-app-bin]} {:keys [kind exec dir entry port url class]}]
-  (case (or kind :exec)
+  (case kind
     :exec    (vec exec)
     :web-app [serve-web-app-bin (str (fs/path dir "app")) (str entry) (str port) class]
     :link    [open-web-app-bin (str url) class]))

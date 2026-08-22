@@ -1,5 +1,5 @@
 ;; --nolockfile: TuxPaint otherwise refuses to start within 30s of its last launch, so a
 ;; close-and-reopen silently does nothing.
-{:label "Draw" :category :create
+{:kind :exec :label "Draw" :category :create
  :exec ["tuxpaint" "--nolockfile"]
  :class "TuxPaint.TuxPaint"}

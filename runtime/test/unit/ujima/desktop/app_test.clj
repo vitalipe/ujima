@@ -4,7 +4,8 @@
             [lib.shell :as shell]
             [ujima.linux.i3 :as i3]
             [ujima.linux.systemd :as systemd]
-            [ujima.desktop.app :as app]))
+            [ujima.desktop.app :as app]
+            [ujima.desktop.app.act :as act]))
 
 
 ;; The actor loop with i3 + scopes stubbed. world* holds the tree + focused ws + the set of live
@@ -171,13 +172,13 @@
 (deftest app->runnable-computes-argv-per-kind
   (let [bins {:open-web-app-bin "open-web-app" :serve-web-app-bin "serve-web-app"}]
     (is (= ["tuxpaint" "--nolockfile"]
-           (app/app->runnable bins {:kind :exec :exec ["tuxpaint" "--nolockfile"] :dir "/x"})))
-    (is (= ["tuxpaint"] (app/app->runnable bins {:exec ["tuxpaint"] :dir "/x"}))
+           (act/app->runnable bins {:kind :exec :exec ["tuxpaint" "--nolockfile"] :dir "/x"})))
+    (is (= ["tuxpaint"] (act/app->runnable bins {:exec ["tuxpaint"] :dir "/x"}))
         ":kind defaults to :exec")
     (is (= ["open-web-app" "http://x.local/" "ujima-lib"]
-           (app/app->runnable bins {:kind :link :url "http://x.local/" :class "ujima-lib"})))
+           (act/app->runnable bins {:kind :link :url "http://x.local/" :class "ujima-lib"})))
     (is (= ["serve-web-app" "/apps/board/app" "index.html" "8100" "ujima-board"]
-           (app/app->runnable bins {:kind :web-app :dir "/apps/board" :entry "index.html"
+           (act/app->runnable bins {:kind :web-app :dir "/apps/board" :entry "index.html"
                                     :port 8100 :class "ujima-board"}))
         "port coerced to string, serve dir = <dir>/app")))
 
@@ -232,7 +233,7 @@
 (deftest close-XX-in-window-force-kills
   (setup! [(win "paint" :focused? true :con 7)] "paint" :scopes #{:paint})
   (stubbed
-    #(with-redefs [app/force-lo-ms 0]                    ; make any 2nd ✕ count as deliberate
+    #(with-redefs [act/force-lo-ms 0]                    ; make any 2nd ✕ count as deliberate
        (app/close-focused!)
        (app/close-focused!)))
   (is (= [[:kill]] (fx-of :kill)) "one polite WM_DELETE")
@@ -242,7 +243,7 @@
   ;; a save-prompt steals focus to a NEW con, so the 2nd ✕ isn't the same window -> no force
   (setup! [(win "paint" :focused? true :con 7)] "paint" :scopes #{:paint})
   (stubbed
-    #(with-redefs [app/force-lo-ms 0]
+    #(with-redefs [act/force-lo-ms 0]
        (app/close-focused!)                              ; ✕ con 7
        (swap! world* assoc :wins [(win "paint" :focused? true :con 9 :wtype "dialog")])
        (app/close-focused!)))                            ; ✕ hits the dialog (con 9), not 7

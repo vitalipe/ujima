@@ -1,44 +1,31 @@
 (ns ujima.desktop.app
-  "The app layer: a small write side (run / switch / close / home / cycle) and a projection.
-   The WORKSPACE is an app's identity — app :write lives on workspace \"write\", home is \"1\" —
-   so we never match on WM_CLASS. Each launch lands in a systemd --user scope
-   (ujima.linux.systemd), which answers 'is this app alive?' (the launch gate + the go-home
-   backstop) and 'kill it' (force-close). i3 owns placement/focus; the tree owns display.
-   Verbs + i3 events + scope-death events all ride one listener thread (i3/emit!)."
+  "The app layer: the catalog scan, the listener loop — observe, act, re-observe, project — and
+   the verbs that feed it. The WORKSPACE is an app's identity (app :write lives on workspace
+   \"write\", home is \"1\"), so windows are never matched on WM_CLASS. Each launch lands in a
+   systemd --user scope: alive? and kill. i3 owns placement and focus. Verbs, i3 events and
+   scope deaths ride one listener thread (i3/emit!)."
   (:require [babashka.fs :as fs]
             [clojure.string :as str]
             [lib.io    :as io]
-            [lib.shell :as shell]
             [ujima.log :as log]
-            [ujima.linux.i3      :as i3]
-            [ujima.linux.systemd :as systemd]
-            [ujima.desktop.app.catalog :as catalog]))
+            [ujima.linux.i3 :as i3]
+            [ujima.desktop.app.catalog    :as catalog]
+            [ujima.desktop.app.act        :as act]
+            [ujima.desktop.app.projection :as proj :refer [home-ws]]))
 
 
 (defonce ^:private catalog* (atom nil))
 (defonce ^:private prev*    (atom nil))   ; last snapshot, the prv of (next prv)
 (defonce ^:private targets* (atom []))
-(defonce ^:private close*   (atom nil))   ; last ✕: {:con :app :at} — drives con-id go-home + ✕✕
 
 
-(def ^:private home-ws     "1")
 (def ^:private browser-app :web)
-(def ^:private launcher-class "ujima-launcher")   ; the shell's own window: not an app, lives home
-(def force-lo-ms 1000)                     ; a 2nd ✕ sooner = accidental double-click (ignore)
-(def force-hi-ms 3000)                     ; a 2nd ✕ later = a fresh close, not an escalation
-
-
-;; the desugar targets (:open-web-app-bin :serve-web-app-bin), config via init! — spawn-time
-;; state because app->runnable's internal callers sit on the listener thread
-(def ^:private bins* (atom {}))
 
 
 (defn- validate-kind!
-  "Throw unless SPEC is launchable for its :kind (default :exec) — the loader's half of app
-   validity (catalog/validate-app! keeps the identity core; app->runnable trusts what passes
-   here). Packaging errors fail HERE, at scan: a broken app is absent-and-logged, never a
-   tile that is dead on click. Unknown :kind throws too — a future kind degrades to absent
-   on an OS that doesn't know it."
+  "Throw unless SPEC is launchable for its :kind (default :exec); catalog/validate-app! keeps
+   the identity core. Packaging errors fail at scan: a broken app is absent and logged. An
+   unknown :kind throws too — a future kind degrades to absent on an OS that doesn't know it."
   [{:keys [kind exec entry port url dir] :as spec}]
   (case (or kind :exec)
     :exec    (do (when-not (and (vector? exec) (seq exec))
@@ -61,12 +48,10 @@
 
 
 (defn- read-app
-  "One scan entry: DIR/app.edn -> spec + what scanning resolves: :id = the dir name, :dir =
-   the dir itself (spawn cwd; relative paths in the spec resolve there), :icon = the dir's
-   icon.svg (FALLBACK-ICON when absent — icon resolution is a loader concern, so the catalog
-   always carries a real path), and for the web kinds a DERIVED :class ujima-<id>
-   (authored :class ignored — the kind owns window identity). Bad content logs and returns
-   nil — an app can break itself, never the session."
+  "DIR/app.edn -> spec + what scanning resolves: :id = the dir name, :dir = the dir (spawn cwd),
+   :icon = the dir's icon.svg or FALLBACK-ICON, and for the web kinds a derived :class
+   ujima-<id> (an authored :class is ignored). Bad content logs and returns nil — an app can
+   break itself, never the session."
   [fallback-icon dir]
   (try
     (let [icon (fs/path dir "icon.svg")
@@ -85,9 +70,8 @@
 
 
 (defn- scan-root
-  "All valid app specs under ROOT, in abc dir order: each subdir directly containing an
-   app.edn is an app (payload-only dirs are invisible). A missing root contributes nothing —
-   warn, not error: a fresh storage partition is a normal state."
+  "All valid app specs under ROOT, in abc dir order: each subdir holding an app.edn is an app.
+   A missing root contributes nothing — a warning, a fresh storage partition is normal."
   [fallback-icon root]
   (if (and root (fs/directory? (str root)))
     (into [] (comp (filter fs/directory?)
@@ -98,11 +82,9 @@
 
 
 (defn load-catalog
-  "Build the catalog from ROOTS (a vector, scanned in index order): specs merge by :id —
-   later root wins, so a storage app can override a baked one; the final order is abc on id
-   (an override keeps its tile position). Apps are external data to the OS: bad entries are
-   skipped loudly, a missing root contributes nothing, and the session boots regardless —
-   an empty catalog is an error line, not a crash."
+  "The catalog from ROOTS, scanned in order: specs merge by :id, later root wins, so a storage
+   app can override a baked one; the final order is abc on id. Bad entries are skipped loudly,
+   and the session boots regardless — an empty catalog is an error line, not a crash."
   [roots fallback-icon]
   (let [merged (reduce (fn [m {:keys [id] :as app}]
                          (when (contains? m id)
@@ -119,55 +101,25 @@
 (defn init! [{:keys [catalog converge-targets] :as cfg}]
   (reset! catalog* catalog)
   (reset! prev*    nil)
-  (reset! close*   nil)
   (reset! targets* (vec converge-targets))
-  (reset! bins*    (select-keys cfg [:open-web-app-bin :serve-web-app-bin]))
+  (act/init! (select-keys cfg [:open-web-app-bin :serve-web-app-bin]))
   catalog)
 
 
 (defn catalog-listing [] (catalog/listing @catalog*))
 
 (defn icon-path
-  "The catalog-resolved icon path for ID (nil for an unknown app) — the assets/app-icon/<id> route
-   serves this file, so the webview launcher never touches the filesystem layout."
+  "The catalog-resolved icon path for ID; nil for an unknown app."
   [id]
   (get-in @catalog* [:by-id id :icon]))
 
 
-;; --- observe + projection (read side; the tree = display) ---
+;; --- the loop: observe, act, re-observe, project ---
 
 (defn- observe! []
   {:focused-ws (i3/focused-workspace)
-   :ws->wins   (group-by :workspace (i3/window-facts (i3/get-tree!)))})
-
-
-(defn- app-of-ws [ws]
-  (when (and ws (not= ws home-ws))
-    (first (filter #(= (name %) ws) (:order @catalog*)))))
-
-
-(defn- open-apps
-  "App ids with windows on their workspace, in catalog (= dock) order — the one definition
-   of 'open', shared by the projection (dock/launcher) and the Alt+Tab ring."
-  [ws->wins]
-  (filter #(seq (get ws->wins (name %))) (:order @catalog*)))
-
-
-(defn- entry [id ws->wins]
-  (let [a    (get-in @catalog* [:by-id id])
-        wins (get ws->wins (name id))]
-    {:id id :label (:label a) :icon (:icon a) :category (:category a)
-     :title (:title (or (first (filter :focused? wins)) (first wins)))
-     ;; detected (the window is really fullscreen) OR declared (:mode) — declared is the escape
-     ;; hatch for an app that draws full-screen without setting the fullscreen state
-     :fullscreen (boolean (or (some :fullscreen? wins) (= :fullscreen (:mode a))))}))
-
-
-(defn- projection [{:keys [focused-ws ws->wins]}]
-  (let [open (mapv #(entry % ws->wins) (open-apps ws->wins))]
-    {:running open
-     :catalog (catalog/listing @catalog*)     ; listing, not raw entries — those hold :env
-     :current (when-let [id (app-of-ws focused-ws)] (entry id ws->wins))}))
+   :ws->wins   (group-by :workspace (i3/window-facts (i3/get-tree!)))
+   :catalog    @catalog*})
 
 
 (defn- converge! [snapshot]
@@ -176,149 +128,23 @@
     (doseq [t @targets*] (t snapshot prv))))
 
 
-;; --- act (write side; listener thread only). scope = lifecycle ---
-
-(defn app->runnable
-  "BINS (the desugar targets) + SPEC -> argv, computed at spawn time — the one seam where a
-   kind becomes a process (bwrap wrapping, per-user paths etc. hook here later). :exec runs
-   as-authored (cwd = the app dir, so relative paths resolve there; bare commands stay PATH
-   lookups); :web-app serves <dir>/app on :port and opens it kiosk; :link opens :url kiosk.
-   Trusts scan-time validate-kind!."
-  [{:keys [open-web-app-bin serve-web-app-bin]} {:keys [kind exec dir entry port url class]}]
-  (case (or kind :exec)
-    :exec    (vec exec)
-    :web-app [serve-web-app-bin (str (fs/path dir "app")) (str entry) (str port) class]
-    :link    [open-web-app-bin (str url) class]))
-
-
-(defn- do-run!
-  "Switch to the app's workspace, then launch into a scope only if it isn't already up. The
-   scope is the gate: an app still cold-starting counts as up, so a re-tap never double-spawns."
-  [{:keys [id dir] :as app} extra]
-  (i3/switch-workspace! (name id))
-  (when-not (systemd/active? id)
-    (try
-      (systemd/spawn-scoped! id (into (app->runnable @bins* app) extra) dir
-                             (when-some [env (:env app)] {:extra-env env}))
-      (log/info "app launched" {:app id})
-      (catch Throwable e
-        (log/error "app launch failed" {:app id :error (ex-message e)})
-        (i3/switch-workspace! home-ws)))))
-
-
-(defn- do-open-url!
-  "A link -> the Web app. Warm: a plain messenger joins the running instance (its window lands
-   in the existing scope). Cold: a normal scoped launch with the url. Either way, switch there."
-  [{:keys [id dir] :as app} url]
-  (if (systemd/active? id)
-    (do (apply shell/sh {:out :inherit :err :inherit :dir dir} (conj (app->runnable @bins* app) url))
-        (i3/switch-workspace! (name id)))
-    (do-run! app [url])))
-
-
-(defn- do-close!
-  "First ✕ = polite WM_DELETE (the app owns save-prompts etc.), arming a record. A deliberate 2nd
-   ✕ on the SAME still-focused window in the 1-3s window = force-kill the scope. No focused window
-   on an app workspace (zombie / launch to abort) = force-kill too."
-  [{:keys [focused-ws ws->wins]}]
-  (when-let [app (app-of-ws focused-ws)]
-    (let [con (:con-id (first (filter :focused? (get ws->wins focused-ws))))
-          now (System/currentTimeMillis)
-          rec @close*]
-      (cond
-        (nil? con)
-        (do (systemd/stop! app) (reset! close* nil))
-
-        (and rec (= app (:app rec)) (= con (:con rec))
-             (<= force-lo-ms (- now (:at rec)) force-hi-ms))
-        (do (log/warn "force-close" {:app app})
-            (systemd/stop! app) (reset! close* nil))
-
-        :else
-        (do (i3/kill-focused!)
-            (reset! close* {:con con :app app :at now}))))))
-
-
-(defn- do-cycle!
-  "Alt+Tab: hop the ring of RUNNING apps in catalog order, so the cycle matches the dock
-   left-to-right. HOME is deliberately NOT a stop (HW: passing through the launcher felt
-   weird) — from outside the ring (home, an app ws emptying mid-close) enter at the first
-   app going forward / the last going backward. No apps running = no-op."
-  [{:keys [focused-ws ws->wins]} step]
-  (let [ring (mapv name (open-apps ws->wins))
-        idx  (.indexOf ring focused-ws)]
-    (when (seq ring)
-      (let [target (if (neg? idx)
-                     (if (pos? step) (first ring) (peek ring))
-                     (nth ring (mod (+ idx step) (count ring))))]
-        (when (not= target focused-ws)
-          (i3/switch-workspace! target))))))
-
-
-(defn- go-home-if-empty!
-  "Go home only if we're looking at APP-ID's now-empty workspace — idempotent across the con-id
-   and scope-death triggers, and never fires for a background app dying elsewhere."
-  [app-id {:keys [focused-ws ws->wins]}]
-  (when (and (= focused-ws (name app-id)) (empty? (get ws->wins focused-ws)))
-    (log/info "empty app workspace — going home" {:ws focused-ws})
-    (i3/switch-workspace! home-ws)))
-
-
-(defn- settle-floaters!
-  "chromium --app auto-floats (fixed size hints) and sets class/role only AFTER mapping, so i3's
-   for_window can't catch it. Un-float floating non-dialog windows on app workspaces. Idempotent."
-  [{:keys [ws->wins]}]
-  (doseq [[ws wins] ws->wins
-          {:keys [con-id floating? wtype]} wins
-          :when (and (app-of-ws ws) floating?
-                     (not (#{"dialog" "utility" "splash"} wtype)))]
-    (i3/command? (format "[con_id=%d]" con-id) "floating" "disable")))
-
-
-(defn- route-windows!
-  "The orphan backstop: a window that mapped on the wrong workspace (focus moved away during the
-   launch) is moved where it belongs, matched by WM_CLASS — INCLUDING the app's own dialogs
-   (e.g. Inkscape's startup dialog, which maps before its main window), which must land with their
-   app, not strand on home. The launcher is not an app, so the catalog cannot place it: without
-   its own rule it inherits whatever was focused when it mapped, and an app opened before the
-   shell is up (a token stick at boot) leaves home empty. Only class-matching windows move; no
-   focus change; idempotent."
-  [{:keys [ws->wins]}]
-  (let [by-class (:by-class @catalog*)]
-    (doseq [[ws wins] ws->wins
-            {:keys [con-id class]} wins
-            :let  [target (if (= launcher-class class)
-                            home-ws
-                            (some-> (get by-class class) name))]
-            :when (and target (not= ws target))]
-      (i3/command? (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" target))))
-
-
 (defn handle-event! [ev]
   (case (:type ev)
-    :app/run      (do-run! (:app ev) (:extra ev []))
-    :app/switch   (i3/switch-workspace! (name (:id (:app ev))))
-    :app/open-url (do-open-url! (:app ev) (:url ev))
-    :app/close    (do-close! (observe!))
-    :app/home     (i3/switch-workspace! home-ws)
-    :app/cycle    (do-cycle! (observe!) (:step ev))
-    :window/closed (when-let [rec @close*]                      ; the window the user ✕'d closed
-                     (when (= (:con-id ev) (:con rec))
-                       (reset! close* nil)
-                       (let [app (:app rec) w (observe!)]
-                         ;; its workspace is now empty -> the user's close took: make sure the app is
-                         ;; really gone (a still-launching process would else re-map a stray window)
-                         (when (empty? (get (:ws->wins w) (name app)))
-                           (systemd/stop! app)
-                           (go-home-if-empty! app w)))))
-    :scope/died    (go-home-if-empty! (:app-id ev) (observe!))  ; crash / self-quit backstop
+    :app/run       (act/run! (:app ev) (:extra ev []))
+    :app/switch    (i3/switch-workspace! (name (:id (:app ev))))
+    :app/open-url  (act/open-url! (:app ev) (:url ev))
+    :app/close     (act/close! (observe!))
+    :app/home      (i3/switch-workspace! home-ws)
+    :app/cycle     (act/cycle! (observe!) (:step ev))
+    :window/closed (act/window-closed! (observe!) (:con-id ev))
+    :scope/died    (act/go-home-if-empty! (observe!) (:app-id ev))   ; crash / self-quit
     :catalog/update-app (swap! catalog* update-in [:by-id (:id ev)] merge (:changes ev))
     nil)
 
   (let [w (observe!)]
-    (settle-floaters! w)
-    (route-windows! w)
-    (-> w projection converge!)))
+    (act/settle-floaters! w)
+    (act/route-windows! w)
+    (-> w proj/projection converge!)))
 
 
 ;; --- verbs: validate, then ride the pipe ---
@@ -328,9 +154,9 @@
       (throw (ex-info "unknown app" {:error :app/unknown-app :id id}))))
 
 (defn update-app!
-  "Merge CHANGES into ID's catalog entry (:env for launches, :hidden for the shell). Emits like
-   every verb, so the listener thread is the only writer; the event carries the changes, not a
-   whole entry, so two of them can't clobber each other. A boot reloads the catalog, resetting all."
+  "Merge CHANGES (:env, :hidden) into ID's catalog entry. Emits like every verb, so the listener
+   thread is the only writer; the event carries the changes, not a whole entry, so two can't
+   clobber each other. A boot reloads the catalog."
   [id changes]
   (resolve! id)
   (i3/emit! {:type :catalog/update-app :id id :changes changes}))

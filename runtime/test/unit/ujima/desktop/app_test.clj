@@ -5,7 +5,8 @@
             [ujima.linux.i3 :as i3]
             [ujima.linux.systemd :as systemd]
             [ujima.desktop.app :as app]
-            [ujima.desktop.app.act :as act]))
+            [ujima.desktop.app.act :as act]
+            [ujima.desktop.app.catalog :as catalog]))
 
 
 ;; The actor loop with i3 + scopes stubbed. world* holds the tree + focused ws + the set of live
@@ -410,7 +411,7 @@
 
 (deftest an-app-env-reaches-its-launches-and-only-its-own
   (setup! [] "1")
-  (stubbed #(do (app/update-app! :paint {:env {"UJIMA_CIRCLE_TOKEN" "deadbeef"}})
+  (stubbed #(do (catalog/merge-app! :paint {:env {"UJIMA_CIRCLE_TOKEN" "deadbeef"}})
                 (app/run! :paint)))
   (is (= [[:spawn-opts :paint {:extra-env {"UJIMA_CIRCLE_TOKEN" "deadbeef"}}]] (fx-of :spawn-opts)))
 
@@ -422,7 +423,7 @@
 (deftest an-app-env-survives-a-relaunch
   ;; closed and reopened from the bar is the same launch path — it must still be handed the env
   (setup! [] "1")
-  (stubbed #(do (app/update-app! :paint {:env {"T" "1"}})
+  (stubbed #(do (catalog/merge-app! :paint {:env {"T" "1"}})
                 (app/run! :paint)))
   (reset! world* {:wins [] :focused-ws "1" :scopes #{}})   ; the scope is gone, the env is not
   (reset! fx* [])
@@ -432,25 +433,25 @@
 
 (deftest clearing-an-app-env-stops-it-reaching-the-spawn
   (setup! [] "1")
-  (stubbed #(do (app/update-app! :paint {:env {"T" "1"}})
-                (app/update-app! :paint {:env nil})
+  (stubbed #(do (catalog/merge-app! :paint {:env {"T" "1"}})
+                (catalog/merge-app! :paint {:env nil})
                 (app/run! :paint)))
   (is (empty? (fx-of :spawn-opts)) "no env = no opts at all, not an empty :extra-env"))
 
 
-;; --- runtime entry changes: one door, and the launch sees them ---
+;; --- runtime entry changes ---
 
-(deftest an-entry-change-lands-on-the-listener-thread
+(deftest an-entry-change-is-visible-at-once
   (setup! [] "1")
-  (stubbed #(app/update-app! :console {:hidden false}))
+  (catalog/merge-app! :console {:hidden false})
   (is (false? (:hidden (first (filter #(= :console (:id %)) (app/catalog-listing)))))
-      "the verb only emits — the handler is what writes the catalog"))
+      "synchronous: a launch right after it sees the change"))
 
 
 (deftest changes-to-different-fields-do-not-clobber-each-other
   (setup! [] "1")
-  (stubbed #(do (app/update-app! :console {:env {"T" "1"}})
-                (app/update-app! :console {:hidden false})))
+  (stubbed #(do (catalog/merge-app! :console {:env {"T" "1"}})
+                (catalog/merge-app! :console {:hidden false})))
   (stubbed #(app/run! :console))
   (is (= [[:spawn-opts :console {:extra-env {"T" "1"}}]] (fx-of :spawn-opts))
       "the second change carried only :hidden — it must not drop the env the first one set"))
@@ -458,5 +459,4 @@
 
 (deftest an-unknown-app-cannot-be-changed
   (setup! [] "1")
-  (is (thrown? Exception (app/update-app! :nope {:hidden false}))
-      "resolve! at emit time, like every other verb"))
+  (is (thrown? Exception (catalog/merge-app! :nope {:hidden false}))))

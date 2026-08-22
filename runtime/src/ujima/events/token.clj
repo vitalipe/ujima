@@ -10,6 +10,7 @@
             [ujima.control       :as control]
             [ujima.log           :as log]
             [ujima.desktop.app   :as app]
+            [ujima.desktop.app.catalog :as catalog]
             [ujima.linux.systemd :as systemd]))
 
 
@@ -61,7 +62,7 @@
 
 (defn- open! [token before]
   (swap! eject-gen* inc)                          ; a pending close is now stale
-  (app/update-app! console {:env {token-env token} :hidden false})
+  (catalog/merge-app! console {:env {token-env token} :hidden false})
   (when before
     (log/warn "circle token replaced — a console already running keeps the old one until it closes"))
   ;; app/run! switches workspace BEFORE its own active? gate, so ask here: a stick that
@@ -78,7 +79,7 @@
     (future
       (Thread/sleep eject-grace-ms)
       (when (= gen @eject-gen*)                   ; nothing re-armed us in the meantime
-        (app/update-app! console {:env nil :hidden true})
+        (catalog/merge-app! console {:env nil :hidden true})
         (systemd/stop! console)))))
 
 

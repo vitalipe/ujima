@@ -1,5 +1,8 @@
 (ns ujima.desktop.app.catalog
-  "app.edn launch specs indexed by :id, validated loudly. Pure.")
+  "app.edn launch specs indexed by :id, validated loudly — and the one runtime write on them.")
+
+
+(defonce ^:private catalog* (atom nil))
 
 
 (defn validate-app!
@@ -41,3 +44,24 @@
             {:id id :label (:label a) :icon (:icon a) :category (:category a)
              :hidden (boolean (:hidden a))}))
         (:order catalog)))
+
+
+(defn init! [catalog] (reset! catalog* catalog))
+
+(defn current [] @catalog*)
+
+
+(defn resolve!
+  "ID's entry; an unknown app throws."
+  [id]
+  (or (get-in @catalog* [:by-id id])
+      (throw (ex-info "unknown app" {:error :app/unknown-app :id id}))))
+
+
+(defn merge-app!
+  "Merge CHANGES (:env, :hidden) into ID's entry. Synchronous, so a launch that follows sees
+   them; the changes, not a whole entry, so two writers can't clobber each other. A boot
+   reloads the catalog."
+  [id changes]
+  (resolve! id)
+  (swap! catalog* update-in [:by-id id] merge changes))

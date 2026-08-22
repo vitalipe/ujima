@@ -14,7 +14,6 @@
             [ujima.desktop.app.projection :as proj :refer [home-ws]]))
 
 
-(defonce ^:private catalog* (atom nil))
 (defonce ^:private prev*    (atom nil))   ; last snapshot, the prv of (next prv)
 (defonce ^:private targets* (atom []))
 
@@ -99,19 +98,19 @@
 
 
 (defn init! [{:keys [catalog converge-targets] :as cfg}]
-  (reset! catalog* catalog)
+  (catalog/init! catalog)
   (reset! prev*    nil)
   (reset! targets* (vec converge-targets))
   (act/init! (select-keys cfg [:open-web-app-bin :serve-web-app-bin]))
   catalog)
 
 
-(defn catalog-listing [] (catalog/listing @catalog*))
+(defn catalog-listing [] (catalog/listing (catalog/current)))
 
 (defn icon-path
   "The catalog-resolved icon path for ID; nil for an unknown app."
   [id]
-  (get-in @catalog* [:by-id id :icon]))
+  (get-in (catalog/current) [:by-id id :icon]))
 
 
 ;; --- the loop: observe, act, re-observe, project ---
@@ -119,7 +118,7 @@
 (defn- observe! []
   {:focused-ws (i3/focused-workspace)
    :ws->wins   (group-by :workspace (i3/window-facts (i3/get-tree!)))
-   :catalog    @catalog*})
+   :catalog    (catalog/current)})
 
 
 (defn- converge! [snapshot]
@@ -138,7 +137,6 @@
     :app/cycle     (act/cycle! (observe!) (:step ev))
     :window/closed (act/window-closed! (observe!) (:con-id ev))
     :scope/died    (act/go-home-if-empty! (observe!) (:app-id ev))   ; crash / self-quit
-    :catalog/update-app (swap! catalog* update-in [:by-id (:id ev)] merge (:changes ev))
     nil)
 
   (let [w (observe!)]
@@ -149,21 +147,8 @@
 
 ;; --- verbs: validate, then ride the pipe ---
 
-(defn- resolve! [id]
-  (or (get-in @catalog* [:by-id id])
-      (throw (ex-info "unknown app" {:error :app/unknown-app :id id}))))
-
-(defn update-app!
-  "Merge CHANGES (:env, :hidden) into ID's catalog entry. Emits like every verb, so the listener
-   thread is the only writer; the event carries the changes, not a whole entry, so two can't
-   clobber each other. A boot reloads the catalog."
-  [id changes]
-  (resolve! id)
-  (i3/emit! {:type :catalog/update-app :id id :changes changes}))
-
-
-(defn run!           [id] (i3/emit! {:type :app/run    :app (resolve! id)}))
-(defn switch-to!     [id] (i3/emit! {:type :app/switch :app (resolve! id)}))
+(defn run!           [id] (i3/emit! {:type :app/run    :app (catalog/resolve! id)}))
+(defn switch-to!     [id] (i3/emit! {:type :app/switch :app (catalog/resolve! id)}))
 (defn close-focused! []   (i3/emit! {:type :app/close}))
 (defn go-home!       []   (i3/emit! {:type :app/home}))
 (defn cycle!         [step] (i3/emit! {:type :app/cycle :step step}))
@@ -171,6 +156,6 @@
 (defn open-url! [url]
   (when-not (re-matches #"https?://\S+" (str url))
     (throw (ex-info "not an http url" {:error :app/bad-url :url (str url)})))
-  (i3/emit! {:type :app/open-url :app (resolve! browser-app) :url url}))
+  (i3/emit! {:type :app/open-url :app (catalog/resolve! browser-app) :url url}))
 
 (defn current-apps-state [] (or @prev* {:running [] :catalog [] :current nil}))

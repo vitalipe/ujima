@@ -70,7 +70,8 @@
           elapsed (- now @relaunch*)]
       (if (>= elapsed relaunch-ms)
         (do (reset! relaunch* now)
-            (act/run! (catalog/resolve! app-id) []))
+            (act/run! (catalog/resolve! app-id) [])
+            (act/fill-screen! (observe!)))
         (future (Thread/sleep (- relaunch-ms elapsed))
                 (handle-event! {:type :scope/died :app-id app-id}))))))
 
@@ -89,8 +90,7 @@
    :scope/died     (fn [w ev] (act/go-home-if-empty! w (:app-id ev)))})
 
 (def ^:private solo
-  {:scope/died     (fn [w ev] (relaunch-solo! w (:app-id ev)))
-   :window/changed (fn [w _]  (act/keep-fullscreen! w))})
+  {:scope/died (fn [w ev] (relaunch-solo! w (:app-id ev)))})
 
 (def ^:private modes {:multi multi :solo solo})
 
@@ -102,8 +102,8 @@
         to?  (= :solo (:to ev))]
     (reset! mode* (if to? [:solo (:id (:app ev))] :multi))
     (cond
-      to?            (do (act/run! (:app ev) []) (act/keep-fullscreen! (observe!)))
-      (vector? from) (act/unfullscreen! (observe!)))))
+      to?            (do (act/run! (:app ev) []) (act/fill-screen! (observe!)))
+      (vector? from) (act/restore-gaps! (observe!)))))
 
 
 ;; --- the loop: observe, act, re-observe, project ---

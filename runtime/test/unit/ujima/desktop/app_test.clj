@@ -335,11 +335,15 @@
 
 (defn- mode-of [] (:mode (snap)))
 
-(deftest solo-enter-cold-runs-and-fullscreens-P
+(def ^:private gaps0 [[:cmd "gaps" "top" "current" "set" "0"] [:cmd "gaps" "bottom" "current" "set" "0"]])
+(def ^:private gaps-back [[:cmd "gaps" "top" "current" "set" "48"] [:cmd "gaps" "bottom" "current" "set" "68"]])
+
+(deftest solo-enter-cold-runs-and-fills-the-screen
   (setup! [] "1")
   (stubbed #(app/enter-solo-mode! :web))
   (is (= [[:switch "web"]] (fx-of :switch)) "switched to P")
   (is (= [[:spawn :web ["chromium"]]] (fx-of :spawn)) "launched P")
+  (is (= gaps0 (fx-of :cmd)) "bar gaps dropped so P fills the screen — no i3 fullscreen")
   (is (= :solo (mode-of)) "projection reports solo"))
 
 (deftest solo-enter-warm-switches-only
@@ -347,23 +351,13 @@
   (stubbed #(app/enter-solo-mode! :web))
   (is (= [[:switch "web"]] (fx-of :switch)))
   (is (= [] (fx-of :spawn)) "P already up — no re-spawn")
-  ;; already-open P: enter fullscreens it now (not tiled/fs yet)
-  (is (= [[:cmd "[con_id=1]" "fullscreen" "enable"]] (fx-of :cmd))))
+  (is (= gaps0 (fx-of :cmd)) "still fills the screen"))
 
-(deftest solo-window-change-keeps-P-fullscreen
-  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web)      ; enter (fullscreens con 7)
-                (reset! fx* [])
-                (swap! world* assoc :wins [(win "web" :focused? true :con 7 :full? true)])
-                (app/handle-event! {:type :window/changed})))
-  (is (= [] (fx-of :cmd)) "already fullscreen -> no-op (the guard)"))
-
-(deftest solo-window-change-fullscreens-a-dropped-P
-  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web)
-                (reset! fx* [])
-                (app/handle-event! {:type :window/changed})))   ; P not fullscreen -> re-assert
-  (is (= [[:cmd "[con_id=7]" "fullscreen" "enable"]] (fx-of :cmd))))
+(deftest solo-does-not-i3-fullscreen
+  ;; the dialog fix: no fullscreen, so a tiled chooser covers via tabbing instead of hiding
+  (setup! [] "1")
+  (stubbed #(app/enter-solo-mode! :web))
+  (is (empty? (filter #(some #{"fullscreen"} %) (fx-of :cmd))) "never issues i3 fullscreen"))
 
 (deftest solo-scope-death-relaunches-P
   (setup! [] "web" :scopes #{})
@@ -408,20 +402,18 @@
   (is (= [] (fx-of :kill)) "no close in solo")
   (is (= [] (filterv #(= [:switch "1"] %) (fx-of :switch))) "no go-home in solo"))
 
-(deftest solo-exit-unfullscreens-and-returns-to-multi
-  (setup! [(win "web" :focused? true :con 7 :full? true)] "web" :scopes #{:web})
-  (stubbed #(do (reset! world* {:wins [(win "web" :focused? true :con 7 :full? true)]
-                                :focused-ws "web" :scopes #{:web}})
-                (app/enter-solo-mode! :web)
+(deftest solo-exit-restores-gaps-and-returns-to-multi
+  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web)
                 (reset! fx* [])
                 (app/exit-solo-mode!)))
   (is (= :multi (mode-of)))
-  (is (= [[:cmd "[con_id=7]" "fullscreen" "disable"]] (fx-of :cmd)) "P un-fullscreened"))
+  (is (= gaps-back (fx-of :cmd)) "bar gaps put back"))
 
 (deftest exit-solo-when-already-multi-does-nothing
-  (setup! [(win "web" :focused? true :con 7 :full? true)] "web" :scopes #{:web})
+  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
   (stubbed #(app/exit-solo-mode!))     ; never entered solo
-  (is (= [] (fx-of :cmd)) "an F11'd multi app is left fullscreen"))
+  (is (= [] (fx-of :cmd)) "no gap change — a normal desktop is left alone"))
 
 
 (deftest verbs-resolve-or-throw

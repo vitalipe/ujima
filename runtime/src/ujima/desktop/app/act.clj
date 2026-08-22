@@ -130,19 +130,22 @@
   (when-let [{:keys [con-id]} (app-window world)]
     (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "toggle")))
 
-(defn keep-fullscreen!
-  "Fullscreen P's window if it isn't already — the solo invariant, re-run on every tick."
-  [world]
-  (when-let [{:keys [con-id fullscreen?]} (app-window world)]
-    (when-not fullscreen?
-      (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "enable"))))
+(def ^:private bar-top    48)   ; keep in sync with i3 config `gaps top`  + eww topbar height
+(def ^:private bar-bottom 68)   ; keep in sync with i3 config `gaps bottom` + eww dock height
 
-(defn unfullscreen!
-  "Drop P's fullscreen on leaving solo."
-  [world]
-  (when-let [{:keys [con-id fullscreen?]} (app-window world)]
-    (when fullscreen?
-      (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "disable"))))
+(defn fill-screen!
+  "Solo: drop the current workspace's bar gaps so the one app fills the screen. NOT i3
+   fullscreen — so a tiled dialog (the file chooser) still covers via the tabbed layout
+   and stays usable, unlike under fullscreen where it hides behind the main window."
+  [_world]
+  (i3/try-command! "gaps" "top"    "current" "set" "0")
+  (i3/try-command! "gaps" "bottom" "current" "set" "0"))
+
+(defn restore-gaps!
+  "Leaving solo: put the bar gaps back."
+  [_world]
+  (i3/try-command! "gaps" "top"    "current" "set" (str bar-top))
+  (i3/try-command! "gaps" "bottom" "current" "set" (str bar-bottom)))
 
 
 (defn settle-floaters!

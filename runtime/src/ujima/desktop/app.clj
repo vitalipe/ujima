@@ -17,6 +17,7 @@
 
 
 (def ^:private browser-app :web)
+(def lock-app :ujima-desktop-lock)   ; the solo target for lock/unlock
 (def ^:private relaunch-ms 3000)           ; a crashing P relaunches no faster than this
 
 
@@ -102,7 +103,10 @@
     (reset! mode* (if to? [:solo (:id (:app ev))] :multi))
     (cond
       to?            (do (act/run! (:app ev) []) (act/fill-screen! (observe!)))
-      (vector? from) (act/restore-gaps! (observe!)))))
+      (vector? from) (do (act/restore-gaps! (observe!))
+                         (when (= lock-app (second from))   ; left the lock screen: clear it away
+                           (act/stop-app! lock-app)
+                           (i3/switch-workspace! home-ws))))))
 
 
 ;; --- the loop: observe, act, re-observe, project ---
@@ -135,7 +139,11 @@
 
 (defn enter-solo-mode! [id] (handle-event! {:type :app/mode :to :solo :app (catalog/resolve! id)}))
 (defn exit-solo-mode!  []   (handle-event! {:type :app/mode :to :multi}))
-(defn solo? [] (vector? @mode*))
+(defn solo?  [] (vector? @mode*))
+
+(defn lock!   [] (enter-solo-mode! lock-app))     ; lock = solo on the lock app
+(defn unlock! [] (exit-solo-mode!))               ; transition! stops the lock app + goes home
+(defn locked? [] (= lock-app (solo-app @mode*)))  ; soloed specifically on the lock app
 
 (defn open-url! [url]
   (when-not (re-matches #"https?://\S+" (str url))

@@ -26,6 +26,9 @@ version truth; branch names and build labels may disagree.
 - The image bakes ujima's bb libraries into `/ujima/m2` (pinned, sha-verified
   at build); like packages, they never change on a live deploy.
 
+- Lock the screen from the Circle app: a machine shows a full-screen Locked
+  page (no switching, no closing) until a teacher unlocks it or the circle
+  token releases it. Built on solo mode.
 - Solo mode: pin the machine to one app filling the screen, with no switching
   or closing and automatic relaunch if it exits — `app/open {:mode :solo}` to
   enter, `app/unsolo` to leave, and inserting the circle token releases it.

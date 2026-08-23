@@ -55,6 +55,10 @@
    "system/clock"    {:doc    "Set the wall clock to EPOCH (ms); records it as the new floor. A timezone, when given, is applied first."
                       :params [:map [:epoch [:int {:min 0}]] [:timezone {:optional true} settings/timezone]]}
 
+   "desktop/lock"    {:doc "Lock this machine's screen."}
+
+   "desktop/unlock"  {:doc "Unlock this machine's screen."}
+
    "system/restart"  {:doc "Reboot this machine."}
 
    "system/poweroff" {:doc "Power this machine off."}})

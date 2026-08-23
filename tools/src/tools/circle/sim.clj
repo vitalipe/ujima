@@ -199,7 +199,7 @@
                              :storage  {:total-mb 5889 :free-mb 5542}
                              :settings {:total-mb 973  :free-mb 906}})
 
-     "desktop/locked"  (constantly false)
+     "desktop/locked"  #(boolean (:locked (m)))
      "desktop/running" #(:running (m))
      "desktop/catalog" (constantly visible)
 
@@ -280,6 +280,9 @@
    "system/clock" (fn [{:keys [epoch timezone]}]
                     (when timezone (put! addr :device [:system :timezone] timezone))
                     (update-machine! addr assoc :offset (- epoch (System/currentTimeMillis))))
+
+   "desktop/lock"    (fn [_] (update-machine! addr assoc :locked true))
+   "desktop/unlock"  (fn [_] (update-machine! addr assoc :locked false))
 
    "system/restart"  (fn [_] (reboot! addr))
    "system/poweroff" (fn [_] (power! addr true))})

@@ -55,6 +55,9 @@
                          (system/clock! epoch)
                          (effects/change-setting! [:system :clock :epoch-floor] epoch :device))
 
+     "desktop/lock"    (fn [_] (desktop/lock!))
+     "desktop/unlock"  (fn [_] (desktop/unlock!))
+
      "system/restart"  (fn [_] (system/reboot!))
      "system/poweroff" (fn [_] (system/shutdown!))}))
 
@@ -75,7 +78,7 @@
                       :storage  (disk/device->space (:storage system-disk))
                       :settings (disk/device->space (:config system-disk))})
 
-   "desktop/locked"  (constantly false)
+   "desktop/locked"  #(desktop/locked?)
    "desktop/running" #(:current (desktop/current-apps-state))
    "desktop/catalog" (fn []
                        (->> (desktop/catalog-listing)

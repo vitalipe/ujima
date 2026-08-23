@@ -125,6 +125,11 @@
   (i3/try-command! "gaps" "bottom" "current" "set" "0"))
 
 
+(defn stop-app!
+  "Force-stop a named app's scope (unlock closes the lock app)."
+  [id]
+  (systemd/stop! id))
+
 (defn restore-gaps!
   "Leaving solo: put the bar gaps back."
   [_world]

@@ -24,6 +24,12 @@
    "app/unsolo"   {:doc     "Leave solo mode."
                    :handler (fn [_] (app/exit-solo-mode!))}
 
+   "desktop/lock"   {:doc     "Lock this machine's screen."
+                     :handler (fn [_] (app/lock!))}
+
+   "desktop/unlock" {:doc     "Unlock this machine's screen."
+                     :handler (fn [_] (app/unlock!))}
+
    "app/close"    {:doc     "Close the focused app."
                    :handler (fn [_] (app/close-focused!))}
 

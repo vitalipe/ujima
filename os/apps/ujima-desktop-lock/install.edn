@@ -1,0 +1,2 @@
+;; the SPA wrapper's stopgap http.server
+{:apt ["python3"]}

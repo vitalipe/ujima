@@ -21,7 +21,8 @@
    ;; :system = no launcher tile, pinned in the dock instead. console pins only once a token
    ;; unhides it, so it ships hidden.
    "files"   {:kind :exec :label "Files"   :category :system :exec ["pcmanfm"] :class "pcmanfm"}
-   "console" {:kind :exec :label "Console" :category :system :hidden true :exec ["sh" "run.sh"] :class "ujima-console"}})
+   "console" {:kind :exec :label "Console" :category :system :hidden true :exec ["sh" "run.sh"] :class "ujima-console"}
+   "ujima-desktop-lock" {:kind :exec :label "Locked" :category :system :hidden true :exec ["lock"] :class "ujima-ujima-desktop-lock"}})
 
 (defn- scan-root!
   "Materialize {dir-name spec} as a temp scan root: <root>/<dir>/app.edn per entry."
@@ -391,6 +392,37 @@
                 (app/exit-solo-mode!)))
   (is (= :multi (mode-of)))
   (is (= gaps-back (fx-of :cmd)) "bar gaps put back"))
+
+(deftest lock-solos-the-lock-app-and-fills-the-screen
+  (setup! [] "1")
+  (stubbed #(app/lock!))
+  (is (= [[:switch "ujima-desktop-lock"]] (fx-of :switch)) "switched to the lock app")
+  (is (= [[:spawn :ujima-desktop-lock ["lock"]]] (fx-of :spawn)) "launched it")
+  (is (= gaps0 (fx-of :cmd)) "fills the screen")
+  (is (true? (app/locked?)) "reports locked"))
+
+(deftest locked?-is-only-the-lock-app-not-any-solo
+  (setup! [] "1")
+  (stubbed #(app/enter-solo-mode! :web))     ; soloed on a normal app
+  (is (false? (app/locked?)) "soloed on the web app is NOT locked"))
+
+(deftest unlock-stops-the-lock-app-and-goes-home
+  (setup! [(win "ujima-desktop-lock" :focused? true :con 7)] "1")
+  (stubbed #(do (app/lock!)
+                (reset! fx* [])
+                (app/unlock!)))
+  (is (false? (app/locked?)))
+  (is (some #{[:stop :ujima-desktop-lock]} (fx-of :stop)) "the lock app is stopped")
+  (is (some #{[:switch "1"]} (fx-of :switch)) "and home"))
+
+(deftest unlock-from-a-normal-solo-leaves-that-app-running
+  (setup! [(win "web" :focused? true :con 7)] "1" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web)
+                (reset! fx* [])
+                (app/exit-solo-mode!)))
+  (is (= [] (fx-of :stop)) "a normal soloed app is not stopped on exit")
+  (is (= gaps-back (fx-of :cmd)) "just the gaps back"))
+
 
 (deftest exit-solo-when-already-multi-does-nothing
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})

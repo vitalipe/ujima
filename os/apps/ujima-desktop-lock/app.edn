@@ -1,0 +1,5 @@
+;; The lock screen: the solo target for desktop/lock. A hidden system app — no launcher or dock
+;; tile, reached only by locking. Solo fills the screen and refuses every exit, so only the
+;; circle token stick or a peer's unlock releases it; unlock stops this app and goes home.
+{:kind :web-app :label "Locked" :category :system :hidden true
+ :entry "index.html" :port 8095}

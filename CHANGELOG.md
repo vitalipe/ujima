@@ -32,6 +32,8 @@ version truth; branch names and build labels may disagree.
   The app's own dialogs (Open/Save) stay usable.
   The Circle app opens an app in solo with a "keep to this app" checkbox, and
   Close app releases a soloed machine.
+- Stellarium opens windowed instead of taking the whole screen with no way
+  out — the top bar's close button is always reachable now.
 - F11 toggles the focused app's fullscreen — also the way out of an app that
   fullscreened itself.
 - Ujima Circle App: a fleet control panel for teachers — every machine in the

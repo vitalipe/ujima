@@ -85,7 +85,6 @@
    :app/close      (fn [w _]  (act/close! w))
    :app/home       (fn [_ _]  (i3/switch-workspace! home-ws))
    :app/cycle      (fn [w ev] (act/cycle! w (:step ev)))
-   :app/fullscreen (fn [w _]  (act/fullscreen! w))
    :window/closed  (fn [w ev] (act/window-closed! w (:con-id ev)))
    :scope/died     (fn [w ev] (act/go-home-if-empty! w (:app-id ev)))})
 
@@ -133,7 +132,6 @@
 (defn close-focused! []   (handle-event! {:type :app/close}))
 (defn go-home!       []   (handle-event! {:type :app/home}))
 (defn cycle!         [step] (handle-event! {:type :app/cycle :step step}))
-(defn toggle-fullscreen! [] (handle-event! {:type :app/fullscreen}))
 
 (defn enter-solo-mode! [id] (handle-event! {:type :app/mode :to :solo :app (catalog/resolve! id)}))
 (defn exit-solo-mode!  []   (handle-event! {:type :app/mode :to :multi}))

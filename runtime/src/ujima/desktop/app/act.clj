@@ -116,36 +116,20 @@
           (i3/switch-workspace! target))))))
 
 
-(defn- app-window
-  "The focused, tiled, non-dialog window on an app workspace — the app's real window, or nil."
-  [{:keys [focused-ws ws->wins] :as world}]
-  (when (proj/app-of-ws world focused-ws)
-    (->> (get ws->wins focused-ws)
-         (filter :focused?)
-         (remove :floating?)
-         (remove #(#{"dialog" "utility" "splash"} (:wtype %)))
-         (first))))
-
-(defn fullscreen! [world]
-  (when-let [{:keys [con-id]} (app-window world)]
-    (i3/try-command! (format "[con_id=%d]" con-id) "fullscreen" "toggle")))
-
-(def ^:private bar-top    48)   ; keep in sync with i3 config `gaps top`  + eww topbar height
-(def ^:private bar-bottom 68)   ; keep in sync with i3 config `gaps bottom` + eww dock height
-
 (defn fill-screen!
-  "Solo: drop the current workspace's bar gaps so the one app fills the screen. NOT i3
+  "drop the current workspace's bar gaps so the one app fills the screen. NOT i3
    fullscreen — so a tiled dialog (the file chooser) still covers via the tabbed layout
    and stays usable, unlike under fullscreen where it hides behind the main window."
   [_world]
   (i3/try-command! "gaps" "top"    "current" "set" "0")
   (i3/try-command! "gaps" "bottom" "current" "set" "0"))
 
+
 (defn restore-gaps!
   "Leaving solo: put the bar gaps back."
   [_world]
-  (i3/try-command! "gaps" "top"    "current" "set" (str bar-top))
-  (i3/try-command! "gaps" "bottom" "current" "set" (str bar-bottom)))
+  (i3/try-command! "gaps" "top"    "current" "set" "48")  ; keep in sync with i3 config `gaps top`  + eww topbar height
+  (i3/try-command! "gaps" "bottom" "current" "set" "68")) ; keep in sync with i3 config `gaps bottom` + eww dock height
 
 
 (defn settle-floaters!

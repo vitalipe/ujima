@@ -34,8 +34,7 @@ version truth; branch names and build labels may disagree.
   Close app releases a soloed machine.
 - Stellarium opens windowed instead of taking the whole screen with no way
   out — the top bar's close button is always reachable now.
-- F11 toggles the focused app's fullscreen — also the way out of an app that
-  fullscreened itself.
+bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home >/dev/null
 - Ujima Circle App: a fleet control panel for teachers — every machine in the
   circle, what each one is running, and sound, apps and power over a selection.
 - Ujima Setup App: per-machine setup over the same circle — name, clock (timezone

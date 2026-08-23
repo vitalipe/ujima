@@ -265,24 +265,6 @@
   (is (false? (:fullscreen (:current (snap))))))
 
 
-;; --- fullscreen: a toggle on the focused app window ---
-
-(deftest fullscreen-toggles-the-focused-app-window
-  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
-  (stubbed #(app/toggle-fullscreen!))
-  (is (= [[:cmd "[con_id=7]" "fullscreen" "toggle"]] (fx-of :cmd))))
-
-(deftest fullscreen-leaves-home-and-dialogs-alone
-  (setup! [(win "1" :focused? true :con 9 :class "ujima-launcher")] "1")
-  (stubbed #(app/toggle-fullscreen!))
-  (is (= [] (fx-of :cmd)) "the launcher is not an app window")
-
-  (setup! [(win "web" :con 7) (win "web" :focused? true :floating? true :wtype "dialog" :con 8)]
-          "web" :scopes #{:web})
-  (stubbed #(app/toggle-fullscreen!))
-  (is (= [] (fx-of :cmd)) "a focused dialog is not the app's window"))
-
-
 (deftest floating-app-window-gets-tiled
   (setup! [(win "web" :focused? true :floating? true :con 7)] "web" :scopes #{:web})
   (stubbed #(app/handle-event! {:type :window/changed}))

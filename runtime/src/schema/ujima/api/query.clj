@@ -40,6 +40,8 @@
                       [:storage  [:maybe partition-space]]
                       [:settings [:maybe partition-space]]]]
      [:desktop  [:map [:locked  [:maybe :boolean]]
+                      [:mode    [:map [:mode [:enum "multi" "solo" "locked"]]
+                                      [:app {:optional true} :string]]]
                       [:running [:maybe desktop-entry]]
                       [:catalog [:vector desktop-entry]]]]
      [:audio    audio]

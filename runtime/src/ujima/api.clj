@@ -55,8 +55,8 @@
                          (system/clock! epoch)
                          (effects/change-setting! [:system :clock :epoch-floor] epoch :device))
 
-     "desktop/lock"    (fn [_] (desktop/lock!))
-     "desktop/unlock"  (fn [_] (desktop/unlock!))
+     "desktop/lock"    (fn [_] (desktop/enter-locked-mode!))
+     "desktop/unlock"  (fn [_] (desktop/exit-locked-mode!))
 
      "system/restart"  (fn [_] (system/reboot!))
      "system/poweroff" (fn [_] (system/shutdown!))}))
@@ -79,6 +79,7 @@
                       :settings (disk/device->space (:config system-disk))})
 
    "desktop/locked"  #(desktop/locked?)
+   "desktop/mode"    #(desktop/mode-state)
    "desktop/running" #(:current (desktop/current-apps-state))
    "desktop/catalog" (fn []
                        (->> (desktop/catalog-listing)

@@ -1,7 +1,10 @@
 (ns ujima.desktop.app
   "The app layer. The WORKSPACE is an app's identity (app :write lives on workspace \"write\",
-   home is \"1\"), so windows are never matched on WM_CLASS. A mode (Multi/Solo) is enter! /
-   exit! / act! / project!; handle-event! runs them under one lock."
+   home is \"1\"), so windows are never matched on WM_CLASS; each launch lands in a systemd
+   scope (alive? + kill), and i3 owns placement and focus.
+
+   The session is in one of three MODES — Multi (the free desktop), Solo (one app, left by
+   exit-solo-mode!), Locked (the lock screen over a remembered app)."
   (:require [ujima.linux.i3 :as i3]
             [ujima.desktop.app.catalog    :as catalog]
             [ujima.desktop.app.act        :as act]
@@ -11,7 +14,7 @@
 (defonce ^:private prev*     (atom nil))   ; last snapshot, the prv of (next prv)
 (defonce ^:private targets*  (atom []))
 (defonce ^:private lock*     (Object.))    ; every pass holds this
-(defonce ^:private state*    (atom nil))   ; the current Mode (a Multi or Solo record)
+(defonce ^:private state*    (atom nil))   ; the current Mode: a Multi, Solo, or Locked record
 (defonce ^:private relaunch* (atom 0))     ; last solo relaunch, ms — the crash-loop gate
 
 
@@ -84,7 +87,7 @@
               (handle-event! {:type :scope/died :app-id app})))))
 
 
-;; --- the two modes: handler tables (absent = refused) + how each decorates the snapshot ---
+;; --- per-mode handler tables (absent = refused) + shared setup/projection helpers ---
 
 (def ^:private multi-handlers
   {:app/run       (fn [ev] (act/run! (:app ev) (:extra ev [])))
@@ -97,25 +100,37 @@
    :scope/died    (fn [ev] (act/go-home-if-empty! (observe!) (:app-id ev)))})
 
 
-(defn- solo-handlers
-  "Closed over P: :scope/died fires for any app's death, so relaunch only when it was P
-   (a backgrounded app from an X->Y re-solo can die too)."
+(defn- keep-alive-handlers
+  "Closed over the pinned app P: relaunch it when (and only when) IT dies — :scope/died fires
+   for any app, and a backgrounded app from an X->Y re-pin can die too."
   [app]
   {:scope/died (fn [ev] (when (= (:app-id ev) app) (relaunch! app)))})
 
 
-;; --- Mode: a state is enter! / exit! (write-side transition) + act! / project! (the pass) ---
+(defn- pin!
+  "The shared setup for solo and lock: run APP (switch-then-launch) and fill the screen."
+  [app]
+  (act/run! (catalog/resolve! app) [])
+  (act/fill-screen!))
+
+
+(defn- pin-project [world mode-kw]
+  (assoc (proj/base world) :mode mode-kw :bars-hidden? true))
+
+
+;; --- the three modes (see the ns doc). enter! RETURNS the mode to store, so it can enrich
+;; --- itself as it enters — Locked captures the app to return to on exit.
 
 (defprotocol Mode
-  (enter!   [m]       "set up on entering this mode")
-  (exit!    [m]       "tear down on leaving it")
+  (enter!   [m]       "set up on entering; returns the mode to store (may enrich itself)")
+  (exit!    [m]       "tear down on leaving")
   (act!     [m ev]    "run this mode's handler for EV, if it admits one")
   (project! [m world] "the base projection stamped with this mode's data"))
 
 
 (defrecord Multi []
   Mode
-  (enter!   [_]       nil)
+  (enter!   [m]       m)
   (exit!    [_]       nil)
   (act!     [_ ev]    (dispatch multi-handlers ev))
   (project! [_ world] (let [snap (proj/base world)]
@@ -125,30 +140,51 @@
 
 (defrecord Solo [app]
   Mode
-  (enter!   [_]       (act/run! (catalog/resolve! app) []) (act/fill-screen!))
-  (exit!    [_]       (act/restore-gaps!)
-                      (when (= lock-app app)             ; left the lock screen: clear it away
-                        (act/stop-app! app)
-                        (i3/switch-workspace! home-ws)))
-  (act!     [_ ev]    (dispatch (solo-handlers app) ev))
-  (project! [_ world] (assoc (proj/base world) :mode :solo :bars-hidden? true)))
+  (enter!   [m]       (pin! app) m)
+  (exit!    [_]       (act/restore-gaps!))
+  (act!     [_ ev]    (dispatch (keep-alive-handlers app) ev))
+  (project! [_ world] (pin-project world :solo)))
+
+
+(defrecord Locked [app-to-focus]
+  Mode
+  (enter!   [m]       (let [w     (observe!) ; before pin! switches away
+                            focus (proj/app-of-ws w (:focused-ws w))]
+
+                        (pin! lock-app)
+                        (assoc m :app-to-focus focus))) ; remember it for exit!
+  
+  (exit!    [m]       (act/restore-gaps!)
+                      (act/stop-app! lock-app)
+
+                      (let [w    (observe!)
+                            back (:app-to-focus m)]
+                            
+                        (i3/switch-workspace!
+                          (if (and back (seq (get (:ws->wins w) (name back))))
+                            (name back)                            ; the app is still open
+                            home-ws))))                            ; gone (or was home)
+
+  (act!     [_ ev]    (dispatch (keep-alive-handlers lock-app) ev))
+  (project! [_ world] (pin-project world :locked)))
 
 
 (defn- event->mode [ev]
   (case (:type ev)
-    :mode/solo  (->Solo (:id (:app ev)))
-    :mode/multi (->Multi)))
+    :mode/solo   (->Solo (:id (:app ev)))
+    :mode/multi  (->Multi)
+    :mode/locked (->Locked nil)))
 
 
 (defn handle-event!
-  "One pass under the lock: a :mode/* event transitions (exit! old, swap, enter! new — always
-   paired); then the mode acts on EV, settle! reconciles, and the mode projects for converge."
+  "One pass under the lock: a :mode/* event transitions (exit! old, then enter! the new and
+   store what it returns — always paired); then the mode acts on EV, settle! reconciles, and
+   the mode projects for converge."
   [ev]
   (locking lock*
     (when (= "mode" (namespace (:type ev)))
       (exit! @state*)
-      (reset! state* (event->mode ev))
-      (enter! @state*))
+      (reset! state* (enter! (event->mode ev))))
     (act! @state* ev)
     (converge! (project! @state* (settle!)))))
 
@@ -161,17 +197,31 @@
 (defn go-home!       []   (handle-event! {:type :app/home}))
 (defn cycle!         [step] (handle-event! {:type :app/cycle :step step}))
 
-(defn enter-solo-mode! [id] (handle-event! {:type :mode/solo :app (catalog/resolve! id)}))
-(defn exit-solo-mode!  []   (handle-event! {:type :mode/multi}))
-(defn solo?  [] (instance? Solo @state*))
+(defn solo?  [] (instance? Solo   @state*))
+(defn locked? [] (instance? Locked @state*))
 
-(defn lock!   [] (enter-solo-mode! lock-app))              ; lock = solo on the lock app
-(defn unlock! [] (exit-solo-mode!))                        ; Solo/exit! stops the lock app + home
-(defn locked? [] (and (solo?) (= lock-app (:app @state*)))); soloed specifically on the lock app
+(defn enter-solo-mode! [id] (handle-event! {:type :mode/solo :app (catalog/resolve! id)}))
+(defn exit-solo-mode!  [] (when (solo?)   (handle-event! {:type :mode/multi})))   ; leaves ONLY solo
+
+(defn enter-locked-mode! [] (handle-event! {:type :mode/locked}))
+(defn exit-locked-mode!  [] (when (locked?) (handle-event! {:type :mode/multi})))  ; leaves ONLY locked
+
+(defn release!
+  "Leave whatever pinned mode we're in (solo OR locked) — the token stick's escape hatch."
+  []
+  (when-not (instance? Multi @state*) (handle-event! {:type :mode/multi})))
 
 (defn open-url! [url]
   (when-not (re-matches #"https?://\S+" (str url))
     (throw (ex-info "not an http url" {:error :app/bad-url :url (str url)})))
   (handle-event! {:type :app/open-url :app (catalog/resolve! browser-app) :url url}))
+
+(defn mode-state
+  "The machine tree's mode view: free (multi), pinned to an app (solo), or locked."
+  []
+  (cond
+    (locked?) {:mode "locked"}
+    (solo?)   {:mode "solo" :app (name (:app @state*))}
+    :else     {:mode "multi"}))
 
 (defn current-apps-state [] (or @prev* {:mode :multi :running [] :catalog [] :current nil}))

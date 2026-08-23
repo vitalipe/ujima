@@ -25,10 +25,10 @@
                    :handler (fn [_] (app/exit-solo-mode!))}
 
    "desktop/lock"   {:doc     "Lock this machine's screen."
-                     :handler (fn [_] (app/lock!))}
+                     :handler (fn [_] (app/enter-locked-mode!))}
 
    "desktop/unlock" {:doc     "Unlock this machine's screen."
-                     :handler (fn [_] (app/unlock!))}
+                     :handler (fn [_] (app/exit-locked-mode!))}
 
    "app/close"    {:doc     "Close the focused app."
                    :handler (fn [_] (app/close-focused!))}

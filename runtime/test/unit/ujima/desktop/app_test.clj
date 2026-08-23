@@ -388,7 +388,7 @@
   (is (= [] (fx-of :kill)) "no close in solo")
   (is (= [] (filterv #(= [:switch "1"] %) (fx-of :switch))) "no go-home in solo"))
 
-(deftest solo-exit-restores-gaps-and-returns-to-multi
+(deftest unsolo-restores-gaps-and-returns-to-multi
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
   (stubbed #(do (app/enter-solo-mode! :web)
                 (reset! fx* [])
@@ -396,38 +396,54 @@
   (is (= :multi (mode-of)))
   (is (= gaps-back (fx-of :cmd)) "bar gaps put back"))
 
-(deftest lock-solos-the-lock-app-and-fills-the-screen
+(deftest lock-pins-the-lock-app-and-fills-the-screen
   (setup! [] "1")
-  (stubbed #(app/lock!))
+  (stubbed #(app/enter-locked-mode!))
   (is (= [[:switch "ujima-desktop-lock"]] (fx-of :switch)) "switched to the lock app")
   (is (= [[:spawn :ujima-desktop-lock ["lock"]]] (fx-of :spawn)) "launched it")
   (is (= gaps0 (fx-of :cmd)) "fills the screen")
-  (is (true? (app/locked?)) "reports locked"))
+  (is (true?  (app/locked?)) "reports locked")
+  (is (false? (app/solo?))   "locked is its own mode, not solo")
+  (is (= :locked (mode-of))))
 
-(deftest locked?-is-only-the-lock-app-not-any-solo
-  (setup! [] "1")
-  (stubbed #(app/enter-solo-mode! :web))     ; soloed on a normal app
-  (is (false? (app/locked?)) "soloed on the web app is NOT locked"))
-
-(deftest unlock-stops-the-lock-app-and-goes-home
-  (setup! [(win "ujima-desktop-lock" :focused? true :con 7)] "1")
-  (stubbed #(do (app/lock!)
+(deftest lock-remembers-the-focused-app-and-unlock-returns-to-it
+  ;; locked over an open web app: unlock stops the lock app and switches BACK to it
+  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
+  (stubbed #(do (app/enter-locked-mode!)                                   ; captures :web as app-to-focus
+                (swap! world* update :wins conj (win "ujima-desktop-lock" :con 9))
                 (reset! fx* [])
-                (app/unlock!)))
-  (is (false? (app/locked?)))
+                (app/exit-locked-mode!)))
+  (is (= :multi (mode-of)))
   (is (some #{[:stop :ujima-desktop-lock]} (fx-of :stop)) "the lock app is stopped")
-  (is (some #{[:switch "1"]} (fx-of :switch)) "and home"))
+  (is (some #{[:switch "web"]} (fx-of :switch)) "returns to the remembered app"))
 
-(deftest unlock-from-a-normal-solo-leaves-that-app-running
-  (setup! [(win "web" :focused? true :con 7)] "1" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web)
+(deftest unlock-goes-home-when-the-remembered-app-is-gone
+  (setup! [] "1")                                             ; locked from home -> app-to-focus nil
+  (stubbed #(do (app/enter-locked-mode!)
                 (reset! fx* [])
-                (app/exit-solo-mode!)))
-  (is (= [] (fx-of :stop)) "a normal soloed app is not stopped on exit")
-  (is (= gaps-back (fx-of :cmd)) "just the gaps back"))
+                (app/exit-locked-mode!)))
+  (is (= :multi (mode-of)))
+  (is (some #{[:switch "1"]} (fx-of :switch)) "home when there is nothing to return to"))
 
+(deftest unsolo-does-not-unlock-and-unlock-does-not-unsolo
+  ;; the guards: the two exits are distinct, so a stray unsolo can't defeat a lock
+  (setup! [(win "ujima-desktop-lock" :focused? true)] "1")
+  (stubbed #(do (app/enter-locked-mode!) (reset! fx* []) (app/exit-solo-mode!)))   ; unsolo while locked
+  (is (true? (app/locked?)) "exit-solo-mode! is a no-op on a locked machine")
 
-(deftest exit-solo-when-already-multi-does-nothing
+  (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web) (reset! fx* []) (app/exit-locked-mode!)))  ; unlock while soloed
+  (is (true? (app/solo?)) "exit-locked-mode! is a no-op on a soloed machine"))
+
+(deftest release-leaves-any-pin
+  (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web) (reset! fx* []) (app/release!)))
+  (is (= :multi (mode-of)) "release! drops solo")
+  (setup! [(win "ujima-desktop-lock" :focused? true)] "1")
+  (stubbed #(do (app/enter-locked-mode!) (reset! fx* []) (app/release!)))
+  (is (= :multi (mode-of)) "release! drops lock"))
+
+(deftest unsolo-when-already-multi-does-nothing
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
   (stubbed #(app/exit-solo-mode!))     ; never entered solo
   (is (= [] (fx-of :cmd)) "no gap change — a normal desktop is left alone"))

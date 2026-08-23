@@ -28,7 +28,7 @@ version truth; branch names and build labels may disagree.
 
 - Lock the screen from the Circle app: a machine shows a full-screen Locked
   page (no switching, no closing) until a teacher unlocks it or the circle
-  token releases it. Built on solo mode.
+  token releases it; unlocking returns to whatever was open.
 - Solo mode: pin the machine to one app filling the screen, with no switching
   or closing and automatic relaunch if it exits — `app/open {:mode :solo}` to
   enter, `app/unsolo` to leave, and inserting the circle token releases it.

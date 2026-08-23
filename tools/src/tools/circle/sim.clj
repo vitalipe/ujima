@@ -200,6 +200,10 @@
                              :settings {:total-mb 973  :free-mb 906}})
 
      "desktop/locked"  #(boolean (:locked (m)))
+     "desktop/mode"    #(let [it (m)]
+                          (cond (:locked it) {:mode "locked"}
+                                (:solo it)   {:mode "solo" :app (:solo it)}
+                                :otherwise   {:mode "multi"}))
      "desktop/running" #(:running (m))
      "desktop/catalog" (constantly visible)
 
@@ -238,7 +242,7 @@
   (power! addr true)
   (future
     (Thread/sleep reboot-ms)
-    (update-machine! addr #(-> % (assoc :off? false :booted (System/currentTimeMillis) :running nil)
+    (update-machine! addr #(-> % (assoc :off? false :booted (System/currentTimeMillis) :running nil :solo nil)
                                  (assoc-in [:settings :session] {})
                                  (assoc-in [:settings :activity] {})))))
 
@@ -251,14 +255,16 @@
   "One per verb the contract declares — the zip below fails if that stops being true."
   [addr apps]
   {"app/open"     (fn [{:keys [app mode]}]
-                    (update-machine! addr assoc :running
-                                     (some-> (app-entry apps app)
-                                             (assoc :fullscreen (= :solo mode)))))
-   "app/unsolo"   (fn [_] (update-machine! addr update :running
-                                           #(some-> % (assoc :fullscreen false))))
-   "app/switch"   (fn [{:keys [app]}] (update-machine! addr assoc :running (app-entry apps app)))
-   "app/close"    (fn [_] (update-machine! addr assoc :running nil))
-   "app/home"     (fn [_] (update-machine! addr assoc :running nil))
+                    (update-machine! addr #(-> %
+                                               (assoc :running (some-> (app-entry apps app)
+                                                                       (assoc :fullscreen (= :solo mode))))
+                                               (assoc :solo (when (= :solo mode) app)))))
+   "app/unsolo"   (fn [_] (update-machine! addr #(-> %
+                                                     (update :running (fn [r] (some-> r (assoc :fullscreen false))))
+                                                     (assoc :solo nil))))
+   "app/switch"   (fn [{:keys [app]}] (update-machine! addr assoc :running (app-entry apps app) :solo nil))
+   "app/close"    (fn [_] (update-machine! addr assoc :running nil :solo nil))
+   "app/home"     (fn [_] (update-machine! addr assoc :running nil :solo nil))
    "app/open-url" (fn [{:keys [url]}]
                     (update-machine! addr assoc :running
                                      {:id :web :label (or (second (re-find #"^(?:\w+://)?([^/:?#]+)" url)) url)
@@ -282,7 +288,7 @@
                     (update-machine! addr assoc :offset (- epoch (System/currentTimeMillis))))
 
    "desktop/lock"    (fn [_] (update-machine! addr assoc :locked true))
-   "desktop/unlock"  (fn [_] (update-machine! addr assoc :locked false))
+   "desktop/unlock"  (fn [_] (update-machine! addr assoc :locked false :solo nil))
 
    "system/restart"  (fn [_] (reboot! addr))
    "system/poweroff" (fn [_] (power! addr true))})

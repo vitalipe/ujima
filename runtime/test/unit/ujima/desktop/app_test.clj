@@ -396,6 +396,18 @@
   (is (= :multi (mode-of)))
   (is (= gaps-back (fx-of :cmd)) "bar gaps put back"))
 
+(deftest enter-solo-mode-0-arity-solos-the-focused-app
+  (setup! [(win "web" :focused? true)] "web" :scopes #{:web})
+  (stubbed #(app/enter-solo-mode!))                ; no id -> solo the focused app
+  (is (= :solo (mode-of)))
+  (is (= gaps0 (fx-of :cmd)) "fills the screen"))
+
+(deftest enter-solo-mode-0-arity-at-home-throws
+  (setup! [(win "1" :focused? true :class "ujima-launcher")] "1")
+  (stubbed #(is (thrown? clojure.lang.ExceptionInfo (app/enter-solo-mode!))))  ; nothing to solo
+  (is (false? (app/solo?)) "did not enter solo"))
+
+
 (deftest lock-pins-the-lock-app-and-fills-the-screen
   (setup! [] "1")
   (stubbed #(app/enter-locked-mode!))

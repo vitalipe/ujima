@@ -197,24 +197,38 @@
 (defn go-home!       []   (handle-event! {:type :app/home}))
 (defn cycle!         [step] (handle-event! {:type :app/cycle :step step}))
 
+
 (defn solo?  [] (instance? Solo   @state*))
 (defn locked? [] (instance? Locked @state*))
 
-(defn enter-solo-mode! [id] (handle-event! {:type :mode/solo :app (catalog/resolve! id)}))
+
+(defn enter-solo-mode!
+  "Solo an app by id, or (0-arity) whatever is focused now — throws at home (nothing to solo)."
+  ([]   (let [w (observe!)]
+          (if-let [id (proj/app-of-ws w (:focused-ws w))]
+            (enter-solo-mode! id)
+            (throw (ex-info "no app to solo" {:error :app/no-current-app})))))
+  ([id] (handle-event! {:type :mode/solo :app (catalog/resolve! id)})))
+
+
 (defn exit-solo-mode!  [] (when (solo?)   (handle-event! {:type :mode/multi})))   ; leaves ONLY solo
+
 
 (defn enter-locked-mode! [] (handle-event! {:type :mode/locked}))
 (defn exit-locked-mode!  [] (when (locked?) (handle-event! {:type :mode/multi})))  ; leaves ONLY locked
+
 
 (defn release!
   "Leave whatever pinned mode we're in (solo OR locked) — the token stick's escape hatch."
   []
   (when-not (instance? Multi @state*) (handle-event! {:type :mode/multi})))
 
+
 (defn open-url! [url]
   (when-not (re-matches #"https?://\S+" (str url))
     (throw (ex-info "not an http url" {:error :app/bad-url :url (str url)})))
   (handle-event! {:type :app/open-url :app (catalog/resolve! browser-app) :url url}))
+
 
 (defn mode-state
   "The machine tree's mode view: free (multi), pinned to an app (solo), or locked."
@@ -223,5 +237,6 @@
     (locked?) {:mode "locked"}
     (solo?)   {:mode "solo" :app (name (:app @state*))}
     :else     {:mode "multi"}))
+
 
 (defn current-apps-state [] (or @prev* {:mode :multi :running [] :catalog [] :current nil}))

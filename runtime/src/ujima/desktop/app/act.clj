@@ -117,12 +117,13 @@
 
 
 (defn fill-screen!
-  "drop the current workspace's bar gaps so the one app fills the screen. NOT i3
-   fullscreen — so a tiled dialog (the file chooser) still covers via the tabbed layout
-   and stays usable, unlike under fullscreen where it hides behind the main window."
-  [_world]
-  (i3/try-command! "gaps" "top"    "current" "set" "0")
-  (i3/try-command! "gaps" "bottom" "current" "set" "0"))
+  "Solo: drop the bar gaps on EVERY workspace so the one app fills the screen. NOT i3
+   fullscreen — a tiled dialog (the file chooser) still covers via the tabbed layout and
+   stays usable. `all`, not `current`: one restore-gaps! then cleans up every workspace a
+   re-solo (X->Y) touched, so a backgrounded app can't be left rendering under the bars."
+  []
+  (i3/try-command! "gaps" "top"    "all" "set" "0")
+  (i3/try-command! "gaps" "bottom" "all" "set" "0"))
 
 
 (defn stop-app!
@@ -131,10 +132,10 @@
   (systemd/stop! id))
 
 (defn restore-gaps!
-  "Leaving solo: put the bar gaps back."
-  [_world]
-  (i3/try-command! "gaps" "top"    "current" "set" "48")  ; keep in sync with i3 config `gaps top`  + eww topbar height
-  (i3/try-command! "gaps" "bottom" "current" "set" "68")) ; keep in sync with i3 config `gaps bottom` + eww dock height
+  "Leaving solo: put the bar gaps back on every workspace."
+  []
+  (i3/try-command! "gaps" "top"    "all" "set" "48")  ; keep in sync with i3 config `gaps top`  + eww topbar height
+  (i3/try-command! "gaps" "bottom" "all" "set" "68")) ; keep in sync with i3 config `gaps bottom` + eww dock height
 
 
 (defn settle-floaters!

@@ -256,14 +256,16 @@
   (is (= :web (current-id)))
   (is (= [:web] (open-ids))))
 
-(deftest fullscreen-is-detected-from-the-tree
+(deftest fullscreen-is-detected-and-hides-the-bars-in-multi
   (setup! [(win "web" :focused? true :full? true)] "web" :scopes #{:web})
   (stubbed #(app/handle-event! {:type :tick}))
-  (is (true? (:fullscreen (:current (snap)))))
+  (is (true? (:fullscreen (:current (snap)))) "detected on the entry")
+  (is (true? (:bars-hidden? (snap)))          "multi hides the bars for a fullscreen window")
 
   (setup! [(win "web" :focused? true)] "web" :scopes #{:web})
   (stubbed #(app/handle-event! {:type :tick}))
-  (is (false? (:fullscreen (:current (snap))))))
+  (is (false? (:fullscreen (:current (snap)))))
+  (is (false? (:bars-hidden? (snap)))         "windowed -> bars shown"))
 
 
 (deftest floating-app-window-gets-tiled
@@ -318,8 +320,8 @@
 
 (defn- mode-of [] (:mode (snap)))
 
-(def ^:private gaps0 [[:cmd "gaps" "top" "current" "set" "0"] [:cmd "gaps" "bottom" "current" "set" "0"]])
-(def ^:private gaps-back [[:cmd "gaps" "top" "current" "set" "48"] [:cmd "gaps" "bottom" "current" "set" "68"]])
+(def ^:private gaps0 [[:cmd "gaps" "top" "all" "set" "0"] [:cmd "gaps" "bottom" "all" "set" "0"]])
+(def ^:private gaps-back [[:cmd "gaps" "top" "all" "set" "48"] [:cmd "gaps" "bottom" "all" "set" "68"]])
 
 (deftest solo-enter-cold-runs-and-fills-the-screen
   (setup! [] "1")
@@ -327,7 +329,8 @@
   (is (= [[:switch "web"]] (fx-of :switch)) "switched to P")
   (is (= [[:spawn :web ["chromium"]]] (fx-of :spawn)) "launched P")
   (is (= gaps0 (fx-of :cmd)) "bar gaps dropped so P fills the screen — no i3 fullscreen")
-  (is (= :solo (mode-of)) "projection reports solo"))
+  (is (= :solo (mode-of)) "projection reports solo")
+  (is (true? (:bars-hidden? (snap))) "solo hides the bars"))
 
 (deftest solo-enter-warm-switches-only
   (setup! [(win "web" :focused? true)] "1" :scopes #{:web})

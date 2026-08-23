@@ -18,11 +18,10 @@
 
 
 (defn show-bar?
-  "Pure: bars shown unless we're in solo, or the focused window is fullscreen."
+  "Pure: the current mode decides — the snapshot carries :bars-hidden? (solo hides them;
+   multi hides only when the focused window is really fullscreen)."
   [snapshot]
-  (and (not= :solo (:mode snapshot))
-       (or (nil? (get-in snapshot [:current :id]))
-           (not (get-in snapshot [:current :fullscreen])))))
+  (not (:bars-hidden? snapshot)))
 
 
 (defn converge!

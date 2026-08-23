@@ -246,6 +246,10 @@
                                  (assoc-in [:settings :session] {})
                                  (assoc-in [:settings :activity] {})))))
 
+(defn- refuse-when-locked! [addr]
+  (when (:locked (get @fleet* addr))
+    (throw (ex-info "the machine is locked" {:error :app/locked}))))
+
 (defn- app-entry [apps id]
   (some #(when (= (keyword id) (:id %))
            (assoc % :title (str (:label %) " — UjimaOS") :fullscreen false))
@@ -254,16 +258,10 @@
 (defn- handlers
   "One per verb the contract declares — the zip below fails if that stops being true."
   [addr apps]
-  {"app/open"     (fn [{:keys [app mode]}]
-                    (update-machine! addr #(-> %
-                                               (assoc :running (some-> (app-entry apps app)
-                                                                       (assoc :fullscreen (= :solo mode))))
-                                               (assoc :solo (when (= :solo mode) app)))))
-   "app/unsolo"   (fn [_] (update-machine! addr #(-> %
-                                                     (update :running (fn [r] (some-> r (assoc :fullscreen false))))
-                                                     (assoc :solo nil))))
-   "app/switch"   (fn [{:keys [app]}] (update-machine! addr assoc :running (app-entry apps app) :solo nil))
-   "app/close"    (fn [_] (update-machine! addr assoc :running nil :solo nil))
+  {"app/open"     (fn [{:keys [app]}] (update-machine! addr assoc :running (app-entry apps app)))
+   "app/switch"   (fn [{:keys [app]}] (update-machine! addr assoc :running (app-entry apps app)))
+   "app/close"    (fn [_] (refuse-when-locked! addr)
+                          (update-machine! addr assoc :running nil :solo nil))
    "app/home"     (fn [_] (update-machine! addr assoc :running nil :solo nil))
    "app/open-url" (fn [{:keys [url]}]
                     (update-machine! addr assoc :running
@@ -286,6 +284,24 @@
    "system/clock" (fn [{:keys [epoch timezone]}]
                     (when timezone (put! addr :device [:system :timezone] timezone))
                     (update-machine! addr assoc :offset (- epoch (System/currentTimeMillis))))
+
+   ;; the hold, faked to the same refusals ujimad makes: locked bounces both verbs, and
+   ;; focusing with no app needs an app to be there
+   "desktop/focus"   (fn [{:keys [app]}]
+                       (refuse-when-locked! addr)
+                       (let [id (or app (some-> (:running (get @fleet* addr)) :id name))]
+                         (when-not id
+                           (throw (ex-info "no app to solo" {:error :app/no-current-app})))
+                         (when (= "ujima-desktop-lock" id)
+                           (throw (ex-info "not a focus target" {:error :app/not-focusable})))
+                         (update-machine! addr #(-> %
+                                                    (assoc :running (app-entry apps id))
+                                                    (assoc :solo id)))))
+
+   "desktop/release" (fn [_]
+                       (refuse-when-locked! addr)
+                       (update-machine! addr #(-> % (assoc :solo nil)
+                                                    (assoc-in [:settings :activity] {}))))
 
    "desktop/lock"    (fn [_] (update-machine! addr assoc :locked true))
    "desktop/unlock"  (fn [_] (update-machine! addr assoc :locked false :solo nil))

@@ -375,6 +375,8 @@
   (is (= [] (fx-of :spawn)) "second death within the interval does not respawn now"))
 
 (deftest solo-refuses-the-multi-verbs
+  ;; close is in this list on purpose: it is what Alt+F4 calls, and a held machine must not
+  ;; be able to close its way out. The circle's close releases first — see close-through-a-hold
   (setup! [(win "web" :focused? true) (win "paint")] "web" :scopes #{:web :paint})
   (stubbed
     #(do (app/enter-solo-mode! :web)
@@ -384,8 +386,9 @@
          (app/go-home!)             ; home
          (app/cycle! 1)             ; cycle
          (app/switch-to! :paint)))  ; switch
+  (is (= :solo (mode-of)) "still held")
   (is (= [] (fx-of :spawn)) "no new app opens in solo")
-  (is (= [] (fx-of :kill)) "no close in solo")
+  (is (= [] (fx-of :kill)) "no close in solo — the chord cannot break a hold")
   (is (= [] (filterv #(= [:switch "1"] %) (fx-of :switch))) "no go-home in solo"))
 
 (deftest unsolo-restores-gaps-and-returns-to-multi
@@ -447,13 +450,55 @@
   (stubbed #(do (app/enter-solo-mode! :web) (reset! fx* []) (app/exit-locked-mode!)))  ; unlock while soloed
   (is (true? (app/solo?)) "exit-locked-mode! is a no-op on a soloed machine"))
 
-(deftest release-leaves-any-pin
+(deftest enter-multi-mode-leaves-any-pin
+  ;; the token stick's escape: the ONE verb that drops a lock without being unlock
+  (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web) (reset! fx* []) (app/enter-multi-mode!)))
+  (is (= :multi (mode-of)) "enter-multi-mode! drops solo")
+  (setup! [(win "ujima-desktop-lock" :focused? true)] "1")
+  (stubbed #(do (app/enter-locked-mode!) (reset! fx* []) (app/enter-multi-mode!)))
+  (is (= :multi (mode-of)) "enter-multi-mode! drops lock"))
+
+
+;; --- the hold's own verbs: what focus, release and close refuse ---
+
+(deftest release-drops-the-hold-and-passes-a-free-machine-by
   (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
   (stubbed #(do (app/enter-solo-mode! :web) (reset! fx* []) (app/release!)))
-  (is (= :multi (mode-of)) "release! drops solo")
-  (setup! [(win "ujima-desktop-lock" :focused? true)] "1")
-  (stubbed #(do (app/enter-locked-mode!) (reset! fx* []) (app/release!)))
-  (is (= :multi (mode-of)) "release! drops lock"))
+  (is (= :multi (mode-of)) "release! leaves the hold")
+
+  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
+  (stubbed #(app/release!))                                  ; never held
+  (is (= [] (fx-of :cmd)) "a free machine is left alone"))
+
+(deftest the-hold-verbs-refuse-a-locked-machine
+  ;; locked is left by unlock and nothing else — focus, release and close all bounce
+  (doseq [[what verb] [["focus"   #(app/enter-solo-mode! :web)]
+                       ["focus-0" #(app/enter-solo-mode!)]
+                       ["release" #(app/release!)]]]
+    (setup! [(win "ujima-desktop-lock" :focused? true)] "1" :scopes #{:web})
+    (stubbed #(do (app/enter-locked-mode!)
+                  (is (thrown? clojure.lang.ExceptionInfo (verb)) what)))
+    (is (true? (app/locked?)) (str what " left the lock standing"))))
+
+(deftest focus-refuses-the-lock-screen
+  ;; soloing the lock app would be a Locked the mode layer cannot see, and unlock would
+  ;; stop answering — so the lock screen is reachable by locking only
+  (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
+  (stubbed #(is (thrown? clojure.lang.ExceptionInfo (app/enter-solo-mode! :ujima-desktop-lock))))
+  (is (false? (app/solo?)) "did not enter solo"))
+
+(deftest close-through-a-hold
+  ;; what /api's app/close does: release, THEN close — the pair the circle sends as one
+  ;; request, and the pair a chord cannot assemble because release! is not on the local tier
+  (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
+  (stubbed #(do (app/enter-solo-mode! :web)
+                (reset! fx* [])
+                (app/release!)
+                (app/close-focused!)))
+  (is (= :multi (mode-of)) "the hold is gone")
+  (is (= gaps-back (fx-of :cmd)) "bar gaps put back")
+  (is (= [[:kill]] (fx-of :kill)) "and the app is closed"))
 
 (deftest unsolo-when-already-multi-does-nothing
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})

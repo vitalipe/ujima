@@ -16,6 +16,7 @@
    ["circle" "volume"]    :volume
    ["circle" "close-app"] :close-app
    ["circle" "open-app"]  :open-app
+   ["circle" "focus"]     :focus
    ["circle" "open-url"]  :open-url
    ["circle" "lock"]      :lock
    ["circle" "unlock"]    :unlock
@@ -31,8 +32,12 @@
 (defn- verb-args [verb body]
   (case verb
     :open-app (if (string? (:app body))
-                {:app (:app body) :solo (boolean (:solo body))}
+                {:app (:app body)}
                 (malformed! "open-app needs an :app id"))
+    ;; "current" = each machine's own app, resolved when the request is built
+    :focus    (if (string? (:app body))
+                {:app (:app body)}
+                (malformed! "focus needs an :app id or \"current\""))
     :open-url (if (and (string? (:url body)) (seq (:url body)))
                 {:url (:url body)}
                 (malformed! "open-url needs a :url"))

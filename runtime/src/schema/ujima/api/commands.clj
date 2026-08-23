@@ -16,14 +16,15 @@
    :keyboard/unknown-layout 409
    :settings/unknown        404
    :app/unknown-app         404
-   :app/bad-url             400})
+   :app/bad-url             400
+   :app/locked              409   ;; locked is left by unlock, so every other mode verb bounces
+   :app/not-focusable       409
+   :app/no-current-app      409})
 
 
 (def commands
-  {"app/open"     {:doc    "Open an app by catalog id; :mode :solo opens it soloed."
-                   :params [:map [:app [:string {:min 1}]] [:mode {:optional true} [:enum :multi :solo]]]}
-
-   "app/unsolo"   {:doc    "Leave solo mode."}
+  {"app/open"     {:doc    "Open an app by catalog id. Opening does not take the machine — see desktop/focus."
+                   :params [:map [:app [:string {:min 1}]]]}
 
    "app/switch"   {:doc    "Focus an app that is already open."
                    :params [:map [:app [:string {:min 1}]]]}
@@ -54,6 +55,13 @@
    ;; closed list is the shape, so an unknown zone dies at the edge and no handler runs
    "system/clock"    {:doc    "Set the wall clock to EPOCH (ms); records it as the new floor. A timezone, when given, is applied first."
                       :params [:map [:epoch [:int {:min 0}]] [:timezone {:optional true} settings/timezone]]}
+
+   ;; the hold: focus takes the machine, release hands it back. Both refuse a locked machine —
+   ;; a lock is a separate, stronger state and desktop/unlock is the only way out of it.
+   "desktop/focus"   {:doc    "Keep this machine to one app: no switching, no closing, no bars. With no :app, whatever is focused right now."
+                      :params [:map [:app {:optional true} [:string {:min 1}]]]}
+
+   "desktop/release" {:doc "Hand the machine back: leave the app hold and drop everything the activity scope holds."}
 
    "desktop/lock"    {:doc "Lock this machine's screen."}
 

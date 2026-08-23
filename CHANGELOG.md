@@ -29,12 +29,16 @@ version truth; branch names and build labels may disagree.
 - Lock the screen from the Circle app: a machine shows a full-screen Locked
   page (no switching, no closing) until a teacher unlocks it or the circle
   token releases it; unlocking returns to whatever was open.
-- Solo mode: pin the machine to one app filling the screen, with no switching
-  or closing and automatic relaunch if it exits — `app/open {:mode :solo}` to
-  enter, `app/unsolo` to leave, and inserting the circle token releases it.
-  The app's own dialogs (Open/Save) stay usable.
-  The Circle app opens an app in solo with a "keep to this app" checkbox, and
-  Close app releases a soloed machine.
+- Hold a machine to one app filling the screen, with no switching or closing
+  and automatic relaunch if it exits — `desktop/focus` to take it (with no
+  app named, whatever that machine has open right now), `desktop/release` to
+  hand it back, and inserting the circle token releases it. The app's own
+  dialogs (Open/Save) stay usable. A held machine refuses the keyboard chords,
+  and closing its app from the Circle app lets go of the hold first. Locked
+  machines refuse both verbs — only unlocking leaves a lock.
+  The Circle app holds a class from one panel: Focus (one app for everyone, or
+  each machine where it already is), Release, and Close, with held machines
+  showing which app they are held in.
 - Stellarium opens windowed instead of taking the whole screen with no way
   out — the top bar's close button is always reachable now.
 bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home >/dev/null

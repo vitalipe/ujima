@@ -193,7 +193,6 @@
 
 (defn run!           [id] (handle-event! {:type :app/run    :app (catalog/resolve! id)}))
 (defn switch-to!     [id] (handle-event! {:type :app/switch :app (catalog/resolve! id)}))
-(defn close-focused! []   (handle-event! {:type :app/close}))
 (defn go-home!       []   (handle-event! {:type :app/home}))
 (defn cycle!         [step] (handle-event! {:type :app/cycle :step step}))
 
@@ -201,14 +200,24 @@
 (defn solo?  [] (instance? Solo   @state*))
 (defn locked? [] (instance? Locked @state*))
 
+(defn- refuse-when-locked!
+  "Locked is left by unlock and nothing else — every other mode verb bounces off it."
+  []
+  (when (locked?) (throw (ex-info "the machine is locked" {:error :app/locked}))))
+
 
 (defn enter-solo-mode!
-  "Solo an app by id, or (0-arity) whatever is focused now — throws at home (nothing to solo)."
+  "Solo an app by id, or (0-arity) whatever is focused now — throws at home (nothing to solo).
+   Never the lock screen: that one is reached by locking, so soloing it would be a Locked the
+   mode layer cannot see, and unlock would no longer answer."
   ([]   (let [w (observe!)]
           (if-let [id (proj/app-of-ws w (:focused-ws w))]
             (enter-solo-mode! id)
             (throw (ex-info "no app to solo" {:error :app/no-current-app})))))
-  ([id] (handle-event! {:type :mode/solo :app (catalog/resolve! id)})))
+  ([id] (refuse-when-locked!)
+        (when (= lock-app (keyword id))
+          (throw (ex-info "the lock screen is not a focus target" {:error :app/not-focusable})))
+        (handle-event! {:type :mode/solo :app (catalog/resolve! id)})))
 
 
 (defn exit-solo-mode!  [] (when (solo?)   (handle-event! {:type :mode/multi})))   ; leaves ONLY solo
@@ -218,10 +227,26 @@
 (defn exit-locked-mode!  [] (when (locked?) (handle-event! {:type :mode/multi})))  ; leaves ONLY locked
 
 
-(defn release!
-  "Leave whatever pinned mode we're in (solo OR locked) — the token stick's escape hatch."
+(defn enter-multi-mode!
+  "Drop whatever pinned mode we're in (solo OR locked) — the token stick's escape hatch."
   []
   (when-not (instance? Multi @state*) (handle-event! {:type :mode/multi})))
+
+
+(defn release!
+  "Hand the machine back: leave the app hold. A free machine is already released, so this is
+   a no-op there; a locked one refuses, since only unlock leaves a lock."
+  []
+  (refuse-when-locked!)
+  (exit-solo-mode!))
+
+
+(defn close-focused!
+  "Close the focused app — refused in a pinned mode, like every other multi verb, because this
+   is what the Alt+F4 chord calls. The circle's close lets go of the hold FIRST (see /api's
+   app/close): that release is the circle's to make, never the held machine's."
+  []
+  (handle-event! {:type :app/close}))
 
 
 (defn open-url! [url]

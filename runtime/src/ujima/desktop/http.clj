@@ -14,21 +14,12 @@
 ;; --- the verbs -----------------------------------------------------------
 
 (def ^:private verbs
-  {"app/open"     {:doc     "Open an app by catalog id; :mode :solo opens it soloed."
-                   :params  [:map [:app [:string {:min 1}]] [:mode {:optional true} [:enum :multi :solo]]]
-                   :handler (fn [{:keys [app mode]}]
-                              (if (= :solo mode)
-                                (app/enter-solo-mode! (keyword app))
-                                (app/run! (keyword app))))}
-
-   "app/unsolo"   {:doc     "Leave solo mode."
-                   :handler (fn [_] (app/exit-solo-mode!))}
-
-   "desktop/lock"   {:doc     "Lock this machine's screen."
-                     :handler (fn [_] (app/enter-locked-mode!))}
-
-   "desktop/unlock" {:doc     "Unlock this machine's screen."
-                     :handler (fn [_] (app/exit-locked-mode!))}
+  ;; no hold verbs here: the hold is the circle's, taken and handed back over the signed tier.
+  ;; A machine that could release itself is not held, and the token stick's escape needs no
+  ;; route — it calls app/enter-multi-mode! in-process.
+  {"app/open"     {:doc     "Open an app by catalog id."
+                   :params  [:map [:app [:string {:min 1}]]]
+                   :handler (fn [{:keys [app]}] (app/run! (keyword app)))}
 
    "app/close"    {:doc     "Close the focused app."
                    :handler (fn [_] (app/close-focused!))}

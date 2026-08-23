@@ -12,15 +12,19 @@ const CAT = {learn:'203,168,120', office:'168,150,201', create:'206,147,166',
              web:'134,184,126', explore:'126,158,214', system:'136,192,208'};
 
 /* one voice: btn = the bar's short label, label = the sentence form used by
-   both the hover hints and the running/settled toast */
+   both the hover hints and the running/settled toast.
+   The class verbs are a pair of pairs: Focus/Release take a machine and hand it
+   back, Lock/Unlock do the same for the whole screen; Close is Release that also
+   clears the desk. Opening an app WITHOUT taking control is not a circle gesture. */
 const VERBS = {
   'mute':      {btn: 'Mute',      label: 'Mute'},
   'unmute':    {btn: 'Sound on',  label: 'Sound on'},
   'volume':    {btn: 'Volume',    label: 'Set volume'},
   'lock':      {btn: 'Lock',      label: 'Lock screens'},
   'unlock':    {btn: 'Unlock',    label: 'Unlock screens'},
-  'open-app':  {btn: 'Open app',  label: 'Open app'},
-  'close-app': {btn: 'Close app', label: 'Close app'},
+  'focus':     {btn: 'Focus',     label: 'Keep to one app'},
+  'release':   {btn: 'Release',   label: 'Hand back'},
+  'close-app': {btn: 'Close',     label: 'Close the app'},
   'open-url':  {btn: 'Open page', label: 'Open page'},
   'restart':   {btn: 'Restart',   label: 'Restart'},
   'poweroff':  {btn: 'Power off', label: 'Power off'}};
@@ -59,16 +63,22 @@ let lastAction = null;    // latest action seen, {..., live:bool}
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
   c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-const model = p => ({
-  id:      p.id,
-  name:    p.label,
-  online:  !!p.online,
-  self:    p.id === S.self,
-  locked:  !!(p.desktop && p.desktop.locked),
-  muted:   !!(p.audio && p.audio.muted),
-  app:     (p.desktop && p.desktop.running)
-             ? {n: p.desktop.running.label, c: p.desktop.running.category} : null,
-  catalog: (p.desktop && p.desktop.catalog) || []});
+/* held = under the circle's hold. Lock is a hold too (a solo on the lock app),
+   but it is its own state with its own pair of verbs, so it never reads as held. */
+const model = p => {
+  const d = p.desktop || {};
+  const locked = !!d.locked;
+  return {
+    id:      p.id,
+    name:    p.label,
+    online:  !!p.online,
+    self:    p.id === S.self,
+    locked:  locked,
+    held:    !locked && !!(d.mode && d.mode.mode === 'solo'),
+    muted:   !!(p.audio && p.audio.muted),
+    app:     d.running ? {n: d.running.label, c: d.running.category} : null,
+    catalog: d.catalog || []};
+};
 
 async function poll(){
   let s;
@@ -107,12 +117,21 @@ function post(verb, extra, targets){
   }).then(poll);
 }
 
-function act(verb, extra){
+function act(verb, extra, targets){
   if (!sel.size || busyNow()) return;
+  if (targets && !targets.length) return;
   closeSheet();
   clearSettled();
-  post(verb, extra);
+  post(verb, extra, targets);
 }
+
+/* ── the selection, read by state ───────────────────────────────────────── */
+const selPeers  = () => [...sel].map(byId).filter(Boolean);
+const heldSel   = () => selPeers().filter(m => m.held);
+const lockedSel = () => selPeers().filter(m => m.locked);
+/* a locked machine is not "held" and Release must not unlock it — the two
+   gestures stay separate, so Release and Close simply pass locked machines by */
+const freeSel   = () => selPeers().filter(m => !m.locked);
 
 /* after the linger, good outcomes always release: a clean run fades away
    whole, a mixed run sheds its ok/accepted machines and keeps only the
@@ -184,6 +203,8 @@ const I = {
   check:'<polyline points="20 6 9 17 4 12"/>',
   x:    '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
   lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  focus:'<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8"/><path d="M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8"/><path d="M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16"/><path d="M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16"/><circle cx="12" cy="12" r="2.5"/>',
+  free: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
   unlock:'<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.9-.9"/>',
 };
 const ic = k => `<span class="ic"><svg viewBox="0 0 24 24">${I[k]}</svg></span>`;
@@ -196,10 +217,14 @@ function sndHtml(m){
   return m.online ? `<span class="ic snd" title="${m.muted?'muted':'sound on'}">
     <svg viewBox="0 0 24 24">${I[m.muted?'mute':'vol']}</svg></span>` : '';
 }
+/* Locked replaces the app name — a locked screen shows nothing else. Held does
+   NOT: which app they are held in is the whole point, so the row keeps the name
+   and only swaps the category dot for the focus mark. */
 function appRow(m, cls){   /* cls: 'napp' (ring) or 'approw' (grid) */
   if (!m.online) return `<div class="${cls} offline"><span class="txt">Off</span></div>`;
   if (m.locked)  return `<div class="${cls} lockedrow">${ic('lock')}<span class="txt">Locked</span></div>`;
   if (!m.app)    return `<div class="${cls} home"><span class="txt">Home</span></div>`;
+  if (m.held)    return `<div class="${cls} heldrow">${ic('focus')}<span class="txt">${esc(m.app.n)}</span></div>`;
   return `<div class="${cls}" style="--cat:${CAT[m.app.c] || '105,113,128'}">
             <span class="catdot"></span><span class="txt">${esc(m.app.n)}</span>
           </div>`;
@@ -255,6 +280,8 @@ function monSvg(hub){
     <rect class="mon-screen" x="6" y="6" width="36" height="22" rx="2"/>
     <g class="scr scr-lock"><rect x="19.5" y="15" width="9" height="7.5" rx="1.5"/>
       <path d="M21.5 15v-2.6a2.5 2.5 0 0 1 5 0V15"/></g>
+    <g class="scr scr-hold"><path d="M15 12.6V10h3"/><path d="M33 12.6V10h-3"/>
+      <path d="M15 21.4V24h3"/><path d="M33 21.4V24h-3"/><circle cx="24" cy="17" r="2.3"/></g>
     <g class="scr scr-load"><circle cx="17" cy="17" r="2.2"/><circle cx="24" cy="17" r="2.2"/><circle cx="31" cy="17" r="2.2"/></g>
     <g class="scr scr-ok"><polyline points="17.5 17.5 22 22 30.5 12.5"/></g>
     <g class="scr scr-err"><line x1="19.5" y1="12.5" x2="28.5" y2="21.5"/><line x1="28.5" y1="12.5" x2="19.5" y2="21.5"/></g>
@@ -277,6 +304,7 @@ function screenCls(m){
   if (run && run.pending.has(m.id)) return 'busy';
   if (run && !run.fading && run.res.has(m.id)) return '';
   if (m.locked) return 'locked';
+  if (m.held)   return 'held';
   return '';
 }
 
@@ -380,7 +408,17 @@ function hubSlots(){
                  c.noreply ? `<span>${c.noreply} no reply</span>` : '']
                 .filter(Boolean).join('<span class="hubdot">·</span>')};
   }
-  return {top, l1: '', l2: ''};
+  return {top, l1: '', l2: holdSummary()};
+}
+
+/* at rest the hub says who is not free — the one place the whole class is
+   readable without hunting the ring */
+function holdSummary(){
+  const held   = M.filter(m => m.online && m.held).length;
+  const locked = M.filter(m => m.online && m.locked).length;
+  return [held   ? `<span class="hold">${held} focused</span>`     : '',
+          locked ? `<span class="warn">${locked} locked</span>` : '']
+         .filter(Boolean).join('<span class="hubdot">·</span>');
 }
 
 function centerInner(){
@@ -493,12 +531,30 @@ function renderRing(){
 }
 
 /* ── action bar ─────────────────────────────────────────────────────────── */
+/* Class holds four gestures in two pairs. Focus reads "Change focus" once the
+   whole selection is already held — the same button, told what it will do.
+   Release and Close carry the count they will actually reach: locked machines
+   are passed by, so the number on the button is the promise. */
 function renderVerbs(){
-  const vbtn = (verb, icon, onclick, danger) =>
-    `<button class="verb${danger ? ' danger' : ''}" data-verb="${verb}"
-       onclick="${onclick || `act('${verb}')`}">${ic(icon)}${VERBS[verb].btn}</button>`;
+  const vbtn = (verb, icon, onclick, o) =>
+    `<button class="verb${(o||{}).danger ? ' danger' : ''}${(o||{}).off ? ' off' : ''}"
+       data-verb="${verb}"
+       onclick="${onclick || `act('${verb}')`}">${ic(icon)}${(o||{}).label || VERBS[verb].btn}${
+         (o||{}).badge ? `<span class="vnum">${(o||{}).badge}</span>` : ''}</button>`;
+  const held = heldSel().length, free = freeSel().length;
   $('verbs').innerHTML = `
     <span class="count">${sel.size} selected</span>
+    <div class="vgroup">
+      <span class="glabel">Class</span>
+      <div class="vrow">
+        ${vbtn('focus', 'focus', 'openFocus()',
+               {label: held === sel.size && held ? 'Change focus' : 'Focus'})}
+        ${vbtn('release', 'free', `act('release', null, freeIds())`,
+               {off: !free, badge: held || ''})}
+        ${vbtn('close-app', 'close', `confirmClose()`, {off: !free})}
+        ${vbtn('open-url', 'globe', 'openUrl()')}
+      </div>
+    </div>
     <div class="vgroup">
       <span class="glabel">Session</span>
       <div class="vrow">
@@ -507,14 +563,6 @@ function renderVerbs(){
         ${vbtn('volume', 'slid', 'openVolume()')}
         ${vbtn('lock', 'lock')}
         ${vbtn('unlock', 'unlock')}
-      </div>
-    </div>
-    <div class="vgroup">
-      <span class="glabel">Apps</span>
-      <div class="vrow">
-        ${vbtn('open-app', 'apps', 'openApps()')}
-        ${vbtn('close-app', 'close')}
-        ${vbtn('open-url', 'globe', 'openUrl()')}
       </div>
     </div>
     <div class="vgroup">
@@ -559,13 +607,20 @@ $('stage').addEventListener('mouseout', () => {
   if (wrap && wrap.classList) wrap.classList.toggle('hub-hot', false);
   setHint('');
 });
+function verbHint(verb){
+  const machines = n => `${n} machine${n === 1 ? '' : 's'}`;
+  if (verb === 'release' || verb === 'close-app'){
+    const free = freeSel().length, lk = lockedSel().length;
+    if (!free) return `All ${machines(lk)} locked — Unlock hands those back`;
+    return `${VERBS[verb].label} · ${machines(free)}` +
+           (lk ? ` · ${lk} locked, skipped` : '');
+  }
+  return `${VERBS[verb].label} · ${machines(sel.size)}`;
+}
 $('bar').addEventListener('mouseover', e => {
   if (e.target.closest('.selx')) return setHint('Clear selection');
   const v = e.target.closest('[data-verb]');
-  if (v){
-    const n = sel.size;
-    return setHint(`${VERBS[v.dataset.verb].label} · ${n} machine${n === 1 ? '' : 's'}`);
-  }
+  if (v) return setHint(verbHint(v.dataset.verb));
   setHint('');
 });
 $('bar').addEventListener('mouseout', () => setHint(''));
@@ -603,30 +658,68 @@ function selApps(){
   return apps;
 }
 
+/* Focus: one app for everyone, or each machine's own. "Where they are now" is
+   sent as the literal "current" — the server resolves it per machine, so five
+   children in five different apps are all held where they already are. */
 let pickApp = null, sheetApps = [];
-function openApps(){
+const freeIds  = () => freeSel().map(m => m.id);
+/* free, and with something to be held in — a locked machine's "current app" is
+   the lock screen, which is not a thing to focus anyone on */
+const busyPeers = () => freeSel().filter(m => m.app);
+
+function openFocus(){
   if (!sel.size) return;
   pickApp = null;
   sheetApps = selApps();
+  const here = busyPeers().length, n = sel.size;
   openSheet(`
-    <h2>Open an app</h2>
+    <h2>Keep the class to one app</h2>
+    <button class="hereopt${here ? '' : ' off'}" id="ap-here" onclick="chooseApp('current')">
+      <span class="ic"><svg viewBox="0 0 24 24">${I.focus}</svg></span>
+      <span class="ht"><b>Where they are now</b>
+        <em>${here === n ? `each of the ${n} in its own app`
+                         : `${here} of ${n} have an app open — the rest are skipped`}</em></span>
+    </button>
+    <div class="orline"><span>or the same app for everyone</span></div>
     <div class="appgrid">${sheetApps.map((a,i) => `
       <button class="apptile" style="--cat:${CAT[a.category] || '105,113,128'}" onclick="chooseApp(${i})" id="ap${i}">
         <span class="glyph">${esc((a.label || '?')[0])}</span><span class="an">${esc(a.label)}</span>
       </button>`).join('')}
     </div>
-    <label class="solochk"><input type="checkbox" id="soloc"> Keep to this app — no switching or closing</label>
+    <p>No switching, no closing, no bars — until you hand the machines back.</p>
     <div class="sfoot">
       <button class="btn quiet" onclick="closeSheet()">Cancel</button>
-      <button class="btn primary" onclick="applyApp()">Open on ${sel.size} machine${sel.size>1?'s':''}</button>
+      <button class="btn primary off" id="focusgo" onclick="applyFocus()">Focus ${n} machine${n>1?'s':''}</button>
     </div>`);
 }
 function chooseApp(i){
-  pickApp = sheetApps[i];
+  pickApp = i === 'current' ? 'current' : sheetApps[i];
   sheetApps.forEach((_,j) => $('ap'+j).classList.toggle('on', j === i));
+  $('ap-here').classList.toggle('on', i === 'current');
+  const n = (pickApp === 'current' ? busyPeers() : selPeers()).length;
+  const go = $('focusgo');
+  go.classList.toggle('off', !n);
+  go.textContent = `Focus ${n} machine${n === 1 ? '' : 's'}`;
 }
-function applyApp(){
-  if (pickApp) act('open-app', {app: pickApp.id, solo: $('soloc').checked});
+function applyFocus(){
+  if (!pickApp) return;
+  if (pickApp === 'current') return act('focus', {app: 'current'}, busyPeers().map(m => m.id));
+  act('focus', {app: pickApp.id}, freeIds());
+}
+
+/* Closing lets go of the hold on its own — the machine has to leave it to close
+   the app it was held in — but it is not a hand-back: whatever the circle set on
+   the class stays set. Only Release drops that. */
+function confirmClose(){
+  const n = freeSel().length;
+  if (!n) return;
+  openSheet(`
+    <h2>Close on ${n} machine${n>1?'s':''}?</h2>
+    <p>Whatever they have open closes and the machines go home. Anything unsaved is lost.</p>
+    <div class="sfoot">
+      <button class="btn quiet" onclick="closeSheet()">Cancel</button>
+      <button class="btn primary" onclick="act('close-app', null, freeIds())">Close</button>
+    </div>`);
 }
 
 function openUrl(){

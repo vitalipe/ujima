@@ -28,13 +28,10 @@
 
 (def commands
   (with-handlers defs/commands
-    {"app/open"     (fn [{:keys [app mode]}]
-                      (if (= :solo mode)
-                        (desktop/enter-solo-mode! (keyword app))
-                        (desktop/run! (keyword app))))
-     "app/unsolo"   (fn [_] (desktop/exit-solo-mode!))
+    {"app/open"     (fn [{:keys [app]}] (desktop/run! (keyword app)))
      "app/switch"   (fn [{:keys [app]}] (desktop/switch-to! (keyword app)))
-     "app/close"    (fn [_] (desktop/close-focused!))
+     "app/close"    (fn [_] (desktop/release!)
+                            (desktop/close-focused!))
      "app/home"     (fn [_] (desktop/go-home!))
      "app/open-url" (fn [{:keys [url]}] (desktop/open-url! url))
 
@@ -54,6 +51,16 @@
                            (effects/change-setting! [:system :timezone] timezone :device))
                          (system/clock! epoch)
                          (effects/change-setting! [:system :clock :epoch-floor] epoch :device))
+
+     "desktop/focus"   (fn [{:keys [app]}]
+                         (if app
+                           (desktop/enter-solo-mode! (keyword app))
+                           (desktop/enter-solo-mode!)))
+
+     ;; two halves, mode first: it is the half that can refuse, and a locked machine must
+     ;; keep the settings the circle put on it
+     "desktop/release" (fn [_] (desktop/release!)
+                               (effects/clear-scope! :activity))
 
      "desktop/lock"    (fn [_] (desktop/enter-locked-mode!))
      "desktop/unlock"  (fn [_] (desktop/exit-locked-mode!))

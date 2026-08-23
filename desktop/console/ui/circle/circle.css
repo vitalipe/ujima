@@ -8,6 +8,7 @@
   --ok:134,184,126;      /* done */
   --danger:191,97,106;   /* failed / power verbs */
   --warn:203,168,120;    /* attention (sand) */
+  --hold:168,150,201;    /* held by the circle — its own hue, never selection's */
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
@@ -75,6 +76,7 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .node.center .mon-screen{fill:rgba(var(--frost),.12)}
 .node.off .mon-screen{fill:#0a0c0e}
 .node.locked .mon-screen{fill:rgba(var(--warn),.16)}
+.node.held .mon-screen{fill:rgba(var(--hold),.16)}
 .node.busy .mon-screen{fill:rgba(var(--sel),.15)}
 .node.res-ok .mon-screen,.node.res-accepted .mon-screen{fill:rgba(var(--ok),.17)}
 .node.res-fail .mon-screen,.node.res-noreply .mon-screen{fill:rgba(var(--danger),.15)}
@@ -82,10 +84,15 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .scr{opacity:0;transition:opacity .45s ease}
 .scr rect,.scr path,.scr polyline,.scr line{fill:none;stroke-linecap:round;stroke-linejoin:round}
 .scr-lock rect,.scr-lock path{stroke:rgb(var(--warn));stroke-width:1.6}
+/* held: a viewfinder round the screen — pinned to one thing, unlike the padlock
+   which says the screen is gone entirely */
+.scr-hold path{stroke:rgb(var(--hold));stroke-width:1.7}
+.scr-hold circle{fill:rgba(var(--hold),.95);stroke:none}
 .scr-ok polyline{stroke:rgba(var(--ok),.95);stroke-width:2.2}
 .scr-err line{stroke:rgba(var(--danger),.9);stroke-width:2.2}
 .scr-load circle{fill:rgba(var(--sel),.9)}
 .node.locked .scr-lock{opacity:1}
+.node.held .scr-hold{opacity:1}
 .node.busy .scr-load{opacity:1}
 .node.res-ok .scr-ok,.node.res-accepted .scr-ok{opacity:1}
 .node.res-fail .scr-err,.node.res-noreply .scr-err{opacity:1}
@@ -151,6 +158,8 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .hubl{font-size:12.5px;color:var(--dim)}
 .hubl .ok{color:rgb(var(--ok))}
 .hubl .fail{color:rgb(var(--danger))}
+.hubl .hold{color:rgb(var(--hold))}
+.hubl .warn{color:rgb(var(--warn))}
 /* per-machine retry, sitting on the broken thread itself */
 .lineretry{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;
   border-radius:999px;background:var(--panel);color:rgb(var(--danger));
@@ -185,7 +194,8 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .napp .catdot{width:7px;height:7px;border-radius:2px;flex:none;background:rgb(var(--cat,105,113,128))}
 .napp.home,.napp.offline,.approw.home,.approw.offline{color:var(--faint)}
 .lockedrow{color:rgba(var(--warn),.95)}
-.lockedrow .ic{color:inherit}
+.heldrow{color:rgba(var(--hold),.95)}
+.lockedrow .ic,.heldrow .ic{color:inherit}
 .napp .ic{width:11px;height:11px;color:var(--dim)}
 .nfoot{display:flex;align-items:center;gap:6px;min-height:17px}
 .nfoot .snd{width:13px;height:13px;color:var(--faint)}
@@ -234,6 +244,14 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .verb:hover{background:rgba(255,255,255,.07)}
 .verb.danger{color:rgb(var(--danger))}
 .verb.danger:hover{background:rgba(var(--danger),.12)}
+/* a verb that would reach nobody stays visible and stays put — the bar never
+   reflows under the pointer, it just stops answering. It keeps the pointer,
+   though: a dimmed verb still has to say WHY it is dim. */
+.verb.off{opacity:.32;cursor:default}
+.verb.off:hover{background:none}
+.vnum{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;
+  padding:0 5px;margin-left:1px;border-radius:999px;font-size:10.5px;font-weight:700;
+  background:rgba(var(--hold),.2);color:rgb(var(--hold))}
 
 /* ── sheets ─────────────────────────────────────────────────────────────── */
 .ovl{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
@@ -244,8 +262,21 @@ button:focus-visible{outline:2px solid rgba(var(--sel),.7);outline-offset:2px;bo
 .sheet h2{font-size:14.5px;font-weight:700}
 .sheet p{font-size:13px;color:var(--dim);line-height:1.45}
 .sfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:2px}
-.solochk{display:flex;align-items:center;gap:9px;margin-top:14px;font-size:13px;color:var(--dim);cursor:pointer}
-.solochk input{width:16px;height:16px;accent-color:rgb(var(--sel));cursor:pointer}
+/* the sheet's first option is not one of the app tiles: it is the whole class,
+   each machine in its own app, so it gets a full-width row of its own */
+.hereopt{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;
+  text-align:left;background:rgba(255,255,255,.055);transition:background .15s,box-shadow .15s}
+.hereopt:hover{background:rgba(255,255,255,.09)}
+.hereopt.on{background:rgba(var(--hold),.13);box-shadow:inset 0 0 0 1.5px rgba(var(--hold),.6)}
+.hereopt.off{opacity:.35;pointer-events:none}
+.hereopt .ic{width:20px;height:20px;flex:none;color:rgb(var(--hold))}
+.hereopt .ht{display:flex;flex-direction:column;gap:2px;min-width:0}
+.hereopt b{font-size:13px;font-weight:650}
+.hereopt em{font-style:normal;font-size:11.5px;color:var(--dim)}
+.orline{display:flex;align-items:center;gap:10px;color:var(--faint);font-size:11px;
+  text-transform:uppercase;letter-spacing:1.3px;font-weight:700}
+.orline::before,.orline::after{content:"";flex:1;height:1px;background:var(--panel-brd)}
+.btn.off{opacity:.35;pointer-events:none}
 .btn{padding:9px 14px;border-radius:11px;font-size:12.5px;font-weight:650;transition:background .15s}
 .btn.quiet{color:var(--dim)} .btn.quiet:hover{background:rgba(255,255,255,.07);color:var(--text)}
 .btn.primary{color:var(--text);background:rgba(var(--sel),.16);box-shadow:inset 0 0 0 1px rgba(var(--sel),.4)}

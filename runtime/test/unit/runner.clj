@@ -17,6 +17,7 @@
             [schema.ujima.app-test]
             [ujima.control.registry-test]
             [ujima.linux.converge-test]
+            [ujima.device-test]
             [ujima.control-test]
             [ujima.importer-test]
             [ujima.control.commands-test]
@@ -61,6 +62,7 @@
     schema.ujima.app-test
     ujima.control.registry-test
     ujima.linux.converge-test
+    ujima.device-test
     ujima.control-test
     ujima.control.commands-test
     ujima.control.queries-test

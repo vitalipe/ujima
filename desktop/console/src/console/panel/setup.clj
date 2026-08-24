@@ -29,9 +29,9 @@
        (every? #(and (string? %) (not (str/blank? %))) v)))
 
 (def ^:private write-specs
-  {[:system :hostname]
+  {[:system :name]
    {:valid? #(and (string? %) (re-matches #"[A-Za-z0-9-]{1,16}" %))
-    :why    "hostname must be 1-16 letters, numbers or dashes"}
+    :why    "name must be 1-16 letters, numbers or dashes"}
 
    [:keyboard :available-layouts]
    {:valid? layout-codes?

@@ -48,7 +48,7 @@
      [:keyboard [:map [:layout :string] [:available-layouts [:vector :string]]]]
      [:net      [:map [:ip [:maybe :string]]
                       [:interfaces [:map-of :keyword interface]]]]
-     [:system   [:map [:hostname [:maybe :string]]
+     [:system   [:map [:name     [:maybe :string]]
                       [:timezone [:maybe :string]]
                       [:clock-ms :int]]]
      [:monitor  [:map [:uptime-minutes [:maybe :int]]

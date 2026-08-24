@@ -67,3 +67,10 @@
 
   (in-try-boot? [this]
     "Returns true if booted in try-boot mode"))
+
+
+;; nil is not a valid system disk, so the info READ answers nil (per its
+;; contract); the writes stay loud — no nil implementation
+(extend-protocol UjimaSystemDisk
+  nil
+  (ujima-disk-info [_] nil))

@@ -23,8 +23,8 @@
 (deftest public-settings-drops-the-secrets
   (let [public (queries/public-settings (records {[:circle :token]      "deadbeef"
                                                   [:audio :muted]       false
-                                                  [:system :hostname]   "meru-01"}))]
-    (is (= #{[:audio :muted] [:system :hostname]} (set (keys public))))
+                                                  [:system :name]       "meru-01"}))]
+    (is (= #{[:audio :muted] [:system :name]} (set (keys public))))
     (is (not (str/includes? (pr-str public) "deadbeef")) "the record goes, not just the value")))
 
 
@@ -42,8 +42,8 @@
 (deftest settings->tree-nests-the-path-keys
   (is (= {:audio {:usb  {:volume {:effective 40}}
                   :muted        {:effective false}}
-          :system {:hostname    {:effective "meru-01"}}}
+          :system {:name        {:effective "meru-01"}}}
          (queries/settings->tree (records {[:audio :usb :volume] 40
                                            [:audio :muted]       false
-                                           [:system :hostname]   "meru-01"})))
+                                           [:system :name]       "meru-01"})))
       "[:audio :usb :volume] is three levels, not one"))

@@ -48,13 +48,13 @@
       (keyboard/layout! desired))))
 
 
-(defn- converge-system! [settings]
-  (doseq [[k current apply!] [[[:system :hostname] system/hostname system/hostname!]
-                              [[:system :timezone] system/timezone system/timezone!]]]
-    (let [desired (get settings k)]
-      (when (and desired (not= desired (current)))
-        (log/info "converge: applying" {:setting k :value desired})
-        (apply! desired)))))
+(defn- converge-system!
+  ;; no hostname here — machine reality, device/init! asserts it once at start
+  [settings]
+  (let [timezone (get settings [:system :timezone])]
+    (when (and timezone (not= timezone (system/timezone)))
+      (log/info "converge: applying" {:setting [:system :timezone] :value timezone})
+      (system/timezone! timezone))))
 
 
 (defn- converge-wifi!

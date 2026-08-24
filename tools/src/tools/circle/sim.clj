@@ -165,7 +165,7 @@
      :running  (when app (some #(when (= app (:id %)) (assoc % :title (str (:label %) " — UjimaOS")
                                                                :fullscreen false))
                                catalog))
-     :settings {:device   {[:system :hostname]           name
+     :settings {:device   {[:system :name]               name
                            [:system :timezone]           "Africa/Dar_es_Salaam"
                            [:keyboard :available-layouts] ["us" "tz"]
                            [:keyboard :layout]           "us"
@@ -221,7 +221,7 @@
                              :interfaces {:wlan0 {:up true :ip addr :prefix 24
                                                   :mac "2c:cf:67:00:00:00" :gateway nil :dhcp true}}})
 
-     "system/hostname" #(effective (m) [:system :hostname])
+     "system/name"     #(effective (m) [:system :name])
      "system/timezone" #(effective (m) [:system :timezone])
      "system/clock-ms" #(clock-ms (m))
 
@@ -434,7 +434,7 @@
       (println (str "circle sim up: " (count taken) " machines on " (first taken) "-"
                     (last (str/split (last taken) #"\.")) ", token " (subs token 0 8) "…"))
       (doseq [[ip m] (sort-by first @fleet*)]
-        (println (format "  %-15s %-10s %s%s" ip (effective m [:system :hostname])
+        (println (format "  %-15s %-10s %s%s" ip (effective m [:system :name])
                          (or (some-> m :running :label) "—") (if (:off? m) "  (off)" ""))))
       (println "ctrl-c to release the addresses")
       @(promise))))

@@ -103,7 +103,7 @@
                        {:ip         (net/lan-ip facts)
                         :interfaces facts}))
 
-   "system/hostname" #(:effective (control/setting [:system :hostname]))
+   "system/name"     #(:effective (control/setting [:system :name]))
    "system/timezone" #(:effective (control/setting [:system :timezone]))
    "system/clock-ms" #(System/currentTimeMillis)
 

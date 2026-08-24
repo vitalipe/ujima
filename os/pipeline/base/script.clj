@@ -60,10 +60,10 @@
     (files/install! project "base/login/autologin.conf"
                     "/etc/systemd/system/getty@tty1.service.d/autologin.conf")
 
-    ;; 4. default host identity — the baked name IS the default ([:system :hostname] is nil
-    ;;    unless a rename is set); the hosts mapping keeps sudo/X from warning "unable to
-    ;;    resolve"; the initramfs hook keeps machine-id stable under the overlay (the why
-    ;;    lives in the file)
+    ;; 4. default host identity — a placeholder only: ujimad's boot converge renames to
+    ;;    the serial-derived ujima-<last4> (the hostname is not a setting); the hosts
+    ;;    mapping keeps sudo/X from warning "unable to resolve"; the initramfs hook keeps
+    ;;    machine-id stable under the overlay (the why lives in the file)
     (files/install! project "base/identity/hostname" "/etc/hostname")
     ($! sh -c "grep -qw ujimaos /etc/hosts || printf '127.0.1.1\\tujimaos\\n' >> /etc/hosts")
     (files/install! project "base/identity/ujima-machine-id"

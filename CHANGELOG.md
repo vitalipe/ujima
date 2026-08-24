@@ -93,6 +93,9 @@ bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home
   mains-powered machines.
 - Setting a machine's clock can carry its timezone, so one call moves both; a
   zone the machine does not know is refused and the clock is left untouched.
+- Renaming a machine changes only its display name (`system.name`, shown with the
+  serial's last 4 digits); the OS hostname is fixed at `ujima-<serial-last4>`, so
+  a rename can no longer break running apps or the machine's network name.
 
 ### Fixed
 

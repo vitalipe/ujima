@@ -39,6 +39,8 @@
     (shell/install-remap! (get-in env [:shell :commands] {}))
     (log/init!            (get-in env [:log] {:level :info}))
 
+    (device/init! disk)   ; machine reality first: hostname + disk stamp
+
     (shell-http-converge/init!)
     (control/init!     (merge (get-in env [:control] {})
                               {:converge-targets [linux/converge! shell-http-converge/converge-ui!]}))
@@ -52,11 +54,7 @@
     (storage/init! (merge (get-in env [:storage] {})
                           {:converge-targets [token-events/on-storage!]}))
 
-    (when disk
-      (ab/system-disk-id! disk)) ; first boot stamps here
-
-
-    (let [{system-disk-id :system-disk-id :as disk-info} (when disk (ab/ujima-disk-info disk))
+    (let [{system-disk-id :system-disk-id :as disk-info} (ab/ujima-disk-info disk)
           auth-cfg (merge (get-in env [:api :auth] {})
                           {:key     (:effective (control/setting [:circle :token]))
                            :self-id system-disk-id})]

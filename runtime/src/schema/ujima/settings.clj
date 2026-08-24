@@ -51,15 +51,12 @@
                 :scopes  #{:circle}
                 :shape   [:re {:error/message "must be 64 hex characters"} #"^[0-9a-f]{64}$"]}
 
-               {:key     [:system :hostname]
-                :doc     "LAN hostname for this machine (single label, not an FQDN)"
-                ;; nil = keep the baked /etc/hostname (tools base.clj). A set value renames at
-                ;; converge — every boot, overlayroot resets /etc (harmless: X runs -ac); clearing
-                ;; it reverts only on reboot
-                :default nil
+               {:key     [:system :name] ;; name != hostname 
+                :doc     "This machine's display name — shown beside the serial tail on the machine and in the circle"
+                :default "UjimaOS"
                 :scopes  #{:device}
                 ;; anchored: malli's :re is re-find, not re-matches
-                :shape   [:re {:error/message "hostname must be 1-16 letters, numbers or dashes"}
+                :shape   [:re {:error/message "name must be 1-16 letters, numbers or dashes"}
                           #"^[A-Za-z0-9-]{1,16}$"]}
 
                {:key     [:system :timezone]

@@ -86,7 +86,7 @@
              "device"           (fn [] (swap! ran conj :device)
                                         {:serial nil :model "Pi 500"})
              "apps"             (fn [] (swap! ran conj :apps) [{:id :gimp}])
-             "system/hostname"  (fn [] (swap! ran conj :hostname) "ujima")
+             "system/name"      (fn [] (swap! ran conj :name) "ujima")
              "system/clock-ms"  (fn [] (swap! ran conj :clock-ms) 1786500000000)}}))
 
 
@@ -109,7 +109,7 @@
 
 (deftest paths-above-nodes-assemble
   (let [rs (tree (atom []))]
-    (is (= {:status 200 :body {:hostname "ujima" :clock-ms 1786500000000}}
+    (is (= {:status 200 :body {:name "ujima" :clock-ms 1786500000000}}
            (ask rs "/api/query/machine/system")) "grafted back from the nodes below")
     (is (= #{:audio :device :apps :system}
            (set (keys (:body (ask rs "/api/query/machine"))))) "the root assembles everything")))
@@ -130,7 +130,7 @@
     (is (= [:audio] @ran) "a narrow read touches one node")
     (reset! ran [])
     (ask rs "/api/query/machine/system")
-    (is (= #{:hostname :clock-ms} (set @ran)) "an assembly touches only what's below it")))
+    (is (= #{:name :clock-ms} (set @ran)) "an assembly touches only what's below it")))
 
 
 (deftest the-deepest-node-wins

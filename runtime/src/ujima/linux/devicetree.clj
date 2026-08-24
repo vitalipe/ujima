@@ -15,3 +15,9 @@
 
 (defn serial [] (prop "serial-number"))
 (defn model  [] (prop "model"))
+
+(defn serial-tail
+  "The serial's last 4 characters — the machine's short id (nil off-devicetree)."
+  []
+  (when-let [s (serial)]
+    (subs s (max 0 (- (count s) 4)))))

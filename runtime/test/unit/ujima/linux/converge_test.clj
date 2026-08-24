@@ -1,10 +1,10 @@
 (ns ujima.linux.converge-test
   (:require [clojure.test :refer [deftest is]]
-            [ujima.linux.converge :as converge]
-            [ujima.linux.audio    :as audio]
-            [ujima.linux.keyboard :as keyboard]
-            [ujima.linux.system   :as system]
-            [ujima.linux.net.wifi :as wifi]))
+            [ujima.linux.converge   :as converge]
+            [ujima.linux.audio      :as audio]
+            [ujima.linux.keyboard   :as keyboard]
+            [ujima.linux.system     :as system]
+            [ujima.linux.net.wifi   :as wifi]))
 
 
 ;; Desired-vs-actual decision logic only (no OS): audio/full-topology and the setters are
@@ -26,7 +26,6 @@
    [:audio :hdmi :volume] 70
    [:audio :muted]        false
    [:keyboard :layout]    "us"
-   [:system :hostname]    "ujima"
    [:system :timezone]    "Africa/Dar_es_Salaam"
    [:network :wifi :mode]  :peer
    [:network :wifi :essid] "IOT"
@@ -40,8 +39,6 @@
   [f]
   (with-redefs [keyboard/layout  (constantly "us")
                 keyboard/layout! (fn [_] (throw (ex-info "unexpected" {})))
-                system/hostname  (constantly "ujima")
-                system/hostname! (fn [_] (throw (ex-info "unexpected" {})))
                 system/timezone  (constantly "Africa/Dar_es_Salaam")
                 system/timezone! (fn [_] (throw (ex-info "unexpected" {})))
                 wifi/radio       (constantly true)
@@ -94,8 +91,6 @@
     (with-redefs [audio/full-topology      (fn [] (throw (ex-info "pipewire down" {})))
                   keyboard/layout  (constantly "us")
                   keyboard/layout! (fn [v] (reset! layout-applied v))
-                  system/hostname  (constantly "ujima")
-                  system/hostname! (fn [_])
                   system/timezone  (constantly "Africa/Dar_es_Salaam")
                   system/timezone! (fn [_])
                   wifi/radio       (constantly true)
@@ -111,16 +106,14 @@
                   audio/switch-output! (fn [_])
                   keyboard/layout  (constantly "us")
                   keyboard/layout! (fn [v] (swap! calls conj [:layout v]))
-                  system/hostname  (constantly "old-name")
-                  system/hostname! (fn [v] (swap! calls conj [:hostname v]))
-                  system/timezone  (constantly "Africa/Dar_es_Salaam")
+                  system/timezone  (constantly "UTC")
                   system/timezone! (fn [v] (swap! calls conj [:timezone v]))
                   wifi/radio       (constantly true)
                   wifi/network     (constantly joined)
                   wifi/join!       (fn [v] (swap! calls conj [:join v]))]
       (converge! base-settings))
-    (is (= [[:hostname "ujima"]] @calls)
-        "only the drifted hostname converged; layout, timezone and wifi were in sync")))
+    (is (= [[:timezone "Africa/Dar_es_Salaam"]] @calls)
+        "only the drifted timezone converged; layout and wifi were in sync")))
 
 
 (defn- wifi-calls
@@ -129,7 +122,6 @@
   (let [calls (atom [])]
     (with-redefs [audio/full-topology  (constantly {:default nil :sinks {}})
                   keyboard/layout      (constantly "us")
-                  system/hostname      (constantly "ujima")
                   system/timezone      (constantly "Africa/Dar_es_Salaam")
                   wifi/radio           (constantly radio)
                   wifi/radio!          (fn [on?] (swap! calls conj [:radio on?]))

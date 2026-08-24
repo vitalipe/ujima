@@ -274,7 +274,7 @@ function settingsHtml(m){
   <div class="scard">
     <span class="sc-title">${ic('tag')}Name</span>
     <div class="frow">
-      <input class="field grow" id="f-name" value="${esc(sys(m).hostname || '')}" maxlength="16"
+      <input class="field grow" id="f-name" value="${esc(sys(m).name || '')}" maxlength="16"
         oninput="refreshSave('name')">
       ${saveBtn('b-name','Save','','primary',"saveSec('name')")}
     </div>
@@ -375,7 +375,7 @@ function copyClock(){
    time keeps moving — what matters is whether the user touched it) */
 function cardDirty(key){
   const m = byId(cur);
-  if (key === 'name')    return $('f-name').value.trim() !== (sys(m).hostname || '');
+  if (key === 'name')    return $('f-name').value.trim() !== (sys(m).name || '');
   if (key === 'snd'){
     const on = document.querySelector('.optrow.snd.on');
     return !!on && on.dataset.k !== (m.audio && m.audio.output);
@@ -431,7 +431,7 @@ function readVals(key){
   if (key === 'name'){
     const v = $('f-name').value.trim();
     if (!/^[A-Za-z0-9-]{1,16}$/.test(v)) return {err: 'letters, numbers and dashes only'};
-    return {url: '/setup/settings', body: {writes: [{path: ['system','hostname'], value: v}]}};
+    return {url: '/setup/settings', body: {writes: [{path: ['system','name'], value: v}]}};
   }
   if (key === 'snd'){
     const on = document.querySelector('.optrow.snd.on');

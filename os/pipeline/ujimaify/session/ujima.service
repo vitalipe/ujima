@@ -33,7 +33,7 @@ StandardOutput=journal
 Restart=always
 RestartSec=3
 # -br = black root, so the 2-4s of session bring-up shows black, not the grey X weave
-# -ac = no X access control: ujimad converges [:system :hostname] mid-session, and xauth
+# -ac = no X access control: ujimad's boot converge renames to ujima-<serial4> AFTER X is up, and xauth
 #       cookies are keyed FamilyLocal/<hostname> — the rename strands every later X client
 #       ("Authorization required" cold-boot stall, one dead session per boot). Auth gates
 #       nobody here anyway (single uid owns ~/.Xauthority; physical access = root). Revisit

@@ -203,16 +203,16 @@
 (defn- tail [id] (subs id (max 0 (- (count id) 4))))
 
 (defn- labelled
-  "Hostname; its id's tail when it has none; both when two machines share a name.
+  "The machine's name; its id's tail when it has none; both when two share a name.
    Needs the whole roster, so it is not a fact about one peer."
   [peers]
   (let [shared (->> peers
-                    (keep #(some-> (get-in % [:system :hostname]) str/lower-case))
+                    (keep #(some-> (get-in % [:system :name]) str/lower-case))
                     frequencies
                     (keep (fn [[name n]] (when (> n 1) name)))
                     set)]
     (mapv (fn [{:keys [id] :as p}]
-            (let [host (get-in p [:system :hostname])]
+            (let [host (get-in p [:system :name])]
               (assoc p :label (cond (str/blank? host)                  (tail id)
                                     (shared (str/lower-case host))     (str host " " (tail id))
                                     :otherwise                          host))))

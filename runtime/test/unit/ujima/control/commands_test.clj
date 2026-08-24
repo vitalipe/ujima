@@ -63,8 +63,8 @@
          (setting! [:audio :usb :volume] 55 :session)))
   (is (= :request/malformed (:error (setting! [:audio :usb :volume] "55" :session)))
       "a string where the shape says int is an error, not something to coerce")
-  (is (= [:device [:system :hostname] "meru-01"]
-         (:wrote (setting! [:system :hostname] "meru-01" :device))))
+  (is (= [:device [:system :name] "meru-01"]
+         (:wrote (setting! [:system :name] "meru-01" :device))))
   (is (= [:device [:keyboard :available-layouts] ["us" "fr"]]
          (:wrote (setting! [:keyboard :available-layouts] ["us" "fr"] :device)))))
 
@@ -75,16 +75,16 @@
   (is (= "not a timezone ujima knows"
          (:message (setting! [:system :timezone] "Mars/Olympus" :device)))
       "the pinned catalog is part of the shape")
-  (is (= "hostname must be 1-16 letters, numbers or dashes"
-         (:message (setting! [:system :hostname] "no spaces!" :device))))
+  (is (= "name must be 1-16 letters, numbers or dashes"
+         (:message (setting! [:system :name] "no spaces!" :device))))
   (is (= :request/malformed (:error (setting! [:audio :muted] "yes" :session)))))
 
 
 (deftest change-setting-checks-the-path-and-the-scope
   (is (= :settings/unknown (:error (setting! [:no :such] "x" :session)))
       "not a setting — the addressing layer's answer, not a write")
-  (let [{:keys [error message]} (setting! [:system :hostname] "meru-01" :session)]
-    (is (= :request/malformed error) "hostname is device-only")
+  (let [{:keys [error message]} (setting! [:system :name] "meru-01" :session)]
+    (is (= :request/malformed error) "name is device-only")
     (is (= "this setting takes device" message) "the def names the scopes it takes"))
   (is (= [:activity [:audio :muted] true] (:wrote (setting! [:audio :muted] true :activity)))
       "a scope the def does allow goes through"))

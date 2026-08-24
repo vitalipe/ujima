@@ -27,7 +27,7 @@
   (fresh!)
   (is (= 40 (value [:audio :usb :volume])))
   (is (= 70 (value [:audio :hdmi :volume])))
-  (is (nil? (value [:system :hostname])) "nil default = keep the baked /etc/hostname"))
+  (is (= "UjimaOS" (value [:system :name])) "the default names the machine — never nil"))
 
 
 (deftest write-stamps-schema-and-round-trips
@@ -51,8 +51,8 @@
 
 (deftest write-of-non-scope-key-is-pruned
   (fresh!)
-  (control/settings! :session [:system :hostname] "nope")   ; :device-only key
-  (is (nil? (value [:system :hostname])) "pruned write leaves the nil default"))
+  (control/settings! :session [:system :name] "nope")   ; :device-only key
+  (is (= "UjimaOS" (value [:system :name])) "pruned write leaves the default"))
 
 
 (deftest file-with-matching-schema-loads
@@ -80,10 +80,10 @@
 (deftest write-over-stale-file-replaces-it
   (let [dir (fresh!)]
     (spit (device-file dir) (pr-str {:settings {:audio/volume 55}}))   ; pre-schema content
-    (control/settings! :device [:system :hostname] "meru-01")
+    (control/settings! :device [:system :name] "meru-01")
     (let [raw (edn/read-string (slurp (device-file dir)))]
       (is (= defs/schema (:schema raw)))
-      (is (= {[:system :hostname] "meru-01"} (:settings raw))
+      (is (= {[:system :name] "meru-01"} (:settings raw))
           "stale content discarded, not merged"))))
 
 
@@ -108,7 +108,7 @@
             :scopes {:device nil :session "tz" :activity "il"}}
            (get s [:keyboard :layout]))
         "the winner, why it won, what it falls back to, and what each scope holds")
-    (is (= {:device nil} (:scopes (get s [:system :hostname])))
+    (is (= {:device nil} (:scopes (get s [:system :name])))
         "only the scopes the def allows — the keys are the write whitelist")
     (is (= :default (:via (get s [:audio :muted]))) "nothing set = the default stands")
     (is (= (count defs/settings) (count s)) "one record per setting, always")))

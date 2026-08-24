@@ -121,8 +121,8 @@
    `f` MUST be pure over the passed map -- it must not read disk, other
    scopes, or the lock, or the atomicity guarantee breaks.
 
-   set:    (update-settings! :device #(assoc % [:system :hostname] \"meru-01\"))
-   clear:  (update-settings! :device #(dissoc % [:system :hostname]))
+   set:    (update-settings! :device #(assoc % [:system :name] \"meru-01\"))
+   clear:  (update-settings! :device #(dissoc % [:system :name]))
    multi:  (update-settings! :session #(merge % {...}))"
   [scope f]
 
@@ -142,7 +142,7 @@
 
 (defn settings!
   "Sugar over `update-settings!` for the common set-one-or-more-keys case.
-   (settings! :device [:system :hostname] \"meru-01\") "
+   (settings! :device [:system :name] \"meru-01\") "
   [scope k v & kvs]
   (update-settings! scope #(apply assoc % k v kvs)))
   

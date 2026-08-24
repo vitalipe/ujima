@@ -98,6 +98,8 @@ bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home
 
 - Renaming the machine also updates `/etc/hosts`, so `sudo` no longer warns
   "unable to resolve host" after a rename.
+- Holding a machine to one app now always hides the top bar and dock — a
+  start-up race could leave a duplicate pair painted over the held app.
 
 ## [0.3.0] - 2026-07-28
 

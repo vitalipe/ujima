@@ -13,8 +13,13 @@
 (def ^:private debounce-ms 200)                      ; actuate only after fullscreen settles quiet
 
 
-(defn- actuate! [show?]
-  (shell/sh? :eww :--config @eww-dir* (if show? "open-many" "close") "topbar" "dock"))
+;; --no-daemonize is load-bearing on every client call: an eww that cannot reach the daemon
+;; otherwise starts its OWN server, which then owns a second pair of bars nothing can close.
+(defn- actuate!
+  "Flip the bars; true when it landed."
+  [show?]
+  (:ok? (shell/sh? :eww :--config @eww-dir* :--no-daemonize
+                   (if show? "open-many" "close") "topbar" "dock")))
 
 
 (defn show-bar?
@@ -34,12 +39,54 @@
     (future
       (Thread/sleep debounce-ms)
       (when (and (= g @gen*) (not= want @shown?))
-        (actuate! want)
-        (reset! shown? want)))))
+        (if (actuate! want)
+          (reset! shown? want)
+          (log/error "eww bars did not flip" {:want want}))))))
+
+
+(defn- bars-open?
+  "Both bars, as the daemon on the socket reports them."
+  [dir]
+  (let [{:keys [ok? out]} (shell/sh? :eww :--config dir :--no-daemonize "active-windows")]
+    (and ok?
+         (boolean (re-find #"(?m)^topbar:" (str out)))
+         (boolean (re-find #"(?m)^dock:"   (str out))))))
+
+
+(defn- probe-bars!
+  "Poll until the daemon reports both bars, or the settle window closes. A cold boot routinely
+   needs a beat here — the socket answers before the app thread has painted anything."
+  [dir]
+  (let [deadline (+ (System/currentTimeMillis) 2000)]
+    (loop []
+      (or (bars-open? dir)
+          (when (< (System/currentTimeMillis) deadline)
+            (Thread/sleep 150)
+            (recur))))))
+
+
+(defn- open-bars-or-throw!
+  "Open the bars and confirm the daemon reports them — eww's exit code has lied in both
+   directions, so the daemon's own answer is the only postcondition worth trusting. The bars
+   ARE the desktop: no dock is no launcher, no switching and no clock, so exhausting the tries
+   is fatal and the supervisor restarts a session that can still be whole."
+  [dir]
+  (loop [attempt 1]
+    (shell/sh? :eww :--config dir :--no-daemonize "open-many" "topbar" "dock")
+    (cond
+      (probe-bars! dir) true
+
+      (< attempt 3)      (do (log/warn "eww bars not up yet — retrying" {:attempt attempt})
+                             (recur (inc attempt)))
+
+      :fail-3-times      (throw (ex-info "eww never opened the bars" {:eww dir :tries 3})))))
 
 
 (defn- await-daemon!
-  "Poll `eww ping` until the daemon socket answers, or give up loudly. The cap is wall-clock:
+  "Poll `eww ping` until the daemon socket answers, or give up loudly. ping is the only eww
+   command safe to probe with — every other one starts a server when it cannot connect. It
+   proves the socket accepts, not that the app thread can service a command; that remaining
+   gap is why the client calls carry --no-daemonize. The cap is wall-clock:
    against a wedged daemon each failed ping itself burns ~1s, so counting tries multiplies the
    intended wait (40 tries ran ~50s on HW)."
   [dir]
@@ -60,7 +107,12 @@
                  (shell/sh :eww :--config dir "daemon" :--no-daemonize))]
     (log/info "opening eww" {:eww dir})
     (reset! eww-dir* dir)
+
     (await-daemon! dir)
-    (shell/sh! :eww :--config dir "open-many" "topbar" "dock")
+    (open-bars-or-throw! dir)
+    
+    ;; we start with bars up
+    (reset! shown? true)
+    
     (let [{:keys [exit]} @daemon]
       (log/error "eww daemon exited — session over" {:exit exit}))))

@@ -10,7 +10,7 @@
             [lib.task.timeline :refer [->TimelineEvent]]))
 
 
-(def ^:private reply-timeout-ms 5000)
+(def ^:private reply-timeout-ms 8500)   ;; a hair over the 8s command transport — a job never gives up first
 (def ^:private keep-jobs        32)
 
 (defonce ^:private jobs* (atom {}))   ;; job id -> {:task :verb :targets :app}

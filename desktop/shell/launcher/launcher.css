@@ -1,11 +1,11 @@
-/* UjimaOS launcher — design turn 47a. Just the launcher surface (identity + status + app grid);
+/* UjimaOS launcher — design turn 47a. Just the launcher surface (identity + app grid);
    the top bar and dock are eww's. This window fills the space between eww's bars (i3 reserves
    48px top / 68px bottom). Values match the mock; layout is flex/grid so it reflows. */
 
 :root{
   --bg:#14171b; --panel:#1b2027; --panel-brd:#282e38;
   --text:#e7eaef; --dim:#9aa4b2; --faint:#697180;
-  --frost:136,192,208;              /* accent (this computer / online / room) */
+  --frost:136,192,208;              /* accent (this computer) */
 }
 
 *{margin:0;padding:0;box-sizing:border-box}
@@ -31,32 +31,14 @@ body{
   opacity:0; transition:opacity .3s ease}
 .home.ready{opacity:1}
 
-/* ── header: identity + status (the mock's y66 header, minus eww's 48px top bar) ─────────── */
+/* ── header: identity (the mock's y66 header, minus eww's 48px top bar) ─────────────────── */
 .head{display:flex; flex-direction:column; align-items:center; gap:14px; padding:22px 24px 0}
 .ident{display:flex; align-items:center; gap:13px}
 .ident-glyph{display:inline-flex; color:#88c0d0}
 .ident-glyph svg{width:30px; height:30px}
 .ident-name{font-size:44px; font-weight:700; letter-spacing:-.6px; line-height:1}
-
-.status{
-  display:flex; align-items:center; gap:16px; padding:9px 18px; border-radius:14px;
-  background:rgba(22,26,32,.55); box-shadow:inset 0 0 0 1px rgba(255,255,255,.06);
-}
-.stat{display:flex; align-items:center; gap:8px}
-.stat-label{font-size:13px; color:var(--dim)}
-.sep{width:4px; height:4px; border-radius:50%; background:var(--faint)}
-
-.wifi{display:flex; align-items:flex-end; gap:2.5px; height:14px}
-.wifi i{width:3px; border-radius:1.5px; background:rgba(255,255,255,.14); display:block}
-.wifi i:nth-child(1){height:5px}
-.wifi i:nth-child(2){height:8px}
-.wifi i:nth-child(3){height:11px}
-.wifi i:nth-child(4){height:14px}
-.wifi i.on{background:rgba(var(--frost),.9)}
-
-.room{display:flex; gap:3px; width:54px}
-.room span{flex:1; height:6px; border-radius:2px; background:rgba(255,255,255,.1)}
-.room span.on{background:rgba(var(--frost),.85)}
+.ident-serial{font-size:15px; font-weight:600; letter-spacing:.5px; color:var(--dim);
+  align-self:flex-end; padding-bottom:4px}
 
 /* ── stage: the category grid, centered in the free space ──────────────── */
 .stage{flex:1; display:flex; align-items:center; justify-content:center; padding:16px 40px; overflow:auto}

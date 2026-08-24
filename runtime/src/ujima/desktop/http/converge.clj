@@ -2,16 +2,22 @@
   "The GUI's converge ports and the streams they feed. control hands it the
    whole settings plane, so this projects; the app layer projects before its
    targets run, so that one republishes as-is."
-  (:require [lib.http.ndjson       :as ndjson]
-            [ujima.control.queries :as queries]))
+  (:require [lib.http.ndjson        :as ndjson]
+            [ujima.control.queries  :as queries]
+            [ujima.linux.devicetree :as devicetree]))
 
 (def pinned-app-order {:files   0   ; the one a user reaches for — it must not move
                        :console 1})
 
+;; machine identity is static — one devicetree read (nil off-Pi: x86 dev hosts)
+(def ^:private serial-tail (delay (devicetree/serial-tail)))
+
 (defn settings->ui
-  "Settings records -> the UI blob."
-  [settings]
-  {:audio    (queries/audio-status settings)
+  "Settings records (+ the static serial tail) -> the UI blob."
+  [settings serial]
+  {:system   {:name        (:effective (get settings [:system :name]))
+              :serial-tail serial}
+   :audio    (queries/audio-status settings)
    :keyboard {:layout  (:effective (get settings [:keyboard :layout]))
               :layouts (:effective (get settings [:keyboard :available-layouts]))
               :next    (queries/next-keyboard-layout settings)}})
@@ -30,7 +36,7 @@
              (sort-by #(pinned-app-order (:id %) 99)))})
 
 
-(defn converge-ui!   [settings _prv] (ndjson/publish! :ui/state (settings->ui settings)))
+(defn converge-ui!   [settings _prv] (ndjson/publish! :ui/state (settings->ui settings @serial-tail)))
 (defn converge-apps! [snapshot _prv] (ndjson/publish! :ui/apps  (apps->ui snapshot)))
 
 (defn stream-ui   [req] (ndjson/subscribe! :ui/state req))

@@ -1,7 +1,7 @@
-/* UjimaOS launcher (design turn 47a) — the category grid + identity/status. No framework, no CDN.
+/* UjimaOS launcher (design turn 47a) — the category grid + identity. No framework, no CDN.
    Served from ujimad's desktop tier at /ujima-desktop on :1336, same-origin with every call it makes.
-   The grid is built ONCE from the catalog; pull(state) does stable, id-keyed updates of the
-   changing bits. STATE is STATIC today — each field notes the API that will feed it. */
+   The grid is built ONCE from the catalog; the identity line and open-state come live from
+   ujimad's NDJSON streams (stream/state, stream/apps). */
 'use strict';
 
 const $ = (id) => document.getElementById(id);
@@ -41,14 +41,6 @@ async function fetchCatalog(){
     .filter(c => c.apps.length);
 }
 
-// ── live state — STATIC today; each field maps to a real source (see comments) ──
-const STATE = {
-  hostname : 'UjimaOS',             // API: GET stream/state -> hostname (settings plane)
-  online   : true,                  // API: stream/state -> network reachable
-  wifiBars : 3,                     // API: stream/state -> wifi strength 0..4 (0 = wired/none)
-  room     : { filled:2, total:6 }, // API: "room to work" = free-RAM headroom (lowram policy)
-};
-
 // ── click = fire an HTTP POST (same-origin; fire-and-forget, we don't need the 202) ──
 function launch(appId){
   fetch('/ujima-desktop/commands/app/open', {
@@ -76,19 +68,17 @@ function buildGrid(cats){
   }
 }
 
-// ── build the fixed status skeleton ONCE (glyphs + room segments with stable ids) ──
-function buildStatus(){
+// ── the identity line: the machine's display name from the settings plane, plus its
+//    last-4 serial digits on the side (absent off-Pi — the span just stays empty) ──
+function buildIdent(){
   document.querySelectorAll('[data-glyph]').forEach(n => n.innerHTML = glyph(n.dataset.glyph, 30));
-  const room = $('room');
-  for (let i = 0; i < STATE.room.total; i++) room.appendChild(el(`<span id="room-${i}"></span>`));
 }
 
-// ── pull: a dead-simple id-keyed loop; stable updates, no re-render ──
-function pull(state){
-  $('hostname').textContent = state.hostname;
-  $('net-label').textContent = state.online ? 'Online' : 'Offline';
-  for (let i = 0; i < 4; i++) $('wifi-' + i).classList.toggle('on', state.online && i < state.wifiBars);
-  for (let i = 0; i < state.room.total; i++) $('room-' + i).classList.toggle('on', i < state.room.filled);
+function applyState(state){
+  const sys = state.system;
+  if (!sys) return;
+  $('name').textContent = sys.name;
+  $('serial').textContent = sys.serialTail || '';
 }
 
 // ── reveal: fade the finished panel in once its icons + the shell font are painted ──
@@ -107,19 +97,19 @@ async function reveal(){
 }
 
 // ── open-app state: stream/apps (the same NDJSON source as the dock) and colour EVERY open
-// app's tile with its category (.open). Each push carries the FULL open-apps list (apps[] — not a
-// delta, and populated even at home), so we just reapply it. Matching is by catalog id — stable
+// app's tile with its category (.open). Each push carries the FULL open-apps list (running[] — not
+// a delta, and populated even at home), so we just reapply it. Matching is by catalog id — stable
 // until user-defined catalogs land in v1. Mirrors eww's deflisten: snapshot then a line per change.
 function applyOpen(state){
-  const open = new Set((state.apps || []).map(a => a.id));
+  const open = new Set((state.running || []).map(a => a.id));
   for (const btn of document.querySelectorAll('.tile'))
     btn.classList.toggle('open', open.has(btn.id.replace(/^tile-/, '')));
 }
 
-async function watchApps(){
+async function watchStream(path, apply){
   for (;;){
     try {
-      const reader = (await fetch('/ujima-desktop/stream/apps')).body.getReader();
+      const reader = (await fetch(path)).body.getReader();
       const dec = new TextDecoder();
       let buf = '';
       for (;;){
@@ -129,47 +119,51 @@ async function watchApps(){
         let nl;
         while ((nl = buf.indexOf('\n')) >= 0){
           const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
-          if (line.trim()) applyOpen(JSON.parse(line));
+          if (line.trim()) apply(JSON.parse(line));
         }
       }
-    } catch (err){ console.error('apps stream dropped:', err); }
+    } catch (err){ console.error(path + ' stream dropped:', err); }
     await new Promise(r => setTimeout(r, 1000));   // reconnect (ujimad restart drops the stream)
   }
 }
 
 // The launcher is UNMAPPED (hidden) whenever you're inside an app, and WebKit suspends its JS there
-// — so watchApps misses the stream/apps pushes that happen while hidden (open an app, close it, and its
-// tile stays lit). On becoming visible again, pull one fresh snapshot and reapply, so the open-state
-// is always current whenever you're actually looking at the launcher.
-async function syncOpen(){
+// — so the watches miss pushes that happen while hidden, and a push already in flight can sit
+// undelivered until the NEXT write wakes the connection (seen live: a hostname rename while
+// hidden left the header stale). On becoming visible again, pull one fresh snapshot per stream
+// and reapply, so everything is current whenever you're actually looking at the launcher.
+async function syncStream(path, apply){
   try {
-    const reader = (await fetch('/ujima-desktop/stream/apps')).body.getReader();
+    const reader = (await fetch(path)).body.getReader();
     const dec = new TextDecoder(); let buf = '';
     for (;;){
       const { value, done } = await reader.read();
       if (done) break;
       buf += dec.decode(value, { stream:true });
       const nl = buf.indexOf('\n');
-      if (nl >= 0){ applyOpen(JSON.parse(buf.slice(0, nl))); reader.cancel().catch(() => {}); return; }
+      if (nl >= 0){ apply(JSON.parse(buf.slice(0, nl))); reader.cancel().catch(() => {}); return; }
     }
-  } catch (err){ console.error('open-state resync failed:', err); }
+  } catch (err){ console.error(path + ' resync failed:', err); }
+}
+function syncAll(){
+  syncStream('/ujima-desktop/stream/state', applyState);
+  syncStream('/ujima-desktop/stream/apps',  applyOpen);
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') syncOpen();
+  if (document.visibilityState === 'visible') syncAll();
 });
-// backstop: the stream reconnect + visibilitychange above can still miss an open→close that
-// happened while hidden (WebKit suspends us) — a slow poll while visible reconverges to truth.
-setInterval(() => { if (document.visibilityState === 'visible') syncOpen(); }, 1500);
+// backstop: the stream reconnect + visibilitychange above can still miss a change that happened
+// while hidden (WebKit suspends us) — a slow poll while visible reconverges to truth.
+setInterval(() => { if (document.visibilityState === 'visible') syncAll(); }, 1500);
 
 async function main(){
-  buildStatus();
-  pull(STATE);
+  buildIdent();
   let cats = [];
   try { cats = await fetchCatalog(); }
   catch (err){ console.error('catalog fetch failed:', err); }
   buildGrid(cats);            // empty on failure — the header still shows, and reveal() still runs
-  watchApps();                // live open-state — starts before reveal so open tiles fade in coloured
+  watchStream('/ujima-desktop/stream/state', applyState);  // identity line
+  watchStream('/ujima-desktop/stream/apps',  applyOpen);   // live open-state — before reveal so open tiles fade in coloured
   await reveal();
-  // live wiring TODO: pull(state) is still STATIC — an EventSource('/ujima-desktop/stream/state') will feed it later.
 }
 document.addEventListener('DOMContentLoaded', main);

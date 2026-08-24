@@ -103,6 +103,10 @@ bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home
   "unable to resolve host" after a rename.
 - Holding a machine to one app now always hides the top bar and dock — a
   start-up race could leave a duplicate pair painted over the held app.
+- The home screen's identity line is live: the machine's real name and serial
+  tail replace a hardcoded name and a fake Online/"Room to work" status pill.
+- Open apps light their tiles on the home screen again, and a change that lands
+  while the home screen is hidden shows as soon as it is visible.
 
 ## [0.3.0] - 2026-07-28
 

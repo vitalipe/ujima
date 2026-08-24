@@ -5,11 +5,12 @@
 
 
 (defn- ui [settings]
-  (converge/settings->ui (update-vals settings #(hash-map :effective %))))
+  (converge/settings->ui (update-vals settings #(hash-map :effective %)) "af3c"))
 
 
 (def ^:private settings
-  {[:audio :active]                :usb
+  {[:system :name]                 "meru-01"
+   [:audio :active]                :usb
    [:audio :usb :volume]           55
    [:audio :hdmi :volume]          70
    [:audio :muted]                 false
@@ -18,7 +19,8 @@
 
 
 (deftest settings->ui-projects-the-active-output
-  (is (= {:audio    {:volume 55 :muted false :output :usb}
+  (is (= {:system   {:name "meru-01" :serial-tail "af3c"}
+          :audio    {:volume 55 :muted false :output :usb}
           :keyboard {:layout "us" :layouts ["us" "tz"] :next "tz"}}
          (ui settings)))
   (is (= 70 (get-in (ui (assoc settings [:audio :active] :hdmi))

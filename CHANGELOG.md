@@ -8,74 +8,71 @@ version truth; branch names and build labels may disagree.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-25
+
+Fleet control: a USB admin token opens the Console — the Circle app runs every
+machine in the circle, the Setup app configures one — over subnet discovery and
+an HMAC-signed device API. Underneath: one `/ujima` root, a persistent machine
+identity, and a clock that never runs backwards.
+
 ### Added
 
+- Ujima Circle App: a fleet control panel for teachers — every machine in the
+  circle, what each one is running, and sound, apps and power over a selection.
+- Ujima Setup App: per-machine setup over the same circle — name, clock
+  (timezone + wall time), keyboard layouts and sound output, plus a machine's
+  identity, address, uptime, storage and warnings.
+- A usb stick carrying an admin token opens the Console: removable partitions
+  are mounted read-only under `/ujima/run/storage/<uuid>` and scanned for it,
+  and the token has to be this machine's own circle key or the stick is
+  ignored. The Console pins beside Files in the dock while the token is in —
+  closing its window leaves the icon, a tap reopens it — and pulling the stick
+  closes the Console after a few seconds.
+- The Console finds its circle by sweeping the local subnet, and keeps sweeping
+  every 45 seconds while open, so a machine that boots later just appears: one
+  that answers and holds the same admin token joins the list, one that stops
+  answering stays on it marked off. Rescan always answers with a sweep that
+  started no earlier than the press; machines that belong to another circle are
+  counted, never listed.
+- Lock the screen from the Circle app: a machine shows a full-screen Locked
+  page (no switching, no closing) until a teacher unlocks it or the circle
+  token releases it; unlocking returns to whatever was open, and a locked
+  machine refuses the hold verbs — only unlocking leaves a lock.
+- Hold a machine to one app filling the screen — no switching, closing or
+  keyboard chords, automatic relaunch if it exits, the app's own dialogs
+  (Open/Save) still usable. `desktop/focus` takes it (with no app named,
+  whatever that machine has open right now), `desktop/release` or inserting
+  the circle token lets go. The Circle app holds a class from one panel —
+  Focus, Release and Close (closing a held app releases the hold first) —
+  with held machines showing which app they are held in.
+- Every machine mints a persistent identity at first boot: a generated system
+  id on the settings partition, surviving A/B installs and board swaps; the
+  machine API reports it as `id` (null until a first boot stamps it).
+- The machine API reports the deployed version: `query/machine/image` answers
+  the stamp written at build/deploy (git tag, plus commit id past a tag,
+  `-dirty` for uncommitted trees); images from before the stamp answer null.
 - The clock never boots backwards: a heartbeat records witnessed time on the
   settings partition and boot lifts a lagging clock to it — wall time stays
   monotonic across power loss on battery-less boards.
 - `hwclock` ships (`util-linux-extra`): a set clock persists to the Pi's RTC,
   surviving reboots while the board has power.
-- Every machine mints a persistent identity at first boot: a generated system id
-  on the settings partition, surviving A/B installs and board swaps; the machine
-  API reports it as `id` (null until a first boot stamps it).
-- The machine API reports the deployed version: `query/machine/image` answers
-  the stamp written at build/deploy (git tag, plus commit id past a tag,
-  `-dirty` for uncommitted trees); images from before the stamp answer null.
 - The device API on :1337 can answer in edn: `?format=edn` on any data route
   (JSON stays the default; files and streams are unaffected).
-- The image bakes ujima's bb libraries into `/ujima/m2` (pinned, sha-verified
-  at build); like packages, they never change on a live deploy.
-
-- Lock the screen from the Circle app: a machine shows a full-screen Locked
-  page (no switching, no closing) until a teacher unlocks it or the circle
-  token releases it; unlocking returns to whatever was open.
-- Hold a machine to one app filling the screen, with no switching or closing
-  and automatic relaunch if it exits — `desktop/focus` to take it (with no
-  app named, whatever that machine has open right now), `desktop/release` to
-  hand it back, and inserting the circle token releases it. The app's own
-  dialogs (Open/Save) stay usable. A held machine refuses the keyboard chords,
-  and closing its app from the Circle app lets go of the hold first. Locked
-  machines refuse both verbs — only unlocking leaves a lock.
-  The Circle app holds a class from one panel: Focus (one app for everyone, or
-  each machine where it already is), Release, and Close, with held machines
-  showing which app they are held in.
-- Stellarium opens windowed instead of taking the whole screen with no way
-  out — the top bar's close button is always reachable now.
-bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home >/dev/null
-- Ujima Circle App: a fleet control panel for teachers — every machine in the
-  circle, what each one is running, and sound, apps and power over a selection.
-- Ujima Setup App: per-machine setup over the same circle — name, clock (timezone
-  + wall time), keyboard layouts and sound output, plus a machine's identity,
-  address, uptime, storage and warnings.
-- The Console finds its circle by sweeping the local subnet: a machine that answers
-  and holds the same admin token joins the list, one that stops answering stays on
-  it marked off, and Rescan sweeps again. Machines on the network that belong to
-  another circle are counted, never listed.
+- Wifi is a setting: `[:network :wifi :essid]` (default `ujima-default-circle`)
+  + `:psk` (nil = open network) name the network to join and `:mode` (`:peer` |
+  `:off`) drives the radio — circle-wide, with a per-device override; seeded at
+  install like any setting, re-asserted at every boot.
+- A wired link with no DHCP answer falls back to a zeroconf (169.254/16)
+  address, so a circle on a bare switch stays addressable.
 - The OS image boots as-is — `dd` it to a card for a system without A/B, where
   settings and storage are not persistent.
-- A usb stick carrying an admin token opens the Console: removable partitions are
-  mounted read-only under `/ujima/run/storage/<uuid>` and scanned for it, the token has
-  to be this machine's own circle key or the stick is ignored, the Console pins beside
-  Files in the dock while the token is in — closing its window leaves the icon, a tap
-  reopens it — and pulling the stick closes the Console after a few seconds.
+- The image bakes ujima's bb libraries into `/ujima/m2` (pinned, sha-verified
+  at build); like packages, they never change on a live deploy.
 - Desktop windows fade in on open and out on close (~130ms), as do the shell's
   popovers and the bars hiding for a fullscreen app.
-- Wifi is a setting: `[:network :wifi :essid]` (default `ujima-default-circle`) + `:psk`
-  (nil = open network) name the network to join and `:mode` (`:peer` | `:off`) drives the
-  radio — circle-wide, with a per-device override; seeded at install like any setting,
-  re-asserted at every boot.
-- A wired link with no DHCP answer falls back to a zeroconf (169.254/16) address, so a
-  circle on a bare switch stays addressable.
-
-- The console keeps looking on its own: while open it sweeps the subnet every
-  45 seconds, so a machine that boots later just appears. Pressing Rescan always
-  answers with a sweep that started no earlier than the press.
 
 ### Changed
 
-- The in-session daemon is `/usr/local/bin/ujimad` (was `ujima-agent`).
-- The USB admin token is the file `.ujima-admin-token` (was
-  `.ujima-control-token`).
 - Everything on-device lives under one root — `/ujima`: code at
   `/ujima/ujimad`, desktop at `/ujima/desktop`, apps at `/ujima/apps` (was
   `/opt/ujima`); the desktop helpers and `/usr/games` ride the session `PATH`.
@@ -84,33 +81,37 @@ bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home
   `/ujima/storage/apps`.
 - An installed system records itself in one file, `/ujima/system/pack.edn` (was
   `metadata.edn` + `install.edn`): pack version, packed-at, installed-at.
-- The device API on :1337 has one shape: reads under `/api/query/`, writes under
-  `/api/commands/`. The old per-subject paths are gone.
+- The in-session daemon is `/usr/local/bin/ujimad` (was `ujima-agent`).
+- The USB admin token is the file `.ujima-admin-token` (was
+  `.ujima-control-token`).
+- The device API on :1337 has one shape: reads under `/api/query/`, writes
+  under `/api/commands/`. The old per-subject paths are gone.
 - The desktop's own surface — its streams, verbs, app catalog and files — now
   answers on `127.0.0.1:1336` under `/ujima-desktop/`, and is no longer
   reachable from the LAN; `:1337` serves `/api` only. Per-app icons moved from
   `GET /app/icon/<id>` to `GET /ujima-desktop/assets/app-icon/<id>`.
 - The device API answers commands and settings reads only to a signed request,
-  and signs every response; machine facts under `/api/query/machine/` stay open.
-- Wifi power saving is off on every connection: dozing turned ~10ms LAN round
-  trips into 40-100ms medians with seconds-scale outliers, for at most ~0.2W on
-  mains-powered machines.
+  and signs every response; machine facts under `/api/query/machine/` stay
+  open.
 - Setting a machine's clock can carry its timezone, so one call moves both; a
   zone the machine does not know is refused and the clock is left untouched.
-- Renaming a machine changes only its display name (`system.name`, shown with the
-  serial's last 4 digits); the OS hostname is fixed at `ujima-<serial-last4>`, so
-  a rename can no longer break running apps or the machine's network name.
+- Renaming a machine changes only its display name (`system.name`, shown with
+  the serial's last 4 digits); the OS hostname is fixed at
+  `ujima-<serial-last4>` with `/etc/hosts` kept in step, so a rename can no
+  longer break running apps or the machine's network name, and `sudo` no
+  longer warns "unable to resolve host".
+- Wifi power saving is off on every connection: dozing turned ~10ms LAN round
+  trips into 40-100ms medians with seconds-scale outliers, for at most ~0.2W
+  on mains-powered machines.
 
 ### Fixed
 
-- Renaming the machine also updates `/etc/hosts`, so `sudo` no longer warns
-  "unable to resolve host" after a rename.
-- Holding a machine to one app now always hides the top bar and dock — a
-  start-up race could leave a duplicate pair painted over the held app.
 - The home screen's identity line is live: the machine's real name and serial
-  tail replace a hardcoded name and a fake Online/"Room to work" status pill.
-- Open apps light their tiles on the home screen again, and a change that lands
-  while the home screen is hidden shows as soon as it is visible.
+  tail replace a hardcoded name and a fake Online/"Room to work" status pill;
+  a change landing while the home screen is hidden shows as soon as it is
+  visible again.
+- Stellarium starts windowed instead of taking the whole screen with no way
+  out — the top bar's close button is always reachable.
 
 ## [0.3.0] - 2026-07-28
 
@@ -193,6 +194,7 @@ read-only root, a babashka settings daemon (ujimad), an i3 + eww + WebKitGTK she
 - **Dev rig** — live `dev push` / `dev script` deploy to a dev Pi, e2e runner,
   screenshot/drive tooling.
 
-[Unreleased]: https://github.com/vitalipe/ujima/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/vitalipe/ujima/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/vitalipe/ujima/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/vitalipe/ujima/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/vitalipe/ujima/releases/tag/v0.2.0

@@ -11,7 +11,7 @@
 (def ^:private port 1337)
 
 ;; a command must resolve inside the jobs deadline (5s)
-(def timeouts {:probe 1000 :poll 1500 :command 4000})
+(def timeouts {:probe 1500 :poll 1500 :command 4000})
 
 
 ;; peer id -> the clock we last read from it: requests stamp from the TARGET's

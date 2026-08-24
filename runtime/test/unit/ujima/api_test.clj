@@ -8,6 +8,7 @@
             [lib.http     :as http]
             [ujima.control      :as control]
             [ujima.linux.system :as system]
+            [ujima.desktop.app  :as desktop]
             [ujima.api          :as api]
             [schema.ujima.settings  :as defs]
             [schema.ujima.api.query :as query]))
@@ -153,6 +154,29 @@
   (is (= 404 (:status (POST "/api/commands/clear/activity/no/such"))) "unknown setting")
   (is (= 404 (:status (POST "/api/commands/clear/device/audio/muted"))) "device is not a clear address")
   (is (= 404 (:status (POST "/api/commands/clear/device/"))) "runtime scopes only — device falls through"))
+
+
+(deftest the-lock-is-not-the-circles-to-release
+  ;; release! is ungated on purpose — the token stick drops any pin with it. What keeps a
+  ;; lock standing against the CIRCLE is these two handlers opening with the gate, and that
+  ;; is not a property of any function, so it is tested where it lives.
+  (fresh!)
+  (let [ran (atom [])]
+    (with-redefs [desktop/locked?        (constantly true)
+                  desktop/release!       #(swap! ran conj :release)
+                  desktop/close-focused! #(swap! ran conj :close)]
+      (is (= 409 (:status (POST "/api/commands/desktop/release"))) "release refuses a locked machine")
+      (is (= 409 (:status (POST "/api/commands/app/close")))       "close refuses a locked machine")
+      (is (= [] @ran) "and neither reached its effect"))))
+
+
+(deftest unlock-is-the-way-out-of-a-lock
+  (fresh!)
+  (let [ran (atom [])]
+    (with-redefs [desktop/locked? (constantly true)
+                  desktop/unlock! #(swap! ran conj :unlock)]
+      (is (= 202 (:status (POST "/api/commands/desktop/unlock"))))
+      (is (= [:unlock] @ran)))))
 
 
 (deftest every-verb-is-answerable

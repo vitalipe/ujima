@@ -552,7 +552,8 @@ function renderVerbs(){
         ${vbtn('release', 'free', `act('release', null, freeIds())`,
                {off: !free, badge: held || ''})}
         ${vbtn('close-app', 'close', `confirmClose()`, {off: !free})}
-        ${vbtn('open-url', 'globe', 'openUrl()')}
+        <!-- TEMP: Open page is refused on a held machine (app/open-url is not admitted
+             in solo), so it is off the bar until that is sorted. openUrl() stays. -->
       </div>
     </div>
     <div class="vgroup">
@@ -560,7 +561,7 @@ function renderVerbs(){
       <div class="vrow">
         ${vbtn('mute', 'mute')}
         ${vbtn('unmute', 'vol')}
-        ${vbtn('volume', 'slid', 'openVolume()')}
+        <!-- TEMP: off the bar. openVolume() stays. -->
         ${vbtn('lock', 'lock')}
         ${vbtn('unlock', 'unlock')}
       </div>

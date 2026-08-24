@@ -16,7 +16,7 @@
 (def ^:private verbs
   ;; no hold verbs here: the hold is the circle's, taken and handed back over the signed tier.
   ;; A machine that could release itself is not held, and the token stick's escape needs no
-  ;; route — it calls app/enter-multi-mode! in-process.
+  ;; route — it calls app/release! in-process.
   {"app/open"     {:doc     "Open an app by catalog id."
                    :params  [:map [:app [:string {:min 1}]]]
                    :handler (fn [{:keys [app]}] (app/run! (keyword app)))}

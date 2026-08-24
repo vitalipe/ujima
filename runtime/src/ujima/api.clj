@@ -30,7 +30,9 @@
   (with-handlers defs/commands
     {"app/open"     (fn [{:keys [app]}] (desktop/run! (keyword app)))
      "app/switch"   (fn [{:keys [app]}] (desktop/switch-to! (keyword app)))
-     "app/close"    (fn [_] (desktop/release!)
+     ;; the circle closes THROUGH a hold: let go first, then close — but never a lock
+     "app/close"    (fn [_] (desktop/refuse-when-locked!)
+                            (desktop/release!)
                             (desktop/close-focused!))
      "app/home"     (fn [_] (desktop/go-home!))
      "app/open-url" (fn [{:keys [url]}] (desktop/open-url! url))
@@ -54,16 +56,14 @@
 
      "desktop/focus"   (fn [{:keys [app]}]
                          (if app
-                           (desktop/enter-solo-mode! (keyword app))
-                           (desktop/enter-solo-mode!)))
+                           (desktop/solo-app! (keyword app))
+                           (desktop/solo-current-app!)))
 
-     ;; two halves, mode first: it is the half that can refuse, and a locked machine must
-     ;; keep the settings the circle put on it
-     "desktop/release" (fn [_] (desktop/release!)
-                               (effects/clear-scope! :activity))
+     "desktop/release" (fn [_] (desktop/refuse-when-locked!)
+                               (desktop/release!))
 
-     "desktop/lock"    (fn [_] (desktop/enter-locked-mode!))
-     "desktop/unlock"  (fn [_] (desktop/exit-locked-mode!))
+     "desktop/lock"    (fn [_] (desktop/lock!))
+     "desktop/unlock"  (fn [_] (desktop/unlock!))
 
      "system/restart"  (fn [_] (system/reboot!))
      "system/poweroff" (fn [_] (system/shutdown!))}))

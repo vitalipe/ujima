@@ -61,7 +61,7 @@
    "desktop/focus"   {:doc    "Keep this machine to one app: no switching, no closing, no bars. With no :app, whatever is focused right now."
                       :params [:map [:app {:optional true} [:string {:min 1}]]]}
 
-   "desktop/release" {:doc "Hand the machine back: leave the app hold and drop everything the activity scope holds."}
+   "desktop/release" {:doc "Leave the app hold. Settings the circle put on the machine are untouched — clear/activity drops those."}
 
    "desktop/lock"    {:doc "Lock this machine's screen."}
 

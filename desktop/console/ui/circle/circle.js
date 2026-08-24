@@ -23,7 +23,7 @@ const VERBS = {
   'lock':      {btn: 'Lock',      label: 'Lock screens'},
   'unlock':    {btn: 'Unlock',    label: 'Unlock screens'},
   'focus':     {btn: 'Focus',     label: 'Keep to one app'},
-  'release':   {btn: 'Release',   label: 'Hand back'},
+  'release':   {btn: 'Release',   label: 'Release the hold'},
   'close-app': {btn: 'Close',     label: 'Close the app'},
   'open-url':  {btn: 'Open page', label: 'Open page'},
   'restart':   {btn: 'Restart',   label: 'Restart'},

@@ -3,8 +3,8 @@
    home is \"1\"), so windows are never matched on WM_CLASS; each launch lands in a systemd
    scope (alive? + kill), and i3 owns placement and focus.
 
-   The session is in one of three MODES — Multi (the free desktop), Solo (one app, left by
-   exit-solo-mode!), Locked (the lock screen over a remembered app)."
+   The session is in one of three MODES — Multi (the free desktop), Solo (one app), Locked
+   (the lock screen over a remembered app); release! returns to Multi from either pin."
   (:require [ujima.linux.i3 :as i3]
             [ujima.desktop.app.catalog    :as catalog]
             [ujima.desktop.app.act        :as act]
@@ -200,45 +200,42 @@
 (defn solo?  [] (instance? Solo   @state*))
 (defn locked? [] (instance? Locked @state*))
 
-(defn- refuse-when-locked!
-  "Locked is left by unlock and nothing else — every other mode verb bounces off it."
+(defn refuse-when-locked!
+  "Throw unless the machine is free of the lock. Public because the gate belongs to the CALLER:
+   the circle may not release a lock, the token stick may."
   []
   (when (locked?) (throw (ex-info "the machine is locked" {:error :app/locked}))))
 
 
-(defn enter-solo-mode!
-  "Solo an app by id, or (0-arity) whatever is focused now — throws at home (nothing to solo).
-   Never the lock screen: that one is reached by locking, so soloing it would be a Locked the
-   mode layer cannot see, and unlock would no longer answer."
-  ([]   (let [w (observe!)]
-          (if-let [id (proj/app-of-ws w (:focused-ws w))]
-            (enter-solo-mode! id)
-            (throw (ex-info "no app to solo" {:error :app/no-current-app})))))
-  ([id] (refuse-when-locked!)
-        (when (= lock-app (keyword id))
-          (throw (ex-info "the lock screen is not a focus target" {:error :app/not-focusable})))
-        (handle-event! {:type :mode/solo :app (catalog/resolve! id)})))
+(defn solo-app!
+  "Hold the machine to APP. Never the lock screen: soloing it would be a Locked the mode layer
+   cannot see, and unlock would no longer answer."
+  [id]
+  (refuse-when-locked!)
+  (when (= lock-app (keyword id))
+    (throw (ex-info "the lock screen is not a focus target" {:error :app/not-focusable})))
+  (handle-event! {:type :mode/solo :app (catalog/resolve! id)}))
 
 
-(defn exit-solo-mode!  [] (when (solo?)   (handle-event! {:type :mode/multi})))   ; leaves ONLY solo
-
-
-(defn enter-locked-mode! [] (handle-event! {:type :mode/locked}))
-(defn exit-locked-mode!  [] (when (locked?) (handle-event! {:type :mode/multi})))  ; leaves ONLY locked
-
-
-(defn enter-multi-mode!
-  "Drop whatever pinned mode we're in (solo OR locked) — the token stick's escape hatch."
+(defn solo-current-app!
+  "Hold the machine to whatever it has focused right now; throws at home, with nothing to hold."
   []
-  (when-not (instance? Multi @state*) (handle-event! {:type :mode/multi})))
+  (let [w (observe!)]
+    (if-let [id (proj/app-of-ws w (:focused-ws w))]
+      (solo-app! id)
+      (throw (ex-info "no app to solo" {:error :app/no-current-app})))))
+
+
+(defn lock!   [] (handle-event! {:type :mode/locked}))
+(defn unlock! [] (when (locked?) (handle-event! {:type :mode/multi})))   ; leaves ONLY lock
 
 
 (defn release!
-  "Hand the machine back: leave the app hold. A free machine is already released, so this is
-   a no-op there; a locked one refuses, since only unlock leaves a lock."
+  "Go to Multi from wherever — solo OR lock — and a no-op when already there. UNGATED on
+   purpose: this is both the circle's \"leave the hold\" and the token stick's escape from
+   anything, and only the caller's gate tells those apart (see refuse-when-locked!)."
   []
-  (refuse-when-locked!)
-  (exit-solo-mode!))
+  (when-not (instance? Multi @state*) (handle-event! {:type :mode/multi})))
 
 
 (defn close-focused!

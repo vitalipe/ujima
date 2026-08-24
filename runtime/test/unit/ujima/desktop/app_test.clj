@@ -325,7 +325,7 @@
 
 (deftest solo-enter-cold-runs-and-fills-the-screen
   (setup! [] "1")
-  (stubbed #(app/enter-solo-mode! :web))
+  (stubbed #(app/solo-app! :web))
   (is (= [[:switch "web"]] (fx-of :switch)) "switched to P")
   (is (= [[:spawn :web ["chromium"]]] (fx-of :spawn)) "launched P")
   (is (= gaps0 (fx-of :cmd)) "bar gaps dropped so P fills the screen — no i3 fullscreen")
@@ -334,7 +334,7 @@
 
 (deftest solo-enter-warm-switches-only
   (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
-  (stubbed #(app/enter-solo-mode! :web))
+  (stubbed #(app/solo-app! :web))
   (is (= [[:switch "web"]] (fx-of :switch)))
   (is (= [] (fx-of :spawn)) "P already up — no re-spawn")
   (is (= gaps0 (fx-of :cmd)) "still fills the screen"))
@@ -342,12 +342,12 @@
 (deftest solo-does-not-i3-fullscreen
   ;; the dialog fix: no fullscreen, so a tiled chooser covers via tabbing instead of hiding
   (setup! [] "1")
-  (stubbed #(app/enter-solo-mode! :web))
+  (stubbed #(app/solo-app! :web))
   (is (empty? (filter #(some #{"fullscreen"} %) (fx-of :cmd))) "never issues i3 fullscreen"))
 
 (deftest solo-scope-death-relaunches-P
   (setup! [] "web" :scopes #{})
-  (stubbed #(do (app/enter-solo-mode! :web)       ; enter (scope now up)
+  (stubbed #(do (app/solo-app! :web)       ; enter (scope now up)
                 (swap! world* update :scopes disj :web)   ; P died
                 (reset! fx* [])
                 (app/handle-event! {:type :scope/died :app-id :web})))
@@ -355,7 +355,7 @@
 
 (deftest solo-scope-death-of-another-app-is-ignored
   (setup! [] "web" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web)
+  (stubbed #(do (app/solo-app! :web)
                 (reset! fx* [])
                 (app/handle-event! {:type :scope/died :app-id :paint})))   ; not P
   (is (= [] (fx-of :spawn)) "only P relaunches"))
@@ -365,7 +365,7 @@
   (setup! [] "web" :scopes #{})
   (stubbed
     #(with-redefs [app/relaunch-ms 999999]
-       (app/enter-solo-mode! :web)
+       (app/solo-app! :web)
        (reset! app/relaunch* 0)                    ; first death relaunches
        (swap! world* update :scopes disj :web)
        (app/handle-event! {:type :scope/died :app-id :web})
@@ -379,7 +379,7 @@
   ;; be able to close its way out. The circle's close releases first — see close-through-a-hold
   (setup! [(win "web" :focused? true) (win "paint")] "web" :scopes #{:web :paint})
   (stubbed
-    #(do (app/enter-solo-mode! :web)
+    #(do (app/solo-app! :web)
          (reset! fx* [])
          (app/run! :paint)          ; open another app
          (app/close-focused!)       ; close
@@ -391,29 +391,29 @@
   (is (= [] (fx-of :kill)) "no close in solo — the chord cannot break a hold")
   (is (= [] (filterv #(= [:switch "1"] %) (fx-of :switch))) "no go-home in solo"))
 
-(deftest unsolo-restores-gaps-and-returns-to-multi
+(deftest release-restores-gaps-and-returns-to-multi
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web)
+  (stubbed #(do (app/solo-app! :web)
                 (reset! fx* [])
-                (app/exit-solo-mode!)))
+                (app/release!)))
   (is (= :multi (mode-of)))
   (is (= gaps-back (fx-of :cmd)) "bar gaps put back"))
 
-(deftest enter-solo-mode-0-arity-solos-the-focused-app
+(deftest solo-current-app-holds-the-focused-app
   (setup! [(win "web" :focused? true)] "web" :scopes #{:web})
-  (stubbed #(app/enter-solo-mode!))                ; no id -> solo the focused app
+  (stubbed #(app/solo-current-app!))                ; no id -> solo the focused app
   (is (= :solo (mode-of)))
   (is (= gaps0 (fx-of :cmd)) "fills the screen"))
 
-(deftest enter-solo-mode-0-arity-at-home-throws
+(deftest solo-current-app-at-home-throws
   (setup! [(win "1" :focused? true :class "ujima-launcher")] "1")
-  (stubbed #(is (thrown? clojure.lang.ExceptionInfo (app/enter-solo-mode!))))  ; nothing to solo
+  (stubbed #(is (thrown? clojure.lang.ExceptionInfo (app/solo-current-app!))))  ; nothing to solo
   (is (false? (app/solo?)) "did not enter solo"))
 
 
 (deftest lock-pins-the-lock-app-and-fills-the-screen
   (setup! [] "1")
-  (stubbed #(app/enter-locked-mode!))
+  (stubbed #(app/lock!))
   (is (= [[:switch "ujima-desktop-lock"]] (fx-of :switch)) "switched to the lock app")
   (is (= [[:spawn :ujima-desktop-lock ["lock"]]] (fx-of :spawn)) "launched it")
   (is (= gaps0 (fx-of :cmd)) "fills the screen")
@@ -424,47 +424,42 @@
 (deftest lock-remembers-the-focused-app-and-unlock-returns-to-it
   ;; locked over an open web app: unlock stops the lock app and switches BACK to it
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
-  (stubbed #(do (app/enter-locked-mode!)                                   ; captures :web as app-to-focus
+  (stubbed #(do (app/lock!)                                   ; captures :web as app-to-focus
                 (swap! world* update :wins conj (win "ujima-desktop-lock" :con 9))
                 (reset! fx* [])
-                (app/exit-locked-mode!)))
+                (app/unlock!)))
   (is (= :multi (mode-of)))
   (is (some #{[:stop :ujima-desktop-lock]} (fx-of :stop)) "the lock app is stopped")
   (is (some #{[:switch "web"]} (fx-of :switch)) "returns to the remembered app"))
 
 (deftest unlock-goes-home-when-the-remembered-app-is-gone
   (setup! [] "1")                                             ; locked from home -> app-to-focus nil
-  (stubbed #(do (app/enter-locked-mode!)
+  (stubbed #(do (app/lock!)
                 (reset! fx* [])
-                (app/exit-locked-mode!)))
+                (app/unlock!)))
   (is (= :multi (mode-of)))
   (is (some #{[:switch "1"]} (fx-of :switch)) "home when there is nothing to return to"))
 
-(deftest unsolo-does-not-unlock-and-unlock-does-not-unsolo
-  ;; the guards: the two exits are distinct, so a stray unsolo can't defeat a lock
-  (setup! [(win "ujima-desktop-lock" :focused? true)] "1")
-  (stubbed #(do (app/enter-locked-mode!) (reset! fx* []) (app/exit-solo-mode!)))   ; unsolo while locked
-  (is (true? (app/locked?)) "exit-solo-mode! is a no-op on a locked machine")
-
+(deftest unlock-leaves-only-a-lock
   (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web) (reset! fx* []) (app/exit-locked-mode!)))  ; unlock while soloed
-  (is (true? (app/solo?)) "exit-locked-mode! is a no-op on a soloed machine"))
+  (stubbed #(do (app/solo-app! :web) (reset! fx* []) (app/unlock!)))
+  (is (true? (app/solo?)) "unlock! is a no-op on a soloed machine"))
 
-(deftest enter-multi-mode-leaves-any-pin
-  ;; the token stick's escape: the ONE verb that drops a lock without being unlock
+(deftest release-leaves-any-pin
+  ;; ungated by design — the token stick's escape. The circle gates itself first
   (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web) (reset! fx* []) (app/enter-multi-mode!)))
-  (is (= :multi (mode-of)) "enter-multi-mode! drops solo")
+  (stubbed #(do (app/solo-app! :web) (reset! fx* []) (app/release!)))
+  (is (= :multi (mode-of)) "release! drops solo")
   (setup! [(win "ujima-desktop-lock" :focused? true)] "1")
-  (stubbed #(do (app/enter-locked-mode!) (reset! fx* []) (app/enter-multi-mode!)))
-  (is (= :multi (mode-of)) "enter-multi-mode! drops lock"))
+  (stubbed #(do (app/lock!) (reset! fx* []) (app/release!)))
+  (is (= :multi (mode-of)) "release! drops lock too"))
 
 
 ;; --- the hold's own verbs: what focus, release and close refuse ---
 
 (deftest release-drops-the-hold-and-passes-a-free-machine-by
   (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web) (reset! fx* []) (app/release!)))
+  (stubbed #(do (app/solo-app! :web) (reset! fx* []) (app/release!)))
   (is (= :multi (mode-of)) "release! leaves the hold")
 
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
@@ -472,12 +467,12 @@
   (is (= [] (fx-of :cmd)) "a free machine is left alone"))
 
 (deftest the-hold-verbs-refuse-a-locked-machine
-  ;; locked is left by unlock and nothing else — focus, release and close all bounce
-  (doseq [[what verb] [["focus"   #(app/enter-solo-mode! :web)]
-                       ["focus-0" #(app/enter-solo-mode!)]
-                       ["release" #(app/release!)]]]
+  ;; focus bounces on its own; the circle's release and close bounce by calling the gate
+  (doseq [[what verb] [["focus"   #(app/solo-app! :web)]
+                       ["focus-0" #(app/solo-current-app!)]
+                       ["gate"    #(app/refuse-when-locked!)]]]
     (setup! [(win "ujima-desktop-lock" :focused? true)] "1" :scopes #{:web})
-    (stubbed #(do (app/enter-locked-mode!)
+    (stubbed #(do (app/lock!)
                   (is (thrown? clojure.lang.ExceptionInfo (verb)) what)))
     (is (true? (app/locked?)) (str what " left the lock standing"))))
 
@@ -485,14 +480,14 @@
   ;; soloing the lock app would be a Locked the mode layer cannot see, and unlock would
   ;; stop answering — so the lock screen is reachable by locking only
   (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
-  (stubbed #(is (thrown? clojure.lang.ExceptionInfo (app/enter-solo-mode! :ujima-desktop-lock))))
+  (stubbed #(is (thrown? clojure.lang.ExceptionInfo (app/solo-app! :ujima-desktop-lock))))
   (is (false? (app/solo?)) "did not enter solo"))
 
 (deftest close-through-a-hold
   ;; what /api's app/close does: release, THEN close — the pair the circle sends as one
   ;; request, and the pair a chord cannot assemble because release! is not on the local tier
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
-  (stubbed #(do (app/enter-solo-mode! :web)
+  (stubbed #(do (app/solo-app! :web)
                 (reset! fx* [])
                 (app/release!)
                 (app/close-focused!)))
@@ -500,9 +495,9 @@
   (is (= gaps-back (fx-of :cmd)) "bar gaps put back")
   (is (= [[:kill]] (fx-of :kill)) "and the app is closed"))
 
-(deftest unsolo-when-already-multi-does-nothing
+(deftest release-when-already-multi-does-nothing
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
-  (stubbed #(app/exit-solo-mode!))     ; never entered solo
+  (stubbed #(app/release!))            ; never held
   (is (= [] (fx-of :cmd)) "no gap change — a normal desktop is left alone"))
 
 

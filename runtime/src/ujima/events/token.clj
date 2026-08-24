@@ -61,8 +61,8 @@
 
 
 (defn- open! [token before]
-  (swap! eject-gen* inc)                          ; a pending close is now stale
-  (app/enter-multi-mode!)                                  ; the stick releases any pin (solo or lock)
+  (swap! eject-gen* inc) ; a pending close is now stale
+  (app/release!)                                  
   (catalog/merge-app! console {:env {token-env token} :hidden false})
   (when before
     (log/warn "circle token replaced — a console already running keeps the old one until it closes"))
@@ -79,7 +79,7 @@
     (log/info "circle token gone — closing the console" {:in-ms eject-grace-ms})
     (future
       (Thread/sleep eject-grace-ms)
-      (when (= gen @eject-gen*)                   ; nothing re-armed us in the meantime
+      (when (= gen @eject-gen*) ; nothing re-armed us in the meantime
         (catalog/merge-app! console {:env nil :hidden true})
         (systemd/stop! console)))))
 

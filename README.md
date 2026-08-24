@@ -174,6 +174,22 @@ partition and the shared pair: the settings partition lands at `/mnt/settings`
 (one dir per slot), and binding the slot's dir to `/ujima/settings` IS slot
 selection.
 
+The autoboot disk — the layout `bb disk autoboot` writes and requires:
+```
+p1  control    64 MiB  fat32  UJCTL    autoboot.txt — boot slot selection, tryboot
+p2  boot A    512 MiB  fat32           slot A kernel + firmware
+p3  boot B    512 MiB  fat32           slot B kernel + firmware
+p4  extended                           container for the logical partitions
+p5  root A     10 GiB  ext4            slot A rootfs
+p6  root B     10 GiB  ext4            slot B rootfs
+p7  settings    1 GiB  ext4   UJCFG    one dir per slot            (persists)
+p8  storage     rest   ext4   UJSTORE  files, extra apps, journal  (persists)
+```
+
+The MBR disk id is fixed (`00c0ffee`), so every partition has a stable
+`PARTUUID=00c0ffee-0N`; fstab and the kernel's `root=` address partitions by it,
+never by device path.
+
 **UjimaOS** — inside a slot, the root filesystem is **read-only** under a tmpfs
 overlay: everything written to `/` resets on reboot. What persists — across reboots
 *and* A/B updates — lives on the harness's shared partitions: settings, storage, and
@@ -184,7 +200,8 @@ the journal. On a running device:
 /ujima/m2          the bb libraries it runs on
 /ujima/desktop     the desktop layer (desktop/, mirrored)
 /ujima/apps        the app catalog scan root
-/ujima/system      the install record (pack.edn)    (per-slot)
+/ujima/image.edn   the build stamp (version, base)  (per-slot)
+/ujima/install.edn the install record (manifest)    (per-slot)
 /ujima/settings    per-slot settings scope          (persists)
 /ujima/storage     shared storage — files, apps     (persists)
 /ujima/run         ephemeral runtime state          (resets)
@@ -209,7 +226,7 @@ bb dev push <ip> ujimad                       # deploy the daemon, restart the s
 
 ### Circle
 
-Two terminals give you a classroom without one. The sim claims real addresses on
+Two terminals give you a circle sim and a Console driving it. The sim claims real addresses on
 the LAN and answers on them exactly as a machine does, so the Console finds them by
 sweeping — its argument is the machine it administers, and that machine's subnet is
 the one swept, so pointing it at a real device instead makes the fakes that device's
@@ -224,10 +241,11 @@ bb circle console up 192.168.1.200            # the panels on :1338, sweeping th
 ### Pins
 
 World-truth the build cannot resolve for itself is committed as a pin, and the
-consumer verifies it: the bb library closure, the timezone and keyboard catalogs,
-and a kernel-matched initramfs. Two have to come from somewhere other than this
-host — schema from a mounted image rootfs, initramfs from a dev Pi with its overlay
-off.
+consumer verifies it. `deps` is re-pinned when the bb dependency set changes — a
+library added or bumped; `schema` and `initramfs` only when the base image does,
+capturing its tz/xkb catalogs and its kernel-matched initramfs. Two have to come
+from somewhere other than this host — schema from a mounted image rootfs,
+initramfs from a dev Pi with its overlay off.
 
 ```
 bb pin deps                                   # deps.edn -> os/build/deps-pin.edn

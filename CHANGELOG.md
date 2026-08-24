@@ -79,8 +79,10 @@ identity, and a clock that never runs backwards.
 - The storage partition mounts directly at `/ujima/storage` (was
   `/mnt/storage`): the Files area is `/ujima/storage/files`, extra apps
   `/ujima/storage/apps`.
-- An installed system records itself in one file, `/ujima/system/pack.edn` (was
-  `metadata.edn` + `install.edn`): pack version, packed-at, installed-at.
+- An installed system records itself in two files at the slot root — the build
+  stamp `/ujima/image.edn` (version, base image) and the install record
+  `/ujima/install.edn` (the pack's manifest, installed-at, slot); was
+  `metadata.edn` + `install.edn`.
 - The in-session daemon is `/usr/local/bin/ujimad` (was `ujima-agent`).
 - The USB admin token is the file `.ujima-admin-token` (was
   `.ujima-control-token`).

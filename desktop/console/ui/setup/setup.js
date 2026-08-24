@@ -660,15 +660,17 @@ async function rescanNow(){
   scanning = true;
   $('rescan').classList.add('scanning');   // held until the reveal settles
   render();
-  try { await fetch('/console/rescan', {method: 'POST'}); } catch (e) {}
-  // the server owns the sweep: watch until it says it is done
+  let mine = null;   // a background sweep may be mid-flight — ours is queued behind it
+  try { mine = (await (await fetch('/console/rescan', {method: 'POST'})).json()).id; } catch (e) {}
+  // the server owns the sweep: watch until OURS (ids only grow) says it is done
   const until = Date.now() + SCAN_LIMIT;
   for (;;){
     await new Promise(r => setTimeout(r, 300));
     let s = null;
     try { s = await (await fetch('/ui/setup')).json(); } catch (e) {}
     if (s && s.peers) S = s;               // degraded reply — keep last frame
-    if (Date.now() > until || !(s && s.scan && s.scan.running)) break;
+    const done = s && s.scan && !s.scan.running && (mine == null || s.scan.id >= mine);
+    if (Date.now() > until || !(s && s.scan) || done) break;
   }
   if (!byId(cur)) { cur = S.self; detailKey = ''; }
   scanning = false;

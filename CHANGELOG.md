@@ -67,6 +67,10 @@ bindsym Mod1+Escape    exec --no-startup-id ujima-desktop POST commands/app/home
 - A wired link with no DHCP answer falls back to a zeroconf (169.254/16) address, so a
   circle on a bare switch stays addressable.
 
+- The console keeps looking on its own: while open it sweeps the subnet every
+  45 seconds, so a machine that boots later just appears. Pressing Rescan always
+  answers with a sweep that started no earlier than the press.
+
 ### Changed
 
 - The in-session daemon is `/usr/local/bin/ujimad` (was `ujima-agent`).

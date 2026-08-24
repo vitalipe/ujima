@@ -1,7 +1,8 @@
 (ns console.circle
   "Who is out there, what each machine is doing, and where a verb becomes a request.
 
-   Discovery is a sweep — at startup, then when a person asks. It only ever adds:
+   Discovery is a sweep — at startup, on a cadence while the console is open,
+   and when a person asks. It only ever adds:
    a machine that stops answering keeps its last tree and reads offline, so a class
    list never thins out mid-lesson. Only a person removes one. Nothing persists."
   (:require [clojure.string :as str]
@@ -12,12 +13,13 @@
 
 (def ^:private poll-ms   2000)
 (def ^:private in-flight 256)   ;; a /24 in one wave — measured 3s on a classroom AP, 8s at 64
+(def ^:private background-scan-ms 45000)   ;; an unasked-for machine appears within the minute, unasked
 
 
 (defonce ^:private cfg*    (atom {}))    ;; :key, :self-addr
 (defonce ^:private roster* (atom {}))    ;; machine id -> {:addr :tree :online :seen-ms}
 (defonce ^:private self*   (atom nil))   ;; this machine's id
-(defonce ^:private scan*   (atom nil))   ;; the one sweep: its task and what it found
+(defonce ^:private scan*   (atom nil))   ;; {:current {:task :found :foreign}, :next {:task}} — the one sweep + at most one queued
 (defonce ^:private lock    (Object.))
 
 
@@ -96,30 +98,71 @@
         {:found (count ours) :foreign foreign}))))
 
 
+(defn- ->scan-task []
+  (task/->task :discover
+               (fn [_] (let [r (sweep!)]
+                         (swap! scan* update :current merge r)
+                         r))))
+
+(defn- current-task [] (get-in @scan* [:current :task]))
+(defn- queued-task  [] (get-in @scan* [:next :task]))
+
 (defn- sweeping? []
-  (when-let [t (:task @scan*)] (not (task/finished? t))))
+  (when-let [t (current-task)] (not (task/finished? t))))
+
+(defn- run-scan!
+  ;; caller holds the lock: t becomes THE sweep and starts
+  [t]
+  (reset! scan* {:current {:task t}})
+  (task/run! t)
+  t)
+
+(defn- chain!
+  ;; when the running sweep ends, the queued one takes its place — unless a
+  ;; rescan! promoted it first (run-scan! clears :next, so the check fails)
+  [running queued]
+  (future
+    (while (not (task/finished? running)) (Thread/sleep 100))
+    (locking lock
+      (when (= queued (queued-task))
+        (run-scan! queued)))))
 
 (defn scan
   "What the current or last sweep is doing — the panels' :scan field."
   []
-  (when-let [{:keys [task found foreign]} @scan*]
+  (when-let [{:keys [task found foreign]} (:current @scan*)]
     {:id      (:id task)
      :running (not (task/finished? task))
      :found   found
      :foreign foreign}))
 
 (defn rescan!
-  "Sweep, or hand back the one already running — never two."
+  "A person asks: their sweep must start no earlier than the ask. Idle = run one
+   now; running = queue ONE next (every asker shares it) and answer its id — the
+   caller watches for that id to finish. Never two sweeps in flight."
   []
   (locking lock
-    (when-not (sweeping?)
-      (let [t (task/->task :discover
-                           (fn [_] (let [r (sweep!)]
-                                     (swap! scan* merge r)
-                                     r)))]
-        (reset! scan* {:task t})
-        (task/run! t)))
-    (scan)))
+    (cond
+      (not (sweeping?)) (do (run-scan! (or (queued-task) (->scan-task))) (scan))
+      (queued-task)     {:id (:id (queued-task)) :running true}
+      :else             (let [t (->scan-task)]
+                          (swap! scan* assoc :next {:task t})
+                          (chain! (current-task) t)
+                          {:id (:id t) :running true}))))
+
+(defn- background-rescan!
+  ;; the cadence tick fills idle air only — never stacks on a sweep, never queues
+  []
+  (locking lock
+    (when (and (not (sweeping?)) (nil? (queued-task)))
+      (run-scan! (->scan-task)))))
+
+(defn- scan-loop! []
+  (future
+    (loop []
+      (Thread/sleep background-scan-ms)
+      (try (background-rescan!) (catch Throwable _ nil))
+      (recur))))
 
 
 ;; ── the poll ────────────────────────────────────────────────────────────────
@@ -235,8 +278,10 @@
   {:removed id})
 
 (defn init!
-  "Poll, and sweep once — before any panel exists, so a window opens onto machines."
+  "Poll, and sweep once — before any panel exists, so a window opens onto
+   machines — then keep sweeping on the cadence for the ones that boot later."
   [{:keys [key self-addr] :or {self-addr "127.0.0.1"}}]
   (reset! cfg* {:key key :self-addr self-addr})
   (poll-loop!)
-  (rescan!))
+  (rescan!)
+  (scan-loop!))

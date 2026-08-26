@@ -1,3 +1,3 @@
 {:kind :exec :label "TuxTyping" :category :learn
  :exec ["tuxtype"]   ; /usr/games rides the session PATH (ujima.service)
- :class "tuxtype"}  ; xprop-verified
+ :window {:class "tuxtype"}}  ; xprop-verified

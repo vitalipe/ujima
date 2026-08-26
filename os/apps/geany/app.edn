@@ -1,3 +1,3 @@
 {:kind :exec :label "Geany" :category :code
  :exec ["sh" "app/run.sh"]   ; cwd wrapper: geany's Save dialog opens in Files (see app/run.sh)
- :class "Geany"}  ; xprop-verified
+ :window {:class "Geany"}}  ; xprop-verified

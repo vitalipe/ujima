@@ -3,4 +3,4 @@
 ;; keep their profiles (excalidraw's drawings live in browser storage).
 {:kind :exec :label "Web" :category :explore
  :exec ["chromium" "--guest" "--class=ujima-web" "--user-data-dir=/tmp/ujima-web" "--no-first-run"]
- :class "ujima-web"}
+ :window {:class "ujima-web"}}

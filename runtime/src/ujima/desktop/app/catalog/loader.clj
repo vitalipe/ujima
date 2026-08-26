@@ -35,7 +35,8 @@
 
 (defn- read-app
   "DIR/app.edn + what the scan resolves: :id = the dir name, :dir, :icon = the dir's icon.svg
-   or FALLBACK-ICON, and for the web kinds :class ujima-<id>. Bad content logs and returns nil."
+   or FALLBACK-ICON, and for the web kinds the class their wrapper is told to set, which is
+   also how they are recognised: :window {:class ujima-<id>}. Bad content logs, returns nil."
   [fallback-icon dir]
   (try
     (let [icon (fs/path dir "icon.svg")
@@ -45,7 +46,7 @@
           (assoc :id id :dir (str dir)
                  :icon (if (fs/exists? icon) (str icon) fallback-icon))
           (as-> spec (if (#{:web-app :link} (:kind spec))
-                       (assoc spec :class (str "ujima-" (name id)))
+                       (assoc spec :window {:class (str "ujima-" (name id))})
                        spec))
           (validate-files!)))
     (catch Throwable e

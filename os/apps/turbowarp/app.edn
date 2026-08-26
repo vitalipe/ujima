@@ -1,3 +1,3 @@
 {:kind :exec :label "TurboWarp" :category :code
  :exec ["./turbowarp-desktop" "--no-sandbox"]   ; cwd = this app dir, any root
- :class "turbowarp-desktop"}  ; StartupWMClass (package.json)
+ :window {:class "turbowarp-desktop"}}  ; StartupWMClass (package.json)

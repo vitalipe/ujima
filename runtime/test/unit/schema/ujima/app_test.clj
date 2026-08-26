@@ -9,7 +9,7 @@
 
 
 (deftest every-kind-as-authored
-  (is (m/validate app/spec {:kind :exec :label "Calc" :category :office :class "libreoffice-calc"
+  (is (m/validate app/spec {:kind :exec :label "Calc" :category :office :window {:class "libreoffice-calc"}
                             :exec ["libreoffice" "--calc"]}))
   (is (m/validate app/spec {:kind :exec :label "Console" :category :system :hidden true :exec ["sh" "app/run.sh"]}))
   (is (m/validate app/spec {:kind :exec :label "Sky" :exec ["stellarium"]}))
@@ -32,5 +32,8 @@
       "a typo is an error, not a silently ignored key")
   (is (= {:env ["disallowed key"]} (errors {:kind :exec :label "E" :exec ["x"] :env {"T" "1"}}))
       ":env is the session's, never authored")
-  (is (= {:class ["disallowed key"]} (errors {:kind :link :label "L" :url "http://x" :class "mine"}))
-      "the web kinds derive :class from the id"))
+  (is (= {:window ["disallowed key"]} (errors {:kind :link :label "L" :url "http://x" :window {:class "mine"}}))
+      "the web kinds derive their :window from the id")
+  (is (= {:window ["names no property — that would describe every window on screen"]}
+         (errors {:kind :exec :label "E" :exec ["x"] :window {}}))
+      "an empty :window would claim every window on the screen"))

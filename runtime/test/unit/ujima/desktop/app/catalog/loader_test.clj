@@ -67,7 +67,7 @@
 
 ;; --- kinds: the scan validates + derives identity ---
 
-(deftest scan-kinds-derive-class-and-validate
+(deftest scan-kinds-derive-window-and-validate
   (let [root (scan-root! {})]
     (fs/create-dirs (fs/path root "lib"))                     ; :link — the teacher case
     (spit (str (fs/path root "lib" "app.edn"))
@@ -88,7 +88,7 @@
     (spit (str (fs/path root "payload" "run.sh")) "#!/bin/sh\n")
     (let [c (loader/load-catalog [root] "fallback-launcher.svg")]
       (is (= [:board :lib :payload] (:order c)) "broken/unknown skipped, valid kinds in")
-      (is (= "ujima-lib"   (get-in c [:by-id :lib :class]))   "link derives its class")
-      (is (= "ujima-board" (get-in c [:by-id :board :class])) "web-app derives its class")
+      (is (= "ujima-lib"   (get-in c [:by-id :lib :window :class]))   "link derives its class")
+      (is (= "ujima-board" (get-in c [:by-id :board :window :class])) "web-app derives its class")
       (is (= ["./run.sh"]  (get-in c [:by-id :payload :exec])) "exec stays as-authored"))
     (fs/delete-tree root)))

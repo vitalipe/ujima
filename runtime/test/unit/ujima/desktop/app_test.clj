@@ -15,14 +15,14 @@
 
 
 (def ^:private catalog-apps               ; dir name = :id (the scanner's contract)
-  {"paint" {:kind :exec :label "Paint" :exec ["tuxpaint" "--nolockfile"] :class "TuxPaint.TuxPaint"}
-   "web"   {:kind :exec :label "Web"   :exec ["chromium"] :class "ujima-web"}
-   "sky"   {:kind :exec :label "Sky"   :exec ["stellarium"] :class "stellarium"}
+  {"paint" {:kind :exec :label "Paint" :exec ["tuxpaint" "--nolockfile"] :window {:class "TuxPaint.TuxPaint"}}
+   "web"   {:kind :exec :label "Web"   :exec ["chromium"] :window {:class "ujima-web"}}
+   "sky"   {:kind :exec :label "Sky"   :exec ["stellarium"] :window {:class "stellarium"}}
    ;; :system = no launcher tile, pinned in the dock instead. console pins only once a token
    ;; unhides it, so it ships hidden.
-   "files"   {:kind :exec :label "Files"   :category :system :exec ["pcmanfm"] :class "pcmanfm"}
-   "console" {:kind :exec :label "Console" :category :system :hidden true :exec ["sh" "run.sh"] :class "ujima-console"}
-   "ujima-desktop-lock" {:kind :exec :label "Locked" :category :system :hidden true :exec ["lock"] :class "ujima-ujima-desktop-lock"}})
+   "files"   {:kind :exec :label "Files"   :category :system :exec ["pcmanfm"] :window {:class "pcmanfm"}}
+   "console" {:kind :exec :label "Console" :category :system :hidden true :exec ["sh" "run.sh"] :window {:class "ujima-console"}}
+   "ujima-desktop-lock" {:kind :exec :label "Locked" :category :system :hidden true :exec ["lock"] :window {:class "ujima-ujima-desktop-lock"}}})
 
 (defn- scan-root!
   "Materialize {dir-name spec} as a temp scan root: <root>/<dir>/app.edn per entry."
@@ -98,10 +98,10 @@
     (is (= ["tuxpaint" "--nolockfile"]
            (act/app->runnable bins {:kind :exec :exec ["tuxpaint" "--nolockfile"] :dir "/x"})))
     (is (= ["open-web-app" "http://x.local/" "ujima-lib"]
-           (act/app->runnable bins {:kind :link :url "http://x.local/" :class "ujima-lib"})))
+           (act/app->runnable bins {:kind :link :url "http://x.local/" :window {:class "ujima-lib"}})))
     (is (= ["serve-web-app" "/apps/board/app" "index.html" "8100" "ujima-board"]
            (act/app->runnable bins {:kind :web-app :dir "/apps/board" :entry "index.html"
-                                    :port 8100 :class "ujima-board"}))
+                                    :port 8100 :window {:class "ujima-board"}}))
         "port coerced to string, serve dir = <dir>/app")))
 
 

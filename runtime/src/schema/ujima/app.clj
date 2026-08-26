@@ -20,10 +20,19 @@
   (into [:map {:closed true}] (concat common entries)))
 
 
+(def ^:private window
+  "What this app's windows look like — the X properties i3 reports, as an author states them.
+   Every key given must hold, so a suite whose editors share one res_class can still be told
+   apart. At least one key: an empty map would describe every window on the screen."
+  [:and [:map {:closed true}
+         [:class {:optional true} [:string {:min 1}]]]
+        [:fn {:error/message "names no property — that would describe every window on screen"}
+         seq]])
+
 (def exec
-  (kind [:kind  [:= :exec]]
-        [:exec  [:vector {:min 1} :string]]
-        [:class {:optional true} [:string {:min 1}]]))
+  (kind [:kind   [:= :exec]]
+        [:exec   [:vector {:min 1} :string]]
+        [:window {:optional true} window]))
 
 (def web-app
   (kind [:kind  [:= :web-app]]

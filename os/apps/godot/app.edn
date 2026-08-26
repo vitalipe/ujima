@@ -6,4 +6,4 @@
 {:kind :exec :label "Godot" :category :code
  :exec ["./godot" "--editor" "--path" "../godot-demo"
         "--rendering-driver" "vulkan" "--rendering-method" "mobile"]
- :class "Godot"}  ; res_class, xprop-verified
+ :window {:class "Godot"}}  ; res_class, xprop-verified

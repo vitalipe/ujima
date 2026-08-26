@@ -1,3 +1,3 @@
 {:kind :exec :label "Impress" :category :office
  :exec ["libreoffice" "-env:UserInstallation=file:///home/ujima/.config/ujima-lo-impress" "--impress"]
- :class "libreoffice-impress"}  ; xprop-verified
+ :window {:class "libreoffice-impress"}}  ; xprop-verified

@@ -5,6 +5,7 @@
             [ujima.log :as log]
             [ujima.linux.i3      :as i3]
             [ujima.linux.systemd :as systemd]
+            [ujima.desktop.app.catalog    :as catalog]
             [ujima.desktop.app.projection :as proj :refer [home-ws]]))
 
 
@@ -26,11 +27,11 @@
   "BINS + SPEC -> argv, at spawn time — the one seam where a kind becomes a process. :exec runs
    as-authored (cwd = the app dir); :web-app serves <dir>/app on :port; :link opens :url.
    Trusts the scan's validation."
-  [{:keys [open-web-app-bin serve-web-app-bin]} {:keys [kind exec dir entry port url class]}]
+  [{:keys [open-web-app-bin serve-web-app-bin]} {:keys [kind exec dir entry port url window]}]
   (case kind
     :exec    (vec exec)
-    :web-app [serve-web-app-bin (str (fs/path dir "app")) (str entry) (str port) class]
-    :link    [open-web-app-bin (str url) class]))
+    :web-app [serve-web-app-bin (str (fs/path dir "app")) (str entry) (str port) (:class window)]
+    :link    [open-web-app-bin (str url) (:class window)]))
 
 
 (defn run!
@@ -150,15 +151,15 @@
 
 
 (defn route-windows!
-  "A window that mapped on the wrong workspace (focus moved during the launch) goes where its
-   WM_CLASS says — the app's own dialogs included, they can map before the main window. The
-   launcher is not in the catalog, so it has its own rule: home. No focus change; idempotent."
+  "A window that mapped on the wrong workspace (focus moved during the launch) goes to the app
+   whose :window describes it — the app's own dialogs included, they can map before the main
+   window. The launcher is not in the catalog, so it has its own rule: home. No focus change;
+   idempotent."
   [{:keys [ws->wins catalog]}]
-  (let [by-class (:by-class catalog)]
-    (doseq [[ws wins] ws->wins
-            {:keys [con-id class]} wins
-            :let  [target (if (= launcher-class class)
-                            home-ws
-                            (some-> (get by-class class) name))]
-            :when (and target (not= ws target))]
-      (i3/try-command! (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" target))))
+  (doseq [[ws wins] ws->wins
+          {:keys [con-id class] :as win} wins
+          :let  [target (if (= launcher-class class)
+                          home-ws
+                          (some-> (catalog/app-of-window catalog win) name))]
+          :when (and target (not= ws target))]
+    (i3/try-command! (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" target)))

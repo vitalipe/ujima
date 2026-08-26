@@ -2,4 +2,4 @@
 ;; close-and-reopen silently does nothing.
 {:kind :exec :label "Draw" :category :create
  :exec ["tuxpaint" "--nolockfile"]
- :class "TuxPaint.TuxPaint"}
+ :window {:class "TuxPaint.TuxPaint"}}

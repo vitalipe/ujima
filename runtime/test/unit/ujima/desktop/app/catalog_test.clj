@@ -26,9 +26,18 @@
 
 
 (deftest a-repeated-id-keeps-its-last-entry
-  (let [c (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"] :class "A1"}
+  (let [c (catalog/->catalog {:apps [{:id :a :label "A" :exec ["x"] :window {:class "A1"}}
                                      {:id :b :label "B" :exec ["b"]}
-                                     {:id :a :label "A2" :exec ["y"] :class "A2"}]})]
+                                     {:id :a :label "A2" :exec ["y"] :window {:class "A2"}}]})]
     (is (= [:a :b] (:order c)))
     (is (= "A2" (get-in c [:by-id :a :label])))
-    (is (= {"A2" :a} (:by-class c)) "the dropped entry's class is gone too")))
+    (is (= [[{:class "A2"} :a]] (:windows c)) "the dropped entry's window is gone too")))
+
+
+(deftest a-window-goes-to-the-app-that-describes-it
+  (let [c (catalog/->catalog {:apps [{:id :paint :label "Paint" :exec ["p"] :window {:class "TuxPaint"}}
+                                     {:id :sky   :label "Sky"   :exec ["s"]}]})]
+    (is (= :paint (catalog/app-of-window c {:class "TuxPaint" :title "untitled"}))
+        "properties the app does not name are not looked at")
+    (is (nil? (catalog/app-of-window c {:class "Gimp"})))
+    (is (nil? (catalog/app-of-window c {:title "Sky"})) "an app naming nothing claims nothing")))

@@ -3,4 +3,4 @@
 ;; windowed, it tiles in the band with the top bar's ✕ to close it.
 {:kind :exec :label "Stellarium" :category :explore
  :exec ["stellarium" "--full-screen" "no"]
- :class "stellarium"}  ; xprop-verified
+ :window {:class "stellarium"}}  ; xprop-verified

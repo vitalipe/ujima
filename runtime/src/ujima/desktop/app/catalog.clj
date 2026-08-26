@@ -1,21 +1,33 @@
 (ns ujima.desktop.app.catalog
   "App specs indexed by :id, and the one runtime write on them."
-  (:require [lib.util :refer [distinct-by index-by map-vals]]))
+  (:require [lib.util :refer [distinct-by index-by]]))
 
 
 (defonce ^:private catalog* (atom nil))
 
 
 (defn ->catalog
-  "{:apps [...]} -> order (abc on id), by-id (a repeated :id keeps its last entry), and
-   by-class (WM_CLASS -> id, for routing an orphaned window)."
+  "{:apps [...]} -> order (abc on id), by-id (a repeated :id keeps its last entry), and windows
+   ([declared id] pairs, for routing an orphaned window). Most-declared-first, so an app naming
+   two properties is tried before one naming a single property they share."
   [raw]
   (let [apps (distinct-by :id (reverse (:apps raw)))]
-    {:order    (mapv :id (sort-by :id apps))
-     :by-id    (index-by :id apps)
-     :by-class (->> apps 
-                 (filter :class) 
-                 (index-by :class) (map-vals :id))}))
+    {:order   (mapv :id (sort-by :id apps))
+     :by-id   (index-by :id apps)
+     :windows (->> apps
+                (filter :window)
+                (sort-by #(- (count (:window %))))
+                (mapv (juxt :window :id)))}))
+
+
+(defn app-of-window
+  "The app whose declared :window every property of holds for WIN — nil when none. A scan, not
+   an index: one index per property cannot answer a declaration that names two of them, and the
+   catalog is tens of apps."
+  [catalog win]
+  (some (fn [[declared id]]
+          (when (= declared (select-keys win (keys declared))) id))
+        (:windows catalog)))
 
 
 (defn listing

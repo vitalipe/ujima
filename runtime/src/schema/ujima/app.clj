@@ -21,11 +21,13 @@
 
 
 (def ^:private window
-  "What this app's windows look like — the X properties i3 reports, as an author states them.
-   Every key given must hold, so a suite whose editors share one res_class can still be told
-   apart. At least one key: an empty map would describe every window on the screen."
+  "What this app's windows look like — the X properties i3 reports, as an author states them:
+   :class is WM_CLASS's res_class, :instance its res_name. Every key given must hold, so a
+   suite whose editors share one res_class is still told apart by the name each was launched
+   under. At least one key: an empty map would describe every window on the screen."
   [:and [:map {:closed true}
-         [:class {:optional true} [:string {:min 1}]]]
+         [:class    {:optional true} [:string {:min 1}]]
+         [:instance {:optional true} [:string {:min 1}]]]
         [:fn {:error/message "names no property — that would describe every window on screen"}
          seq]])
 

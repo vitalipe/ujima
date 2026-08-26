@@ -22,6 +22,9 @@
    ;; unhides it, so it ships hidden.
    "files"   {:kind :exec :label "Files"   :category :system :exec ["pcmanfm"] :window {:class "pcmanfm"}}
    "console" {:kind :exec :label "Console" :category :system :hidden true :exec ["sh" "run.sh"] :window {:class "ujima-console"}}
+   ;; two tiles of one suite: one res_class between them, told apart by the res_name each launches under
+   "docs"   {:kind :exec :label "Documents"    :exec ["oo" "--new:word"] :window {:class "OFFICE" :instance "ujima-docs"}}
+   "sheets" {:kind :exec :label "Spreadsheets" :exec ["oo" "--new:cell"] :window {:class "OFFICE" :instance "ujima-sheets"}}
    "ujima-desktop-lock" {:kind :exec :label "Locked" :category :system :hidden true :exec ["lock"] :window {:class "ujima-ujima-desktop-lock"}}})
 
 (defn- scan-root!
@@ -45,14 +48,18 @@
 (def ^:private pushed* (atom []))
 
 
-(defn- win [ws & {:keys [focused? title floating? wtype con full? class]}]
+(defn- win [ws & {:keys [focused? title floating? wtype con full? class instance]}]
   {:ws ws :focused? (boolean focused?) :title (or title ws) :full? (boolean full?)
-   :floating? (boolean floating?) :wtype (or wtype "normal") :con (or con 1) :class class})
+   :floating? (boolean floating?) :wtype (or wtype "normal") :con (or con 1)
+   :class class :instance instance})
 
 (defn- node [w]
   (cond-> {:id (:con w) :window (+ 1000 (:con w)) :name (:title w)
            :focused (:focused? w) :window_type (:wtype w) :fullscreen_mode (if (:full? w) 1 0)}
-    (:class w) (assoc :window_properties {:class (:class w)})))
+    (or (:class w) (:instance w))
+    (assoc :window_properties (cond-> {}
+                                (:class w)    (assoc :class (:class w))
+                                (:instance w) (assoc :instance (:instance w))))))
 
 (defn- tree [wins]
   {:type "root"
@@ -305,6 +312,18 @@
   (setup! [(win "1" :focused? true :con 9 :class "ujima-launcher")] "1")
   (stubbed #(app/handle-event! {:type :window/changed}))
   (is (= [] (fx-of :cmd)) "already home — idempotent"))
+
+
+(deftest tiles-sharing-a-class-are-routed-apart-by-instance
+  (setup! [(win "1" :focused? true :con 7 :class "OFFICE" :instance "ujima-sheets")]
+          "1" :scopes #{:sheets})
+  (stubbed #(app/handle-event! {:type :window/changed}))
+  (is (= [[:cmd "[con_id=7]" "move" "container" "to" "workspace" "sheets"]] (fx-of :cmd))))
+
+(deftest a-shared-class-with-an-unnamed-instance-stays-where-it-mapped
+  (setup! [(win "1" :focused? true :con 7 :class "OFFICE" :instance "something-else")] "1")
+  (stubbed #(app/handle-event! {:type :window/changed}))
+  (is (= [] (fx-of :cmd)) "neither tile describes it — better put than on the wrong one"))
 
 
 (deftest app-dialog-is-routed-by-class

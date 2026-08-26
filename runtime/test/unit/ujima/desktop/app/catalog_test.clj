@@ -41,3 +41,24 @@
         "properties the app does not name are not looked at")
     (is (nil? (catalog/app-of-window c {:class "Gimp"})))
     (is (nil? (catalog/app-of-window c {:title "Sky"})) "an app naming nothing claims nothing")))
+
+
+(deftest tiles-sharing-a-class-are-told-apart-by-instance
+  (let [c (catalog/->catalog
+            {:apps [{:id :docs   :label "Documents"    :exec ["oo"]
+                     :window {:class "OFFICE" :instance "ujima-docs"}}
+                    {:id :sheets :label "Spreadsheets" :exec ["oo"]
+                     :window {:class "OFFICE" :instance "ujima-sheets"}}]})]
+    (is (= :sheets (catalog/app-of-window c {:class "OFFICE" :instance "ujima-sheets"})))
+    (is (= :docs   (catalog/app-of-window c {:class "OFFICE" :instance "ujima-docs"})))
+    (is (nil? (catalog/app-of-window c {:class "OFFICE" :instance "something-else"}))
+        "an unnamed instance is claimed by neither, rather than by whichever indexed last")))
+
+
+(deftest the-app-naming-more-properties-is-tried-first
+  (let [c (catalog/->catalog
+            {:apps [{:id :suite :label "Suite"  :exec ["s"] :window {:class "OFFICE"}}
+                    {:id :docs  :label "Docs"   :exec ["d"] :window {:class "OFFICE" :instance "ujima-docs"}}]})]
+    (is (= :docs  (catalog/app-of-window c {:class "OFFICE" :instance "ujima-docs"})))
+    (is (= :suite (catalog/app-of-window c {:class "OFFICE" :instance "other"}))
+        "the looser declaration still catches what the specific one does not")))

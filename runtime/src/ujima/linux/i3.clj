@@ -33,7 +33,8 @@
 
 
 (defn window-facts
-  "The tree flattened to [{:con-id :workspace :focused? :floating? :wtype :fullscreen? :class :title}]."
+  "The tree flattened to [{:con-id :workspace :focused? :floating? :wtype :fullscreen? :class
+   :instance :title}]."
   [tree]
   (letfn [(walk [node ws floating?]
             (let [ws (if (= "workspace" (:type node)) (:name node) ws)]
@@ -43,6 +44,7 @@
                     :floating? floating? :wtype (:window_type node)
                     :fullscreen? (pos? (long (or (:fullscreen_mode node) 0)))
                     :class (:class (:window_properties node))
+                    :instance (:instance (:window_properties node))
                     :title (:name node)}])
                 (mapcat #(walk % ws floating?) (:nodes node))
                 (mapcat #(walk % ws true) (:floating_nodes node)))))]

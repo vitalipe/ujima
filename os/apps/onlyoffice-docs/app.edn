@@ -1,7 +1,0 @@
-;; --unshare-net is load-bearing: without a loopback of its own this tile hands its
-;; argv to whichever ONLYOFFICE is already up, and exits.
-{:kind :exec :label "Documents" :category :office
- :exec ["bwrap" "--unshare-net" "--dev-bind" "/" "/" "--proc" "/proc"
-        "--setenv" "RESOURCE_NAME" "ujima-oo-docs"
-        "/usr/bin/onlyoffice-desktopeditors" "--new:word"]
- :window {:class "ONLYOFFICE" :instance "ujima-oo-docs"}}

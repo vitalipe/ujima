@@ -13,6 +13,8 @@ version truth; branch names and build labels may disagree.
 - ONLYOFFICE opens as three apps — Documents, Spreadsheets and Presentations — each
   with its own icon, workspace and close, in place of one tile for the whole suite.
 - ONLYOFFICE opens in a dark theme.
+- ONLYOFFICE draws no window buttons of its own — a document closes from ujima's bar,
+  like every other app.
 
 ## [0.4.0] - 2026-08-25
 

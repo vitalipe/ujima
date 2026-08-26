@@ -10,7 +10,8 @@ version truth; branch names and build labels may disagree.
 
 ### Changed
 
-- ONLYOFFICE opens in a dark theme.
+- ONLYOFFICE opens in a ujima theme — the desktop's charcoal and the office category
+  colour. Its document editors keep ONLYOFFICE's own dark grey.
 - ONLYOFFICE draws no window buttons of its own — a document closes from ujima's bar,
   like every other app.
 

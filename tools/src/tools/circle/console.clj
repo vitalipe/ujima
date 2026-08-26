@@ -10,6 +10,10 @@
 (def ^:private state-file (state/file "ujima-circle-console.edn"))
 (def ^:private stop-timeout-ms 5000)
 
+;; ctrl-c, and the SIGTERM `down!` sends — the console ends when someone ends it,
+;; so those are how it is meant to go, not failures
+(def ^:private signal-exits #{130 143})
+
 
 (defn running
   "The pid of the console this host is running, nil when none is."
@@ -43,8 +47,10 @@
       (.addShutdownHook (Runtime/getRuntime)
                         (Thread. #(do (.destroy (:proc proc))
                                       (state/clear! state-file))))
-      @proc
-      (state/clear! state-file))))
+      (let [exit (:exit @proc)]
+        (state/clear! state-file)
+        (when-not (or (zero? exit) (signal-exits exit))
+          (throw (ex-info "the console exited without starting" {:exit exit})))))))
 
 
 (defn down!

@@ -1,7 +1,7 @@
 {
   "id": "theme-ujima",
   "name": "Ujima",
-  "type": "dark",
+  "type": "light",
   "colors": {
     "background-normal": "#1b2027",
     "background-normal-element": "#1b2027",
@@ -49,6 +49,12 @@
     "chb-border-normal": "#39414e",
     "chb-border-checked": "#b58fc9",
     "disabled-element-opacity": ".3",
-    "theme-inverted-image-filter": "invert(1)"
+    "theme-inverted-image-filter": "invert(1)",
+    "text-toolbar-header": "#333333",
+    "toolbar-header-document": "#ffffff",
+    "toolbar-header-spreadsheet": "#ffffff",
+    "toolbar-header-presentation": "#ffffff",
+    "toolbar-header-pdf": "#ffffff",
+    "toolbar-header-draw": "#ffffff"
   }
 }

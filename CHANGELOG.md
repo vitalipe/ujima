@@ -8,6 +8,12 @@ version truth; branch names and build labels may disagree.
 
 ## [Unreleased]
 
+### Changed
+
+- ONLYOFFICE opens as three apps — Documents, Spreadsheets and Presentations — each
+  with its own icon, workspace and close, in place of one tile for the whole suite.
+- ONLYOFFICE opens in a dark theme.
+
 ## [0.4.0] - 2026-08-25
 
 Fleet control: a USB admin token opens the Console — the Circle app runs every

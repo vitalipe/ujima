@@ -1,0 +1,7 @@
+;; --unshare-net is load-bearing: without a loopback of its own this tile hands its
+;; argv to whichever ONLYOFFICE is already up, and exits.
+{:kind :exec :label "Presentations" :category :office
+ :exec ["bwrap" "--unshare-net" "--dev-bind" "/" "/" "--proc" "/proc"
+        "--setenv" "RESOURCE_NAME" "ujima-oo-slides"
+        "/usr/bin/onlyoffice-desktopeditors" "--new:slide"]
+ :window {:class "ONLYOFFICE" :instance "ujima-oo-slides"}}

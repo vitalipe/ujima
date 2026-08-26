@@ -9,9 +9,9 @@
     [babashka.fs :as fs]
     [babashka.process :as p]
     [lib.io :refer [slurp-edn]]
-    [lib.shell :refer [$! require-root!]]
+    [lib.shell :refer [$! $? require-root!]]
     [lib.task.flow :refer [flow <step!]]
-    [ujima.linux.disk :refer [block-device? device->partitions]]
+    [ujima.linux.disk :refer [block-device? carries-data? device->signatures]]
     [ujima.linux.disk.loop :as loopback]
     [ujima.linux.disk.mount :as mount]
     [ujima.pack :as ujima-pack]
@@ -47,15 +47,17 @@
 
 
 (defn- prepare-media!
-  "An .img target is (re)created sparse; a block device with partitions refuses
-   without `wipe`."
+  "An .img target is (re)created sparse; a block device carrying data refuses
+   without `wipe`. `partx -d` because `wipefs` leaves the kernel's nodes behind."
   [target wipe]
   (if (block-device? target)
-    (when (seq (device->partitions target))
+    (when (carries-data? target)
       (when-not wipe
-        (throw (ex-info "device already has partitions — pass --wipe to destroy them"
-                        {:target target})))
+        (throw (ex-info "device carries data — pass --wipe to destroy it"
+                        {:target     target
+                         :signatures (device->signatures target)})))
       ($! wipefs -a [target])
+      ($? partx -d [target])
       ($! partprobe [target])
       ($! udevadm settle))
     (do (fs/delete-if-exists target)

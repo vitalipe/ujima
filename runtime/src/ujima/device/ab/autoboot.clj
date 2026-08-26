@@ -4,7 +4,7 @@
     [clojure.string :as str]
     [lib.io                 :refer [file->uint-be slurp-text]]
     [ujima.log              :as log]
-    [ujima.linux.disk       :refer [device->partitions]]
+    [ujima.linux.disk       :refer [carries-data? device->signatures]]
     [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
     [ujima.linux.sudo       :refer [sudo$!]]
 
@@ -123,11 +123,14 @@
                :try-boot-slot (idx->slot try-boot-idx)}))))))
 
 
+  ;; the disk is the oracle: kernel nodes outlive a `wipefs -a`, and unpartitioned
+  ;; media has none at all.
   (write-ujima-layout! [_]
-    (when-not (empty? (device->partitions device))
+    (when (carries-data? device)
       (throw
-        (ex-info "Refusing to write Ujima layout: device already has partitions"
-                 {:device     device})))
+        (ex-info "Refusing to write Ujima layout: device carries data"
+                 {:device     device
+                  :signatures (device->signatures device)})))
 
     (write-ab-partition-layout! device))
 

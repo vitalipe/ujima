@@ -1,8 +1,10 @@
 (ns ujima.linux.disk
   (:require [clojure.string :as str]
             [babashka.fs :as fs]
+            [cheshire.core :as json]
             [lib.io :refer [file->number]]
             [lib.shell :refer [$?]]
+            [ujima.linux.sudo :refer [sudo$?]]
             [ujima.linux.disk.mount :as mount]))
 
 
@@ -39,6 +41,21 @@
     (str/split-lines)
     (filter  #(fs/exists? (sys-file->path % "partition")))
     (sort-by #(sys-file->long % "partition"))))
+
+
+(defn device->signatures
+  "What libblkid finds on the medium itself — unlike `device->partitions`, which
+   reports the kernel's cached nodes."
+  [device]
+  (let [{:keys [ok? out]} (sudo$? wipefs -J [device])]
+    (when ok?
+      (:signatures (json/parse-string out true)))))
+
+
+(defn carries-data?
+  "True for a partition table, or a filesystem written straight to the device."
+  [device]
+  (boolean (seq (device->signatures device))))
 
 
 (defn partition->info [path]

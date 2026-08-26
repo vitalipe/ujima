@@ -1,25 +1,10 @@
 (ns tools.cmd.circle
   "The `circle` noun — the dev loop for the console: `console` runs the panels, `sim` fakes a
-   fleet for them to find. The tree lives here; starting the console is six lines, so it does
-   too, while the sim's work is tools.circle.sim."
-  (:require [babashka.process  :as p]
-            [tools.circle.sim  :as sim]))
-
-
-(defn- console-up!
-  "The console in dev. The device hands it these two in the environment; here the CLI does."
-  [{:keys [self token]}]
-  (let [self (or self
-                 (when-let [fake (first (sim/claimed))]
-                   (println (str "self: " fake " — the sim's first machine"))
-                   fake))]
-    (when-not self
-      (throw (ex-info "no <self-ip>, and no sim running to borrow one from" {})))
-    (p/shell {:dir "desktop/console"
-              :extra-env {"UJIMA_SELF"          self
-                          "UJIMA_CIRCLE_TOKEN" (or token sim/default-token)}}
-             "bb" "--config" (str (System/getProperty "user.dir") "/bb.edn")
-             "-m" "console.main")))
+   fleet for them to find, `demo` is both in one command. The tree lives here; the work is
+   tools.circle.console, tools.circle.sim and tools.circle.demo."
+  (:require [tools.circle.console :as console]
+            [tools.circle.demo    :as demo]
+            [tools.circle.sim     :as sim]))
 
 
 (def cli
@@ -27,11 +12,16 @@
    {"console"
     {"up"
      {:usage "Usage: circle console up [<self-ip>] [--token <hex>]"
-      :target console-up!
+      :target console/up!
       :args [:self]
       :spec {:self  {:desc "Machine this console administers — its subnet is the one swept (default: a running sim's first machine)"
                      :coerce :string}
-             :token {:desc "Circle token (default: the baked one)" :coerce :string}}}}
+             :token {:desc "Circle token (default: the baked one)" :coerce :string}}}
+
+     "down"
+     {:usage "Usage: circle console down"
+      :target console/down!
+      :spec {}}}
 
     "sim"
     {"up"
@@ -46,4 +36,12 @@
      "down"
      {:usage "Usage: circle sim down"
       :target sim/down!
-      :spec {}}}}})
+      :spec {}}}
+
+    "demo"
+    {:usage "Usage: circle demo [<iface>] [--token <hex>]"
+     :target demo/up!
+     :args [:iface]
+     :spec {:iface {:desc "Interface whose subnet the demo lands on (default: the first wifi device)"
+                    :coerce :string}
+            :token {:desc "Circle token (default: the baked one)" :coerce :string}}}}})

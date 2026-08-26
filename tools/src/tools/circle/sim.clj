@@ -16,14 +16,14 @@
             [ujima.api.auth   :as auth]
             [ujima.api.routes :as routes]
             [ujima.linux.sudo :refer [sudo! sudo?]]
+            [tools.circle.state :as state]
             [schema.ujima.api.commands :as api]))
 
 
 (def ^:private port         1337)
 (def default-token  "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
 (def ^:private default-pool "tools/config/pool.edn")
-(def ^:private state-file   (str (fs/path (or (System/getenv "XDG_RUNTIME_DIR") "/tmp")
-                                          "ujima-circle-sim.edn")))
+(def ^:private state-file   (state/file "ujima-circle-sim.edn"))
 (def ^:private reboot-ms    15000)
 (def ^:private stop-timeout-ms 5000)
 
@@ -54,10 +54,10 @@
 
 ;; arping exit 0 = something answered. NB this is Habets' arping, where -D means
 ;; "print dots", NOT duplicate address detection — the plain exit code is the check.
-(defn- answers? [iface ip]
+(defn answers? [iface ip]
   (:ok? (sudo? :arping "-c" "2" "-w" "2" "-I" iface ip)))
 
-(defn- local
+(defn local
   "Every address already on this box. arping never finds these — the kernel does not
    ARP-reply to itself — so claiming one succeeds nowhere and the release takes the
    host's own address off the interface."
@@ -76,27 +76,9 @@
 
 ;; ── what we hold, so a crash can be cleaned up ──────────────────────────────
 
-(defn- process [pid]
-  (some-> pid java.lang.ProcessHandle/of (.orElse nil)))
-
-(defn- started-at [ph]
-  (some-> ph .info .startInstant (.orElse nil) .toEpochMilli))
-
-(defn- ours?
-  "Is the claim's process still the one that wrote it? A pid outlives nothing — the number
-   is reused — and a dev tool has no business killing, or standing aside for, a stranger
-   that inherited it. A claim from before this check carries no start time: take its word."
-  [{:keys [pid started]}]
-  (when-let [ph (process pid)]
-    (and (.isAlive ph)
-         (or (nil? started) (= started (started-at ph))))))
-
-(defn- read-state []
-  (when (fs/exists? state-file)
-    (try (edn/read-string (slurp state-file)) (catch Exception _ nil))))
-
-(defn- write-state! [state]
-  (spit state-file (pr-str state)))
+(defn- ours?      [claim] (state/ours? claim))
+(defn- read-state []       (state/read! state-file))
+(defn- write-state! [s]    (state/write! state-file s))
 
 (defn- claim-all!
   "One at a time, each recorded as it lands. A record of an address the sim does not
@@ -114,7 +96,7 @@
 
 (defn- release-all! [{:keys [iface prefix addresses]}]
   (doseq [ip addresses] (release! iface prefix ip))
-  (fs/delete-if-exists state-file)
+  (state/clear! state-file)
   (count addresses))
 
 (defn claimed
@@ -417,9 +399,7 @@
       ;; armed before the first claim: a run that dies part-way still releases what it took
       (.addShutdownHook (Runtime/getRuntime)
                         (Thread. #(some-> (read-state) release-all!)))
-      (let [me (java.lang.ProcessHandle/current)]
-        (claim-all! {:pid (.pid me) :started (started-at me) :iface iface :prefix prefix}
-                    taken))
+      (claim-all! (merge (state/me) {:iface iface :prefix prefix}) taken)
 
       (reset! fleet*
               (into {} (map-indexed (fn [i [ip entry]]
@@ -442,12 +422,8 @@
 
 (defn- stop!
   "SIGTERM, then wait: the sim's own shutdown hook releases as it goes."
-  [{:keys [pid] :as claim}]
-  (some-> (process pid) .destroy)
-  (loop [waited 0]
-    (when (and (ours? claim) (< waited stop-timeout-ms))
-      (Thread/sleep 100)
-      (recur (+ waited 100)))))
+  [claim]
+  (state/stop! claim stop-timeout-ms))
 
 (defn down!
   "Stops a running sim, and clears what one that died hard left claimed."

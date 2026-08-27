@@ -205,7 +205,7 @@ read-only root, a babashka settings daemon (ujimad), an i3 + eww + WebKitGTK she
 - **Dev rig** — live `dev push` / `dev script` deploy to a dev Pi, e2e runner,
   screenshot/drive tooling.
 
-[Unreleased]: https://github.com/vitalipe/ujima/compare/v0.4.0...HEAD
-[0.4.0]: https://github.com/vitalipe/ujima/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/vitalipe/ujima/compare/v0.2.0...v0.3.0
-[0.2.0]: https://github.com/vitalipe/ujima/releases/tag/v0.2.0
+[Unreleased]: https://github.com/vitalipe/ujima-os/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/vitalipe/ujima-os/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/vitalipe/ujima-os/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/vitalipe/ujima-os/releases/tag/v0.2.0

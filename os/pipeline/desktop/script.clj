@@ -47,6 +47,10 @@
     ($! fc-cache -f)
     (files/mirror! project "desktop/theme/Nordic" "/usr/share/themes/Nordic")
     (files/install! project "desktop/theme/settings.ini" "/etc/gtk-3.0/settings.ini")
+    ;; chromium takes its frame from a managed policy, never from GTK — untinted it wears its
+    ;; own grey directly under the shell's top pane, which is the one place the seam shows
+    (files/install! project "desktop/theme/chromium-policy.json"
+                    "/etc/chromium/policies/managed/ujima.json")
 
     ;; GTK chooser label override ("Home" -> "Temporary"; the why lives in the catalog):
     ;; the .mo is GENERATED here from the catalog — no vendored binary, no gettext in the

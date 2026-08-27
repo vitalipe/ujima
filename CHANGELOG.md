@@ -12,6 +12,8 @@ version truth; branch names and build labels may disagree.
 
 - ONLYOFFICE opens in a ujima theme — the desktop's charcoal and the office category
   colour around a light document editor.
+- The Web app's browser frame and tab strip follow the desktop's charcoal instead of
+  Chromium's own grey.
 - ONLYOFFICE draws no window buttons of its own — a document closes from ujima's bar,
   like every other app.
 

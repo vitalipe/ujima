@@ -22,6 +22,16 @@
                    (if show? "open-many" "close") "topbar" "dock")))
 
 
+(defn lock-surface!
+  "Map or unmap the lock window — the shell's own surface, not an app. It is opened only once
+   the lock workspace is focused: i3 places a new window on the CURRENT workspace, and an eww
+   window opened elsewhere does not stay where it was put. Closing on release keeps it from
+   drifting onto an app's workspace."
+  [show?]
+  (:ok? (shell/sh? :eww :--config @eww-dir* :--no-daemonize
+                   (if show? "open" "close") "lockscreen")))
+
+
 (defn show-bar?
   "Pure: the current mode decides — the snapshot carries :bars-hidden? (solo hides them;
    multi hides only when the focused window is really fullscreen)."

@@ -7,6 +7,7 @@
 ;; fire-and-forget POSTs through bin/ujima-desktop, which owns the mount.
 
 (defpoll clock :interval "10s" "date +%H:%M")
+(defpoll lockdate :interval "1h" "date +'%A, %B %-d'")
 
 (defvar ewwcmd "eww --config /ujima/desktop/shell/eww")
 ; a launcher click steals focus from the override-redirect bars → they go dormant; only a REAL
@@ -179,3 +180,22 @@
   :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
   :wm-ignore true :stacking "fg"
   (button :hexpand true :vexpand true :onclick "${ewwcmd} close volbackdrop volume"))
+
+;; SPIKE — the lock screen as shell state rather than an app: a fullscreen window this
+;; daemon already holds, opened on lock and closed on unlock. Opened last so it stacks
+;; over the bars (same trick as volbackdrop).
+(defwidget lockscreen []
+  (box :class "lockscreen"
+    (box :class "lockcard" :orientation "v" :halign "center" :valign "center"
+         :space-evenly false :spacing 26
+      (box :class "lockchip" :halign "center" :valign "center"
+        (image :path "/ujima/desktop/shell/icons/lock.svg" :image-width 46 :image-height 46))
+      (label :class "locktitle" :text "Locked")
+      (box :orientation "v" :space-evenly false :spacing 4
+        (label :class "locktime" :text {clock})
+        (label :class "lockdate" :text {lockdate})))))
+
+(defwindow lockscreen
+  :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
+  :windowtype "normal"
+  (lockscreen))

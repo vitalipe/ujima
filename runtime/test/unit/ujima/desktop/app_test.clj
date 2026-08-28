@@ -6,6 +6,7 @@
             [ujima.linux.systemd :as systemd]
             [ujima.desktop.app :as app]
             [ujima.desktop.app.act :as act]
+            [ujima.desktop.eww :as eww]
             [ujima.desktop.app.catalog :as catalog]
             [ujima.desktop.app.catalog.loader :as loader]))
 
@@ -25,7 +26,7 @@
    ;; two tiles of one suite: one res_class between them, told apart by the res_name each launches under
    "docs"   {:kind :exec :label "Documents"    :exec ["oo" "--new:word"] :window {:class "OFFICE" :instance "ujima-docs"}}
    "sheets" {:kind :exec :label "Spreadsheets" :exec ["oo" "--new:cell"] :window {:class "OFFICE" :instance "ujima-sheets"}}
-   "ujima-desktop-lock" {:kind :exec :label "Locked" :category :system :hidden true :exec ["lock"] :window {:class "ujima-ujima-desktop-lock"}}})
+   })
 
 (defn- scan-root!
   "Materialize {dir-name spec} as a temp scan root: <root>/<dir>/app.edn per entry."
@@ -89,7 +90,8 @@
                                         (when opts (swap! fx* conj [:spawn-opts id opts])))
                 systemd/stop!         (fn [id] (swap! world* update :scopes disj id)
                                               (swap! fx* conj [:stop id]))
-                shell/sh              (fn [& args] (swap! fx* conj [:sh (vec (rest args))]))]
+                shell/sh              (fn [& args] (swap! fx* conj [:sh (vec (rest args))]))
+                eww/lock-surface!     (fn [show?] (swap! fx* conj [:lock-surface show?]) true)]
     (f)))
 
 (defn- fx-of [k] (filterv #(= k (first %)) @fx*))
@@ -430,25 +432,26 @@
   (is (false? (app/solo?)) "did not enter solo"))
 
 
-(deftest lock-pins-the-lock-app-and-fills-the-screen
+(deftest lock-switches-to-the-lock-workspace-and-fills-the-screen
   (setup! [] "1")
   (stubbed #(app/lock!))
-  (is (= [[:switch "ujima-desktop-lock"]] (fx-of :switch)) "switched to the lock app")
-  (is (= [[:spawn :ujima-desktop-lock ["lock"]]] (fx-of :spawn)) "launched it")
+  (is (= [[:switch "lock"]] (fx-of :switch)) "switched to the shell's lock workspace")
+  (is (= [[:lock-surface true]] (fx-of :lock-surface)) "mapped the lock surface there")
+  (is (= [] (fx-of :spawn)) "nothing is launched — the lock is a surface, not a process")
   (is (= gaps0 (fx-of :cmd)) "fills the screen")
   (is (true?  (app/locked?)) "reports locked")
   (is (false? (app/solo?))   "locked is its own mode, not solo")
   (is (= :locked (mode-of))))
 
 (deftest lock-remembers-the-focused-app-and-unlock-returns-to-it
-  ;; locked over an open web app: unlock stops the lock app and switches BACK to it
+  ;; locked over an open web app: unlock unmaps the surface and switches BACK to it
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
   (stubbed #(do (app/lock!)                                   ; captures :web as app-to-focus
-                (swap! world* update :wins conj (win "ujima-desktop-lock" :con 9))
                 (reset! fx* [])
                 (app/unlock!)))
   (is (= :multi (mode-of)))
-  (is (some #{[:stop :ujima-desktop-lock]} (fx-of :stop)) "the lock app is stopped")
+  (is (= [[:lock-surface false]] (fx-of :lock-surface)) "the lock surface is unmapped")
+  (is (= [] (fx-of :stop)) "nothing to stop — the app underneath was never touched")
   (is (some #{[:switch "web"]} (fx-of :switch)) "returns to the remembered app"))
 
 (deftest unlock-goes-home-when-the-remembered-app-is-gone
@@ -469,7 +472,7 @@
   (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
   (stubbed #(do (app/solo-app! :web) (reset! fx* []) (app/release!)))
   (is (= :multi (mode-of)) "release! drops solo")
-  (setup! [(win "ujima-desktop-lock" :focused? true)] "1")
+  (setup! [] "1")
   (stubbed #(do (app/lock!) (reset! fx* []) (app/release!)))
   (is (= :multi (mode-of)) "release! drops lock too"))
 
@@ -490,17 +493,10 @@
   (doseq [[what verb] [["focus"   #(app/solo-app! :web)]
                        ["focus-0" #(app/solo-current-app!)]
                        ["gate"    #(app/refuse-when-locked!)]]]
-    (setup! [(win "ujima-desktop-lock" :focused? true)] "1" :scopes #{:web})
+    (setup! [(win "web")] "1" :scopes #{:web})
     (stubbed #(do (app/lock!)
                   (is (thrown? clojure.lang.ExceptionInfo (verb)) what)))
     (is (true? (app/locked?)) (str what " left the lock standing"))))
-
-(deftest focus-refuses-the-lock-screen
-  ;; soloing the lock app would be a Locked the mode layer cannot see, and unlock would
-  ;; stop answering — so the lock screen is reachable by locking only
-  (setup! [(win "web" :focused? true)] "1" :scopes #{:web})
-  (stubbed #(is (thrown? clojure.lang.ExceptionInfo (app/solo-app! :ujima-desktop-lock))))
-  (is (false? (app/solo?)) "did not enter solo"))
 
 (deftest close-through-a-hold
   ;; what /api's app/close does: release, THEN close — the pair the circle sends as one

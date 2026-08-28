@@ -114,3 +114,19 @@ $faint: #697180;
 .volscale trough { background-color: $panel-brd; border-radius: 8px; min-width: 6px; }
 .volscale trough highlight { background-color: #7e9ed6; border-radius: 8px; }
 .volscale slider { background-color: $text; border-radius: 999px; min-width: 16px; min-height: 16px; margin: -6px; }
+
+// --- lock screen (SPIKE) ------------------------------------------------------
+// GTK CSS drops font-weight silently, so weight comes from the family name: fontconfig
+// exposes "Public Sans SemiBold" and "Public Sans Medium" as families. There is no
+// "Public Sans Bold" family — that name falls back to another face — so the title is
+// SemiBold here, where the GTK app could ask Pango for Bold.
+// transparent: on its own workspace the X root wallpaper is already there (picom)
+.lockscreen { background-color: transparent; }
+.lockchip {
+  background-color: rgba(136,192,208,.10);
+  border: 1.5px solid rgba(136,192,208,.28);
+  border-radius: 28px; min-width: 96px; min-height: 96px;
+}
+.locktitle { font-family: "Public Sans SemiBold"; font-size: 40px; color: $text; }
+.locktime  { font-family: "Public Sans SemiBold"; font-size: 22px; color: $text; }
+.lockdate  { font-family: "Public Sans Medium"; font-size: 13px; color: $faint; }

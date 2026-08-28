@@ -3,7 +3,9 @@
   (:require [ujima.desktop.app.catalog :as catalog]))
 
 
+;; the shell's own workspaces — neither is an app, so neither is ever in the catalog
 (def home-ws "1")
+(def lock-ws "lock")
 
 
 (defn app-of-ws [{:keys [catalog]} ws]

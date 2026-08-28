@@ -4,7 +4,8 @@
    scope (alive? + kill), and i3 owns placement and focus.
 
    The session is in one of three MODES — Multi (the free desktop), Solo (one app), Locked
-   (the lock screen over a remembered app); release! returns to Multi from either pin."
+   (the shell's lock surface on its own workspace, over a remembered app); release! returns to
+   Multi from either pin."
   (:require [ujima.linux.i3 :as i3]
             [ujima.desktop.app.catalog    :as catalog]
             [ujima.desktop.app.act        :as act]
@@ -19,7 +20,6 @@
 
 
 (def ^:private browser-app :web)
-(def lock-app              :ujima-desktop-lock)   ; the solo target for lock/unlock
 (def ^:private relaunch-ms 3000)           ; a crashing P relaunches no faster than this
 
 
@@ -148,24 +148,24 @@
 
 (defrecord Locked [app-to-focus]
   Mode
-  (enter!   [m]       (let [w     (observe!) ; before pin! switches away
+  (enter!   [m]       (let [w     (observe!) ; before the switch moves us
                             focus (proj/app-of-ws w (:focused-ws w))]
 
-                        (pin! lock-app)
+                        (act/show-lock!)
                         (assoc m :app-to-focus focus))) ; remember it for exit!
-  
-  (exit!    [m]       (act/restore-gaps!)
-                      (act/stop-app! lock-app)
+
+  (exit!    [m]       (act/hide-lock!)
 
                       (let [w    (observe!)
                             back (:app-to-focus m)]
-                            
+
                         (i3/switch-workspace!
                           (if (and back (seq (get (:ws->wins w) (name back))))
                             (name back)                            ; the app is still open
                             home-ws))))                            ; gone (or was home)
 
-  (act!     [_ ev]    (dispatch (keep-alive-handlers lock-app) ev))
+  ;; no handlers: the lock is a surface the shell already holds, not a process to keep alive
+  (act!     [_ ev]    (dispatch {} ev))
   (project! [_ world] (pin-project world :locked)))
 
 
@@ -208,12 +208,9 @@
 
 
 (defn solo-app!
-  "Hold the machine to APP. Never the lock screen: soloing it would be a Locked the mode layer
-   cannot see, and unlock would no longer answer."
+  "Hold the machine to APP."
   [id]
   (refuse-when-locked!)
-  (when (= lock-app (keyword id))
-    (throw (ex-info "the lock screen is not a focus target" {:error :app/not-focusable})))
   (handle-event! {:type :mode/solo :app (catalog/resolve! id)}))
 
 

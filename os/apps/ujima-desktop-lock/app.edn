@@ -1,8 +1,0 @@
-;; The lock screen: the solo target for desktop/lock. A hidden system app — no launcher or dock
-;; tile, reached only by locking. Locked mode fills the screen and refuses every exit, so only
-;; the circle token stick or a peer's unlock releases it; unlock stops this app and goes back to
-;; what was open. A GTK window, not a web app: locking must not cost a browser's worth of RAM at
-;; the one moment the session is already full.
-{:kind :exec :label "Locked" :category :system :hidden true
- :exec ["python3" "app/lock.py"]
- :window {:class "ujima-lock"}}   ; xprop-verify on HW

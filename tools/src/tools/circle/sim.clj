@@ -274,8 +274,6 @@
                        (let [id (or app (some-> (:running (get @fleet* addr)) :id name))]
                          (when-not id
                            (throw (ex-info "no app to solo" {:error :app/no-current-app})))
-                         (when (= "ujima-desktop-lock" id)
-                           (throw (ex-info "not a focus target" {:error :app/not-focusable})))
                          (update-machine! addr #(-> %
                                                     (assoc :running (app-entry apps id))
                                                     (assoc :solo id)))))

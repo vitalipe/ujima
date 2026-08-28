@@ -1,12 +1,14 @@
 (ns ujima.desktop.app.act
-  "The effects on i3 and the scopes; listener thread only. Each takes the observed world."
+  "The effects on i3, the scopes and the shell's own surfaces; listener thread only. Each
+   takes the observed world."
   (:require [babashka.fs :as fs]
             [lib.shell :as shell]
             [ujima.log :as log]
             [ujima.linux.i3      :as i3]
             [ujima.linux.systemd :as systemd]
+            [ujima.desktop.eww   :as eww]
             [ujima.desktop.app.catalog    :as catalog]
-            [ujima.desktop.app.projection :as proj :refer [home-ws]]))
+            [ujima.desktop.app.projection :as proj :refer [home-ws lock-ws]]))
 
 
 (defonce ^:private bins*  (atom {}))    ; :open-web-app-bin :serve-web-app-bin
@@ -127,16 +129,29 @@
   (i3/try-command! "gaps" "bottom" "all" "set" "0"))
 
 
-(defn stop-app!
-  "Force-stop a named app's scope (unlock closes the lock app)."
-  [id]
-  (systemd/stop! id))
-
 (defn restore-gaps!
   "Leaving solo: put the bar gaps back on every workspace."
   []
   (i3/try-command! "gaps" "top"    "all" "set" "48")  ; keep in sync with i3 config `gaps top`  + eww topbar height
   (i3/try-command! "gaps" "bottom" "all" "set" "68")) ; keep in sync with i3 config `gaps bottom` + eww dock height
+
+
+(defn show-lock!
+  "Lock: switch to the shell's lock workspace, map the lock surface onto it, and drop the gaps
+   so it fills the screen. The order is load-bearing — eww maps the window on whatever
+   workspace is focused, so the switch has to land first."
+  []
+  (i3/switch-workspace! lock-ws)
+  (eww/lock-surface! true)
+  (fill-screen!))
+
+
+(defn hide-lock!
+  "Release: unmap the lock surface and put the gaps back. Where the session lands next is the
+   caller's call."
+  []
+  (eww/lock-surface! false)
+  (restore-gaps!))
 
 
 (defn settle-floaters!

@@ -65,9 +65,20 @@
       (is (= 1 @opens) "no retry once the daemon reports both bars"))))
 
 
+(deftest the-lock-surface-is-a-session-precondition-too
+  ;; without it, locking would switch to an empty workspace and the machine would look unlocked
+  (let [probe #'eww/probe!
+        orig  @probe]
+    (try
+      (alter-var-root probe (constantly (constantly nil)))
+      (with-redefs [shell/sh? (fn [& _] {:ok? true})]
+        (is (thrown? clojure.lang.ExceptionInfo (@#'eww/open-lock-surface-or-throw! "/x"))))
+      (finally (alter-var-root probe (constantly orig))))))
+
+
 (deftest open-bars-or-throw!-gives-up-loudly-so-the-session-restarts
   (let [opens (atom 0)
-        probe #'eww/probe-bars!
+        probe #'eww/probe!
         orig  @probe]
     (try
       ;; stubbed to never settle — the real window is a boot's worth of patience

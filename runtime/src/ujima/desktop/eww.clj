@@ -22,16 +22,6 @@
                    (if show? "open-many" "close") "topbar" "dock")))
 
 
-(defn lock-surface!
-  "Map or unmap the lock window — the shell's own surface, not an app. It is opened only once
-   the lock workspace is focused: i3 places a new window on the CURRENT workspace, and an eww
-   window opened elsewhere does not stay where it was put. Closing on release keeps it from
-   drifting onto an app's workspace."
-  [show?]
-  (:ok? (shell/sh? :eww :--config @eww-dir* :--no-daemonize
-                   (if show? "open" "close") "lockscreen")))
-
-
 (defn show-bar?
   "Pure: the current mode decides — the snapshot carries :bars-hidden? (solo hides them;
    multi hides only when the focused window is really fullscreen)."
@@ -54,42 +44,54 @@
           (log/error "eww bars did not flip" {:want want}))))))
 
 
-(defn- bars-open?
-  "Both bars, as the daemon on the socket reports them."
-  [dir]
+(defn- windows-open?
+  "NAMES, as the daemon on the socket reports them."
+  [dir names]
   (let [{:keys [ok? out]} (shell/sh? :eww :--config dir :--no-daemonize "active-windows")]
-    (and ok?
-         (boolean (re-find #"(?m)^topbar:" (str out)))
-         (boolean (re-find #"(?m)^dock:"   (str out))))))
+    (and ok? (every? #(re-find (re-pattern (str "(?m)^" % ":")) (str out)) names))))
 
 
-(defn- probe-bars!
-  "Poll until the daemon reports both bars, or the settle window closes. A cold boot routinely
-   needs a beat here — the socket answers before the app thread has painted anything."
-  [dir]
+(defn- probe!
+  "Poll until the daemon reports NAMES. A cold boot needs the beat — the socket answers before
+   the app thread has painted."
+  [dir names]
   (let [deadline (+ (System/currentTimeMillis) 2000)]
     (loop []
-      (or (bars-open? dir)
+      (or (windows-open? dir names)
           (when (< (System/currentTimeMillis) deadline)
             (Thread/sleep 150)
             (recur))))))
 
 
-(defn- open-bars-or-throw!
-  "Open the bars and confirm the daemon reports them — eww's exit code has lied in both
-   directions, so the daemon's own answer is the only postcondition worth trusting. The bars
-   ARE the desktop: no dock is no launcher, no switching and no clock, so exhausting the tries
-   is fatal and the supervisor restarts a session that can still be whole."
-  [dir]
+(defn- open-or-throw!
+  "Run ARGV, then confirm the daemon reports NAMES — eww's exit code has lied in both
+   directions, so the daemon's own answer is the only postcondition worth trusting. Exhausting
+   the tries is fatal: the supervisor restarts a session that can still be whole."
+  [dir argv names]
   (loop [attempt 1]
-    (shell/sh? :eww :--config dir :--no-daemonize "open-many" "topbar" "dock")
+    (apply shell/sh? :eww :--config dir :--no-daemonize argv)
     (cond
-      (probe-bars! dir) true
+      (probe! dir names) true
 
-      (< attempt 3)      (do (log/warn "eww bars not up yet — retrying" {:attempt attempt})
+      (< attempt 3)      (do (log/warn "eww window not up yet — retrying"
+                                       {:windows names :attempt attempt})
                              (recur (inc attempt)))
 
-      :fail-3-times      (throw (ex-info "eww never opened the bars" {:eww dir :tries 3})))))
+      :fail-3-times      (throw (ex-info "eww never opened a window"
+                                         {:eww dir :windows names :tries 3})))))
+
+
+(defn- open-bars-or-throw!
+  "The bars ARE the desktop: no dock is no launcher, no switching and no clock."
+  [dir]
+  (open-or-throw! dir ["open-many" "topbar" "dock"] ["topbar" "dock"]))
+
+
+(defn- open-lock-surface-or-throw!
+  "Opened once and left open for the session, so locking is a workspace switch — nothing is
+   mapped or torn down on that path. route-windows! pins it to the lock workspace."
+  [dir]
+  (open-or-throw! dir ["open" "lockscreen"] ["lockscreen"]))
 
 
 (defn- await-daemon!
@@ -120,6 +122,7 @@
 
     (await-daemon! dir)
     (open-bars-or-throw! dir)
+    (open-lock-surface-or-throw! dir)
     
     ;; we start with bars up
     (reset! shown? true)

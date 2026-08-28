@@ -164,8 +164,7 @@
                             (name back)                            ; the app is still open
                             home-ws))))                            ; gone (or was home)
 
-  ;; no handlers: the lock is a surface the shell already holds, not a process to keep alive
-  (act!     [_ ev]    (dispatch {} ev))
+  (act!     [_ ev]    (dispatch {} ev))    ; no handlers: every verb refused
   (project! [_ world] (pin-project world :locked)))
 
 

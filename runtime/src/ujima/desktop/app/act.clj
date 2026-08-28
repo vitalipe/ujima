@@ -6,7 +6,6 @@
             [ujima.log :as log]
             [ujima.linux.i3      :as i3]
             [ujima.linux.systemd :as systemd]
-            [ujima.desktop.eww   :as eww]
             [ujima.desktop.app.catalog    :as catalog]
             [ujima.desktop.app.projection :as proj :refer [home-ws lock-ws]]))
 
@@ -16,6 +15,8 @@
 
 
 (def ^:private launcher-class "ujima-launcher")   ; not an app, lives home
+(def ^:private lock-title    "Eww - lockscreen") ; not an app either, lives on lock-ws
+
 (def force-lo-ms 1000)                     ; a 2nd close sooner is a double-click
 (def force-hi-ms 3000)                     ; a 2nd close later is a fresh close
 
@@ -137,20 +138,16 @@
 
 
 (defn show-lock!
-  "Lock: switch to the shell's lock workspace, map the lock surface onto it, and drop the gaps
-   so it fills the screen. The order is load-bearing — eww maps the window on whatever
-   workspace is focused, so the switch has to land first."
+  "Lock: the surface is already on lock-ws, so this is a switch and a gap drop — nothing is
+   mapped, spawned or torn down."
   []
   (i3/switch-workspace! lock-ws)
-  (eww/lock-surface! true)
   (fill-screen!))
 
 
 (defn hide-lock!
-  "Release: unmap the lock surface and put the gaps back. Where the session lands next is the
-   caller's call."
+  "Release: put the gaps back. Where the session lands next is the caller's call."
   []
-  (eww/lock-surface! false)
   (restore-gaps!))
 
 
@@ -168,13 +165,14 @@
 (defn route-windows!
   "A window that mapped on the wrong workspace (focus moved during the launch) goes to the app
    whose :window describes it — the app's own dialogs included, they can map before the main
-   window. The launcher is not in the catalog, so it has its own rule: home. No focus change;
-   idempotent."
+   window. Two are not in the catalog and have rules of their own: the launcher lives home, the
+   lock surface on lock-ws. No focus change; idempotent."
   [{:keys [ws->wins catalog]}]
   (doseq [[ws wins] ws->wins
-          {:keys [con-id class] :as win} wins
-          :let  [target (if (= launcher-class class)
-                          home-ws
-                          (some-> (catalog/app-of-window catalog win) name))]
+          {:keys [con-id class title] :as win} wins
+          :let  [target (cond
+                          (= launcher-class class) home-ws
+                          (= lock-title title)     lock-ws
+                          :else (some-> (catalog/app-of-window catalog win) name))]
           :when (and target (not= ws target))]
     (i3/try-command! (format "[con_id=%d]" con-id) "move" "container" "to" "workspace" target)))

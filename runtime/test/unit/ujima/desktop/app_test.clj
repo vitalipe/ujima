@@ -6,7 +6,6 @@
             [ujima.linux.systemd :as systemd]
             [ujima.desktop.app :as app]
             [ujima.desktop.app.act :as act]
-            [ujima.desktop.eww :as eww]
             [ujima.desktop.app.catalog :as catalog]
             [ujima.desktop.app.catalog.loader :as loader]))
 
@@ -90,8 +89,7 @@
                                         (when opts (swap! fx* conj [:spawn-opts id opts])))
                 systemd/stop!         (fn [id] (swap! world* update :scopes disj id)
                                               (swap! fx* conj [:stop id]))
-                shell/sh              (fn [& args] (swap! fx* conj [:sh (vec (rest args))]))
-                eww/lock-surface!     (fn [show?] (swap! fx* conj [:lock-surface show?]) true)]
+                shell/sh              (fn [& args] (swap! fx* conj [:sh (vec (rest args))]))]
     (f)))
 
 (defn- fx-of [k] (filterv #(= k (first %)) @fx*))
@@ -316,6 +314,18 @@
   (is (= [] (fx-of :cmd)) "already home — idempotent"))
 
 
+(deftest the-lock-surface-is-routed-to-the-lock-workspace
+  ;; it maps wherever focus happened to be; unpinned, locking would switch to an empty ws
+  (setup! [(win "1" :focused? true :con 9 :title "Eww - lockscreen")] "1")
+  (stubbed #(app/handle-event! {:type :window/changed}))
+  (is (= [[:cmd "[con_id=9]" "move" "container" "to" "workspace" "lock"]] (fx-of :cmd))))
+
+(deftest the-lock-surface-on-its-own-workspace-is-left-alone
+  (setup! [(win "lock" :con 9 :title "Eww - lockscreen")] "1")
+  (stubbed #(app/handle-event! {:type :window/changed}))
+  (is (= [] (fx-of :cmd)) "already on the lock workspace — idempotent"))
+
+
 (deftest tiles-sharing-a-class-are-routed-apart-by-instance
   (setup! [(win "1" :focused? true :con 7 :class "OFFICE" :instance "ujima-sheets")]
           "1" :scopes #{:sheets})
@@ -436,7 +446,7 @@
   (setup! [] "1")
   (stubbed #(app/lock!))
   (is (= [[:switch "lock"]] (fx-of :switch)) "switched to the shell's lock workspace")
-  (is (= [[:lock-surface true]] (fx-of :lock-surface)) "mapped the lock surface there")
+  (is (= [] (fx-of :sh)) "nothing is mapped or torn down — the surface is already there")
   (is (= [] (fx-of :spawn)) "nothing is launched — the lock is a surface, not a process")
   (is (= gaps0 (fx-of :cmd)) "fills the screen")
   (is (true?  (app/locked?)) "reports locked")
@@ -444,13 +454,12 @@
   (is (= :locked (mode-of))))
 
 (deftest lock-remembers-the-focused-app-and-unlock-returns-to-it
-  ;; locked over an open web app: unlock unmaps the surface and switches BACK to it
+  ;; locked over an open web app: unlock just switches BACK to it — the surface stays open
   (setup! [(win "web" :focused? true :con 7)] "web" :scopes #{:web})
   (stubbed #(do (app/lock!)                                   ; captures :web as app-to-focus
                 (reset! fx* [])
                 (app/unlock!)))
   (is (= :multi (mode-of)))
-  (is (= [[:lock-surface false]] (fx-of :lock-surface)) "the lock surface is unmapped")
   (is (= [] (fx-of :stop)) "nothing to stop — the app underneath was never touched")
   (is (some #{[:switch "web"]} (fx-of :switch)) "returns to the remembered app"))
 

@@ -1,2 +1,3 @@
-;; the SPA wrapper's stopgap http.server
-{:apt ["python3"]}
+;; GTK from python — the same binding the launcher host uses. The install stage already pulls
+;; both; named here so the lock keeps its own dependency if the launcher ever moves off GTK.
+{:apt ["python3-gi" "gir1.2-gtk-3.0"]}

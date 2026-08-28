@@ -16,6 +16,8 @@ version truth; branch names and build labels may disagree.
   Chromium's own grey.
 - ONLYOFFICE draws no window buttons of its own — a document closes from ujima's bar,
   like every other app.
+- Locking costs a fraction of the memory it used to — the lock screen no longer runs a
+  browser to draw itself — and it now wears the desktop wallpaper.
 
 ## [0.4.0] - 2026-08-25
 

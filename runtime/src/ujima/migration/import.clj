@@ -1,10 +1,10 @@
-(ns ujima.importer
-  "Apply a settings command file — a vector of {:scope :setting :value} — through
-   control's writer. Validates EVERY entry first; any error applies nothing.
-   The installer chroots into a freshly written slot and runs this to seed it;
-   the same tool works on a live machine."
-  (:require [lib.io :as io]
-            [malli.core  :as m]
+(ns ujima.migration.import
+  "Apply a command file through control's writer. Validates every entry first; any error
+   applies nothing.
+
+   An upgrade runs the NEW slot's copy of this, so this side decides what it accepts: a
+   setting the new version renamed or dropped is refused here, by name."
+  (:require [malli.core  :as m]
             [malli.error :as me]
             [schema.ujima.settings :as defs]
             [ujima.control :as control]))
@@ -40,7 +40,10 @@
 
 (defn validate
   "-> {:errors [{:entry :error}] :warnings [{:entry :warning}]};
-   empty :errors = the whole file is applicable."
+   empty :errors = the whole file is applicable.
+
+   Pure — no control/init!, so an upgrade can ask a freshly written slot what it would
+   refuse without standing that slot's control plane up."
   [entries]
   (if-not (and (sequential? entries) (seq entries))
     {:errors   [{:error "command file must be a non-empty vector of {:scope :setting :value} entries"}]
@@ -73,32 +76,3 @@
       validate-only {:ok? true  :errors []     :warnings warnings :applied 0}
       :apply        (do (apply! entries)
                         {:ok? true :errors [] :warnings warnings :applied (count entries)}))))
-
-
-(defn -main [& args]
-  (let [validate-only? (boolean (some #{"--validate-only"} args))
-        [file & extra] (remove #{"--validate-only"} args)]
-
-    (when (or (nil? file) (seq extra))
-      (println "usage: bb -m ujima.importer [--validate-only] <commands.edn>")
-      (System/exit 2))
-
-    (let [entries (io/slurp-edn file ::unreadable)]
-      (when (= ::unreadable entries)
-        (println "cannot read" file)
-        (System/exit 2))
-
-      (let [cfg (io/slurp-config "config" "ujimad")]
-        (control/init! {:storage          (get-in cfg [:control :storage])
-                        :tmp              (get-in cfg [:control :tmp])
-                        :converge-targets []}))
-
-      (let [{:keys [ok? errors warnings applied]} (import! entries {:validate-only validate-only?})]
-        (doseq [{:keys [entry warning]} warnings]
-          (println "WARN: " warning "—" (pr-str entry)))
-        (doseq [{:keys [entry error]} errors]
-          (println "ERROR:" error "—" (pr-str entry)))
-        (if ok?
-          (println (if validate-only? "valid" (str "applied " applied " settings")))
-          (do (println "nothing applied")
-              (System/exit 1)))))))

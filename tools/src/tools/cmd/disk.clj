@@ -97,7 +97,7 @@
                "chroot" (str root-mnt) "/bin/sh" "-c"
                (str "cd /ujima/ujimad && exec /usr/local/bin/bb"
                     " -cp " (chroot-classpath root-mnt)
-                    " -m ujima.importer " seed-chroot))
+                    " -m ujima.migration import " seed-chroot))
       (finally
         ($! rm -f (str root-mnt seed-chroot) (str root-mnt qemu-chroot))
         (doseq [b (reverse binds)]

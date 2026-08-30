@@ -21,6 +21,18 @@
      :output output}))
 
 
+(defn ordered-layouts
+  "Available layouts rotated so the CURRENT one is last — the switcher's order."
+  [settings]
+  (let [settings        (map-vals :effective settings)
+        available       (settings [:keyboard :available-layouts])
+        current         (settings [:keyboard :layout])
+        [before after]  (split-with #(not= current %) available)]
+    (if (seq after)
+      (vec (concat (rest after) before [current]))
+      (vec available))))
+
+
 (defn next-keyboard-layout
   "The switcher's cycle order — one home, so the stream and the one-shot verb
    cannot drift."

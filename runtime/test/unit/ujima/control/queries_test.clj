@@ -1,5 +1,5 @@
 (ns ujima.control.queries-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is testing]]
             [clojure.string :as str]
             [ujima.control.queries :as queries]))
 
@@ -26,6 +26,31 @@
                                                   [:system :name]       "meru-01"}))]
     (is (= #{[:audio :muted] [:system :name]} (set (keys public))))
     (is (not (str/includes? (pr-str public) "deadbeef")) "the record goes, not just the value")))
+
+
+(deftest ordered-layouts-rotates-the-current-one-to-the-end
+  (let [order* (fn [layout layouts]
+                 (queries/ordered-layouts
+                   (records {[:keyboard :layout]            layout
+                             [:keyboard :available-layouts] layouts})))
+        avail  ["us" "tz" "ma" "et" "cz"]]
+    (is (= ["tz" "ma" "et" "cz" "us"] (order* "us" avail)))
+    (is (= ["ma" "et" "cz" "us" "tz"] (order* "tz" avail)))
+    (is (= ["us" "tz" "ma" "et" "cz"] (order* "cz" avail)) "the last one rotates to a no-op")
+
+    (testing "a rotation, so the cyclic sequence is the same whichever is current"
+      (let [cyclic (fn [xs] (let [i (.indexOf xs "us")] (concat (drop i xs) (take i xs))))]
+        (is (apply = (map #(cyclic (order* % avail)) avail)))))
+
+    (testing "the head is always what super+space advances to"
+      (doseq [l avail]
+        (is (= (first (order* l avail))
+               (queries/next-keyboard-layout
+                 (records {[:keyboard :layout] l [:keyboard :available-layouts] avail}))))))
+
+    (is (= [] (order* "us" []))            "no layouts -> nothing to order")
+    (is (= ["us" "tz"] (order* "fr" ["us" "tz"]))
+        "a current layout that is not available leaves the list alone")))
 
 
 (deftest next-keyboard-layout-cycles-the-available-ones

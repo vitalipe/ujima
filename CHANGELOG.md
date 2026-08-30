@@ -20,6 +20,8 @@ version truth; branch names and build labels may disagree.
 
 ### Changed
 
+- The bar shows the keyboard layouts as a fixed cycle with the current one last, so
+  the leftmost is always the one super+space switches to next.
 - ONLYOFFICE opens in a ujima theme — the desktop's charcoal and the office category
   colour around a light document editor.
 - The Web app's browser frame and tab strip follow the desktop's charcoal instead of

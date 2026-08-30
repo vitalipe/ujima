@@ -21,7 +21,7 @@
 (deftest settings->ui-projects-the-active-output
   (is (= {:system   {:name "meru-01" :serial-tail "af3c"}
           :audio    {:volume 55 :muted false :output :usb}
-          :keyboard {:layout "us" :layouts ["us" "tz"] :next "tz"}}
+          :keyboard {:layout "us" :layouts ["tz" "us"] :next "tz"}}
          (ui settings)))
   (is (= 70 (get-in (ui (assoc settings [:audio :active] :hdmi))
                     [:audio :volume]))
@@ -35,7 +35,7 @@
 
 (deftest settings->ui-carries-the-switcher-cycle
   (is (= "us" (get-in (ui (assoc settings [:keyboard :layout] "tz")) [:keyboard :next]))
-      "the cycle itself is queries/next-keyboard-layout's contract — this is the wiring"))
+      "the order itself is queries/next-keyboard-layout's contract — this is the wiring"))
 
 
 ;; --- apps->ui: which apps exist is the app layer's, where the shell shows them is ours ---

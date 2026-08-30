@@ -19,7 +19,7 @@
               :serial-tail serial}
    :audio    (queries/audio-status settings)
    :keyboard {:layout  (:effective (get settings [:keyboard :layout]))
-              :layouts (:effective (get settings [:keyboard :available-layouts]))
+              :layouts (queries/ordered-layouts settings)
               :next    (queries/next-keyboard-layout settings)}})
 
 

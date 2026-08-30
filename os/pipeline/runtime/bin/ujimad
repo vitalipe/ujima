@@ -1,5 +1,5 @@
 #!/bin/sh
-# managed by the ujima image build — source: os/pipeline/ujimaify/session/ujimad
+# managed by the ujima image build — source: os/pipeline/runtime/bin/ujimad
 #
 # The in-session ujimad launcher. i3 execs `ujimad` as the session user, so app/window
 # lifecycle + the loopback API run with the session env (DISPLAY, XDG_RUNTIME_DIR) —

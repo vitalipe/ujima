@@ -55,7 +55,7 @@ bb disk autoboot slot <A|B> from-image <img> <img|blockdev> [settings.edn] insta
 bb disk autoboot slot <A|B> activate <img|blockdev>                        set the boot slot
 bb disk info <img|blockdev>                                                slots, install metadata, boot selection
 
-bb dev push <ip> ujimad                               deploy the daemon + restart the session
+bb dev push <ip> runtime                               deploy the daemon + restart the session
 bb dev script <ip> <name>                             run pipeline script <name> live on the device
 bb dev view <ip>                                      interactive VNC mirror of the device's display
 bb dev screenshot <ip>                                one-frame PNG of the device's display
@@ -156,8 +156,8 @@ Install re-points only `root=` in the pack's cmdline; everything else on that li
 is the image's. `bb disk slot A from-image <img> <disk>` skips the pack — **dev
 only**, shipped installs go through a pack.
 
-For the live iteration loop against a running dev device, `bb dev push <ip> ujimad`
-deploys the daemon and restarts the session; `bb dev script <ip> <name>` runs any
+For the live iteration loop against a running dev device, `bb dev push <ip> runtime`
+deploys the runtime and restarts the session; `bb dev script <ip> <name>` runs any
 OS script in place. Live deploys ship **code and static files only** — they never
 install packages, so anything that needs a new binary is an image rebuild (the
 failure mode is a quiet "won't open": the spawn throws on the missing binary).
@@ -221,7 +221,7 @@ send synthetic input, or deploy the daemon and restart its session in place.
 bb dev view <ip>                              # interactive VNC mirror of the screen
 bb dev screenshot <ip>                        # one frame -> tmp/screen/ujima-screen.png
 bb dev click <ip> 640 400                     # synthetic input on :0
-bb dev push <ip> ujimad                       # deploy the daemon, restart the session
+bb dev push <ip> runtime                       # deploy the daemon, restart the session
 ```
 
 ### Circle

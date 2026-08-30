@@ -75,26 +75,47 @@
 
 (defn- seed-chroot!
   "Pipe ENTRIES into the slot's own ujimactl and read its report back. Nothing is written
-   into the slot to do it, so a seed file's secrets never land in the image."
+   into the slot to do it, so a seed file's secrets never land in the image.
+
+   The unwind is best-effort, then loud: one busy bind cannot strand the rest, and a
+   mount left pointing into the image is an error, not a log line."
   [root-mnt entries dry-run]
-  (let [binds ["/dev" "/proc" "/sys"]]
-    (try
-      (doseq [b binds] ($! mount --bind [b] (str root-mnt b)))
-      ($! cp [qemu-src] (str root-mnt qemu-chroot))
-      (let [{:keys [ok? out err]} (sh? {:in (pr-str entries)}
-                                       :chroot (str root-mnt) "/usr/local/bin/ujimactl"
-                                       "migration" "seed" (when dry-run "--dry-run"))
-            report (try (edn/read-string (str/trim (str out))) (catch Throwable _ nil))]
-        (when-not ok?
-          (throw (ex-info "the slot's seed failed" {:error (str err out)})))
-        (when-not (map? report)
-          (throw (ex-info "the slot's seed answered with no report" {:out (str out)})))
-        report)
-      (finally
-        ($! rm -f (str root-mnt qemu-chroot))
-        (doseq [b (reverse binds)]
-          (when (mount/mount-point? (str root-mnt b))
-            ($! umount (str root-mnt b))))))))
+  (let [binds  ["/dev" "/proc" "/sys"]
+        result (try
+                 (doseq [b binds] ($! mount --bind [b] (str root-mnt b)))
+                 ($! cp [qemu-src] (str root-mnt qemu-chroot))
+                 (let [{:keys [ok? out err]} (sh? {:in (pr-str entries)}
+                                                  :chroot (str root-mnt) "/usr/local/bin/ujimactl"
+                                                  "migration" "seed" (when dry-run "--dry-run"))
+                       report (try (edn/read-string (str/trim (str out))) (catch Throwable _ nil))]
+                   (when-not ok?
+                     (throw (ex-info "the slot's seed failed" {:error (str err out)})))
+                   (when-not (map? report)
+                     (throw (ex-info "the slot's seed answered with no report" {:out (str out)})))
+                   {:value report})
+                 (catch Throwable e {:thrown e}))
+
+        debris (let [{:keys [ok? err]} ($? rm -f (str root-mnt qemu-chroot))]
+                 (when-not ok? {:path (str root-mnt qemu-chroot) :error (str/trim (str err))}))
+        stuck  (->> (map #(str root-mnt %) (reverse binds))
+                    (filter mount/mount-point?)
+                    (keep (fn [m]
+                            (let [{:keys [ok? err]} ($? umount [m])]
+                              (when-not ok? {:mount m :error (str/trim (str err))}))))
+                    (vec))]
+
+    (binding [*out* *err*]
+      (when debris
+        (println (str "left in the image: " (:path debris) " — " (:error debris))))
+      (doseq [{:keys [mount error]} stuck]
+        (println (str "stuck mount: " mount " — " error))))
+
+    (when-let [e (:thrown result)]
+      (throw e))
+    (when (seq stuck)
+      (throw (ex-info "the chroot unwind left mounts pointing into the image"
+                      {:stuck stuck})))
+    (:value result)))
 
 
 (defn- seed-slot!

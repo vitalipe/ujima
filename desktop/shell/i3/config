@@ -67,8 +67,6 @@ exec --no-startup-id ujimad
 # eww surfaces (the top pane at home, the lock screen) show the desktop through them instead
 # of painting a black block. fading (~130ms) softens window open/close; workspace switches stay
 # hard cuts — picom keeps window state across unmap, so a re-shown window is not an "open".
-# corner-radius-rules is the other half of the tooltip card in eww.scss: a GTK tooltip toplevel
-# has no working alpha, so GTK cannot round it (the corners come out BLACK over anything light).
-# The compositor clips them instead — keep the 10 here equal to the card's border-radius. Scoped
-# to window_type=tooltip so nothing else on screen gets rounded.
+# corner-radius-rules is the other half of eww.scss's tooltip card: a GTK tooltip toplevel has no
+# working alpha, so GTK cannot round it. Keep the 10 equal to the card's border-radius.
 exec_always --no-startup-id picom --backend xrender --unredir-if-possible --fading --fade-in-step 0.08 --fade-out-step 0.08 --fade-delta 10 --corner-radius-rules "10:window_type='tooltip'"

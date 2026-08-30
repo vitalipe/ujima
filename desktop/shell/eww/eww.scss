@@ -13,13 +13,9 @@ $faint: #697180;
 * { all: unset; font-family: "Public Sans", sans-serif; font-size: 13px; }
 
 // --- tooltips ------------------------------------------------------------------
-// GTK paints a tooltip in its OWN toplevel, which the `*` reset above strips bare too — so
-// every pixel of one is painted here or not at all. That toplevel has NO working alpha (HW:
-// `background-color: transparent` comes out solid BLACK, not see-through), so the card has to
-// fill the whole window and the four corners outside the radius stay black. picom clips them
-// away instead — the matching `corner-radius-rules` for window_type=tooltip in i3/config is
-// half of this rounding and must keep the same radius. The card sits a step ABOVE $panel;
-// matching it would dissolve the tooltip into the bar it points at.
+// A tooltip is its own toplevel, so the `*` reset strips it too — every pixel is painted here.
+// That toplevel has NO working alpha (transparent renders BLACK), so the card fills the window
+// and picom clips the corners: keep the radius equal to i3/config's corner-radius-rules.
 tooltip, tooltip.background {
   background-color: #232a33;
   border: 1px solid #39424f;
@@ -38,11 +34,8 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 .topbar .bar.off { background-color: transparent; border-bottom-color: transparent; }   // home: fully transparent — the continuous desktop background shows through
 .topbar .idcell { min-width: 48px; }
 .topbar .title { font-weight: 600; }
-// close: a BARE glyph, no chip and no border at rest — the top pane is a flat strip, and an
-// outlined box sitting in it reads as heavier than anything else on screen. What makes it visible
-// instead is colour and weight: it wears the skin's soft red in the SVG itself (a baked stroke is
-// the only way an icon is coloured at rest here). The 34px target is still there, just invisible
-// until hover, where a soft red fill appears to confirm the hit area.
+// close: a bare glyph, no chip at rest — an outlined box reads heavier than anything else on a
+// flat strip. Colour and weight carry it; the 34px target shows only on hover.
 .topbar .wbtn { min-width: 34px; min-height: 34px; border-radius: 10px; margin-right: 4px;
                 transition: background-color 150ms ease; }
 .topbar .wbtn.close:hover { background-color: rgba(214, 131, 131, 0.20); }
@@ -51,10 +44,8 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 // 8px vertical padding keeps the tiles SQUARE (52×52) — without it they stretch to
 // the full 68px and the highlight reads tall/narrow.
 .dock { background-color: $panel; border-top: 1px solid $panel-brd; padding: 8px 18px; color: $text; }
-// the bar's text one step up from the shell's 13px base — the layout codes, the volume number and
-// the clock were the smallest thing on a screen meant to be read across a room. It has to be set
-// on `label`, NOT on `.dock`: the `*` reset at the top re-declares font-size on every node, so a
-// size inherited from an ancestor class never reaches them.
+// on `label`, NOT `.dock`: the `*` reset re-declares font-size on every node, so a size
+// inherited from an ancestor never reaches them
 .dock label { font-size: 14px; }
 // launcher / home + Files: ACTION buttons (not apps) — bare at rest, frost glow only when their
 // target is the active view (.active). 50a: rgba(frost,.24) + ring .5.
@@ -89,58 +80,43 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 .dock .win.active.cat-code      { background-color: rgba(176, 184, 119, 0.24); box-shadow: inset 0 0 0 1.5px rgba(176, 184, 119, 0.5); }
 .dock .win.active.cat-system    { background-color: rgba(136, 192, 208, 0.24); box-shadow: inset 0 0 0 1.5px rgba(136, 192, 208, 0.5); }
 .dock .win.active.cat-web-files { background-color: rgba(134, 184, 126, 0.24); box-shadow: inset 0 0 0 1.5px rgba(134, 184, 126, 0.5); }
-// keyboard: icon + layout code, on exactly the volume control's rhythm — same 6/8 padding, same
-// pill, same 20px glyph, so the two tray controls are one family and not two sizes. The well sits
-// on the BOX, not the button, because when there is more than one layout it has to contain the
-// alternatives too — the same shallow darkening the volume opens into. One gesture, one language.
+// the volume control's rhythm exactly — same 6/8 padding, pill and 20px glyph. The well sits on
+// the BOX so it can contain the alternatives too.
 .dock .kbdbox { border-radius: 999px; transition: background-color 160ms ease; }
 .dock .kbdbox.open { background-color: rgba(0, 0, 0, 0.22); margin-left: 4px; }
 .dock .tray .kbd { padding: 6px 8px; border-radius: 999px; color: $dim; font-weight: 500; }
-// alternatives sit at $faint, a step BELOW the current chip's $dim: with every code in the same
-// colour there was nothing but the icon's position to say which layout is live. Hover lifts one to
-// $text and NOTHING else — no fill. A fill here drew a box inside the well (the same thing removed
-// from the speaker), and being a pill, the well's rounded cap cut the leftmost chip's corners off.
-// The jump from #697180 to #e7eaef is a bigger signal than any tint would have been anyway.
-// the well's left inset measured 10px against 9px on the right — even, yet it read cramped,
-// because the codes sit ~20px apart from each other and the eye compares the edge gap to that
-// rhythm, not to the opposite edge. 6px more brings it into line with the internal spacing.
+// alternatives at $faint, a step below the current chip's $dim. Hover lifts one to $text and
+// nothing else — a fill would put a box inside the well, and the pill's cap clips its corners.
+// left inset measured even with the right (10 vs 9) yet read cramped: the codes sit ~20px apart
+// and the eye compares the edge gap to THAT rhythm
 .dock .kbdalts { padding-left: 6px; }
 .dock .kbdalt { padding: 6px 9px; border-radius: 999px; color: $faint; font-weight: 500; transition: color 150ms ease; }
 .dock .kbdalt:hover { color: $text; }
-// hairline between the controls and the clock: the clock is the one thing in the tray you
-// cannot press, and nothing else said so
+// the clock is the one thing in the tray you cannot press
 .dock .traysep { min-width: 1px; min-height: 22px; background-color: rgba(255, 255, 255, 0.09); margin: 0 6px 0 4px; }
-// no min-width/min-height: the icon plus its padding IS the button, so the well's insets are this
-// one declaration. 6px vertical against 8px horizontal is deliberate and OPTICAL, not sloppy: the
-// speaker glyph draws only 14px of ink inside its 20px box, so equal box padding measured 11px of
-// air above and below against 9px at the right. 6/8 lands all three at 9px — what the eye sees is
-// what matches. And no hover fill: inside the well it drew a second, squarer container around the
-// icon and undid the "one control" the well exists to say.
+// the icon plus its padding IS the button, so one declaration sets the well's insets. 6/8 is
+// OPTICAL: the glyph draws 14px of ink in a 20px box, so equal padding measures 11px vs 9px.
+// No hover fill — inside the well it drew a second container around the icon.
 .dock .tray .sound { padding: 6px 8px; border-radius: 999px; }
 // inline volume: the revealed slider + its live number, sized so the reveal is a
 // predictable 172px of travel rather than something that resizes with the value —
 // hence the fixed min-width on BOTH (the number would otherwise jog the slider
 // every time it crossed 9 -> 10 -> 100).
-// open, the slider + its number + the speaker are ONE control, not three loose parts sharing the
-// tray. A shallow well says so — and ONLY the well: a hairline around it drew a hard rectangle
-// that fought every other edge in the bar. Nothing but a soft darkening of the dock, shaped as a
-// full pill so it echoes the slider's own trough instead of introducing a new corner radius.
-// Geometry is untouched — no padding, so the speaker still never moves under the pointer, and the
-// left margin only pushes the tray's LEFT neighbours away, which is the breathing room kbd needs.
+// open, the slider + number + speaker are ONE control: a shallow well says so. No border — a
+// hairline drew the only hard rectangle in a bar of soft fills. No padding either, so the speaker
+// never moves under the pointer; the left margin only pushes the tray's LEFT neighbours.
 .dock .volbox { border-radius: 999px; transition: background-color 160ms ease; }
 .dock .volbox.open { background-color: rgba(0, 0, 0, 0.22); margin-left: 4px; }
 .dock .volbox .volscale { min-width: 130px; min-height: 32px; margin-left: 8px; }   // 32 = the button's height, so neither child forces the well taller
 .dock .volbox .volscale trough { background-color: rgba(255, 255, 255, 0.17); border-radius: 999px; min-height: 5px; }
 .dock .volbox .volscale trough highlight { background-color: #7e9ed6; border-radius: 999px; }
-// the knob used to be $text: pure shell-white, and so the brightest pixel in the bar for what is
-// really just a position marker. It belongs to the track — a light tint of the fill reads as "the
-// fill ends here" rather than as a foreign dot, and still separates from the unfilled grey.
+// a light tint of the fill, not $text: the knob is a position marker, not the brightest pixel
+// in the bar
 .dock .volbox .volscale slider { background-color: #9db6e0; border-radius: 999px; min-width: 13px; min-height: 13px; margin: -4px; }
 .dock .volbox .volscale.off { opacity: 0.35; }
 .dock .volbox .volscale.muted trough highlight { background-color: $faint; }   // muted: the fill drains to grey, the level itself is untouched
 .dock .volbox .volnum { min-width: 28px; color: $dim; font-weight: 500; transition: color 150ms ease; }   // 28, not 26: "100" is wider at 14px
-// the number mutes too, so it needs to say it is live — text only, like the layout alternatives:
-// a fill would put a box back inside the well
+// the number mutes too — text only, like the layout alternatives
 .dock .volbox .volnumbtn:hover .volnum { color: $text; }
 .dock .volbox .volscale.muted + .volnum { color: $faint; }
 .dock .tray .clock { padding: 0 8px 0 0; color: $dim; font-weight: 500; }

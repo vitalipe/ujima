@@ -5,8 +5,8 @@
    Every verb takes the device FIRST (like `ssh <host> <cmd>`), so the payload trails and a
    re-run only edits the tail:
 
-     push <ip> ujimad    deploy ujimad live: run the ujimad script (= `script ujimad` — stages
-                         runtime/ src + config into /ujima/ujimad), then restart ujima.service.
+     push <ip> runtime   deploy the runtime live: run the runtime script (= `script runtime` —
+                         stages runtime/ src + config + both wrappers), then restart ujima.service.
      upgrade <ip> <pack> install a pack into the device's INACTIVE slot and carry its settings
                          over. Touches no boot config; re-running is cheap.
      boot <ip>           try-boot the prepared slot, then keep it (--no-commit to stay on trial).
@@ -122,7 +122,7 @@
 ;; What `push <target>` knows how to deploy: the image script that stages it (the copy) and the
 ;; systemd unit to restart so the new code takes effect. A new deployable target is one entry.
 (def ^:private push-targets
-  {"ujimad" {:script "ujimad" :service "ujima"}})
+  {"runtime" {:script "runtime" :service "ujima"}})
 
 
 (defn- ujimad-pid
@@ -137,7 +137,7 @@
    script!), then restart its systemd unit so the new code is live — and REFUSE to report
    success until a FRESH ujimad pid is seen. The PAMName/logind session leak (see ujimaify
    session/ujima.service) once let a 'successful' restart leave an orphan session serving OLD code;
-   never trust a push without a new pid. Today only \"ujimad\" (the ujimad script ->
+   never trust a push without a new pid. Today only \"runtime\" (the runtime script ->
    ujima.service); a new target is one entry in push-targets."
   [{:keys [target ip] :as opts}]
   (if-let [{:keys [script service]} (get push-targets target)]
@@ -173,42 +173,13 @@
 ;; `upgrade` prepares a slot and touches no boot config, `boot` goes there and keeps it.
 ;; ---------------------------------------------------------------------------
 
-(def ^:private device-script "tools/device/upgrade.clj")
-(def ^:private device-script-path "/tmp/ujima-upgrade.clj")
 (def ^:private packs-dir "/ujima/storage/updates")
 
-;; the export carries the wifi psk, so it lives 0600 on tmpfs for the extent of one upgrade
-(def ^:private commands-path "/tmp/ujima-migrate.edn")
-
-
-(defn- installed-runtime-cp
-  "The device's own classpath, the way its ujimad launcher builds it. Explicit because bb's
-   resolver needs a JVM the image doesn't carry."
-  []
-  "src$(find /ujima/m2 -name '*.jar' -printf ':%p' 2>/dev/null)")
-
-
-(defn- runtime-cmd
-  "Run an installed runtime ns on the device, unprivileged."
-  [ns-name & args]
-  (str "cd /ujima/ujimad && bb -cp \"" (installed-runtime-cp) "\" -m " ns-name
-       (when (seq args) (str " " (str/join " " args)))))
-
-
-(defn- script-cmd
-  "Run the shipped script against the installed runtime, as root. bb is resolved as the
-   login user first — sudo's secure_path does not include it."
+(defn- ctl
+  "A ujimactl line. The device's own wrapper owns the classpath, so nothing here spells a
+   namespace, a jar path or a bb invocation."
   [& args]
-  (str "cd /ujima/ujimad && sudo \"$(command -v bb)\" -cp \"" (installed-runtime-cp) "\" "
-       device-script-path " " (str/join " " args)))
-
-
-(defn- ship-script!
-  "Put the script on the device's tmpfs. Re-shipped after every reboot — / is a tmpfs
-   overlay and nothing under /tmp survives one."
-  [{:keys [password ssh-opts host]}]
-  (apply sh! {:in (slurp device-script)} :sshpass "-p" password "ssh"
-         (concat ssh-opts [host (str "cat > " device-script-path)])))
+  (str "sudo ujimactl " (str/join " " args)))
 
 
 (defn- edn-line
@@ -223,19 +194,19 @@
 
 
 (defn- device-status [transport]
-  (let [{:keys [ok? out err]} (remote-sh? transport (script-cmd "status"))]
+  (let [{:keys [ok? out err]} (remote-sh? transport (ctl "upgrade" "info"))]
     (when-not ok?
       (throw (ex-info "could not read the device's A/B status" {:error (str err out)})))
     (edn-line out "the device's A/B status")))
 
 
-(defn- require-migration-ns!
-  "The exporter runs on the RUNNING slot, so that slot has to carry it — one `bb dev push
-   ujimad` away."
+(defn- require-ujimactl!
+  "Everything here runs through the device's own ujimactl. The runtime stage owns the
+   wrapper together with the code, so one push lands both."
   [{:keys [ip] :as transport}]
-  (when-not (:ok? (remote-sh? transport "test -f /ujima/ujimad/src/ujima/migration.clj"))
-    (throw (ex-info (str ip " is running a slot with no ujima.migration — the settings export "
-                         "lives there. Push it first:  bb dev push " ip " ujimad")
+  (when-not (:ok? (remote-sh? transport "command -v ujimactl >/dev/null"))
+    (throw (ex-info (str ip " has no ujimactl — its image predates it. Push the runtime "
+                         "(wrapper included):  bb dev push " ip " runtime")
                     {:ip ip}))))
 
 
@@ -282,7 +253,7 @@
   "The EXPORT half, run by the RUNNING slot's own migration ns. Not the API's settings
    query — that strips :secret?, and the psk is what makes the new slot reachable."
   [transport]
-  (let [{:keys [ok? out err]} (remote-sh? transport (runtime-cmd "ujima.migration" "export"))]
+  (let [{:keys [ok? out err]} (remote-sh? transport "ujimactl migration export")]
     (when-not ok?
       (throw (ex-info "settings export failed on the device" {:error (str err out)})))
     (or (->> (str/split-lines (str out))
@@ -307,8 +278,7 @@
 
   (let [transport (ssh-transport opts)
         {:keys [password ssh-opts host]} transport
-        _         (require-migration-ns! transport)
-        _         (ship-script! transport)
+        _         (require-ujimactl! transport)
         status    (device-status transport)
         running   (:running-slot status)
         target    (target-slot status)
@@ -335,7 +305,7 @@
           (progress! 100 "slot already written")
           (do (progress! 0 (str "writing slot " (name target) " (boot + root, ~10.5G)"))
               (try
-                (remote-exec! transport (script-cmd "install" dest))
+                (remote-exec! transport (ctl "upgrade" "install" dest))
                 (finally
                   ;; idempotency comes from the install record, not a resident 4.4G pack
                   (rm! dest))))))
@@ -351,17 +321,20 @@
 
           (progress! 50 (str "carrying " (count commands) " settings into slot " (name target)))
 
-          ;; umask, not chmod: the psk must never exist world-readable, not even briefly
-          (apply sh! {:in (pr-str commands)} :sshpass "-p" password "ssh"
-                 (concat ssh-opts [host (str "umask 077 && cat > " commands-path)]))
+          ;; piped, never written: the psk does not touch the device's disk on the way in
+          (let [{:keys [ok? out err]} (apply sh? {:in (pr-str commands)}
+                                             :sshpass "-p" password "ssh"
+                                             (concat ssh-opts [host (ctl "upgrade" "migrate")]))]
+            (when-not ok?
+              (throw (ex-info "settings migration failed on the device" {:error (str err out)})))
 
-          (try
-            ;; the device prints what the target slot refused; a newline first so its report
-            ;; lands under the task line rather than inside it
-            (println)
-            (remote-exec! transport (script-cmd "migrate" commands-path))
-            (finally
-              (rm! commands-path)))))
+            (let [{:keys [applied dropped]} (edn-line out "the migration report")]
+              ;; a newline first so the report lands under the task line, not inside it
+              (println)
+              (doseq [{:keys [entry error]} dropped]
+                (println (str "  DROPPED " error " — " (pr-str entry))))
+              (println (str "  slot " (name target) " carried " applied " settings, dropped "
+                            (count dropped)))))))
 
       (println (str "slot " (name target) " is ready. Boot it with:  bb dev boot " ip))
       {:ip ip :pack (str pack) :from running :slot target})))
@@ -396,7 +369,6 @@
   (require-host-cmd! "sshpass" "install it (e.g. apt install sshpass)")
   (let [transport (ssh-transport opts)
         {:keys [password ssh-opts host]} transport
-        _   (ship-script! transport)
         was (:running-slot (device-status transport))]
 
     (flow :boot
@@ -404,13 +376,11 @@
         (progress! 0 (str "try-booting out of slot " (name was)))
         ;; the box goes down under us, so a dropped session here is success, not failure
         (apply sh? :sshpass "-p" password "ssh"
-               (concat ssh-opts [host (script-cmd "boot")])))
+               (concat ssh-opts [host (ctl "upgrade" "boot")])))
 
       (<step! 80 :await
         (progress! 0 "waiting for it to drop and come back")
-        (await-reboot! transport (* 60 1000) (* 5 60 1000))
-        ;; / is a tmpfs overlay, so nothing we put under /tmp survived the reboot
-        (ship-script! transport))
+        (await-reboot! transport (* 60 1000) (* 5 60 1000)))
 
       (<step! 100 :keep
         (let [status (device-status transport)
@@ -418,7 +388,7 @@
           (if no-commit
             (progress! 100 (str "on slot " (name now) ", left on TRIAL"))
             (do (progress! 50 (str "committing slot " (name now)))
-                (remote-exec! transport (script-cmd "commit"))))
+                (remote-exec! transport (ctl "upgrade" "commit"))))
 
           (println)
           (println (str "came up on slot " (name now) " (was " (name was) "), version "
@@ -553,11 +523,11 @@
 (def cli
   {"dev"
    {"push"
-    {:usage "Usage: dev push <ip> ujimad [--user ujima] [--password ujima] [--port 22]"
+    {:usage "Usage: dev push <ip> runtime [--user ujima] [--password ujima] [--port 22]"
      :target push!
      :args [:ip :target]
      :spec {:ip       {:desc "Target RPI host or IP" :require true :coerce :string}
-            :target   {:desc "What to push (ujimad)" :require true :coerce :string}
+            :target   {:desc "What to push (runtime)" :require true :coerce :string}
             :user     {:desc "SSH user"     :default "ujima" :coerce :string}
             :password {:desc "SSH password" :default "ujima" :coerce :string}
             :port     {:desc "SSH port"     :default "22"    :coerce :string}}}

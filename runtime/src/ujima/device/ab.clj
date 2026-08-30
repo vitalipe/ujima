@@ -32,7 +32,7 @@
   (write-ujima-layout! [this]
     "Destructively write the Ujima A/B partition layout.
 
-     Returns Ujima.Task.")
+     Returns a COLD task — the caller runs it (task/run!!) or joins it (<join!).")
 
 
   (install-into-slot! [this ujima-pack-path slot]
@@ -40,7 +40,7 @@
 
      This destroys the existing content of that slot.
 
-     Returns Ujima.Task.")
+     Returns a COLD task — the caller runs it (task/run!!) or joins it (<join!).")
 
 
   (set-boot-slot! [this slot]

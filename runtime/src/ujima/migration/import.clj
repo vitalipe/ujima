@@ -1,6 +1,5 @@
 (ns ujima.migration.import
-  "Apply a command file through control's writer. Validates every entry first; any error
-   applies nothing.
+  "Apply settings through control's writer, dropping what this version refuses.
 
    An upgrade runs the NEW slot's copy of this, so this side decides what it accepts: a
    setting the new version renamed or dropped is refused here, by name."
@@ -67,12 +66,22 @@
 
 
 (defn import!
-  "Validate then apply (all-or-nothing). control/init! must have run.
-   -> {:ok? bool :errors [..] :warnings [..] :applied n}"
-  [entries {:keys [validate-only]}]
+  "Drop what this version refuses, apply the rest, say what was dropped.
+   control/init! must have run. `:dry-run` computes the same report and writes nothing.
+
+   Best-effort by design, because only the CALLER knows where these entries came from: a
+   refusal is a typo in a hand-written file but ordinary drift in a machine's own export.
+   The installer therefore dry-runs and refuses on any drop; an upgrade carries on.
+
+   -> {:applied n :dropped [{:entry :error}] :warnings [{:entry :warning}]}"
+  [entries {:keys [dry-run]}]
   (let [{:keys [errors warnings]} (validate entries)]
-    (cond
-      (seq errors)  {:ok? false :errors errors :warnings warnings :applied 0}
-      validate-only {:ok? true  :errors []     :warnings warnings :applied 0}
-      :apply        (do (apply! entries)
-                        {:ok? true :errors [] :warnings warnings :applied (count entries)}))))
+    (if-not (and (sequential? entries) (seq entries))
+      {:applied 0 :dropped errors :warnings warnings}
+      (let [refused (set (map :entry errors))
+            kept    (vec (remove refused entries))]
+        (when-not dry-run
+          (apply! kept))
+        {:applied  (if dry-run 0 (count kept))
+         :dropped  errors
+         :warnings warnings}))))

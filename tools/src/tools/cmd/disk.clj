@@ -7,10 +7,11 @@
     [clojure.string :as str]
     [clojure.pprint :refer [pprint]]
     [babashka.fs :as fs]
-    [babashka.process :as p]
+    [clojure.edn :as edn]
+    [lib.cli :as cli]
     [lib.io :refer [slurp-edn]]
-    [lib.shell :refer [$! $? require-root!]]
-    [lib.task.flow :refer [flow <step!]]
+    [lib.shell :refer [$! $? sh? require-root!]]
+    [lib.task.flow :refer [flow <step! <join!]]
     [ujima.linux.disk :refer [block-device? carries-data? device->signatures]]
     [ujima.linux.disk.loop :as loopback]
     [ujima.linux.disk.mount :as mount]
@@ -72,45 +73,40 @@
 (def ^:private qemu-chroot "/usr/bin/qemu-aarch64-static")
 
 
-(defn- chroot-classpath
-  "The slot runtime's own classpath, chroot-relative: src + every baked m2 jar."
-  [root-mnt]
-  (let [jars (fs/glob (str root-mnt "/ujima/m2") "**.jar")]
-    (when (empty? jars)
-      (throw (ex-info "slot runtime has no /ujima/m2 jars — image built from a stale vendor?"
-                      {:root (str root-mnt)})))
-    (->> jars
-         (map #(str/replace (str %) (str root-mnt) ""))
-         (sort)
-         (cons "src")
-         (str/join ":"))))
-
-
-(defn- run-importer! [root-mnt seed-file]
-  (let [seed-chroot "/tmp/ujima-seed.edn"
-        binds       ["/dev" "/proc" "/sys"]]
+(defn- seed-chroot!
+  "Pipe ENTRIES into the slot's own ujimactl and read its report back. Nothing is written
+   into the slot to do it, so a seed file's secrets never land in the image."
+  [root-mnt entries dry-run]
+  (let [binds ["/dev" "/proc" "/sys"]]
     (try
       (doseq [b binds] ($! mount --bind [b] (str root-mnt b)))
       ($! cp [qemu-src] (str root-mnt qemu-chroot))
-      ($! cp [seed-file] (str root-mnt seed-chroot))
-      (p/shell {:inherit true}
-               "chroot" (str root-mnt) "/bin/sh" "-c"
-               (str "cd /ujima/ujimad && exec /usr/local/bin/bb"
-                    " -cp " (chroot-classpath root-mnt)
-                    " -m ujima.migration import " seed-chroot))
+      (let [{:keys [ok? out err]} (sh? {:in (pr-str entries)}
+                                       :chroot (str root-mnt) "/usr/local/bin/ujimactl"
+                                       "migration" "seed" (when dry-run "--dry-run"))
+            report (try (edn/read-string (str/trim (str out))) (catch Throwable _ nil))]
+        (when-not ok?
+          (throw (ex-info "the slot's seed failed" {:error (str err out)})))
+        (when-not (map? report)
+          (throw (ex-info "the slot's seed answered with no report" {:out (str out)})))
+        report)
       (finally
-        ($! rm -f (str root-mnt seed-chroot) (str root-mnt qemu-chroot))
+        ($! rm -f (str root-mnt qemu-chroot))
         (doseq [b (reverse binds)]
           (when (mount/mount-point? (str root-mnt b))
             ($! umount (str root-mnt b))))))))
 
 
 (defn- seed-slot!
-  "Run the slot's OWN runtime importer over the seed file: mount the slot root,
-   bind this slot's UJCFG dir where the runtime expects /ujima/settings, chroot
-   (aarch64 bb under qemu), import. Any invalid entry throws — nothing applied."
+  "Seed the slot through its OWN runtime: mount the slot root, bind this slot's UJCFG dir
+   at /ujima/settings, chroot (aarch64 under qemu), seed.
+
+   Dry-runs first and refuses on ANY drop. A seed file is hand-written, so a setting the
+   image will not take is a typo — unlike an upgrade's entries, which come off a machine's
+   own export where a drop just means the registry moved."
   [dev slot seed-file]
-  (let [{cfg-blk :config :as parts} (partitions/device->partitions-by-name dev)
+  (let [entries (slurp-edn seed-file)
+        {cfg-blk :config :as parts} (partitions/device->partitions-by-name dev)
         {:keys [root]}              (get parts slot)]
     (mount/with-mounted-ext4 [root-mnt root]
       (mount/with-mounted-ext4 [cfg-mnt cfg-blk]
@@ -118,7 +114,15 @@
               settings (str root-mnt "/ujima/settings")]
           (try
             ($! mount --bind [slot-cfg] [settings])
-            (run-importer! root-mnt seed-file)
+
+            (let [{:keys [dropped]} (seed-chroot! root-mnt entries true)]
+              (when (seq dropped)
+                (throw (ex-info "the image refuses settings in this seed file"
+                                {:refused (mapv (juxt :error :entry) dropped)}))))
+
+            (let [{:keys [applied]} (seed-chroot! root-mnt entries false)]
+              (println (str "seeded " applied " settings -> slot " (name slot))))
+
             (finally
               (when (mount/mount-point? settings)
                 ($! umount [settings])))))))))
@@ -141,7 +145,7 @@
   (require-root!)
   (prepare-media! target wipe)
   (with-disk* target
-    (fn [dev] (ab/write-ujima-layout! (->disk dev))))
+    (fn [dev] (cli/run-and-display! (ab/write-ujima-layout! (->disk dev)))))
   (println "created autoboot A/B layout ->" target))
 
 
@@ -164,13 +168,9 @@
     (with-disk* target
       (fn [dev]
         (let [disk (->disk dev)]
-          (<step! 20 :layout
-            (progress! 0 "writing A/B layout")
-            (ab/write-ujima-layout! disk))
+          (<join! 20 (ab/write-ujima-layout! disk))
 
-          (<step! 90 :slot
-            (progress! 0 "installing slot A (boot + root, ~10.5G)")
-            (ab/install-into-slot! disk pack :a))
+          (<join! 90 (ab/install-into-slot! disk pack :a))
 
           (when settings
             (<step! 97 :seed
@@ -195,7 +195,7 @@
                    (when c (require-seed-file! c))
                    (with-disk* target
                      (fn [dev]
-                       (ab/install-into-slot! (->disk dev) pack slot)
+                       (cli/run-and-display! (ab/install-into-slot! (->disk dev) pack slot))
                        (when c
                          (println "seeding settings -> slot" (name slot))
                          (seed-slot! dev slot c)))))]

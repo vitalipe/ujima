@@ -29,7 +29,7 @@
 
   (let [exported (export/export)]
     (fresh!)                                              ; a different machine
-    (is (:ok? (import/import! exported {})))
+    (is (= (count exported) (:applied (import/import! exported {}))))
     (is (= exported (export/export)))))
 
 

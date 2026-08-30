@@ -8,6 +8,21 @@ version truth; branch names and build labels may disagree.
 
 ## [Unreleased]
 
+### Added
+
+- A machine upgrades itself: `bb dev upgrade <ip> <pack>` installs a pack into
+  the device's inactive slot and carries its settings across; `bb dev boot <ip>`
+  try-boots the prepared slot and commits it once the device comes back.
+- `ujimactl` — the runtime's one-shot CLI on every machine: migration
+  export/seed and the upgrade verbs (info, install, migrate, boot, commit).
+- Installing a pack streams real progress — validate, boot image, root image,
+  verify, record — instead of going dark for the whole write.
+
+### Changed
+
+- The live-deploy target is `bb dev push <ip> runtime` (was `ujimad`), and a
+  push now ships the runtime's entry-point wrappers along with the code.
+
 ## [0.4.0] - 2026-08-25
 
 Fleet control: a USB admin token opens the Console — the Circle app runs every

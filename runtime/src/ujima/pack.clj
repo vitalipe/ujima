@@ -4,6 +4,7 @@
             [babashka.fs :as fs]
 
             [lib.io :refer [slurp-edn spit-edn!]]
+            [lib.task.flow :refer [flow <step!]]
             
             [lib.shell              :refer [$ $! $? result-or-fail!]]
             [ujima.linux.sudo       :refer [sudo$ sudo$!]]
@@ -161,50 +162,62 @@
 
 
 (defn unpack!
-  "Write the pack's members into the two partitions and stamp /ujima/install.edn —
-   the manifest + :installed-at + whatever the harness passes as `record-extra`
-   (e.g. {:slot :a} — pack itself has no slot vocabulary)."
+  "COLD flow — the caller runs or joins it: write the pack's members into the two
+   partitions and stamp /ujima/install.edn — the manifest + :installed-at + whatever the
+   harness passes as `record-extra` (e.g. {:slot :a} — pack itself has no slot vocabulary)."
   ([ujima-pack-path boot-partition-path root-partition-path]
    (unpack! ujima-pack-path boot-partition-path root-partition-path {}))
 
   ([ujima-pack-path boot-partition-path root-partition-path record-extra]
-   (validate! ujima-pack-path)
+   (flow :unpack
+     (<step! 3 :check
+       (progress! 0 "validating the pack against the partitions")
+       (validate! ujima-pack-path)
+       (require-block-device! boot-partition-path)
+       (require-block-device! root-partition-path)
 
-   (require-block-device! boot-partition-path)
-   (require-block-device! root-partition-path)
+       ;; fit-check the manifest's byte sizes against the real partitions — an
+       ;; oversized member fails HERE, not as a broken pipe mid-dd
+       (let [mf (manifest ujima-pack-path)]
+         (doseq [[member partition] [[:boot boot-partition-path] [:root root-partition-path]]]
+           (let [need (get-in mf [:members member :bytes])
+                 have (:size-bytes (partition->info partition))]
+             (when (> need have)
+               (throw
+                 (ex-info "Pack member does not fit the target partition"
+                          {:member member
+                           :partition (str partition)
+                           :member-bytes need
+                           :partition-bytes have})))))))
 
-   (let [mf (manifest ujima-pack-path)]
+     (let [mf (manifest ujima-pack-path)]
+       (<step! 8 :boot
+         (progress! 0 "writing boot.img")
+         (unpack-to-partition! ujima-pack-path "boot.img" boot-partition-path
+                               (get-in mf [:members :boot :sha256])))
 
-     ;; fit-check the manifest's byte sizes against the real partitions — an
-     ;; oversized member fails HERE, not as a broken pipe mid-dd
-     (doseq [[member partition] [[:boot boot-partition-path] [:root root-partition-path]]]
-       (let [need (get-in mf [:members member :bytes])
-             have (:size-bytes (partition->info partition))]
-         (when (> need have)
-           (throw
-             (ex-info "Pack member does not fit the target partition"
-                      {:member member
-                       :partition (str partition)
-                       :member-bytes need
-                       :partition-bytes have})))))
+       (<step! 85 :root
+         (progress! 0 (str "writing root.img — "
+                           (format "%.1f" (/ (get-in mf [:members :root :bytes]) 1e9)) " GB"))
+         (unpack-to-partition! ujima-pack-path "root.img" root-partition-path
+                               (get-in mf [:members :root :sha256])))
 
-     (unpack-to-partition! ujima-pack-path "boot.img" boot-partition-path
-                           (get-in mf [:members :boot :sha256]))
-     (unpack-to-partition! ujima-pack-path "root.img" root-partition-path
-                           (get-in mf [:members :root :sha256]))
+       (<step! 97 :verify
+         (progress! 0 "fsck + grow the root fs")
+         (sudo$! e2fsck    -fn [root-partition-path]) ;; fail on fs errors, don't attempt to fix
+         (sudo$! resize2fs -f  [root-partition-path]) ;; -f: we checked it read-only above; skip resize2fs's own "run e2fsck -f first" gate (s_lastcheck<s_mtime after staging)
+         (sudo$! sync))
 
-     (sudo$! e2fsck    -fn [root-partition-path]) ;; fail on fs errors, don't attempt to fix
-     (sudo$! resize2fs -f  [root-partition-path]) ;; -f: we checked it read-only above; skip resize2fs's own "run e2fsck -f first" gate (s_lastcheck<s_mtime after staging)
-     (sudo$! sync)
+       (<step! 100 :record
+         (progress! 0 "stamping the install record")
+         (with-mounted-ext4 [mnt-root root-partition-path]
+           (fs/with-temp-dir [tmp-dir {:prefix "ujima-install-record-"}]
+             (let [installed (merge mf
+                                    {:installed-at (str (java.time.Instant/now))}
+                                    record-extra)]
+               (spit-edn! (fs/path tmp-dir "install.edn") installed)
+               (sudo$! install -D -m "0644"
+                       (fs/path tmp-dir "install.edn")
+                       (fs/path mnt-root install-record-path))))))
 
-     (with-mounted-ext4 [mnt-root root-partition-path]
-       (fs/with-temp-dir [tmp-dir {:prefix "ujima-install-record-"}]
-         (let [installed (merge mf
-                                {:installed-at (str (java.time.Instant/now))}
-                                record-extra)]
-           (spit-edn! (fs/path tmp-dir "install.edn") installed)
-           (sudo$! install -D -m "0644"
-                   (fs/path tmp-dir "install.edn")
-                   (fs/path mnt-root install-record-path))))))
-
-   nil))
+       nil))))

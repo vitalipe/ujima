@@ -132,6 +132,41 @@
                       : (state.audio.volume ?: 0) <= 50    ? "/ujima/desktop/shell/icons/speaker-low.svg"
                       :                                      "/ujima/desktop/shell/icons/speaker.svg"})))))
 
+;; --- keyboard layout: the volume's shape reused. Hovering slides the OTHER installed layouts
+;; --- out to the LEFT of the current one, each a direct pick — leftward because the tray is
+;; --- right-anchored, so the chip under the pointer stays put. With a single layout there is
+;; --- nothing to choose and only the hover well appears; the reveal is gated on the count, not
+;; --- hidden by CSS, so one layout costs no widgets. Clicking the current chip still cycles,
+;; --- which is what Super+Space does and the only thing a one-layout machine could do anyway.
+(defvar kbdopen false)
+
+(defwidget kbdinline []
+  (eventbox :class {kbdopen ? "kbdbox open" : "kbdbox"} :valign "center"
+    :onhover "${EWW_CMD} --no-daemonize update kbdopen=true"
+    :onhoverlost "${EWW_CMD} --no-daemonize update kbdopen=false"
+    (box :space-evenly false :spacing 2
+      (revealer :transition "slideleft" :duration "180ms"
+                :reveal {kbdopen && arraylength(state.keyboard.layouts) > 1}
+        (box :space-evenly false :spacing 2
+          ;; every layout is rendered and the CURRENT one hidden — GTK collapses a hidden child,
+          ;; so the row closes up with no gap (same trick the launcher trays use)
+          (for l in {state.keyboard.layouts}
+            (button :class "kbdalt" :timeout "2s" :visible {l != state.keyboard.layout}
+              :tooltip "Switch to ${l}"
+              :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${l}\"}' >/dev/null"
+              (label :text l)))))
+      ;; :valign centre, like the volume box — without it the tray stretches the button to the
+      ;; dock's full inner height and no amount of padding tuning can make its hover pill match
+      (button :class "kbd" :valign "center" :timeout "2s"
+        :tooltip "Keyboard layout"
+        :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
+        ;; code THEN icon: the icon becomes the control's fixed right anchor, exactly like the
+        ;; speaker's, so both tray controls are the same shape — anchor on the right, everything
+        ;; that opens growing leftwards away from the pointer.
+        (box :space-evenly false :spacing 7 :valign "center"
+          (label :text {state.keyboard.layout})
+          (image :path "/ujima/desktop/shell/icons/keyboard.svg" :image-width 20 :image-height 20))))))
+
 ;; --- bottom: launcher tile left (lit when home), running apps centered (the
 ;; --- stream/apps), tray right. A dock click is the same verb as a launcher
 ;; --- tile: run = ensure-open = focus
@@ -166,12 +201,7 @@
       ; the label flips when the push lands
       ;; the layout code alone ("tz") was the one tray item with no icon — it read as a typo
       ;; more than a control. Icon + code: the icon says what it is, the code says which.
-      (button :class "kbd" :timeout "2s"
-        :tooltip "${(state.keyboard.next ?: "") == "" ? "Keyboard layout" : "Switch to " + state.keyboard.next}"
-        :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
-        (box :space-evenly false :spacing 7 :valign "center"
-          (image :path "/ujima/desktop/shell/icons/keyboard.svg" :image-width 18 :image-height 18)
-          (label :text {state.keyboard.layout})))
+      (kbdinline)
       (volinline)
       ;; hairline: everything left of it is a control, the clock right of it is a readout
       (box :class "traysep" :valign "center")

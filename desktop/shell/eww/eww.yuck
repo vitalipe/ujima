@@ -109,7 +109,7 @@
 (defvar volopen false)
 
 (defwidget volinline []
-  (eventbox :class "volbox"
+  (eventbox :class {volopen ? "volbox open" : "volbox"} :valign "center"
     :onhover "${EWW_CMD} --no-daemonize update volopen=true"
     :onhoverlost "${EWW_CMD} --no-daemonize update volopen=false vol=-1"
     (box :space-evenly false :spacing 4

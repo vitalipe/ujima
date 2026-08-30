@@ -92,16 +92,32 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 // hairline between the controls and the clock: the clock is the one thing in the tray you
 // cannot press, and nothing else said so
 .dock .traysep { min-width: 1px; min-height: 22px; background-color: rgba(255, 255, 255, 0.09); margin: 0 6px 0 4px; }
-.dock .tray .sound { min-width: 40px; min-height: 44px; border-radius: 11px; }
-.dock .tray .sound:hover { background-color: rgba(255, 255, 255, 0.07); }
+// no min-width/min-height: the icon plus its padding IS the button, so the well's insets are this
+// one declaration. 6px vertical against 8px horizontal is deliberate and OPTICAL, not sloppy: the
+// speaker glyph draws only 14px of ink inside its 20px box, so equal box padding measured 11px of
+// air above and below against 9px at the right. 6/8 lands all three at 9px — what the eye sees is
+// what matches. And no hover fill: inside the well it drew a second, squarer container around the
+// icon and undid the "one control" the well exists to say.
+.dock .tray .sound { padding: 6px 8px; border-radius: 999px; }
 // inline volume: the revealed slider + its live number, sized so the reveal is a
 // predictable 172px of travel rather than something that resizes with the value —
 // hence the fixed min-width on BOTH (the number would otherwise jog the slider
 // every time it crossed 9 -> 10 -> 100).
-.dock .volbox .volscale { min-width: 130px; min-height: 44px; margin-left: 8px; }
+// open, the slider + its number + the speaker are ONE control, not three loose parts sharing the
+// tray. A shallow well says so — and ONLY the well: a hairline around it drew a hard rectangle
+// that fought every other edge in the bar. Nothing but a soft darkening of the dock, shaped as a
+// full pill so it echoes the slider's own trough instead of introducing a new corner radius.
+// Geometry is untouched — no padding, so the speaker still never moves under the pointer, and the
+// left margin only pushes the tray's LEFT neighbours away, which is the breathing room kbd needs.
+.dock .volbox { border-radius: 999px; transition: background-color 160ms ease; }
+.dock .volbox.open { background-color: rgba(0, 0, 0, 0.22); margin-left: 4px; }
+.dock .volbox .volscale { min-width: 130px; min-height: 32px; margin-left: 8px; }   // 32 = the button's height, so neither child forces the well taller
 .dock .volbox .volscale trough { background-color: rgba(255, 255, 255, 0.17); border-radius: 999px; min-height: 5px; }
 .dock .volbox .volscale trough highlight { background-color: #7e9ed6; border-radius: 999px; }
-.dock .volbox .volscale slider { background-color: $text; border-radius: 999px; min-width: 14px; min-height: 14px; margin: -5px; }
+// the knob used to be $text: pure shell-white, and so the brightest pixel in the bar for what is
+// really just a position marker. It belongs to the track — a light tint of the fill reads as "the
+// fill ends here" rather than as a foreign dot, and still separates from the unfilled grey.
+.dock .volbox .volscale slider { background-color: #9db6e0; border-radius: 999px; min-width: 13px; min-height: 13px; margin: -4px; }
 .dock .volbox .volscale.off { opacity: 0.35; }
 .dock .volbox .volscale.muted trough highlight { background-color: $faint; }   // muted: the fill drains to grey, the level itself is untouched
 .dock .volbox .volnum { min-width: 26px; color: $dim; font-weight: 500; }

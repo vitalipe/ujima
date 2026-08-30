@@ -17,11 +17,13 @@ version truth; branch names and build labels may disagree.
   export/seed and the upgrade verbs (info, install, migrate, boot, commit).
 - Installing a pack streams real progress — validate, boot image, root image,
   verify, record — instead of going dark for the whole write.
+- Every control in the bar names itself on hover — the apps, the close button, the
+  keyboard layout, the speaker, and the date behind the clock.
+- The keyboard layout opens on hover to show the other installed layouts, each one a
+  direct pick rather than something to cycle to.
 
 ### Changed
 
-- The bar shows the keyboard layouts as a fixed cycle with the current one last, so
-  the leftmost is always the one super+space switches to next.
 - ONLYOFFICE opens in a ujima theme — the desktop's charcoal and the office category
   colour around a light document editor.
 - The Web app's browser frame and tab strip follow the desktop's charcoal instead of
@@ -32,6 +34,14 @@ version truth; branch names and build labels may disagree.
   shell, comes up at once over the wallpaper, and leaves what was open untouched behind it.
 - The live-deploy target is `bb dev push <ip> runtime` (was `ujimad`), and a
   push now ships the runtime's entry-point wrappers along with the code.
+- Volume lives in the bar itself: hovering the speaker slides a slider out beside it,
+  and either the speaker or the number mutes. The separate volume panel is gone.
+- The close button in the top pane is a red ✕ you can see, not a faint grey mark.
+- The speaker icon shows roughly how loud the machine is, and the layout code sits
+  beside a keyboard icon instead of standing alone.
+- The bar's text is a step larger.
+- The bar shows the keyboard layouts as a fixed cycle with the current one last, so
+  the leftmost is always the one super+space switches to next.
 
 ## [0.4.0] - 2026-08-25
 

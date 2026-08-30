@@ -37,10 +37,11 @@
 
 
 (defn- target-slot
-  "The slot to write. Refuses inside a trial boot — the state written FROM evaporates at the
-   next reboot."
+  "The slot to write. Refuses inside an UNCOMMITTED trial boot — the state written FROM
+   evaporates at the next reboot. The firmware flag alone cannot decide: it stays 1 for
+   the whole boot even after a commit, so trial = the same `and` as running-slot."
   [disk-info]
-  (when (ab/in-try-boot? (autoboot/->boot-runtime))
+  (when (and (ab/in-try-boot? (autoboot/->boot-runtime)) (:try-boot-slot disk-info))
     (throw (ex-info "this machine is running a TRIAL boot — commit it or reboot to fall back"
                     {})))
   (if (= :a (running-slot disk-info)) :b :a))

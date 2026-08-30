@@ -10,7 +10,7 @@ ROOT=/ujima/desktop/console
 
 # from $ROOT: the console resolves ui/ and dev/ relative to its own dir
 cd "$ROOT"
-bb -cp "src:/ujima/ujimad/src" -m console.main &
+bb -cp "src:/ujima/runtime/src" -m console.main &
 
 until curl -sf "http://127.0.0.1:$PORT/" >/dev/null 2>&1; do sleep 0.2; done
 

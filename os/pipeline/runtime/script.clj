@@ -1,7 +1,7 @@
 (ns pipeline.runtime.script
   "Runs INSIDE the target chroot as root (and is the live `dev push runtime` deploy path).
    Stages the ujima core codebase — the runtime/ source tree + deployment config — into
-   /ujima/ujimad, and installs its two entry points (the ujimad launcher, the ujimactl
+   /ujima/runtime, and installs its two entry points (the ujimad launcher, the ujimactl
    wrapper): the code and its front doors are one unit, deployed together. runtime/ is
    shared, not the daemon's own tree: tools + the os build link it on the host, and
    on-device consumers beyond ujimad (the installer) run from this same deploy. This is
@@ -19,7 +19,7 @@
 
 (defn run! [{:keys [project]}]
   (with-console-out
-    (let [dst "/ujima/ujimad"]
+    (let [dst "/ujima/runtime"]
       (fs/create-dirs (str dst "/config"))
 
       ;; clean-mirror src ONLY — config is copied, never rm'd, so a hand-dropped

@@ -72,7 +72,7 @@
 
 
 ;; staging dir on the device = the chroot repo bind path; NOT the install target —
-;; the ujimad script copies <project>/runtime/src into /ujima/ujimad, staging there would
+;; the runtime script copies <project>/runtime/src into /ujima/runtime, staging there would
 ;; copy it into itself
 (def ^:private device-stage scripts/project-mnt)
 

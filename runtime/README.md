@@ -15,7 +15,7 @@ The ujima core codebase — shared, not the daemon's private tree.
 - `config/` — deployment config (`ujimad.edn`), staged with the code.
 - `test/` — the unit + integration suites (`bb test:unit`, `bb test:integration`).
 
-The ujimad stage deploys this tree to `/ujima/ujimad`; on-device consumers beyond the
+The runtime stage deploys this tree to `/ujima/runtime`; on-device consumers beyond the
 daemon (the installer) run from the same deploy.
 
 ujimad is session-scoped, not a system daemon: i3 execs it inside the X session, so

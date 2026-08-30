@@ -196,7 +196,7 @@ overlay: everything written to `/` resets on reboot. What persists — across re
 the journal. On a running device:
 
 ```
-/ujima/ujimad      the deployed core (runtime/)
+/ujima/runtime     the deployed core (runtime/)
 /ujima/m2          the bb libraries it runs on
 /ujima/desktop     the desktop layer (desktop/, mirrored)
 /ujima/apps        the app catalog scan root

@@ -1,0 +1,11 @@
+#!/bin/sh
+# managed by the ujima image build — source: os/pipeline/runtime/bin/ujimactl
+#
+# The one-shot face of the runtime, beside ujimad's long-running one. The only place that
+# knows how to put the runtime on a classpath — installers chroot a slot and run this, so
+# they never spell a namespace or a jar path.
+cd /ujima/ujimad
+# an explicit -cp = no resolution on-device (bb's resolver needs a JVM the image doesn't
+# carry); whatever jars the install stage baked are on the path
+CP="src$(find /ujima/m2 -name '*.jar' -printf ':%p' 2>/dev/null)"
+exec bb -cp "$CP" -m ujima.ujimactl "$@"

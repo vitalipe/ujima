@@ -5,7 +5,7 @@
    The initramfs can't be generated here — update-initramfs segfaults under qemu — so the image
    ships a kernel-matched one from os/boot/initramfs, produced on a Pi by the dev kit's build-initramfs (pulled home by `bb pin initramfs <ip>`).
 
-   Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
+   Pipeline: install -> boot -> base -> runtime -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [clojure.string :as str]

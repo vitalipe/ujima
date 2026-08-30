@@ -3,6 +3,7 @@
     [babashka.fs :as fs]
     [clojure.string :as str]
     [lib.io                 :refer [file->uint-be slurp-text]]
+    [lib.task.flow          :refer [flow <step! <join!]]
     [ujima.log              :as log]
     [ujima.linux.disk       :refer [carries-data? device->signatures]]
     [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
@@ -132,45 +133,54 @@
                  {:device     device
                   :signatures (device->signatures device)})))
 
-    (write-ab-partition-layout! device))
+    (flow :layout
+      (<step! 100 :partition
+        (progress! 0 "A/B partition table + filesystems")
+        (write-ab-partition-layout! device))
+      {:device device}))
 
 
   (install-into-slot! [_ ujima-pack-path slot]
 
-    (require-ab-slot! slot)   
+    (require-ab-slot! slot)
     (require-ab-partition-layout! device)
-    (pack/validate! ujima-pack-path)
 
     (let [{cfg-blk :config storage-blk :storage :as parts} (device->partitions-by-name device)
           {:keys [root boot]}         (get parts slot)]
 
-      (pack/unpack! ujima-pack-path boot root {:slot slot})
+      (flow :install-slot
+        (<join! 90 (pack/unpack! ujima-pack-path boot root {:slot slot}))
 
-      ;; re-point `root` at this slot; the rest of the line is the pack's own
-      (with-mounted-vfat [boot-mnt boot]
-        (autoboot/cmdline! boot-mnt
-                           (autoboot/cmdline-assoc (autoboot/cmdline boot-mnt)
-                                                   "root" (str "PARTUUID=" (slot->root-uuid slot)))))
+        (<step! 100 :wire
+          (progress! 0 "root=, fstab, settings + logs dirs")
 
-      ;; per-slot fstab. Its mount points / bind targets are rootfs content baked at build
-      ;; time (the base stage) — a pack is expected to carry them.
-      (let [ujimad-owner
-            (with-mounted-ext4 [root-mnt root]
-              (fs/create-dirs (fs/path root-mnt "etc"))   ; real rootfs has it; a minimal/test root may not
-              (spit (str (fs/path root-mnt "etc/fstab")) (slot->fstab slot))
-              (rootfs-owner root-mnt "ujima"))]
+          ;; re-point `root` at this slot; the rest of the line is the pack's own
+          (with-mounted-vfat [boot-mnt boot]
+            (autoboot/cmdline! boot-mnt
+                               (autoboot/cmdline-assoc (autoboot/cmdline boot-mnt)
+                                                       "root" (str "PARTUUID=" (slot->root-uuid slot)))))
 
-        ;; this slot's settings subdir, owned by the ujimad user so it can write the device scope
-        ;; through the /ujima/settings bind (a root-owned dir breaks every device-scope write)
-        (with-mounted-ext4 [cfg-mnt cfg-blk]
-          (let [slot-dir (fs/path cfg-mnt (name slot))]
-            (fs/create-dirs slot-dir)
-            (when ujimad-owner
-              (sudo$! chown [ujimad-owner] [slot-dir])))))
+          ;; per-slot fstab. Its mount points / bind targets are rootfs content baked at build
+          ;; time (the base stage) — a pack is expected to carry them.
+          (let [ujimad-owner
+                (with-mounted-ext4 [root-mnt root]
+                  (fs/create-dirs (fs/path root-mnt "etc"))   ; real rootfs has it; a minimal/test root may not
+                  (spit (str (fs/path root-mnt "etc/fstab")) (slot->fstab slot))
+                  (rootfs-owner root-mnt "ujima"))]
 
-      ;; journald logs dir on storage (the /var/log/journal bind source)
-      (with-mounted-ext4 [storage-mnt storage-blk]
-        (fs/create-dirs (fs/path storage-mnt "logs")))))
+            ;; this slot's settings subdir, owned by the ujimad user so it can write the device scope
+            ;; through the /ujima/settings bind (a root-owned dir breaks every device-scope write)
+            (with-mounted-ext4 [cfg-mnt cfg-blk]
+              (let [slot-dir (fs/path cfg-mnt (name slot))]
+                (fs/create-dirs slot-dir)
+                (when ujimad-owner
+                  (sudo$! chown [ujimad-owner] [slot-dir])))))
+
+          ;; journald logs dir on storage (the /var/log/journal bind source)
+          (with-mounted-ext4 [storage-mnt storage-blk]
+            (fs/create-dirs (fs/path storage-mnt "logs"))))
+
+        {:slot slot})))
 
 
   (set-boot-slot! [_ slot]
@@ -234,5 +244,5 @@
   (->AutobootDisk device))
 
 
-(defn ->boot []
+(defn ->boot-runtime []
   (->AutobootRuntime))

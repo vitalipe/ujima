@@ -1,6 +1,6 @@
 (ns tools.cmd.pin
   "bb pin — pull world-truth into the repo as committed, build-verified pins.
-   Each pin's CONSUMER verifies it (the ujimad stage diffs the catalogs, the
+   Each pin's CONSUMER verifies it (the runtime stage diffs the catalogs, the
    install stage sha-checks the jars, the boot stage matches the kernel):
    pin writes, the build refuses drift."
   (:require [babashka.process :as p]

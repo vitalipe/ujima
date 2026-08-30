@@ -6,7 +6,7 @@
    loopback audio rig. Not part of the release pipeline — run on dev images only; nothing
    under os/pipeline/dev/ may ship in a release.
 
-   Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
+   Pipeline: install -> boot -> base -> runtime -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [clojure.string :as str]

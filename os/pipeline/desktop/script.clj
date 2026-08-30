@@ -5,7 +5,7 @@
    session's systemd unit lives in the ujimaify stage; runtime desktop *settings* (wallpaper,
    resolution, …) are ujimad's job at runtime, not this build script.
 
-   Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
+   Pipeline: install -> boot -> base -> runtime -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]

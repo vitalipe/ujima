@@ -5,7 +5,7 @@
    that the ujimad/desktop layers build on. Static files live in os/pipeline/base/<concern>/ (login,
    identity, x11, network); this script is the pulls + the actions. (fstab + boot units → the ujimaify stage.)
 
-   Pipeline: install -> boot -> base -> ujimad -> desktop -> ujimaify -> [dev] -> [cleanup].
+   Pipeline: install -> boot -> base -> runtime -> desktop -> ujimaify -> [dev] -> [cleanup].
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$ $! $? with-console-out]]

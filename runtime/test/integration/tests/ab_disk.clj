@@ -10,6 +10,8 @@
             [ujima.linux.disk.loop :as loopback]
             [ujima.linux.disk.mount :refer [with-mounted-vfat with-mounted-ext4]]
             [lib.shell :refer [$! require-root!]]
+            [lib.task :as task]
+            [lib.task.timeline :as timeline]
             [ujima.device.ab.autoboot.bootfiles :as autoboot]
             [ujima.device.ab.autoboot :refer [->disk]]
             [ujima.device.ab.autoboot.partitions :as rpi-partitions]))
@@ -131,7 +133,8 @@
 
 
 (defn test-write-layout! [disk* device]
-  (ab/write-ujima-layout! disk*)
+  (assert= "Layout flow should finish :done"
+           :done (timeline/timeline->state (task/run!! (ab/write-ujima-layout! disk*))))
   (let [info (require-disk-info! disk*)]
     (assert-layout! info device)
     (assert-empty-slot! info :a)
@@ -182,7 +185,9 @@
 
 (defn test-install! [disk* pack-file slot expected-installed-slots]
   (let [expected-metadata (pack/manifest pack-file)]
-    (ab/install-into-slot! disk* pack-file slot)
+    (assert= "Install flow should finish :done"
+             :done (timeline/timeline->state
+                     (task/run!! (ab/install-into-slot! disk* pack-file slot))))
     (let [info (require-disk-info! disk*)]
       (doseq [installed-slot expected-installed-slots]
         (assert-installed-slot! info installed-slot expected-metadata)

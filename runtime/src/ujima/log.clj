@@ -39,6 +39,13 @@
     (timbre/info message data)))
 
 
+(defn off!
+  "Silence all log output — for one-shot CLI entry points (ujimactl) whose stdout is a
+   parsed report and whose failures are thrown, not logged."
+  []
+  (timbre/merge-config! {:appenders {:println {:enabled? false}}}))
+
+
 ;; <N> syslog-priority prefix: journald strips it and sets PRIORITY, so `journalctl -p` filters by level.
 (def ^:private level->syslog {:trace 7 :debug 7 :info 6 :warn 4 :error 3 :fatal 2 :report 5 :spy 7})
 

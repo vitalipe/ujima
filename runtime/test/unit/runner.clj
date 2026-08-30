@@ -19,7 +19,8 @@
             [ujima.linux.converge-test]
             [ujima.device-test]
             [ujima.control-test]
-            [ujima.importer-test]
+            [ujima.migration.export-test]
+            [ujima.migration.import-test]
             [ujima.control.commands-test]
             [ujima.control.queries-test]
             [ujima.api-test]
@@ -64,6 +65,8 @@
     ujima.linux.converge-test
     ujima.device-test
     ujima.control-test
+    ujima.migration.export-test
+    ujima.migration.import-test
     ujima.control.commands-test
     ujima.control.queries-test
     ujima.api-test

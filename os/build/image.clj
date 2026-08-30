@@ -103,11 +103,11 @@
 
 ;; The ujima script chain, in order — `bb build` is this plus stage/pack/disk, so the sequence
 ;; lives here only. boot first: a stash that no longer matches the image's kernel fails in seconds.
-(def ^:private content-scripts ["boot" "base" "ujimad" "desktop" "ujimaify"])
+(def ^:private content-scripts ["boot" "base" "runtime" "desktop" "ujimaify"])
 
 
 (defn- stamp-image-facts!
-  "Write /ujima/image.edn — the image's identity, canonical inside the image. The ujimad
+  "Write /ujima/image.edn — the image's identity, canonical inside the image. The runtime
    stage cp's it into ujimad's config as the env base layer."
   [img facts]
   (loopback/with-loopback-device [dev img]

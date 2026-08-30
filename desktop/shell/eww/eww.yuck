@@ -9,7 +9,6 @@
 (defpoll clock :interval "10s" "date +%H:%M")
 (defpoll lockdate :interval "1h" "date +'%A, %B %-d'")
 
-(defvar ewwcmd "eww --config /ujima/desktop/shell/eww")
 ; a launcher click steals focus from the override-redirect bars → they go dormant; only a REAL
 ; XTEST click on a bar re-wakes them (a click SENT via XSendEvent does not — HW-tested). Tap the
 ; far top-right corner: the arrow glyph draws down-right from its hotspot, so parked at 1279,0
@@ -49,6 +48,7 @@
       (label :class "title" :halign "start" :hexpand true :text {apps.current?.title ?: ""})
       (button :class "close" :valign "center" :timeout "2s"
         :visible {(apps.current?.id ?: "") != ""}
+        :tooltip "Close ${apps.current?.label ?: ""}"
         :onclick "ujima-desktop POST commands/app/close >/dev/null"
         "✕"))))
 
@@ -92,6 +92,35 @@
       (box))
     (box)))
 
+;; --- volume, INLINE in the dock (replaces the popover + backdrop pair): hovering the
+;; --- speaker slides a slider out to its LEFT. Left, not right, is load-bearing — the tray
+;; --- is right-anchored, so growing leftwards leaves the speaker under the pointer exactly
+;; --- where it was; a reveal that moved its own trigger would chase the cursor out of the
+;; --- eventbox and flap. Click on the speaker mutes.
+;; `vol` is eww-local interaction state: the number/knob track the finger instantly instead of
+;; waiting for the push round-trip; -1 = untouched, follow ujimad. Hover-lost clears it, so the
+;; next reveal starts from ujimad's truth rather than a stale local number.
+(defvar vol -1)
+(defvar volopen false)
+
+(defwidget volinline []
+  (eventbox :class "volbox"
+    :onhover "${EWW_CMD} --no-daemonize update volopen=true"
+    :onhoverlost "${EWW_CMD} --no-daemonize update volopen=false vol=-1"
+    (box :space-evenly false :spacing 4
+      (revealer :transition "slideleft" :duration "180ms" :reveal volopen
+        (box :space-evenly false :spacing 8
+          (scale :class {"volscale" + ((state.audio.volume ?: -1) == -1 ? " off" : "") + (state.audio.muted ? " muted" : "")}
+                 :valign "center" :orientation "h" :min 0 :max 101 :timeout "1s"
+                 :value {vol < 0 ? (state.audio.volume ?: 0) : vol}
+                 :onchange "${EWW_CMD} --no-daemonize update vol={} ; ujima-desktop POST ui/volume/move '{\"value\": {}}' >/dev/null")
+          (label :class "volnum" :xalign 1
+                 :text {(state.audio.volume ?: -1) == -1 ? "--" : (vol < 0 ? state.audio.volume : vol)})))
+      (button :class "sound" :timeout "2s"
+        :tooltip "${(state.audio.volume ?: -1) == -1 ? "No audio output" : (state.audio.muted ? "Unmute" : "Mute")}"
+        :onclick "ujima-desktop POST commands/audio/muted '{\"value\": ${!state.audio.muted}}' >/dev/null"
+        (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 19 :image-height 19)))))
+
 ;; --- bottom: launcher tile left (lit when home), running apps centered (the
 ;; --- stream/apps), tray right. A dock click is the same verb as a launcher
 ;; --- tile: run = ensure-open = focus
@@ -102,12 +131,14 @@
     ;; the app tiles: exactly one thing selected at a time (home, or the active app).
     (box :halign "start" :space-evenly false :spacing 6
       (button :class {(apps.current?.id ?: "") == "" ? "home active" : "home"} :timeout "2s"
+        :tooltip "Apps"
         :onclick "ujima-desktop POST commands/app/home >/dev/null"
         (image :path "/ujima/desktop/shell/icons/launcher.svg" :image-width 25 :image-height 25))
       ;; pinned: ujimad decides the list (files always, console once a token unhides it); this
       ;; only renders it. ACTIONS like the launcher, not apps, so they share .home.
       (for p in {apps.pinned}
         (button :class {p.id == (apps.current?.id ?: "") ? "home active" : "home"} :timeout "2s"
+          :tooltip "${p.label}"
           :onclick "ujima-desktop POST commands/app/open '{\"app\": \"${p.id}\"}' >/dev/null"
           (image :path "${p.icon}" :image-width 26 :image-height 26))))
     ;; running apps: every open app carries a very subtle hint of its category; the ACTIVE one
@@ -116,38 +147,18 @@
       (for a in {apps.running}
         (button :class {"win cat-" + (a.category ?: "none") + (a.id == (apps.current?.id ?: "") ? " active" : "")} :timeout "2s"
           :visible {a.category != "system"}   ; system apps (files) are pinned on the left, not shown here
+          :tooltip "${a.label}"
           :onclick "ujima-desktop POST commands/app/open '{\"app\": \"${a.id}\"}' >/dev/null"
           (image :path "${a.icon}" :image-width 32 :image-height 32))))
     (box :class "tray" :halign "end" :space-evenly false :spacing 4
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
       ; the label flips when the push lands
       (button :class "kbd" :timeout "2s"
+        :tooltip "${(state.keyboard.next ?: "") == "" ? "Keyboard layout" : "Switch to " + state.keyboard.next}"
         :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
         (label :text {state.keyboard.layout}))
-      (button :class "sound" :onclick "${ewwcmd} open volbackdrop; ${ewwcmd} open volume"
-        (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 19 :image-height 19))
-      (label :class "clock" :text {clock}))))
-
-
-;; --- volume overlay: slider moves are fire-and-forget (ujimad throttles the
-;; --- drag); mute posts the DESIRED state; everything reflects back via the
-;; --- stream/state push. Greyed when no output classifies (output null).
-;; `vol` is eww-local interaction state: the number/knob track the finger
-;; instantly instead of waiting for the push round-trip; -1 = untouched, follow
-;; ujimad. Once touched it pins to the last local value — fine while the
-;; widget is the only volume writer.
-(defvar vol -1)
-
-(defwidget volpanel []
-  (box :class "volpanel" :orientation "v" :space-evenly false :spacing 8 :hexpand true :vexpand true
-    (label :class "volnum" :text {vol < 0 ? (state.audio.volume ?: "--") : vol})
-    (scale :class {(state.audio.volume ?: -1) == -1 ? "volscale off" : "volscale"}
-           :orientation "v" :flipped true :vexpand true :min 0 :max 101 :timeout "1s"
-           :value {vol < 0 ? (state.audio.volume ?: 0) : vol}
-           :onchange "${ewwcmd} update vol={} ; ujima-desktop POST ui/volume/move '{\"value\": {}}' >/dev/null")
-    (button :class "volmute" :timeout "2s"
-      :onclick "ujima-desktop POST commands/audio/muted '{\"value\": ${!state.audio.muted}}' >/dev/null"
-      (image :path {state.audio.muted ? "/ujima/desktop/shell/icons/speaker-muted.svg" : "/ujima/desktop/shell/icons/speaker.svg"} :image-width 22 :image-height 22))))
+      (volinline)
+      (label :class "clock" :tooltip {lockdate} :text {clock}))))
 
 
 ;; --- surfaces ------------------------------------------------------------
@@ -166,24 +177,9 @@
   :wm-ignore true :stacking "fg"
   (dock))
 
-;; the window is larger than the card: the transparent wrapper's padding floats the
-;; card above the dock and off the screen edge (margins on the ROOT widget won't do —
-;; eww promotes the root's background to the whole window)
-(defwindow volume
-  :monitor 0 :geometry (geometry :anchor "bottom right" :width "76px" :height "330px")
-  :wm-ignore true :stacking "fg"
-  (box :class "volwrap" (volpanel)))
-
-;; invisible fullscreen click-catcher: opened with the popover (under it), any click closes both
-;; so clicking outside the popover dismisses it. The popover is opened last → stacks on top.
-(defwindow volbackdrop
-  :monitor 0 :geometry (geometry :anchor "center" :width "100%" :height "100%")
-  :wm-ignore true :stacking "fg"
-  (button :hexpand true :vexpand true :onclick "${ewwcmd} close volbackdrop volume"))
-
 ;; SPIKE — the lock screen as shell state rather than an app: a fullscreen window this
 ;; daemon already holds, opened on lock and closed on unlock. Opened last so it stacks
-;; over the bars (same trick as volbackdrop).
+;; over the bars (opened last = stacked last among :wm-ignore "fg" windows).
 (defwidget lockscreen []
   (box :class "lockscreen"
     (box :class "lockcard" :orientation "v" :halign "center" :valign "center"

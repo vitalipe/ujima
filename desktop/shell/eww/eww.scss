@@ -12,6 +12,22 @@ $faint: #697180;
 
 * { all: unset; font-family: "Public Sans", sans-serif; font-size: 13px; }
 
+// --- tooltips ------------------------------------------------------------------
+// GTK paints a tooltip in its OWN toplevel, which the `*` reset above strips bare too — so
+// every pixel of one is painted here or not at all. That toplevel has NO working alpha (HW:
+// `background-color: transparent` comes out solid BLACK, not see-through), so the card has to
+// fill the whole window and the four corners outside the radius stay black. picom clips them
+// away instead — the matching `corner-radius-rules` for window_type=tooltip in i3/config is
+// half of this rounding and must keep the same radius. The card sits a step ABOVE $panel;
+// matching it would dissolve the tooltip into the bar it points at.
+tooltip, tooltip.background {
+  background-color: #232a33;
+  border: 1px solid #39424f;
+  border-radius: 10px;
+}
+tooltip box { padding: 5px 10px; }
+tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text; }
+
 // --- top pane (33a): flat, 48px, #12151a — app icon · App — Title · ✕ -----------
 // STYLE-ONLY vs the turn-14 bar: no tab underline/tint. ✕ keeps master's red hover.
 // bg lives on the inner .bar so home (.bar.off) can drop the top-pane look: it tints
@@ -66,6 +82,18 @@ $faint: #697180;
 .dock .tray .kbd:hover { background-color: rgba(255, 255, 255, 0.07); color: $text; }
 .dock .tray .sound { min-width: 40px; min-height: 44px; border-radius: 11px; }
 .dock .tray .sound:hover { background-color: rgba(255, 255, 255, 0.07); }
+// inline volume: the revealed slider + its live number, sized so the reveal is a
+// predictable 172px of travel rather than something that resizes with the value —
+// hence the fixed min-width on BOTH (the number would otherwise jog the slider
+// every time it crossed 9 -> 10 -> 100).
+.dock .volbox .volscale { min-width: 130px; min-height: 44px; margin-left: 8px; }
+.dock .volbox .volscale trough { background-color: rgba(255, 255, 255, 0.17); border-radius: 999px; min-height: 5px; }
+.dock .volbox .volscale trough highlight { background-color: #7e9ed6; border-radius: 999px; }
+.dock .volbox .volscale slider { background-color: $text; border-radius: 999px; min-width: 14px; min-height: 14px; margin: -5px; }
+.dock .volbox .volscale.off { opacity: 0.35; }
+.dock .volbox .volscale.muted trough highlight { background-color: $faint; }   // muted: the fill drains to grey, the level itself is untouched
+.dock .volbox .volnum { min-width: 26px; color: $dim; font-weight: 500; }
+.dock .volbox .volscale.muted + .volnum { color: $faint; }
 .dock .tray .clock { padding: 0 8px 0 6px; color: $dim; font-weight: 500; }
 
 // --- launcher (25c): apps grouped in soft category-tinted TRAYS; neutral tiles;
@@ -102,18 +130,6 @@ $faint: #697180;
 .launcher .opendot.cat-office    { background-color: #a896c9; }
 .launcher .opendot.cat-create    { background-color: #ce93a6; }
 .launcher .opendot.cat-web-files { background-color: #86b87e; }
-
-// --- volume popover ----------------------------------------------------------
-.volwrap { padding: 0 12px 80px 0; }   // float the card above the 68px dock + edge inset
-.volpanel { background-color: $panel; border: 1px solid $panel-brd; border-radius: 16px; padding: 12px 8px; }
-.volpanel .volmute { padding: 4px; border-radius: 8px; }
-.volpanel .volmute:hover { background-color: rgba(255, 255, 255, 0.07); }
-.volpanel .volnum { color: $dim; }
-.volscale { min-height: 150px; }
-.volscale.off { opacity: 0.35; }
-.volscale trough { background-color: $panel-brd; border-radius: 8px; min-width: 6px; }
-.volscale trough highlight { background-color: #7e9ed6; border-radius: 8px; }
-.volscale slider { background-color: $text; border-radius: 999px; min-width: 16px; min-height: 16px; margin: -6px; }
 
 // --- lock screen (SPIKE) ------------------------------------------------------
 // GTK CSS drops font-weight silently, so weight comes from the family name: fontconfig

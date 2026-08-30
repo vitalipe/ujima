@@ -51,6 +51,11 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 // 8px vertical padding keeps the tiles SQUARE (52×52) — without it they stretch to
 // the full 68px and the highlight reads tall/narrow.
 .dock { background-color: $panel; border-top: 1px solid $panel-brd; padding: 8px 18px; color: $text; }
+// the bar's text one step up from the shell's 13px base — the layout codes, the volume number and
+// the clock were the smallest thing on a screen meant to be read across a room. It has to be set
+// on `label`, NOT on `.dock`: the `*` reset at the top re-declares font-size on every node, so a
+// size inherited from an ancestor class never reaches them.
+.dock label { font-size: 14px; }
 // launcher / home + Files: ACTION buttons (not apps) — bare at rest, frost glow only when their
 // target is the active view (.active). 50a: rgba(frost,.24) + ring .5.
 .dock .home { min-width: 52px; min-height: 52px; border-radius: 13px; transition: background-color 150ms ease; }
@@ -96,6 +101,10 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 // $text and NOTHING else — no fill. A fill here drew a box inside the well (the same thing removed
 // from the speaker), and being a pill, the well's rounded cap cut the leftmost chip's corners off.
 // The jump from #697180 to #e7eaef is a bigger signal than any tint would have been anyway.
+// the well's left inset measured 10px against 9px on the right — even, yet it read cramped,
+// because the codes sit ~20px apart from each other and the eye compares the edge gap to that
+// rhythm, not to the opposite edge. 6px more brings it into line with the internal spacing.
+.dock .kbdalts { padding-left: 6px; }
 .dock .kbdalt { padding: 6px 9px; border-radius: 999px; color: $faint; font-weight: 500; transition: color 150ms ease; }
 .dock .kbdalt:hover { color: $text; }
 // hairline between the controls and the clock: the clock is the one thing in the tray you
@@ -129,7 +138,10 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 .dock .volbox .volscale slider { background-color: #9db6e0; border-radius: 999px; min-width: 13px; min-height: 13px; margin: -4px; }
 .dock .volbox .volscale.off { opacity: 0.35; }
 .dock .volbox .volscale.muted trough highlight { background-color: $faint; }   // muted: the fill drains to grey, the level itself is untouched
-.dock .volbox .volnum { min-width: 26px; color: $dim; font-weight: 500; }
+.dock .volbox .volnum { min-width: 28px; color: $dim; font-weight: 500; transition: color 150ms ease; }   // 28, not 26: "100" is wider at 14px
+// the number mutes too, so it needs to say it is live — text only, like the layout alternatives:
+// a fill would put a box back inside the well
+.dock .volbox .volnumbtn:hover .volnum { color: $text; }
 .dock .volbox .volscale.muted + .volnum { color: $faint; }
 .dock .tray .clock { padding: 0 8px 0 0; color: $dim; font-weight: 500; }
 

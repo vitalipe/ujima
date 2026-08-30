@@ -97,6 +97,14 @@
       (box))
     (box)))
 
+;; both the speaker and the number toggle mute, so the verb, its tooltip and its disabled case
+;; live in ONE place — two copies of a ternary this shape would drift the first time either moved.
+(defwidget mutebtn [cls]
+  (button :class cls :timeout "2s"
+    :tooltip "${(state.audio.volume ?: -1) == -1 ? "No audio output" : (state.audio.muted ? "Unmute" : "Mute")}"
+    :onclick "ujima-desktop POST commands/audio/muted '{\"value\": ${!state.audio.muted}}' >/dev/null"
+    (children)))
+
 ;; --- volume, INLINE in the dock (replaces the popover + backdrop pair): hovering the
 ;; --- speaker slides a slider out to its LEFT. Left, not right, is load-bearing — the tray
 ;; --- is right-anchored, so growing leftwards leaves the speaker under the pointer exactly
@@ -119,11 +127,10 @@
                  :valign "center" :orientation "h" :min 0 :max 101 :timeout "1s"
                  :value {vol < 0 ? (state.audio.volume ?: 0) : vol}
                  :onchange "${EWW_CMD} --no-daemonize update vol={} ; ujima-desktop POST ui/volume/move '{\"value\": {}}' >/dev/null")
-          (label :class "volnum" :xalign 1
-                 :text {(state.audio.volume ?: -1) == -1 ? "--" : (vol < 0 ? state.audio.volume : vol)})))
-      (button :class "sound" :timeout "2s"
-        :tooltip "${(state.audio.volume ?: -1) == -1 ? "No audio output" : (state.audio.muted ? "Unmute" : "Mute")}"
-        :onclick "ujima-desktop POST commands/audio/muted '{\"value\": ${!state.audio.muted}}' >/dev/null"
+          (mutebtn :cls "volnumbtn"
+            (label :class "volnum" :xalign 1
+                   :text {(state.audio.volume ?: -1) == -1 ? "--" : (vol < 0 ? state.audio.volume : vol)}))))
+      (mutebtn :cls "sound"
         ;; the glyph carries the level, not just mute: cone / one arc / two arcs, so a glance
         ;; at the closed tray already says roughly how loud the machine is
         (image :image-width 20 :image-height 20
@@ -147,7 +154,7 @@
     (box :space-evenly false :spacing 2
       (revealer :transition "slideleft" :duration "180ms"
                 :reveal {kbdopen && arraylength(state.keyboard.layouts) > 1}
-        (box :space-evenly false :spacing 2
+        (box :class "kbdalts" :space-evenly false :spacing 2
           ;; every layout is rendered and the CURRENT one hidden — GTK collapses a hidden child,
           ;; so the row closes up with no gap (same trick the launcher trays use)
           (for l in {state.keyboard.layouts}

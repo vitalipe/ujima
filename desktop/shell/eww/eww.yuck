@@ -147,7 +147,8 @@
           (for l in {state.keyboard.layouts}
             (button :class "kbdalt" :timeout "2s" :visible {l != state.keyboard.layout.value}
               :tooltip "Switch to ${l}"
-              :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${l}\"}' >/dev/null"
+              ;; collapse before posting: picking is a decision, not a round-trip to wait on
+              :onclick "${EWW_CMD} --no-daemonize update kbdopen=false; ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${l}\"}' >/dev/null"
               (label :text l)))))
       ;; :valign centre — without it the tray stretches the button to the dock's full height
       (button :class "kbd" :valign "center" :timeout "2s"

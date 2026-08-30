@@ -20,7 +20,7 @@ version truth; branch names and build labels may disagree.
 - Every control in the bar names itself on hover — the apps, the close button, the
   keyboard layout, the speaker, and the date behind the clock.
 - The keyboard layout opens on hover to show the other installed layouts, each one a
-  direct pick rather than something to cycle to.
+  direct pick rather than something to cycle to; the row closes as soon as you pick.
 
 ### Changed
 

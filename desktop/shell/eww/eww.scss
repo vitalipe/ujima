@@ -38,8 +38,14 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 .topbar .bar.off { background-color: transparent; border-bottom-color: transparent; }   // home: fully transparent — the continuous desktop background shows through
 .topbar .idcell { min-width: 48px; }
 .topbar .title { font-weight: 600; }
-.topbar .close { min-width: 30px; min-height: 30px; border-radius: 8px; color: $dim; font-size: 15px; }
-.topbar .close:hover { background-color: rgba(214, 131, 131, 0.2); color: #e2a6a6; }
+// close: a BARE glyph, no chip and no border at rest — the top pane is a flat strip, and an
+// outlined box sitting in it reads as heavier than anything else on screen. What makes it visible
+// instead is colour and weight: it wears the skin's soft red in the SVG itself (a baked stroke is
+// the only way an icon is coloured at rest here). The 34px target is still there, just invisible
+// until hover, where a soft red fill appears to confirm the hit area.
+.topbar .wbtn { min-width: 34px; min-height: 34px; border-radius: 10px; margin-right: 4px;
+                transition: background-color 150ms ease; }
+.topbar .wbtn.close:hover { background-color: rgba(214, 131, 131, 0.20); }
 
 // --- dock (33a): 68px, #1b2027 — launcher Sand · apps 32px, active = category ----
 // 8px vertical padding keeps the tiles SQUARE (52×52) — without it they stretch to
@@ -78,8 +84,14 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 .dock .win.active.cat-code      { background-color: rgba(176, 184, 119, 0.24); box-shadow: inset 0 0 0 1.5px rgba(176, 184, 119, 0.5); }
 .dock .win.active.cat-system    { background-color: rgba(136, 192, 208, 0.24); box-shadow: inset 0 0 0 1.5px rgba(136, 192, 208, 0.5); }
 .dock .win.active.cat-web-files { background-color: rgba(134, 184, 126, 0.24); box-shadow: inset 0 0 0 1.5px rgba(134, 184, 126, 0.5); }
-.dock .tray .kbd { padding: 0 10px; border-radius: 11px; color: $dim; font-weight: 500; transition: background-color 150ms ease; }
+// keyboard: icon + layout code in one chip, sized to match .sound so the two controls sit on
+// the same rhythm. The code inherits `color` from the button (never set it on the label — that
+// would block the hover brighten from reaching it).
+.dock .tray .kbd { padding: 0 10px 0 8px; min-height: 44px; border-radius: 11px; color: $dim; font-weight: 500; transition: background-color 150ms ease; }
 .dock .tray .kbd:hover { background-color: rgba(255, 255, 255, 0.07); color: $text; }
+// hairline between the controls and the clock: the clock is the one thing in the tray you
+// cannot press, and nothing else said so
+.dock .traysep { min-width: 1px; min-height: 22px; background-color: rgba(255, 255, 255, 0.09); margin: 0 6px 0 4px; }
 .dock .tray .sound { min-width: 40px; min-height: 44px; border-radius: 11px; }
 .dock .tray .sound:hover { background-color: rgba(255, 255, 255, 0.07); }
 // inline volume: the revealed slider + its live number, sized so the reveal is a
@@ -94,7 +106,7 @@ tooltip label { font-family: "Public Sans Medium"; font-size: 12px; color: $text
 .dock .volbox .volscale.muted trough highlight { background-color: $faint; }   // muted: the fill drains to grey, the level itself is untouched
 .dock .volbox .volnum { min-width: 26px; color: $dim; font-weight: 500; }
 .dock .volbox .volscale.muted + .volnum { color: $faint; }
-.dock .tray .clock { padding: 0 8px 0 6px; color: $dim; font-weight: 500; }
+.dock .tray .clock { padding: 0 8px 0 0; color: $dim; font-weight: 500; }
 
 // --- launcher (25c): apps grouped in soft category-tinted TRAYS; neutral tiles;
 // --- an OPEN app gets a category ring + corner dot. Names hidden.

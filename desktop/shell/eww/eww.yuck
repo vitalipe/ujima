@@ -18,7 +18,7 @@
 ;; the authoritative UI state (JSON); the while-loop is the reconnect story — an
 ;; ujimad restart drops the connection, 1s later the snapshot line rehydrates us
 (deflisten state
-  :initial "{\"audio\":{\"volume\":null,\"muted\":false,\"output\":null},\"keyboard\":{\"layout\":\"--\",\"layouts\":[],\"next\":null}}"
+  :initial "{\"audio\":{\"volume\":{\"value\":null,\"locked\":false},\"muted\":{\"value\":false,\"locked\":false},\"output\":{\"value\":null,\"locked\":false}},\"keyboard\":{\"layout\":{\"value\":\"--\",\"locked\":false},\"layouts\":[],\"next\":null}}"
   "while true; do curl -sN http://127.0.0.1:1336/ujima-desktop/stream/state; sleep 1; done")
 
 ;; the running apps (derived from the i3 tree) — same push contract as `state`
@@ -46,11 +46,8 @@
                :image-width 20 :image-height 20
                :visible {(apps.current?.id ?: "") != ""}))
       (label :class "title" :halign "start" :hexpand true :text {apps.current?.title ?: ""})
-      ;; close. The old ✕ was a bare U+2715 text glyph in $dim with no chip: against 48px of
-      ;; empty strip it rendered as a thin hairline and read as decoration, not a button. This is
-      ;; a lucide SVG, still chipless — the fix was never a box, it was weight and colour. The
-      ;; stroke is baked into the SVG and GTK will not recolour it, so the red that makes a
-      ;; chipless glyph visible lives in the file; only the hover fill lives in CSS.
+      ;; chipless: the stroke is baked into the SVG (GTK will not recolour it), so the resting
+      ;; red lives in the file and only the hover fill is CSS
       (button :class "wbtn close" :valign "center" :timeout "2s"
         :visible {(apps.current?.id ?: "") != ""}
         :tooltip "Close ${apps.current?.label ?: ""}"
@@ -97,22 +94,17 @@
       (box))
     (box)))
 
-;; both the speaker and the number toggle mute, so the verb, its tooltip and its disabled case
-;; live in ONE place — two copies of a ternary this shape would drift the first time either moved.
+;; the speaker and the number both mute — one definition so they cannot drift
 (defwidget mutebtn [cls]
   (button :class cls :timeout "2s"
-    :tooltip "${(state.audio.volume ?: -1) == -1 ? "No audio output" : (state.audio.muted ? "Unmute" : "Mute")}"
-    :onclick "ujima-desktop POST commands/audio/muted '{\"value\": ${!state.audio.muted}}' >/dev/null"
+    :tooltip "${(state.audio.volume.value ?: -1) == -1 ? "No audio output" : (state.audio.muted.value ? "Unmute" : "Mute")}"
+    :onclick "ujima-desktop POST commands/audio/muted '{\"value\": ${!state.audio.muted.value}}' >/dev/null"
     (children)))
 
-;; --- volume, INLINE in the dock (replaces the popover + backdrop pair): hovering the
-;; --- speaker slides a slider out to its LEFT. Left, not right, is load-bearing — the tray
-;; --- is right-anchored, so growing leftwards leaves the speaker under the pointer exactly
-;; --- where it was; a reveal that moved its own trigger would chase the cursor out of the
-;; --- eventbox and flap. Click on the speaker mutes.
-;; `vol` is eww-local interaction state: the number/knob track the finger instantly instead of
-;; waiting for the push round-trip; -1 = untouched, follow ujimad. Hover-lost clears it, so the
-;; next reveal starts from ujimad's truth rather than a stale local number.
+;; --- volume, inline: hovering the speaker slides a slider out to its LEFT. Leftwards is
+;; --- load-bearing — the tray is right-anchored, so the speaker stays under the pointer; a
+;; --- reveal that moved its own trigger would flap.
+;; `vol` = local interaction state so the knob tracks the finger; -1 = follow ujimad.
 (defvar vol -1)
 (defvar volopen false)
 
@@ -123,28 +115,24 @@
     (box :space-evenly false :spacing 4
       (revealer :transition "slideleft" :duration "180ms" :reveal volopen
         (box :space-evenly false :spacing 8
-          (scale :class {"volscale" + ((state.audio.volume ?: -1) == -1 ? " off" : "") + (state.audio.muted ? " muted" : "")}
+          (scale :class {"volscale" + ((state.audio.volume.value ?: -1) == -1 ? " off" : "") + (state.audio.muted.value ? " muted" : "")}
                  :valign "center" :orientation "h" :min 0 :max 101 :timeout "1s"
-                 :value {vol < 0 ? (state.audio.volume ?: 0) : vol}
+                 :value {vol < 0 ? (state.audio.volume.value ?: 0) : vol}
                  :onchange "${EWW_CMD} --no-daemonize update vol={} ; ujima-desktop POST ui/volume/move '{\"value\": {}}' >/dev/null")
           (mutebtn :cls "volnumbtn"
             (label :class "volnum" :xalign 1
-                   :text {(state.audio.volume ?: -1) == -1 ? "--" : (vol < 0 ? state.audio.volume : vol)}))))
+                   :text {(state.audio.volume.value ?: -1) == -1 ? "--" : (vol < 0 ? state.audio.volume.value : vol)}))))
       (mutebtn :cls "sound"
-        ;; the glyph carries the level, not just mute: cone / one arc / two arcs, so a glance
-        ;; at the closed tray already says roughly how loud the machine is
+        ;; the glyph carries the level, so the closed tray says roughly how loud it is
         (image :image-width 20 :image-height 20
-               :path {state.audio.muted                    ? "/ujima/desktop/shell/icons/speaker-muted.svg"
-                      : (state.audio.volume ?: 0) == 0     ? "/ujima/desktop/shell/icons/speaker-off.svg"
-                      : (state.audio.volume ?: 0) <= 50    ? "/ujima/desktop/shell/icons/speaker-low.svg"
+               :path {state.audio.muted.value                    ? "/ujima/desktop/shell/icons/speaker-muted.svg"
+                      : (state.audio.volume.value ?: 0) == 0     ? "/ujima/desktop/shell/icons/speaker-off.svg"
+                      : (state.audio.volume.value ?: 0) <= 50    ? "/ujima/desktop/shell/icons/speaker-low.svg"
                       :                                      "/ujima/desktop/shell/icons/speaker.svg"})))))
 
-;; --- keyboard layout: the volume's shape reused. Hovering slides the OTHER installed layouts
-;; --- out to the LEFT of the current one, each a direct pick — leftward because the tray is
-;; --- right-anchored, so the chip under the pointer stays put. With a single layout there is
-;; --- nothing to choose and only the hover well appears; the reveal is gated on the count, not
-;; --- hidden by CSS, so one layout costs no widgets. Clicking the current chip still cycles,
-;; --- which is what Super+Space does and the only thing a one-layout machine could do anyway.
+;; --- keyboard layout: the volume's shape reused. Hovering slides the other layouts out to the
+;; --- LEFT, each a direct pick. One layout = nothing to choose, so the reveal is gated on the
+;; --- count. Clicking the current chip still cycles, same as super+space.
 (defvar kbdopen false)
 
 (defwidget kbdinline []
@@ -155,23 +143,19 @@
       (revealer :transition "slideleft" :duration "180ms"
                 :reveal {kbdopen && arraylength(state.keyboard.layouts) > 1}
         (box :class "kbdalts" :space-evenly false :spacing 2
-          ;; every layout is rendered and the CURRENT one hidden — GTK collapses a hidden child,
-          ;; so the row closes up with no gap (same trick the launcher trays use)
+          ;; every layout renders, the current one hidden — GTK collapses it, so no gap
           (for l in {state.keyboard.layouts}
-            (button :class "kbdalt" :timeout "2s" :visible {l != state.keyboard.layout}
+            (button :class "kbdalt" :timeout "2s" :visible {l != state.keyboard.layout.value}
               :tooltip "Switch to ${l}"
               :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${l}\"}' >/dev/null"
               (label :text l)))))
-      ;; :valign centre, like the volume box — without it the tray stretches the button to the
-      ;; dock's full inner height and no amount of padding tuning can make its hover pill match
+      ;; :valign centre — without it the tray stretches the button to the dock's full height
       (button :class "kbd" :valign "center" :timeout "2s"
         :tooltip "Keyboard layout"
         :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
-        ;; code THEN icon: the icon becomes the control's fixed right anchor, exactly like the
-        ;; speaker's, so both tray controls are the same shape — anchor on the right, everything
-        ;; that opens growing leftwards away from the pointer.
+        ;; code THEN icon: the icon is the fixed right anchor, like the speaker's
         (box :space-evenly false :spacing 7 :valign "center"
-          (label :text {state.keyboard.layout})
+          (label :text {state.keyboard.layout.value})
           (image :path "/ujima/desktop/shell/icons/keyboard.svg" :image-width 20 :image-height 20))))))
 
 ;; --- bottom: launcher tile left (lit when home), running apps centered (the
@@ -206,11 +190,9 @@
     (box :class "tray" :halign "end" :space-evenly false :spacing 4
       ; posts back the :next the server showed us — idempotent, a double-click can't double-advance;
       ; the label flips when the push lands
-      ;; the layout code alone ("tz") was the one tray item with no icon — it read as a typo
-      ;; more than a control. Icon + code: the icon says what it is, the code says which.
       (kbdinline)
       (volinline)
-      ;; hairline: everything left of it is a control, the clock right of it is a readout
+      ;; hairline: controls to the left, the clock is a readout
       (box :class "traysep" :valign "center")
       (label :class "clock" :tooltip {lockdate} :text {clock}))))
 

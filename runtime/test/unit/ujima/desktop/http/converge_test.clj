@@ -20,17 +20,37 @@
 
 (deftest settings->ui-projects-the-active-output
   (is (= {:system   {:name "meru-01" :serial-tail "af3c"}
-          :audio    {:volume 55 :muted false :output :usb}
-          :keyboard {:layout "us" :layouts ["tz" "us"] :next "tz"}}
+          :audio    {:volume {:value 55 :locked false}
+                     :muted  {:value false :locked false}
+                     :output {:value :usb :locked false}}
+          :keyboard {:layout {:value "us" :locked false} :layouts ["tz" "us"] :next "tz"}}
          (ui settings)))
   (is (= 70 (get-in (ui (assoc settings [:audio :active] :hdmi))
-                    [:audio :volume]))
+                    [:audio :volume :value]))
       "volume follows the active class"))
 
 
 (deftest settings->ui-greys-out-without-an-active-output
-  (is (= {:volume nil :muted false :output nil}
+  (is (= {:volume {:value nil :locked false}
+          :muted  {:value false :locked false}
+          :output {:value nil :locked false}}
          (:audio (ui (assoc settings [:audio :active] nil))))))
+
+
+(deftest settings->ui-locks-what-an-activity-holds
+  (let [held  (fn [m k] (assoc m k (assoc (get m k) :via :activity)))
+        recs  (update-vals settings #(hash-map :effective % :via :session))
+        ui*   #(converge/settings->ui % "af3c")]
+    (is (false? (get-in (ui* recs) [:audio :volume :locked]))
+        "a session value is the user's own")
+    (is (true?  (get-in (ui* (held recs [:audio :usb :volume])) [:audio :volume :locked])))
+    (is (false? (get-in (ui* (-> recs
+                               (held [:audio :usb :volume])
+                               (assoc [:audio :active] {:effective :hdmi :via :session})))
+                        [:audio :volume :locked]))
+        "the padlock follows the ACTIVE output — pinning usb does not pin hdmi")
+    (is (true?  (get-in (ui* (held recs [:audio :muted]))     [:audio :muted :locked])))
+    (is (true?  (get-in (ui* (held recs [:keyboard :layout])) [:keyboard :layout :locked])))))
 
 
 (deftest settings->ui-carries-the-switcher-cycle

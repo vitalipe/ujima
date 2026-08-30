@@ -12,15 +12,26 @@
 ;; machine identity is static — one devicetree read (nil off-Pi: x86 dev hosts)
 (def ^:private serial-tail (delay (devicetree/serial-tail)))
 
+(defn- lockable [record]
+  {:value  (:effective record)
+   :locked (= :activity (:via record))})
+
+
 (defn settings->ui
   "Settings records (+ the static serial tail) -> the UI blob."
   [settings serial]
-  {:system   {:name        (:effective (get settings [:system :name]))
-              :serial-tail serial}
-   :audio    (queries/audio-status settings)
-   :keyboard {:layout  (:effective (get settings [:keyboard :layout]))
-              :layouts (queries/ordered-layouts settings)
-              :next    (queries/next-keyboard-layout settings)}})
+  (let [output (:effective (get settings [:audio :active]))]
+
+    {:system   {:name        (:effective (get settings [:system :name]))
+                :serial-tail serial}
+
+     :audio    {:volume (lockable (get settings [:audio output :volume]))
+                :muted  (lockable (get settings [:audio :muted]))
+                :output (lockable (get settings [:audio :active]))}
+
+     :keyboard {:layout  (lockable (get settings [:keyboard :layout]))
+                :layouts (queries/ordered-layouts settings)
+                :next    (queries/next-keyboard-layout settings)}}))
 
 
 (defn apps->ui

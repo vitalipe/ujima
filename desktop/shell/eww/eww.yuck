@@ -129,14 +129,17 @@
             (label :class "volnum" :xalign 1
                    :text {(state.audio.volume.value ?: -1) == -1 ? "--" : (vol < 0 ? state.audio.volume.value : vol)}))))
       (mutebtn :cls "sound"
-        ;; the glyph carries the level, so the closed tray says roughly how loud it is
-        (image :image-width 20 :image-height 20
-               :path {(state.audio.muted.locked || state.audio.volume.locked)
-                                                                 ? "/ujima/desktop/shell/icons/speaker-locked.svg"
-                      : state.audio.muted.value                  ? "/ujima/desktop/shell/icons/speaker-muted.svg"
-                      : (state.audio.volume.value ?: 0) == 0     ? "/ujima/desktop/shell/icons/speaker-off.svg"
-                      : (state.audio.volume.value ?: 0) <= 50    ? "/ujima/desktop/shell/icons/speaker-low.svg"
-                      :                                      "/ujima/desktop/shell/icons/speaker.svg"})))))
+        ;; the speaker keeps its whole ladder; the lock rides the glyph's empty top-left corner and
+        ;; is always in the layout, just transparent — so nothing shifts when policy changes
+        (box :space-evenly false :spacing 1 :valign "center"
+          (image :class "lockmark" :valign "start" :path "/ujima/desktop/shell/icons/lockmark.svg"
+                 :image-width 10 :image-height 10
+                 :visible {state.audio.muted.locked || state.audio.volume.locked})
+          (image :image-width 20 :image-height 20
+                 :path {state.audio.muted.value                  ? "/ujima/desktop/shell/icons/speaker-muted.svg"
+                        : (state.audio.volume.value ?: 0) == 0   ? "/ujima/desktop/shell/icons/speaker-off.svg"
+                        : (state.audio.volume.value ?: 0) <= 50  ? "/ujima/desktop/shell/icons/speaker-low.svg"
+                        :                                    "/ujima/desktop/shell/icons/speaker.svg"}))))))
 
 ;; --- keyboard layout: the volume's shape reused. Hovering slides the other layouts out to the
 ;; --- LEFT, each a direct pick. One layout = nothing to choose, so the reveal is gated on the
@@ -144,12 +147,13 @@
 (defvar kbdopen false)
 
 (defwidget kbdinline []
-  (eventbox :class {kbdopen ? "kbdbox open" : "kbdbox"} :valign "center"
+  (eventbox :class {kbdopen && !state.keyboard.layout.locked ? "kbdbox open" : "kbdbox"} :valign "center"
     :onhover "${EWW_CMD} --no-daemonize update kbdopen=true"
     :onhoverlost "${EWW_CMD} --no-daemonize update kbdopen=false"
     (box :space-evenly false :spacing 2
       (revealer :transition "slideleft" :duration "180ms"
-                :reveal {kbdopen && arraylength(state.keyboard.layouts) > 1}
+                :reveal {kbdopen && !state.keyboard.layout.locked
+                         && arraylength(state.keyboard.layouts) > 1}
         (box :class "kbdalts" :space-evenly false :spacing 2
           ;; every layout renders, the current one hidden — GTK collapses it, so no gap
           (for l in {state.keyboard.layouts}
@@ -160,11 +164,15 @@
               (label :text l)))))
       ;; :valign centre — without it the tray stretches the button to the dock's full height
       (button :class "kbd" :valign "center" :timeout "2s"
-        :tooltip "Keyboard layout"
+        :active {!state.keyboard.layout.locked}
+        :tooltip "${state.keyboard.layout.locked ? "Keyboard layout is locked" : "Keyboard layout"}"
         :onclick "ujima-desktop POST commands/keyboard/layout '{\"layout\": \"${state.keyboard.next}\"}' >/dev/null"
         ;; code THEN icon: the icon is the fixed right anchor, like the speaker's
         (box :space-evenly false :spacing 7 :valign "center"
           (label :text {state.keyboard.layout.value})
+          (image :class "lockmark onkbd" :valign "start" :path "/ujima/desktop/shell/icons/lockmark.svg"
+                 :image-width 10 :image-height 10
+                 :visible {state.keyboard.layout.locked})
           (image :path "/ujima/desktop/shell/icons/keyboard.svg" :image-width 20 :image-height 20))))))
 
 ;; --- bottom: launcher tile left (lit when home), running apps centered (the

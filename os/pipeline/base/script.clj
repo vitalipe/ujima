@@ -60,14 +60,15 @@
     (files/install! project "base/login/autologin.conf"
                     "/etc/systemd/system/getty@tty1.service.d/autologin.conf")
 
-    ;; 4. default host identity — a placeholder only: ujimad's boot converge renames to
-    ;;    the serial-derived ujima-<last4> (the hostname is not a setting); the hosts
-    ;;    mapping keeps sudo/X from warning "unable to resolve"; the initramfs hook keeps
-    ;;    machine-id stable under the overlay (the why lives in the file)
+    ;; 4. placeholder host identity — the initramfs hook derives the real machine-id, hostname
+    ;;    and 127.0.1.1 line from the board serial before PID 1 (the why lives in the file), so
+    ;;    these two only ever stand on a machine with no devicetree serial. The 127.0.1.1 line
+    ;;    is REPLACED, not appended: raspios ships its own, and a second one just means two
+    ;;    lines to keep in sync.
     (files/install! project "base/identity/hostname" "/etc/hostname")
-    ($! sh -c "grep -qw ujimaos /etc/hosts || printf '127.0.1.1\\tujimaos\\n' >> /etc/hosts")
-    (files/install! project "base/identity/ujima-machine-id"
-                    "/etc/initramfs-tools/scripts/init-bottom/ujima-machine-id")
+    ($! sh -c "sed -i '/^127\\.0\\.1\\.1/d' /etc/hosts && printf '127.0.1.1\\tujimaos\\n' >> /etc/hosts")
+    (files/install! project "base/identity/ujima-identity"
+                    "/etc/initramfs-tools/scripts/init-bottom/ujima-identity")
 
     ;; 5. X bring-up plumbing — the packages ride install's cached layer; the confs live
     ;;    HERE so an edit ships without a package-set (cache-key) change

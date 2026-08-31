@@ -1,9 +1,6 @@
 (ns ujima.device
   (:require
-    [ujima.log                :as log]
     [ujima.linux.disk         :as disk]
-    [ujima.linux.system       :as system]
-    [ujima.linux.devicetree   :as devicetree]
     [ujima.device.ab          :as ab]
     [ujima.device.ab.autoboot :as autoboot]))
 
@@ -17,15 +14,10 @@
 
 
 (defn init!
-  "Machine reality, converged ONCE at start: the serial-derived hostname (never
-   a setting — a live rename breaks chromium's profile locks) and the disk's
-   first-boot id stamp. Dev hosts (no devicetree, nil disk) are left alone."
+  "Machine reality, converged ONCE at start: the disk's first-boot id stamp. The
+   hostname is NOT here — the initramfs hook derives it from the board serial before
+   PID 1 (os/pipeline/base/identity/ujima-identity), which is the only point early
+   enough for avahi. Dev hosts (nil disk) are left alone."
   [disk]
-  
-  (when-let [hostname (some->> (devicetree/serial-tail) (str "ujima-"))]
-    (when (not= hostname (system/hostname))
-      (log/info "init: renaming the host" {:to hostname})
-      (system/hostname! hostname)))
-  
   (when disk
     (ab/system-disk-id! disk)))

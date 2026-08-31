@@ -1,0 +1,37 @@
+#!/bin/sh
+# managed by the ujima image build — source: os/pipeline/base/identity/ujima-identity
+#
+# Overlay-safe machine identity: machine-id, hostname and the 127.0.1.1 line, all derived from
+# the board serial and written into the real root BEFORE PID 1 reads any of them.
+#
+# Under the overlay (every image — see the boot stage's cmdline) nothing userspace writes to /etc
+# survives: the write hits the ephemeral tmpfs upper. That breaks two identities the same way.
+# systemd mints a random machine-id per boot (one orphan /var/log/journal/<id>/ each time). And a
+# hostname applied after startup is BOTH thrown away and too late — avahi has already published
+# the baked placeholder, so every machine advertised ujimaos.local and they collided on the LAN,
+# every boot, with the winner decided by boot order.
+#
+# Deriving beats persisting here: same serial, same values, every boot. PREREQ=overlayroot → runs
+# after the overlay mounts, so ${rootmnt} is the overlay and these land in its upper.
+#
+# The producer (dev/kit/build-initramfs) bakes this into the stash and the boot stage ships that,
+# so this file only has to be PRESENT in the rootfs for the producer's update-initramfs to find.
+# EDITING IT CHANGES NOTHING until the stash is rebuilt.
+PREREQ="overlayroot"
+prereqs() { echo "$PREREQ"; }
+case "$1" in prereqs) prereqs; exit 0;; esac
+
+serial=$(tr -dc 'a-zA-Z0-9' < /sys/firmware/devicetree/base/serial-number 2>/dev/null)
+[ -n "$serial" ] || exit 0
+
+mid=$(printf '%s' "$serial" | sha256sum | cut -c1-32)
+printf '%s\n' "$mid" > "${rootmnt}/etc/machine-id"
+
+host="ujima-$(printf '%s' "$serial" | tail -c 4)"
+printf '%s\n' "$host" > "${rootmnt}/etc/hostname"
+
+# every 127.0.1.1 line, not the first: raspios ships its own and the image adds a placeholder,
+# so replacing in place would leave a stale name behind on the other one
+hosts="${rootmnt}/etc/hosts"
+{ grep -v '^127\.0\.1\.1' "$hosts"; printf '127.0.1.1\t%s\n' "$host"; } > "$hosts.ujima" \
+  && mv "$hosts.ujima" "$hosts"

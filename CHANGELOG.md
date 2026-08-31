@@ -48,6 +48,13 @@ version truth; branch names and build labels may disagree.
 - Moving the volume unmutes when you let go of the slider, so a machine you muted stays
   silent while you set the level.
 
+### Fixed
+
+- A machine answers to its own name on the network. Every machine used to announce
+  itself as `ujimaos`, so two of them on one network fought over the name and which one
+  you reached depended on boot order; each now announces `ujima-<serial>` from the moment
+  it starts.
+
 ## [0.4.0] - 2026-08-25
 
 Fleet control: a USB admin token opens the Console — the Circle app runs every

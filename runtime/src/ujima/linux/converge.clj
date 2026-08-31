@@ -49,7 +49,6 @@
 
 
 (defn- converge-system!
-  ;; no hostname here — machine reality, device/init! asserts it once at start
   [settings]
   (let [timezone (get settings [:system :timezone])]
     (when (and timezone (not= timezone (system/timezone)))

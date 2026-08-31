@@ -39,7 +39,7 @@
     (shell/install-remap! (get-in env [:shell :commands] {}))
     (log/init!            (get-in env [:log] {:level :info}))
 
-    (device/init! disk)   ; machine reality first: hostname + disk stamp
+    (device/init! disk)   ; machine reality first: the disk stamp
 
     (shell-http-converge/init!)
     (control/init!     (merge (get-in env [:control] {})

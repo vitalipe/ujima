@@ -96,8 +96,8 @@
 
 ;; the speaker and the number both mute — one definition so they cannot drift
 (defwidget mutebtn [cls]
-  (button :class cls :timeout "2s"
-    :tooltip "${(state.audio.volume.value ?: -1) == -1 ? "No audio output" : (state.audio.muted.value ? "Unmute" : "Mute")}"
+  (button :class cls :timeout "2s" :active {!state.audio.muted.locked}
+    :tooltip "${state.audio.muted.locked ? "Sound is locked" : ((state.audio.volume.value ?: -1) == -1 ? "No audio output" : (state.audio.muted.value ? "Unmute" : "Mute"))}"
     :onclick "ujima-desktop POST commands/audio/muted '{\"value\": ${!state.audio.muted.value}}' >/dev/null"
     (children)))
 
@@ -109,14 +109,16 @@
 (defvar volopen false)
 
 (defwidget volinline []
-  (eventbox :class {volopen ? "volbox open" : "volbox"} :valign "center"
+  (eventbox :class {volopen && !(state.audio.muted.value && state.audio.muted.locked) ? "volbox open" : "volbox"} :valign "center"
     :onhover "${EWW_CMD} --no-daemonize update volopen=true"
     :onhoverlost "${EWW_CMD} --no-daemonize update volopen=false vol=-1"
     (box :space-evenly false :spacing 4
-      (revealer :transition "slideleft" :duration "180ms" :reveal volopen
+      (revealer :transition "slideleft" :duration "180ms"
+                :reveal {volopen && !(state.audio.muted.value && state.audio.muted.locked)}
         (box :space-evenly false :spacing 8
-          (scale :class {"volscale" + ((state.audio.volume.value ?: -1) == -1 ? " off" : "") + (state.audio.muted.value ? " muted" : "")}
+          (scale :class {"volscale" + ((state.audio.volume.value ?: -1) == -1 ? " off" : "") + (state.audio.muted.value ? " muted" : "") + (state.audio.volume.locked ? " locked" : "")}
                  :valign "center" :orientation "h" :min 0 :max 101 :timeout "1s"
+                 :active {!state.audio.volume.locked}
                  :value {vol < 0 ? (state.audio.volume.value ?: 0) : vol}
                  :onchange "${EWW_CMD} --no-daemonize update vol={} ; ujima-desktop POST ui/volume/move '{\"value\": {}}' >/dev/null")
           (mutebtn :cls "volnumbtn"
@@ -125,7 +127,9 @@
       (mutebtn :cls "sound"
         ;; the glyph carries the level, so the closed tray says roughly how loud it is
         (image :image-width 20 :image-height 20
-               :path {state.audio.muted.value                    ? "/ujima/desktop/shell/icons/speaker-muted.svg"
+               :path {(state.audio.muted.locked || state.audio.volume.locked)
+                                                                 ? "/ujima/desktop/shell/icons/speaker-locked.svg"
+                      : state.audio.muted.value                  ? "/ujima/desktop/shell/icons/speaker-muted.svg"
                       : (state.audio.volume.value ?: 0) == 0     ? "/ujima/desktop/shell/icons/speaker-off.svg"
                       : (state.audio.volume.value ?: 0) <= 50    ? "/ujima/desktop/shell/icons/speaker-low.svg"
                       :                                      "/ujima/desktop/shell/icons/speaker.svg"})))))

@@ -116,11 +116,15 @@
       (revealer :transition "slideleft" :duration "180ms"
                 :reveal {volopen && !(state.audio.muted.value && state.audio.muted.locked)}
         (box :space-evenly false :spacing 8
+          ;; unmute when the DRAG ENDS, not on every value: a machine the user muted stays
+          ;; silent while it is being adjusted
+          (eventbox :onclick {state.audio.muted.value && !state.audio.muted.locked
+                              ? "ujima-desktop POST commands/audio/muted '{\"value\": false}' >/dev/null" : ""}
           (scale :class {"volscale" + ((state.audio.volume.value ?: -1) == -1 ? " off" : "") + (state.audio.muted.value ? " muted" : "") + (state.audio.volume.locked ? " locked" : "")}
                  :valign "center" :orientation "h" :min 0 :max 101 :timeout "1s"
                  :active {!state.audio.volume.locked}
                  :value {vol < 0 ? (state.audio.volume.value ?: 0) : vol}
-                 :onchange "${EWW_CMD} --no-daemonize update vol={} ; ujima-desktop POST ui/volume/move '{\"value\": {}}' >/dev/null")
+                 :onchange "${EWW_CMD} --no-daemonize update vol={} ; ujima-desktop POST ui/volume/move '{\"value\": {}}' >/dev/null"))
           (mutebtn :cls "volnumbtn"
             (label :class "volnum" :xalign 1
                    :text {(state.audio.volume.value ?: -1) == -1 ? "--" : (vol < 0 ? state.audio.volume.value : vol)}))))

@@ -44,6 +44,8 @@ version truth; branch names and build labels may disagree.
   the leftmost is always the one super+space switches to next.
 - Sound an activity has pinned shows a locked speaker and cannot be changed from the
   bar: the slider loses its handle, and when sound is pinned off the panel stays shut.
+- Moving the volume unmutes when you let go of the slider, so a machine you muted stays
+  silent while you set the level.
 
 ## [0.4.0] - 2026-08-25
 

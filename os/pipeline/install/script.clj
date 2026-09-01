@@ -14,7 +14,8 @@
     ($! apt-get update)
     ($! apt-get install -y --no-install-recommends
         "ca-certificates"
-        "util-linux-extra")  ; hwclock — clock! persists a set clock to the RTC; Debian split it out of util-linux
+        "util-linux-extra"   ; hwclock — clock! persists a set clock to the RTC; Debian split it out of util-linux
+        "avahi-utils")       ; avahi-browse — the console enumerates _ujima._tcp for peers the subnet sweep misses (some APs throttle it); the daemon itself rides the raspios base, so this is the client side only and pulls in nothing new
 
     ;; ESCAPE HATCH — the one static file this script writes, deliberately NOT a concern
     ;; file: it must exist BEFORE the overlayroot install below (its postinst trigger runs

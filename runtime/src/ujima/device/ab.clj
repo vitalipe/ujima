@@ -11,14 +11,16 @@
 
      {:device  \"/dev/sda\"
       :type    :ab
-      :storage \"/dev/sda8\"
-      :config  \"/dev/sda7\"
+      :storage \"/dev/sda10\"
+      :logs    \"/dev/sda9\"
       :system-disk-id \"1b0c…\"
       :slots {:a {:boot \"/dev/sda2\"
                   :root \"/dev/sda5\"
+                  :config \"/dev/sda7\"
                   :ujima-os {:pack-version 1 :packed-at ... :installed-at ...}}
               :b {:boot \"/dev/sda3\"
                   :root \"/dev/sda6\"
+                  :config \"/dev/sda8\"
                   :ujima-os nil}}
 
       :boot-slot :a
@@ -26,7 +28,7 @@
 
      :try-boot-slot  -> nil when no trial boot is pending.
      :system-disk-id -> the disk's identity, nil when never stamped; lives on the
-                        config partition, so it survives slot installs and board swaps.")
+                        control partition, so it survives slot installs and board swaps.")
 
 
   (write-ujima-layout! [this]

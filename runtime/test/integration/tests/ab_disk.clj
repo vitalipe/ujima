@@ -116,12 +116,14 @@
   (assert= "Disk info should report the loopback device"
            device
            (:device info))
-  (doseq [path [(:config info)
+  (doseq [path [(:logs info)
                 (:storage info)
                 (get-in info [:slots :a :boot])
                 (get-in info [:slots :a :root])
+                (get-in info [:slots :a :config])
                 (get-in info [:slots :b :boot])
-                (get-in info [:slots :b :root])]]
+                (get-in info [:slots :b :root])
+                (get-in info [:slots :b :config])]]
     (assert-block-device! "Expected Ujima partition to be a block device"
                           path))
   true)
@@ -146,41 +148,44 @@
 
 
 (defn assert-slot-settings! [info slot]
-  ;; the per-slot settings subdir exists on the shared config partition (the bind source)
-  (with-mounted-ext4 [cfg-mnt (:config info)]
-    (assert= "Expected per-slot settings subdir on the config partition"
-             true (fs/exists? (fs/path cfg-mnt (name slot)))))
-  ;; the slot's fstab: settings partition mounted REQUIRED (no nofail) at /mnt/settings, then
-  ;; bind-mounted per-slot onto /ujima/settings. (The mount-point dirs themselves are build
-  ;; content — os.base — not part of the install contract.)
+  ;; the slot's fstab: the slot's OWN settings partition mounted REQUIRED (no nofail)
+  ;; directly at /ujima/settings — mounting the slot's partition IS slot selection.
+  ;; (The mount-point dirs themselves are build content — os.base — not part of the
+  ;; install contract.)
   (with-mounted-ext4 [root-mnt (get-in info [:slots slot :root])]
     (let [fstab         (slurp (str (fs/path root-mnt "etc/fstab")))
+          config-uuid   (format "%08x-%02x" rpi-partitions/ujima-mbr-disk-id
+                                            (case slot :a 7 :b 8))
           settings-line (->> (str/split-lines fstab)
-                             (filter #(re-find #"\s/mnt/settings\s" %))
+                             (filter #(re-find #"\s/ujima/settings\s" %))
                              first)]
-      (assert-some! "fstab should mount the settings partition at /mnt/settings" settings-line)
+      (assert-some! "fstab should mount a settings partition at /ujima/settings" settings-line)
+      (assert-some! "fstab should mount the slot's OWN settings partition"
+                    (re-find (re-pattern (str "PARTUUID=" config-uuid
+                                              "\\s+/ujima/settings\\s+ext4"))
+                             settings-line))
       (when (str/includes? settings-line "nofail")
         (fail! "Settings mount must be REQUIRED (no nofail) so a bad partition halts boot rather than silently using defaults"
                {:line settings-line}))
-      (assert-some! "fstab should bind /mnt/settings/<slot> onto /ujima/settings"
-                    (re-find (re-pattern (str "/mnt/settings/" (name slot)
-                                              "\\s+/ujima/settings\\s+none\\s+bind"))
-                             fstab)))))
+      (assert-nil! "The shared /mnt/settings mount is gone — nothing may bring it back"
+                   (re-find #"/mnt/settings" fstab)))))
 
 
 (defn assert-slot-logs! [info slot]
-  ;; journald's logs dir exists on the shared storage partition (the bind source)
-  (with-mounted-ext4 [s-mnt (:storage info)]
-    (assert= "Expected /logs dir on the storage partition"
-             true (fs/exists? (fs/path s-mnt "logs"))))
-  ;; the slot's fstab: storage partition mounted directly at /ujima/storage (nofail),
-  ;; journald bind-mounted from it
+  ;; journald's journal dir exists on the shared logs partition (the bind source)
+  (with-mounted-ext4 [logs-mnt (:logs info)]
+    (assert= "Expected /journal dir on the logs partition"
+             true (fs/exists? (fs/path logs-mnt "journal"))))
+  ;; the slot's fstab: logs partition mounted at /ujima/logs (nofail), journald
+  ;; bind-mounted from it; storage still mounted directly at /ujima/storage (nofail)
   (with-mounted-ext4 [root-mnt (get-in info [:slots slot :root])]
     (let [fstab (slurp (str (fs/path root-mnt "etc/fstab")))]
+      (assert-some! "fstab should mount the logs partition at /ujima/logs"
+                    (re-find #"\s/ujima/logs\s+ext4\s+noatime,nofail" fstab))
       (assert-some! "fstab should mount the storage partition at /ujima/storage"
-                    (re-find #"\s/ujima/storage\s+ext4\s+defaults,nofail" fstab))
-      (assert-some! "fstab should bind /var/log/journal onto /ujima/storage/logs"
-                    (re-find #"/ujima/storage/logs\s+/var/log/journal\s+none\s+bind" fstab)))))
+                    (re-find #"\s/ujima/storage\s+ext4\s+noatime,nofail" fstab))
+      (assert-some! "fstab should bind /var/log/journal onto /ujima/logs/journal"
+                    (re-find #"/ujima/logs/journal\s+/var/log/journal\s+none\s+bind" fstab)))))
 
 
 (defn test-install! [disk* pack-file slot expected-installed-slots]
@@ -197,6 +202,23 @@
       (assert-slot-settings! info slot)
       (assert-slot-logs! info slot)
       true)))
+
+
+(defn test-system-disk-id-stamp! [disk* stamped]
+  (let [id (ab/system-disk-id! disk*)]
+    (assert-some! "Stamping a fresh disk should mint an id" id)
+    (assert= "A second call must answer the existing id, never re-mint"
+             id (ab/system-disk-id! disk*))
+    (assert= "Disk info should carry the stamped id"
+             id (:system-disk-id (require-disk-info! disk*)))
+    (reset! stamped id)
+    true))
+
+
+(defn test-system-disk-id-survives! [disk* stamped]
+  (assert= "The id stamped before the installs should survive them"
+           @stamped
+           (:system-disk-id (require-disk-info! disk*))))
 
 
 (defn test-boot-slot! [disk* slot]
@@ -250,7 +272,8 @@
     ($! truncate -s "32G" [sut-img-file])
 
     (loopback/with-loopback-device [device sut-img-file]
-      (let [disk* (->disk {:device device})]
+      (let [disk*   (->disk {:device device})
+            stamped (atom nil)]
         (run-tests!
           [["0. initial state"
             #(test-initial-state! disk*)]
@@ -258,20 +281,26 @@
            ["1. initialize disk"
             #(test-write-layout! disk* device)]
 
-           ["2. install into slot :a"
+           ["2. stamp system-disk-id"
+            #(test-system-disk-id-stamp! disk* stamped)]
+
+           ["3. install into slot :a"
             #(test-install! disk* pack-file :a #{:a})]
 
-           ["3. install into slot :b"
+           ["4. install into slot :b"
             #(test-install! disk* pack-file :b #{:a :b})]
 
-           ["4. set boot slot :a"
+           ["5. system-disk-id survives the installs"
+            #(test-system-disk-id-survives! disk* stamped)]
+
+           ["6. set boot slot :a"
             #(test-boot-slot! disk* :a)]
 
-           ["5. set boot slot :b"
+           ["7. set boot slot :b"
             #(test-boot-slot! disk* :b)]
 
-           ["6. set try-boot slot :a"
+           ["8. set try-boot slot :a"
             #(test-try-boot-slot! disk* :b :a)]
 
-           ["7. clear try-boot slot"
+           ["9. clear try-boot slot"
             #(test-clear-try-boot-slot! disk* :b)]])))))

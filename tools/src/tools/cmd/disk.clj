@@ -119,34 +119,32 @@
 
 
 (defn- seed-slot!
-  "Seed the slot through its OWN runtime: mount the slot root, bind this slot's UJCFG dir
-   at /ujima/settings, chroot (aarch64 under qemu), seed.
+  "Seed the slot through its OWN runtime: mount the slot root, mount this slot's own
+   UJCFG partition at /ujima/settings, chroot (aarch64 under qemu), seed.
 
    Dry-runs first and refuses on ANY drop. A seed file is hand-written, so a setting the
    image will not take is a typo — unlike an upgrade's entries, which come off a machine's
    own export where a drop just means the registry moved."
   [dev slot seed-file]
   (let [entries (slurp-edn seed-file)
-        {cfg-blk :config :as parts} (partitions/device->partitions-by-name dev)
-        {:keys [root]}              (get parts slot)]
+        parts   (partitions/device->partitions-by-name dev)
+        {:keys [root] cfg-blk :config} (get parts slot)]
     (mount/with-mounted-ext4 [root-mnt root]
-      (mount/with-mounted-ext4 [cfg-mnt cfg-blk]
-        (let [slot-cfg (str (fs/path cfg-mnt (name slot)))
-              settings (str root-mnt "/ujima/settings")]
-          (try
-            ($! mount --bind [slot-cfg] [settings])
+      (let [settings (str root-mnt "/ujima/settings")]
+        (try
+          ($! mount -t ext4 [cfg-blk] [settings])
 
-            (let [{:keys [dropped]} (seed-chroot! root-mnt entries true)]
-              (when (seq dropped)
-                (throw (ex-info "the image refuses settings in this seed file"
-                                {:refused (mapv (juxt :error :entry) dropped)}))))
+          (let [{:keys [dropped]} (seed-chroot! root-mnt entries true)]
+            (when (seq dropped)
+              (throw (ex-info "the image refuses settings in this seed file"
+                              {:refused (mapv (juxt :error :entry) dropped)}))))
 
-            (let [{:keys [applied]} (seed-chroot! root-mnt entries false)]
-              (println (str "seeded " applied " settings -> slot " (name slot))))
+          (let [{:keys [applied]} (seed-chroot! root-mnt entries false)]
+            (println (str "seeded " applied " settings -> slot " (name slot))))
 
-            (finally
-              (when (mount/mount-point? settings)
-                ($! umount [settings])))))))))
+          (finally
+            (when (mount/mount-point? settings)
+              ($! umount [settings]))))))))
 
 
 (defn- require-seed-file!

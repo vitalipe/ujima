@@ -51,6 +51,12 @@ version truth; branch names and build labels may disagree.
 - The Console finds machines two ways: one that announces itself on the network appears
   in about a second, and the subnet sweep still runs behind it — so a class fills in
   promptly even where an access point throttles the sweep.
+- The disk carries each slot's settings on that slot's own partition and the journal on
+  a partition of its own: a corrupt settings filesystem now halts only its slot instead
+  of both, a failed slot's logs stay readable from the one that boots, and user files
+  filling the disk can no longer squeeze the journal out. Settings and logs stop on the
+  first filesystem error rather than writing on; the machine id moved to the control
+  partition. Disks installed with the old layout must be re-installed.
 
 ### Fixed
 

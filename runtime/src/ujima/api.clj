@@ -83,7 +83,7 @@
    "disk"     (fn [] {:type     (:type system-disk)
                       :slot     (:boot-slot system-disk)
                       :storage  (disk/device->space (:storage system-disk))
-                      :settings (disk/device->space (:config system-disk))})
+                      :settings (disk/device->space (get-in system-disk [:slots (:boot-slot system-disk) :config]))})
 
    "desktop/locked"  #(desktop/locked?)
    "desktop/mode"    #(desktop/mode-state)

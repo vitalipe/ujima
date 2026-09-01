@@ -84,39 +84,38 @@
 
 
 (defn- with-slot-chroot*
-  "Mount SLOT's root and the config partition, bind that slot's settings dir where its
-   runtime expects them plus /dev /proc /sys, call F with the root, and unwind all of it.
+  "Mount SLOT's root, mount that slot's OWN config partition where its runtime expects
+   settings, bind /dev /proc /sys, call F with the root, and unwind all of it.
 
    The unwind is best-effort, then LOUD: a mount left pointing into the inactive slot is
    an error naming what stayed stuck, never a lazy umount — deferred teardown on a
    partition we are about to try-boot is hidden state."
   [disk slot f]
-  (let [{cfg-blk :config :as parts} (partitions/device->partitions-by-name (:device disk))
-        {:keys [root]}              (get parts slot)
+  (let [parts                       (partitions/device->partitions-by-name (:device disk))
+        {:keys [root] cfg-blk :config} (get parts slot)
         binds                       ["/dev" "/proc" "/sys"]]
     (mount/with-mounted-ext4 [root-mnt root]
-      (mount/with-mounted-ext4 [cfg-mnt cfg-blk]
-        (let [settings (str root-mnt "/ujima/settings")
-              result   (try
-                         (sudo$! mount --bind [(str (fs/path cfg-mnt (name slot)))] [settings])
-                         (doseq [b binds] (sudo$! mount --bind [b] (str root-mnt b)))
-                         {:value (f root-mnt)}
-                         (catch Throwable e {:thrown e}))
-              stuck    (unwind-chroot-binds! root-mnt settings binds)]
+      (let [settings (str root-mnt "/ujima/settings")
+            result   (try
+                       (sudo$! mount -t ext4 [cfg-blk] [settings])
+                       (doseq [b binds] (sudo$! mount --bind [b] (str root-mnt b)))
+                       {:value (f root-mnt)}
+                       (catch Throwable e {:thrown e}))
+            stuck    (unwind-chroot-binds! root-mnt settings binds)]
 
-          ;; stderr as well as the throw: a stuck bind also fails the outer root umount,
-          ;; and THAT error is the one that propagates — these lines must not be lost
-          (when (seq stuck)
-            (binding [*out* *err*]
-              (doseq [{:keys [mount error]} stuck]
-                (println (str "stuck mount: " mount " — " error)))))
+        ;; stderr as well as the throw: a stuck bind also fails the outer root umount,
+        ;; and THAT error is the one that propagates — these lines must not be lost
+        (when (seq stuck)
+          (binding [*out* *err*]
+            (doseq [{:keys [mount error]} stuck]
+              (println (str "stuck mount: " mount " — " error)))))
 
-          (when-let [e (:thrown result)]
-            (throw e))
-          (when (seq stuck)
-            (throw (ex-info "the chroot unwind left mounts pointing into the inactive slot"
-                            {:slot slot :stuck stuck})))
-          (:value result))))))
+        (when-let [e (:thrown result)]
+          (throw e))
+        (when (seq stuck)
+          (throw (ex-info "the chroot unwind left mounts pointing into the inactive slot"
+                          {:slot slot :stuck stuck})))
+        (:value result)))))
 
 
 (defmacro ^:private with-slot-chroot [[sym disk slot] & body]

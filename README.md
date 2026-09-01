@@ -141,7 +141,7 @@ every boot.
 sudo bb disk autoboot empty out/u-disk.img   # or a real device: /dev/mmcblk0 (--wipe if used)
 ```
 
-An empty A/B harness: control, boot A/B, root A/B, settings, storage.
+An empty A/B harness: control, boot A/B, root A/B, settings A/B, logs, storage.
 
 ### Apply to a slot
 
@@ -166,24 +166,29 @@ failure mode is a quiet "won't open": the spawn throws on the missing binary).
 ## Disk layout
 
 **The A/B harness** — the card layout, owned by the installer: a control partition,
-boot + root **slot pairs**, and two partitions that belong to no slot — **settings**
-and **storage**. An update installs a pack into the inactive slot and activates it;
-the Pi's tryboot mechanism falls back to the previous slot if the new one fails to
-boot. Each install writes that slot's fstab, so a slot always mounts its own boot
-partition and the shared pair: the settings partition lands at `/mnt/settings`
-(one dir per slot), and binding the slot's dir to `/ujima/settings` IS slot
-selection.
+boot + root + settings **slot triples**, and two partitions that belong to no
+slot — **logs** and **storage**. An update installs a pack into the inactive slot
+and activates it; the Pi's tryboot mechanism falls back to the previous slot if the
+new one fails to boot. Each install writes that slot's fstab, so a slot always
+mounts its own boot partition and its OWN settings partition at `/ujima/settings` —
+mounting the slot's settings partition IS slot selection. Per-slot settings keep the
+fault domains honest: settings is a required mount (a corrupt one halts boot), and
+splitting it means it halts only its slot — the fallback slot boots on its own copy.
+Logs are deliberately shared, so when a slot dies its journal stays readable from
+the other one.
 
 The autoboot disk — the layout `bb disk autoboot` writes and requires:
 ```
-p1  control    64 MiB  fat32  UJCTL    autoboot.txt — boot slot selection, tryboot
-p2  boot A    512 MiB  fat32           slot A kernel + firmware
-p3  boot B    512 MiB  fat32           slot B kernel + firmware
-p4  extended                           container for the logical partitions
-p5  root A     10 GiB  ext4            slot A rootfs
-p6  root B     10 GiB  ext4            slot B rootfs
-p7  settings    1 GiB  ext4   UJCFG    one dir per slot            (persists)
-p8  storage     rest   ext4   UJSTORE  files, extra apps, journal  (persists)
+p1   control     64 MiB  fat32  UJCTL    autoboot.txt (boot slot selection, tryboot) + system-disk-id
+p2   boot A     512 MiB  fat32           slot A kernel + firmware
+p3   boot B     512 MiB  fat32           slot B kernel + firmware
+p4   extended                            container for the logical partitions
+p5   root A      10 GiB  ext4            slot A rootfs
+p6   root B      10 GiB  ext4            slot B rootfs
+p7   settings A 512 MiB  ext4   UJCFG-A  slot A settings              (persists)
+p8   settings B 512 MiB  ext4   UJCFG-B  slot B settings              (persists)
+p9   logs         1 GiB  ext4   UJLOG    the journal, shared          (persists)
+p10  storage      rest   ext4   UJSTORE  files, extra apps            (persists)
 ```
 
 The MBR disk id is fixed (`00c0ffee`), so every partition has a stable
@@ -192,8 +197,8 @@ never by device path.
 
 **UjimaOS** — inside a slot, the root filesystem is **read-only** under a tmpfs
 overlay: everything written to `/` resets on reboot. What persists — across reboots
-*and* A/B updates — lives on the harness's shared partitions: settings, storage, and
-the journal. On a running device:
+*and* A/B updates — lives on the harness's persistent partitions: settings, logs,
+and storage. On a running device:
 
 ```
 /ujima/runtime     the deployed core (runtime/)
@@ -202,7 +207,8 @@ the journal. On a running device:
 /ujima/apps        the app catalog scan root
 /ujima/image.edn   the build stamp (version, base)  (per-slot)
 /ujima/install.edn the install record (manifest)    (per-slot)
-/ujima/settings    per-slot settings scope          (persists)
+/ujima/settings    the slot's settings partition    (persists)
+/ujima/logs        the journal, shared across slots (persists)
 /ujima/storage     shared storage — files, apps     (persists)
 /ujima/run         ephemeral runtime state          (resets)
 /ujima/dev         the dev kit                      (dev images only)

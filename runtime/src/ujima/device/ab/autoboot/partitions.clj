@@ -17,14 +17,14 @@
   (require-block-device! device)
 
   (let [[?control ?boot-a ?boot-b _ext
-         ?root-a ?root-b ?config ?storage :as partitions]
+         ?root-a ?root-b ?config-a ?config-b ?logs ?storage :as partitions]
         (mapv partition->info (device->partitions device))]
 
-    (when-not (= 8 (count partitions))
+    (when-not (= 10 (count partitions))
       (throw
         (ex-info "Device does not have the expected Ujima partition number"
           {:device   device
-           :expected 8
+           :expected 10
            :actual   (count partitions)})))
 
     (when-not (>= (:size-bytes ?control) (MiB 64))
@@ -52,10 +52,20 @@
         (ex-info "Root(b) partition is too small"
           {:device device :expected (MiB 10240) :actual (:size-bytes ?root-b)})))
 
-    (when-not (>= (:size-bytes ?config) (MiB 1024))
+    (when-not (>= (:size-bytes ?config-a) (MiB 512))
       (throw
-        (ex-info "Config partition is too small"
-          {:device device :expected (MiB 1024) :actual (:size-bytes ?config)})))
+        (ex-info "Config(a) partition is too small"
+          {:device device :expected (MiB 512) :actual (:size-bytes ?config-a)})))
+
+    (when-not (>= (:size-bytes ?config-b) (MiB 512))
+      (throw
+        (ex-info "Config(b) partition is too small"
+          {:device device :expected (MiB 512) :actual (:size-bytes ?config-b)})))
+
+    (when-not (>= (:size-bytes ?logs) (MiB 1024))
+      (throw
+        (ex-info "Logs partition is too small"
+          {:device device :expected (MiB 1024) :actual (:size-bytes ?logs)})))
 
     (when-not ?storage
       (throw
@@ -74,12 +84,12 @@
 
 (defn device->partitions-by-name [device]
   (when (ujima-ab-partition-layout? device)
-    (let [[control ,boot-a, boot-b,_ext,root-a,root-b, config storage] (device->partitions device)]
+    (let [[control ,boot-a, boot-b,_ext,root-a,root-b, config-a config-b logs storage] (device->partitions device)]
       {:control control
-       :config  config
+       :logs    logs
        :storage storage
-       :a       {:boot boot-a :root root-a} 
-       :b       {:boot boot-b :root root-b}})))
+       :a       {:boot boot-a :root root-a :config config-a}
+       :b       {:boot boot-b :root root-b :config config-b}})))
 
   
 (defn write-ab-partition-layout! [device]
@@ -91,10 +101,12 @@
         ext-start                    boot-b-end
         
         ;; +1 for EBR
-        [root-a-start root-a-end]   [(+ ext-start  1)  (+ ext-start  10240 1)]
-        [root-b-start root-b-end]   [(+ root-a-end 1)  (+ root-a-end 10240 1)]
-        [config-start config-end]   [(+ root-b-end 1)  (+ root-b-end 1024  1)]
-        [storage-start]             [(+ config-end 1)]]
+        [root-a-start root-a-end]     [(+ ext-start    1)  (+ ext-start    10240 1)]
+        [root-b-start root-b-end]     [(+ root-a-end   1)  (+ root-a-end   10240 1)]
+        [config-a-start config-a-end] [(+ root-b-end   1)  (+ root-b-end   512   1)]
+        [config-b-start config-b-end] [(+ config-a-end 1)  (+ config-a-end 512   1)]
+        [logs-start logs-end]         [(+ config-b-end 1)  (+ config-b-end 1024  1)]
+        [storage-start]               [(+ logs-end     1)]]
 
     (require-block-device! device) 
 
@@ -109,19 +121,31 @@
 
     (sudo$! parted -s [device] mkpart extended (MiB  ext-start) "100%")
 
-    (sudo$! parted -s [device] mkpart logical ext4 (MiB root-a-start) (MiB root-a-end))
-    (sudo$! parted -s [device] mkpart logical ext4 (MiB root-b-start) (MiB root-b-end))
-    (sudo$! parted -s [device] mkpart logical ext4 (MiB config-start) (MiB config-end))
-    (sudo$! parted -s [device] mkpart logical ext4 (MiB storage-start) "100%")
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB root-a-start)   (MiB root-a-end))
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB root-b-start)   (MiB root-b-end))
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB config-a-start) (MiB config-a-end))
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB config-b-start) (MiB config-b-end))
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB logs-start)     (MiB logs-end))
+    (sudo$! parted -s [device] mkpart logical ext4 (MiB storage-start)  "100%")
 
     (sudo$! partprobe [device])
     ($!     udevadm settle)
-  
+
     ;; Format only persistent/control partitions here.
     ;; Boot/root partitions are written later from images.
-    (let [{:keys [control config storage]} (device->partitions-by-name device)]
-  
+    (let [{:keys [control logs storage] {config-a :config} :a {config-b :config} :b}
+          (device->partitions-by-name device)]
+
       (sudo$! :mkfs.vfat -F 32 -n "UJCTL" [control])
 
-      (sudo$! :mkfs.ext4 -F -L "UJCFG"   [config])
-      (sudo$! :mkfs.ext4 -F -L "UJSTORE" [storage]))))
+      (sudo$! :mkfs.ext4 -F -L "UJCFG-A" [config-a])
+      (sudo$! :mkfs.ext4 -F -L "UJCFG-B" [config-b])
+      (sudo$! :mkfs.ext4 -F -L "UJLOG"   [logs])
+      (sudo$! :mkfs.ext4 -F -L "UJSTORE" [storage])
+
+      ;; settings + logs stop on the first ext4 error instead of compounding it;
+      ;; storage stays `continue` — user files shouldn't vanish mid-session over
+      ;; one bad block, pass-2 fsck still catches it on reboot
+      (sudo$! tune2fs -e "remount-ro" [config-a])
+      (sudo$! tune2fs -e "remount-ro" [config-b])
+      (sudo$! tune2fs -e "remount-ro" [logs]))))

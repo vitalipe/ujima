@@ -6,10 +6,11 @@
 
 
 (defn system->disk
-  "The disk this system booted from, found by the scheme's config-partition
-   PARTUUID — nil when there is none (a dev host)."
+  "The disk this system booted from, found by the scheme's control-partition
+   PARTUUID (slot-agnostic, its index never moves) — nil when there is none
+   (a dev host)."
   []
-  (when-let [dev (disk/partuuid->disk autoboot/ujima-config-uuid)]
+  (when-let [dev (disk/partuuid->disk autoboot/ujima-control-uuid)]
     (autoboot/->disk {:device dev})))
 
 

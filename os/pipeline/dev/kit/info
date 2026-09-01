@@ -39,5 +39,5 @@ printf '  gateway  : %s\n' "$(ip route 2>/dev/null | awk '/^default/{print $3; e
 printf '  wifi ssid: %s\n' "$(nmcli -t -f active,ssid dev wifi 2>/dev/null | awk -F: '$1=="yes"{print $2; exit}')"
 
 sec disk
-df -h / /ujima/storage /ujima/settings 2>/dev/null | sed 's/^/  /'
+df -h / /ujima/storage /ujima/settings /ujima/logs 2>/dev/null | sed 's/^/  /'
 printf '\n'

@@ -77,8 +77,9 @@
   (fresh!)
   (is (= {:type :ab :slot :a :storage nil :settings nil}
          (GET "/api/query/machine/disk" {:disk {:type :ab :boot-slot :a
-                                                :storage "/dev/nope1" :config "/dev/nope2"}}))
-      "boot-time disk info + live space lookup; absent devices read nil")
+                                                :storage "/dev/nope1"
+                                                :slots {:a {:config "/dev/nope2"}}}}))
+      "boot-time disk info + live space lookup (settings = the booted slot's config); absent devices read nil")
   (is (= {:type nil :slot nil :storage nil :settings nil} (GET "/api/query/machine/disk"))
       "no ujima disk (a host run) = the shape with honest nils"))
 

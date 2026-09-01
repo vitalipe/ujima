@@ -27,13 +27,14 @@
       (ex-info "Boot slot must be :a or :b" {:expected #{:a :b} :actual ?slot}))))
 
 
-;; 1 control · 2 boot-a · 3 boot-b · 4 ext · 5 root-a · 6 root-b · 7 config · 8 storage
+;; 1 control · 2 boot-a · 3 boot-b · 4 ext · 5 root-a · 6 root-b · 7 config-a · 8 config-b · 9 logs · 10 storage
 (def slot->idx {:a 2 :b 3})
 (def idx->slot {2 :a  3 :b})
 
 
-(def ujima-config-uuid  (format "%08x-%02x" ujima-mbr-disk-id 7))
-(def ujima-storage-uuid (format "%08x-%02x" ujima-mbr-disk-id 8))
+(def ujima-control-uuid (format "%08x-%02x" ujima-mbr-disk-id 1))
+(def ujima-logs-uuid    (format "%08x-%02x" ujima-mbr-disk-id 9))
+(def ujima-storage-uuid (format "%08x-%02x" ujima-mbr-disk-id 10))
 
 
 (def slot->boot-uuid {:a (format "%08x-%02x" ujima-mbr-disk-id 2)
@@ -44,8 +45,12 @@
                       :b (format "%08x-%02x" ujima-mbr-disk-id 6)})
 
 
-;; the disk's identity: a file at the settings-partition root, above the slot
-;; dirs — survives slot installs and board swaps
+(def slot->config-uuid {:a (format "%08x-%02x" ujima-mbr-disk-id 7)
+                        :b (format "%08x-%02x" ujima-mbr-disk-id 8)})
+
+
+;; the disk's identity: a file at the control-partition root, next to
+;; autoboot.txt — survives slot installs and board swaps
 (def ^:private system-disk-id-file "system-disk-id")
 
 
@@ -53,18 +58,11 @@
   (some-> (slurp-text (fs/path root system-disk-id-file) nil) str/trim not-empty))
 
 
-(defn- probe-for-system-disk-id [config-partition]
- (try
-   (with-mounted-ext4 [cfg-mnt config-partition]
-     (read-system-disk-id cfg-mnt))
-   (catch Exception _ nil)))
-
-
 (defn- slot->fstab
-  "Per-slot /etc/fstab for an installed slot: /boot/firmware, the shared settings partition and its
-   per-slot bind onto /ujima/settings (the stable path ujimad reads, so it never knows its slot),
-   plus the shared storage partition mounted directly at /ujima/storage; all by PARTUUID.
-   /mnt/settings (the one path outside /ujima) holds both slot dirs — the bind IS slot selection.
+  "Per-slot /etc/fstab for an installed slot: /boot/firmware, the slot's OWN settings
+   partition mounted directly at /ujima/settings (the stable path ujimad reads, so it
+   never knows its slot — mounting the slot's partition IS slot selection), plus the
+   shared logs and storage partitions; all by PARTUUID.
    Root is NOT listed — the kernel mounts it from the cmdline and overlayroot overlays it
    (read-only lower + tmpfs upper) and rewrites this fstab itself, so a '/' entry would be
    pointless (overlayroot just comments it out) and systemd-remount-fs, which would act on it,
@@ -72,18 +70,23 @@
 
    Settings is a REQUIRED mount (no `nofail`): ujimad is meaningless without it, so a
    missing/corrupt settings partition must halt boot (emergency) rather than silently fall back to
-   the empty rootfs mountpoint and run on defaults. Being required also means systemd's
+   the empty rootfs mountpoint and run on defaults — and per-slot partitions mean it halts only
+   THIS slot; the other slot boots on its own settings. Being required also means systemd's
    local-fs.target guarantees it is mounted before ujimad starts — no mount check in ujimad code.
-   `nofail` stays on boot-firmware/storage — those missing shouldn't brick an otherwise-correct boot."
+   `data=journal`: full data journaling — the partition is tiny and rarely written, so the cost
+   is nothing and a mid-write power cut can't tear a settings file.
+   `nofail` stays on boot-firmware/logs/storage — those missing shouldn't brick an
+   otherwise-correct boot. Logs is shared so a failed slot's journal stays readable
+   from the other slot; journald writes it through the /var/log/journal bind."
   [slot]
-  (str "proc                  /proc           proc  defaults         0  0\n"
-       "PARTUUID=" (slot->boot-uuid slot) "  /boot/firmware  vfat  defaults,nofail  0  2\n"
+  (str "proc                  /proc             proc  defaults              0  0\n"
+       "PARTUUID=" (slot->boot-uuid slot)   "  /boot/firmware    vfat  defaults,nofail       0  2\n"
 
-       "PARTUUID=" ujima-config-uuid      "  /mnt/settings   ext4  defaults         0  2\n"
-       "PARTUUID=" ujima-storage-uuid     "  /ujima/storage  ext4  defaults,nofail  0  2\n"
+       "PARTUUID=" (slot->config-uuid slot) "  /ujima/settings   ext4  noatime,data=journal  0  2\n"
+       "PARTUUID=" ujima-logs-uuid          "  /ujima/logs       ext4  noatime,nofail        0  2\n"
+       "PARTUUID=" ujima-storage-uuid       "  /ujima/storage    ext4  noatime,nofail        0  2\n"
 
-       "/mnt/settings/" (name slot)       "  /ujima/settings none  bind             0  0\n"
-       "/ujima/storage/logs"              "  /var/log/journal none  bind,nofail     0  0\n"))
+       "/ujima/logs/journal   /var/log/journal  none  bind,nofail           0  0\n"))
 
 
 (defn- rootfs-owner
@@ -106,7 +109,7 @@
 
   (ujima-disk-info [{device :device}]
     (when (ujima-ab-partition-layout? device)
-      (let [{:keys [a b config storage control]} (device->partitions-by-name device)]
+      (let [{:keys [a b logs storage control]} (device->partitions-by-name device)]
         (with-mounted-vfat [ctl-mnt control]
           (let [meta-a (pack/install-record (:root a))
                 meta-b (pack/install-record (:root b))]
@@ -115,8 +118,8 @@
               {:device  device
                :type    :ab
                :storage storage
-               :config  config
-               :system-disk-id (probe-for-system-disk-id config)
+               :logs    logs
+               :system-disk-id (read-system-disk-id ctl-mnt)
                :slots   {:a (assoc a :ujima-os meta-a)
                          :b (assoc b :ujima-os meta-b)}
 
@@ -145,8 +148,8 @@
     (require-ab-slot! slot)
     (require-ab-partition-layout! device)
 
-    (let [{cfg-blk :config storage-blk :storage :as parts} (device->partitions-by-name device)
-          {:keys [root boot]}         (get parts slot)]
+    (let [{logs-blk :logs :as parts}          (device->partitions-by-name device)
+          {:keys [root boot] cfg-blk :config} (get parts slot)]
 
       (flow :install-slot
         (<join! 90 (pack/unpack! ujima-pack-path boot root {:slot slot}))
@@ -168,17 +171,16 @@
                   (spit (str (fs/path root-mnt "etc/fstab")) (slot->fstab slot))
                   (rootfs-owner root-mnt "ujima"))]
 
-            ;; this slot's settings subdir, owned by the ujimad user so it can write the device scope
-            ;; through the /ujima/settings bind (a root-owned dir breaks every device-scope write)
+            ;; this slot's own settings partition, its root owned by the ujimad user so it can
+            ;; write the device scope through the /ujima/settings mount (a root-owned dir breaks
+            ;; every device-scope write); lost+found beside the scope files is inert
             (with-mounted-ext4 [cfg-mnt cfg-blk]
-              (let [slot-dir (fs/path cfg-mnt (name slot))]
-                (fs/create-dirs slot-dir)
-                (when ujimad-owner
-                  (sudo$! chown [ujimad-owner] [slot-dir])))))
+              (when ujimad-owner
+                (sudo$! chown [ujimad-owner] [cfg-mnt]))))
 
-          ;; journald logs dir on storage (the /var/log/journal bind source)
-          (with-mounted-ext4 [storage-mnt storage-blk]
-            (fs/create-dirs (fs/path storage-mnt "logs"))))
+          ;; journald journal dir on the shared logs partition (the /var/log/journal bind source)
+          (with-mounted-ext4 [logs-mnt logs-blk]
+            (fs/create-dirs (fs/path logs-mnt "journal"))))
 
         {:slot slot})))
 
@@ -213,18 +215,20 @@
 
   (system-disk-id! [_]
     (require-ab-partition-layout! device)
-    (let [{config :config} (device->partitions-by-name device)]
-      (with-mounted-ext4 [cfg-mnt config]
-        (or (read-system-disk-id cfg-mnt)
+    (let [{control :control} (device->partitions-by-name device)]
+      (with-mounted-vfat [ctl-mnt control]
+        (or (read-system-disk-id ctl-mnt)
             (let [id (str (java.util.UUID/randomUUID))]
-              ;; root-owned partition root; install(1) like pack's manifest write
+              ;; root-owned partition root; install(1) like pack's manifest write.
+              ;; A plain write is right for FAT (no atomic rename): the file is
+              ;; write-once on an otherwise-quiet partition.
               (fs/with-temp-dir [tmp {:prefix "ujima-system-disk-id-"}]
                 (spit (str (fs/path tmp system-disk-id-file)) (str id "\n"))
                 (sudo$! install -m "0644"
                         (fs/path tmp system-disk-id-file)
-                        (fs/path cfg-mnt system-disk-id-file)))
+                        (fs/path ctl-mnt system-disk-id-file)))
               (log/info "system-disk-id stamped" {:id id})
-              id)))))) 
+              id))))))
 
 
 (defrecord AutobootRuntime []

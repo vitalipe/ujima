@@ -43,8 +43,8 @@ version truth; branch names and build labels may disagree.
 - The bar shows the keyboard layouts as a fixed cycle with the current one last, so
   the leftmost is always the one super+space switches to next.
 - Anything an activity has pinned wears a padlock in the bar and cannot be changed there,
-  sound and the keyboard layout alike: the volume slider loses its handle, the layout
-  picker will not open, and when sound is pinned off the volume panel stays shut too.
+  sound and the keyboard layout alike: the volume track greys out, the layout picker will
+  not open, and when sound is pinned off the volume panel stays shut too.
 - Moving the volume unmutes when you let go of the slider, so a machine you muted stays
   silent while you set the level.
 

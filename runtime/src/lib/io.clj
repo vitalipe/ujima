@@ -50,7 +50,15 @@
           tmp  (fs/path dir (str "." (fs/file-name file) ".tmp"))]
 
       (fs/create-dirs dir)
-      (spit (str tmp) text)
+      ;; fsync BEFORE the rename: the move orders the name swap, only a sync
+      ;; orders the data under it — without it a power cut can swap in an empty file
+      (with-open [out (java.nio.channels.FileChannel/open
+                        tmp (into-array java.nio.file.StandardOpenOption
+                                        [java.nio.file.StandardOpenOption/WRITE
+                                         java.nio.file.StandardOpenOption/CREATE
+                                         java.nio.file.StandardOpenOption/TRUNCATE_EXISTING]))]
+        (.write out (java.nio.ByteBuffer/wrap (.getBytes (str text) "UTF-8")))
+        (.force out true))
       (fs/move tmp file {:replace-existing true :atomic-move true})
 
       (slurp-text path))))

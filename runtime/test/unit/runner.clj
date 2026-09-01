@@ -30,6 +30,7 @@
             [ujima.linux.audio-test]
             [ujima.linux.i3-test]
             [ujima.linux.net-test]
+            [ujima.linux.net.wifi-test]
             [ujima.linux.systemd-test]
             [ujima.linux.disk.block-test]
             [ujima.linux.disk.mount-test]
@@ -76,6 +77,7 @@
     ujima.linux.audio-test
     ujima.linux.i3-test
     ujima.linux.net-test
+    ujima.linux.net.wifi-test
     ujima.linux.systemd-test
     ujima.linux.disk.block-test
     ujima.linux.disk.mount-test

@@ -108,8 +108,8 @@
    "system/timezone" #(:effective (control/setting [:system :timezone]))
    "system/clock-ms" #(System/currentTimeMillis)
 
-   "monitor/uptime-minutes" system/uptime-minutes
-   "monitor/messages"       (constantly [])})
+   "health/uptime-minutes" system/uptime-minutes
+   "health/messages"       (constantly [])})
 
 
 (defn endpoints

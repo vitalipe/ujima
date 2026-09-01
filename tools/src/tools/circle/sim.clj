@@ -207,8 +207,8 @@
      "system/timezone" #(effective (m) [:system :timezone])
      "system/clock-ms" #(clock-ms (m))
 
-     "monitor/uptime-minutes" #(quot (- (System/currentTimeMillis) (:booted (m))) 60000)
-     "monitor/messages"       (constantly [])}))
+     "health/uptime-minutes" #(quot (- (System/currentTimeMillis) (:booted (m))) 60000)
+     "health/messages"       (constantly [])}))
 
 
 (defn- update-machine! [addr f & args]

@@ -51,5 +51,5 @@
      [:system   [:map [:name     [:maybe :string]]
                       [:timezone [:maybe :string]]
                       [:clock-ms :int]]]
-     [:monitor  [:map [:uptime-minutes [:maybe :int]]
+     [:health   [:map [:uptime-minutes [:maybe :int]]
                       [:messages [:vector [:map [:type :keyword] [:id :keyword] [:label :string]]]]]]]))

@@ -89,7 +89,7 @@ const sys      = m => m.system  || {};
 const dev      = m => m.device  || {};
 const dsk      = m => m.disk    || {};
 const net      = m => m.net     || {};
-const mon      = m => m.monitor || {};
+const health   = m => m.health  || {};
 const layouts  = m => (m.keyboard && m.keyboard.availableLayouts) || [];
 const locked   = m => !!(m.desktop && m.desktop.locked);
 const fmtUp    = min => min == null ? '—' : `${Math.floor(min/60)}h ${String(min%60).padStart(2,'0')}m`;
@@ -210,7 +210,7 @@ function headGlyphCls(m){
   return glyphCls(m, state);
 }
 function statusText(m){
-  return m.online ? `on · up ${fmtUp(mon(m).uptimeMinutes)}` : 'off';
+  return m.online ? `on · up ${fmtUp(health(m).uptimeMinutes)}` : 'off';
 }
 function renderDetail(){
   const m = byId(cur);
@@ -588,14 +588,14 @@ function refreshSend(key){
 /* ── diagnostics tab ─────────────────────────────────────────────────────── */
 /* checks and log are parked: no gateway/internet probe, no journal lines yet */
 function diagHtml(m){
-  const warns = mon(m).messages || [];
+  const warns = health(m).messages || [];
   return `
   <div class="scard">
     <span class="sc-title">${ic('cpu')}Identity</span>
     <div class="drow"><span class="k">Serial</span><span class="v mono">${esc(dev(m).serial || '—')}</span></div>
     <div class="drow"><span class="k">Image</span><span class="v">${esc((m.image && m.image.version) || '—')} · slot ${esc(dsk(m).slot || '?')}</span></div>
     <div class="drow"><span class="k">Address</span><span class="v mono">${esc(net(m).ip || '—')}</span></div>
-    <div class="drow"><span class="k">Up</span><span class="v">${fmtUp(mon(m).uptimeMinutes)}</span></div>
+    <div class="drow"><span class="k">Up</span><span class="v">${fmtUp(health(m).uptimeMinutes)}</span></div>
     <div class="drow"><span class="k">Storage free</span><span class="v">${fmtFree(dsk(m))}</span></div>
     <div class="drow"><span class="k">Machine time</span><span class="v">${esc((sys(m).now || '').replace('T',' '))}</span></div>
   </div>

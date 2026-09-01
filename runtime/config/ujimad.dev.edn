@@ -12,9 +12,7 @@
  ;; Dev stubs: the daemon's whole command surface (linux/system + linux/audio).
  ;; sudo-wrapped setters are remapped on the WRAPPED command (remap skips `sudo -n`),
  ;; so a :sudo entry would be a no-op — each command is stubbed individually.
- :shell   {:commands {:hostnamectl ["echo"]   ; set-hostname (sudo)
-                      :sed         ["echo"]   ; hostname!'s /etc/hosts line (sudo)
-                      :timedatectl ["echo"]   ; set-timezone (sudo)
+ :shell   {:commands {:timedatectl ["echo"]   ; set-timezone (sudo)
                       :localectl   ["echo"]   ; set-x11-keymap (sudo)
                       :systemctl   ["echo"]   ; reboot / poweroff (sudo)
                       :pactl       ["echo"]   ; audio volume / mute (no sudo)

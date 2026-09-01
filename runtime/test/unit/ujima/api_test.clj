@@ -8,6 +8,7 @@
             [lib.http     :as http]
             [ujima.control      :as control]
             [ujima.linux.system :as system]
+            [ujima.linux.disk   :as disk]
             [ujima.desktop.app  :as desktop]
             [ujima.api          :as api]
             [schema.ujima.settings  :as defs]
@@ -22,7 +23,8 @@
   "One request through the real edge; BODY is json text or nil."
   [method uri body cfg]
   ;; identity: the gate has its own ns and its own tests — these are the shapes
-  (let [app (http/app {:endpoints {"api" (api/endpoints (assoc cfg :gate identity))}
+  (let [cfg (update cfg :slot #(or % (get-in cfg [:disk :boot-slot])))
+        app (http/app {:endpoints {"api" (api/endpoints (assoc cfg :gate identity))}
                        :log (fn [& _])})]
     (app (cond-> {:request-method method :uri uri :query-string "format=edn"}
            body (assoc :body body :raw-body body)))))
@@ -81,7 +83,15 @@
                                                 :slots {:a {:config "/dev/nope2"}}}}))
       "boot-time disk info + live space lookup (settings = the booted slot's config); absent devices read nil")
   (is (= {:type nil :slot nil :storage nil :settings nil} (GET "/api/query/machine/disk"))
-      "no ujima disk (a host run) = the shape with honest nils"))
+      "no ujima disk (a host run) = the shape with honest nils")
+  (is (= {:type :ab :slot :b :storage {:asked "/dev/store"} :settings {:asked "/dev/cfg-b"}}
+         (with-redefs [disk/device->space (fn [d] (when d {:asked d}))]
+           (GET "/api/query/machine/disk"
+                {:disk {:type :ab :boot-slot :a :try-boot-slot :b
+                        :storage "/dev/store"
+                        :slots {:a {:config "/dev/cfg-a"} :b {:config "/dev/cfg-b"}}}
+                 :slot :b})))
+      "a trial boot answers with the RUNNING slot, and settings is that slot's config"))
 
 
 (deftest the-id-is-the-disk-stamp

@@ -55,15 +55,18 @@
                           {:converge-targets [token-events/on-storage!]}))
 
     (let [{system-disk-id :system-disk-id :as disk-info} (ab/ujima-disk-info disk)
-          auth-cfg (merge (get-in env [:api :auth] {})
-                          {:key     (:effective (control/setting [:circle :token]))
-                           :self-id system-disk-id})]
+
+          boot-rt      (device/system->boot-runtime) 
+          auth-cfg     (merge (get-in env [:api :auth] {})
+                              {:key     (:effective (control/setting [:circle :token]))
+                               :self-id system-disk-id})]
 
       (http/listen! (merge api-http
-                           {:endpoints {"api" (api/endpoints {:version (:version deploy)
-                                                              :id      system-disk-id
-                                                              :gate    (auth/->gate auth-cfg)
-                                                              :disk    disk-info})}
+                           {:endpoints {"api" (api/endpoints {:version      (:version deploy)
+                                                              :id           system-disk-id
+                                                              :gate         (auth/->gate auth-cfg)
+                                                              :disk         disk-info
+                                                              :slot         (ab/running-slot boot-rt)})}
                             :log       log/log!
                             :sign      (auth/->sign auth-cfg)})))
 

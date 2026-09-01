@@ -14,6 +14,12 @@
     (autoboot/->disk {:device dev})))
 
 
+(defn system->boot-runtime
+  "How this machine boots, over the disk it booted from."
+  []
+  (autoboot/->boot-runtime (system->disk)))
+
+
 (defn init!
   "Machine reality, converged ONCE at start: the disk's first-boot id stamp. The
    hostname is NOT here — the initramfs hook derives it from the board serial before

@@ -74,16 +74,17 @@
 (defn machine-nodes
   "The open machine tier, one node per source. A var, not a literal inside endpoints, so
    the sim can hold its fake tier to this one's shape."
-  [{:keys [version id] system-disk :disk}]
+  [{:keys [version id slot] system-disk :disk}]
   {"schema"   (constantly 1)
    "id"       (constantly id)
    "device"   (fn [] {:serial (devicetree/serial)
                       :model  (devicetree/model)})
    "image"    (constantly {:version version})
+   
    "disk"     (fn [] {:type     (:type system-disk)
-                      :slot     (:boot-slot system-disk)
+                      :slot     slot
                       :storage  (disk/device->space (:storage system-disk))
-                      :settings (disk/device->space (get-in system-disk [:slots (:boot-slot system-disk) :config]))})
+                      :settings (disk/device->space (get-in system-disk [:slots slot :config]))})
 
    "desktop/locked"  #(desktop/locked?)
    "desktop/mode"    #(desktop/mode-state)

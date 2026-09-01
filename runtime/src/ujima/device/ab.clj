@@ -62,13 +62,19 @@
 
 (defprotocol UjimaBootRuntime
 
+  "How THIS machine boots — over its own disk."
+
 
   (try-boot! [this]
     "Reboot into currently set try-boot slot.")
 
 
-  (in-try-boot? [this]
-    "Returns true if booted in try-boot mode"))
+  (running-slot [this]
+    "The slot this machine is RUNNING from — a trial boot is not :boot-slot.")
+
+
+  (trial-boot? [this]
+    "Whether the running slot is one the disk has not committed to."))
 
 
 ;; nil is not a valid system disk, so the info READ answers nil (per its

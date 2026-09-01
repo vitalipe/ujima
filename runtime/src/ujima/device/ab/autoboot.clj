@@ -12,7 +12,8 @@
 
     [ujima.pack :as pack]
 
-    [ujima.device.ab                     :refer [UjimaSystemDisk UjimaBootRuntime]]
+    [ujima.device.ab                     :refer [UjimaSystemDisk UjimaBootRuntime
+                                                 ujima-disk-info]]
     [ujima.device.ab.autoboot.bootfiles  :as autoboot]
     [ujima.device.ab.autoboot.partitions :refer [ujima-mbr-disk-id
                                                  device->partitions-by-name
@@ -231,22 +232,38 @@
               id))))))
 
 
-(defrecord AutobootRuntime []
+(def ^:private tryboot-flag "/proc/device-tree/chosen/bootloader/tryboot")
+
+
+(defn- uncommitted-trial?
+  ;; the flag survives the commit that clears :try-boot-slot, so neither decides alone
+  [disk-info]
+  (boolean (and (:try-boot-slot disk-info)
+                (not (zero? (file->uint-be tryboot-flag))))))
+
+
+(defrecord AutobootRuntime [system-disk-info]
 
   UjimaBootRuntime
 
   (try-boot! [_]
-    ;; ONE argument — the firmware parses "0 tryboot"; two args is reboot(8)'s
-    ;; "Too many arguments." (found on first real invocation)
+    ;; ONE argument — the firmware parses "0 tryboot"
     (sudo$! reboot "0 tryboot"))
 
-  (in-try-boot? [_]
-    (not (zero? (file->uint-be "/proc/device-tree/chosen/bootloader/tryboot")))))
+
+  (trial-boot? [_]
+    (uncommitted-trial? system-disk-info))
+
+
+  (running-slot [_]
+    (if (uncommitted-trial? system-disk-info)
+      (:try-boot-slot system-disk-info)
+      (:boot-slot system-disk-info))))
 
 
 (defn ->disk [{:keys [device]}]
   (->AutobootDisk device))
 
 
-(defn ->boot-runtime []
-  (->AutobootRuntime))
+(defn ->boot-runtime [disk]
+  (->AutobootRuntime (ujima-disk-info disk)))

@@ -18,7 +18,6 @@
 
             [ujima.device    :as device]
             [ujima.device.ab :as ab]
-            [ujima.device.ab.autoboot :as autoboot]
             [ujima.device.ab.autoboot.partitions :as partitions]))
 
 
@@ -27,34 +26,23 @@
       (throw (ex-info "this machine has no ujima A/B disk — nothing to upgrade" {}))))
 
 
-(defn- running-slot
-  "The slot this machine is RUNNING from — during a trial boot that is NOT :boot-slot. The
-   `and` matters: after a commit :try-boot-slot is cleared while the firmware flag is not."
-  [disk-info]
-  (if (and (ab/in-try-boot? (autoboot/->boot-runtime)) (:try-boot-slot disk-info))
-    (:try-boot-slot disk-info)
-    (:boot-slot disk-info)))
-
-
 (defn- target-slot
-  "The slot to write. Refuses inside an UNCOMMITTED trial boot — the state written FROM
-   evaporates at the next reboot. The firmware flag alone cannot decide: it stays 1 for
-   the whole boot even after a commit, so trial = the same `and` as running-slot."
-  [disk-info]
-  (when (and (ab/in-try-boot? (autoboot/->boot-runtime)) (:try-boot-slot disk-info))
+  "The slot to write — refused inside a trial boot, which evaporates at the next reboot."
+  [rt]
+  (when (ab/trial-boot? rt)
     (throw (ex-info "this machine is running a TRIAL boot — commit it or reboot to fall back"
                     {})))
-  (if (= :a (running-slot disk-info)) :b :a))
+  (if (= :a (ab/running-slot rt)) :b :a))
 
 
 (defn info
   "What is running and what each slot holds."
   []
   (let [disk (require-disk!)
-        i    (ab/ujima-disk-info disk)]
-    {:running-slot (running-slot i)
-     :in-try-boot? (ab/in-try-boot? (autoboot/->boot-runtime))
-     :disk         i}))
+        rt   (device/system->boot-runtime)]
+    {:running-slot (ab/running-slot rt)
+     :trial-boot?  (ab/trial-boot? rt)
+     :disk         (ab/ujima-disk-info disk)}))
 
 
 (defn install!
@@ -65,7 +53,7 @@
   (when-not (fs/exists? pack)
     (throw (ex-info (str "pack not found: " pack) {:pack (str pack)})))
   (let [disk   (require-disk!)
-        target (target-slot (ab/ujima-disk-info disk))]
+        target (target-slot (device/system->boot-runtime))]
     (flow :install
       (<join! 100 (ab/install-into-slot! disk pack target))
       {:slot target :pack (str pack)})))
@@ -135,7 +123,7 @@
     (throw (ex-info "settings to carry must be a non-empty vector" {})))
 
   (let [disk   (require-disk!)
-        target (target-slot (ab/ujima-disk-info disk))]
+        target (target-slot (device/system->boot-runtime))]
     (with-slot-chroot [root-mnt disk target]
       (let [{:keys [ok? out err]} (sudo$? {:in (pr-str entries)}
                                           chroot [root-mnt] "/usr/local/bin/ujimactl"
@@ -155,14 +143,15 @@
   []
   (shell/require-root!)
   (let [disk   (require-disk!)
+        rt     (device/system->boot-runtime)
         i      (ab/ujima-disk-info disk)
-        target (target-slot i)]
+        target (target-slot rt)]
     (when-not (get-in i [:slots target :ujima-os])
       (throw (ex-info (str "slot " (name target) " carries no install record — refusing to "
                            "try-boot into a slot with nothing in it")
                       {:slot target})))
     (ab/set-try-boot-slot! disk target)
-    (ab/try-boot! (autoboot/->boot-runtime))
+    (ab/try-boot! rt)
     target))
 
 
@@ -171,6 +160,6 @@
   []
   (shell/require-root!)
   (let [disk    (require-disk!)
-        running (running-slot (ab/ujima-disk-info disk))]
+        running (ab/running-slot (device/system->boot-runtime))]
     (ab/set-boot-slot! disk running)
     running))

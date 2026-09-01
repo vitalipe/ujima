@@ -48,6 +48,10 @@ version truth; branch names and build labels may disagree.
 - Moving the volume unmutes when you let go of the slider, so a machine you muted stays
   silent while you set the level.
 
+- The Console finds machines two ways: one that announces itself on the network appears
+  in about a second, and the subnet sweep still runs behind it — so a class fills in
+  promptly even where an access point throttles the sweep.
+
 ### Fixed
 
 - A machine answers to its own name on the network. Every machine used to announce

@@ -1,0 +1,24 @@
+<?xml version="1.0" standalone='no'?><!--*-nxml-*-->
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+
+<!-- managed by the ujima image build — source: os/pipeline/runtime/avahi/ujima.service
+
+     The circle advert. avahi publishes it as soon as it starts, so a machine is findable
+     the moment it joins rather than when a console next sweeps for it.
+
+     %h is avahi's own host-name wildcard, and the initramfs hook derives that per board
+     (base/identity/ujima-identity) — so this one identical file names a distinct machine
+     everywhere. Before that hook existed every machine's %h was the baked placeholder and
+     this file would have advertised the same name circle-wide.
+
+     The port below is substituted at build time from [:api :http :port] in
+     runtime/config/ujimad.edn — the same value ujimad binds, so the advertised port cannot
+     drift from the real one. (Mind the placeholder: the build seds it, so spell it once.) -->
+
+<service-group>
+  <name replace-wildcards="yes">%h</name>
+  <service>
+    <type>_ujima._tcp</type>
+    <port>%%PORT%%</port>
+  </service>
+</service-group>

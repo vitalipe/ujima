@@ -1,19 +1,22 @@
 (ns console.circle
   "Who is out there, what each machine is doing, and where a verb becomes a request.
 
-   Discovery is a sweep — at startup, on a cadence while the console is open,
-   and when a person asks. It only ever adds:
-   a machine that stops answering keeps its last tree and reads offline, so a class
-   list never thins out mid-lesson. Only a person removes one. Nothing persists."
+   Discovery is two passes — what announced itself over mDNS, then the subnet sweep —
+   at startup, on a cadence while the console is open, and when a person asks. It only
+   ever adds: a machine that stops answering keeps its last tree and reads offline, so a
+   class list never thins out mid-lesson. Only a person removes one. Nothing persists."
   (:require [clojure.string :as str]
             [console.api    :as api]
-            [lib.task       :as task])
+            [lib.task       :as task]
+            [ujima.linux.net.mdns :as mdns])
   (:import  [java.time LocalDateTime ZoneId]))
 
 
 (def ^:private poll-ms   2000)
 (def ^:private in-flight 256)   ;; a /24 in one wave — measured 3s on a classroom AP, 8s at 64
 (def ^:private background-scan-ms 45000)   ;; an unasked-for machine appears within the minute, unasked
+
+(def ^:private mdns-service "_ujima._tcp")   ;; what a ujima machine publishes about itself
 
 
 (defonce ^:private cfg*    (atom {}))    ;; :key, :self-addr
@@ -76,26 +79,49 @@
 (defn- adopt! [id addr]
   (swap! roster* update id merge {:addr addr :online true}))
 
+(defn- probe-all
+  "Probe ADDRS, twice for the silent — a dropped probe is a missing machine."
+  [key addrs]
+  (let [probe  (fn [addr] [addr (api/probe key addr)])
+        once   (in-waves probe addrs)
+        silent (for [[addr r] once :when (= :noreply (:status r))] addr)]
+    (concat (remove (fn [[_ r]] (= :noreply (:status r))) once)
+            (in-waves probe silent))))
+
+(defn- adopt-answers!
+  "Take what verified, and pull its tree — found is drawable. Keyed by id, not address:
+   one machine can answer on several of them (mDNS lists every interface it publishes
+   on), and it is still one machine. First address wins."
+  [answers]
+  (let [ours    (reduce (fn [acc [addr r]]
+                          (let [id (:id (:data r))]
+                            (if (or (not= :ok (:status r)) (contains? acc id))
+                              acc
+                              (assoc acc id addr))))
+                        {} answers)
+        foreign (count (filter (fn [[_ r]] (= :auth/bad-response (:reason (:data r)))) answers))]
+    (locking lock
+      (doseq [[id addr] ours] (adopt! id addr)))
+    (doall (in-waves refresh! (keys ours)))
+    {:found (count ours) :foreign foreign}))
+
 (defn- sweep!
-  "Probe the subnet, twice for the silent — a dropped probe is a missing machine."
+  "The announced first, then the subnet. mDNS costs one multicast query and answers in
+   about a second, so a machine reaches the roster while an AP that throttles the wave
+   below — 256 connections walking sequential addresses looks like a port scan — is still
+   chewing on it. The sweep is not redundant: it is what finds a machine on a network that
+   drops multicast, and it reaches addresses nothing announced."
   []
   (let [{:keys [key self-addr]} @cfg*
-        {:keys [id ip prefix]}  (our-network key self-addr)]
+        {:keys [id ip prefix]}  (our-network key self-addr)
+        heard                   (mdns/browse mdns-service)]
     (when id (reset! self* id))
-    (if-not ip
-      {:found 0 :foreign 0 :reason :no-network}
-      (let [probe   (fn [addr] [addr (api/probe key addr)])
-            once    (in-waves probe (hosts ip prefix))
-            silent  (for [[addr r] once :when (= :noreply (:status r))] addr)
-            answers (concat (remove (fn [[_ r]] (= :noreply (:status r))) once)
-                            (in-waves probe silent))
-            ours    (for [[addr r] answers :when (= :ok (:status r))] [addr (:id (:data r))])
-            foreign (count (filter (fn [[_ r]] (= :auth/bad-response (:reason (:data r)))) answers))]
-        (locking lock
-          (doseq [[addr id] ours] (adopt! id addr)))
-        ;; found is drawable: pull the trees now
-        (doall (in-waves refresh! (map second ours)))
-        {:found (count ours) :foreign foreign}))))
+    (cond-> (merge-with +
+              (adopt-answers! (probe-all key heard))
+              (if ip
+                (adopt-answers! (probe-all key (remove (set heard) (hosts ip prefix))))
+                {:found 0 :foreign 0}))
+      (nil? ip) (assoc :reason :no-network))))
 
 
 (defn- ->scan-task []

@@ -12,9 +12,20 @@
 
    `project` is the read-only repo bind inside the chroot (default /ujima-src)."
   (:require [lib.shell :refer [$! with-console-out]]
+            [clojure.edn :as edn]
             [babashka.fs :as fs]
             [build.files :as files]
             [build.schema :as schema]))
+
+
+(defn- api-port
+  "The port ujimad binds, read from the config this stage ships — so the mDNS advert
+   below cannot name a port the daemon isn't on."
+  [project]
+  (-> (slurp (str project "/runtime/config/ujimad.edn"))
+      (edn/read-string)
+      (get-in [:api :http :port])
+      (or (throw (ex-info "ujimad.edn names no [:api :http :port]" {})))))
 
 
 (defn run! [{:keys [project]}]
@@ -31,6 +42,12 @@
       ;; the entry points over this layout, deployed with the code they launch
       (files/install! project "runtime/bin/ujimad"   "/usr/local/bin/ujimad")
       (files/install! project "runtime/bin/ujimactl" "/usr/local/bin/ujimactl")
+
+      ;; the mDNS advert for the api this stage just deployed — avahi picks the file up on
+      ;; its own, so a machine announces itself at boot instead of waiting to be swept for
+      (let [advert "/etc/avahi/services/ujima.service"]
+        (files/install! project "runtime/avahi/ujima.service" advert)
+        ($! sed -i (str "s/%%PORT%%/" (api-port project) "/") [advert]))
 
       ;; the catalogs gate: this rootfs must match the pinned tz/xkb lists exactly
       (println "catalogs" (schema/verify! "/"))

@@ -13,7 +13,7 @@
 
 (defn- fresh! []
   (let [dir (str (fs/create-temp-dir))]
-    (control/init! {:storage dir :tmp dir :converge-targets []})
+    (control/init! {:storage dir :tmp dir})
     dir))
 
 (defn- value [key] (:effective (control/setting key)))

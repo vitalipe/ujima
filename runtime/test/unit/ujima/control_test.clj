@@ -7,15 +7,16 @@
 
 
 ;; Full control-plane loop against real temp files. Control is a pure settings
-;; machine — no OS stubs needed; converge ports are whatever :converge-targets
-;; the test passes (none, unless it's testing the notification itself).
+;; machine — no OS stubs needed; converge ports are whatever the test attaches
+;; with on-converge! (none, unless it's testing the notification itself).
 
 
 (defn- fresh!
   ([] (fresh! []))
   ([targets]
    (let [dir (str (fs/create-temp-dir))]
-     (control/init! {:storage dir :tmp dir :converge-targets targets})
+     (control/init! {:storage dir :tmp dir})
+     (doseq [t targets] (control/on-converge! t))
      dir)))
 
 (defn- device-file [dir] (str dir "/device.edn"))

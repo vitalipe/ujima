@@ -26,14 +26,21 @@
 (declare handle-event! ->Multi)
 
 
-(defn init! [{:keys [catalog converge-targets] :as cfg}]
+(defn init! [{:keys [catalog] :as cfg}]
   (catalog/init! catalog)
   (reset! prev*     nil)
   (reset! state*    (->Multi))
   (reset! relaunch* 0)
-  (reset! targets*  (vec converge-targets))
+  (reset! targets*  [])
   (act/init! (select-keys cfg [:open-web-app-bin :serve-web-app-bin]))
   catalog)
+
+
+(defn on-converge!
+  "Attach a target: F gets (snapshot, previous) after every pass."
+  [f]
+  (swap! targets* conj f)
+  nil)
 
 
 (defn catalog-listing [] (catalog/listing (catalog/current)))

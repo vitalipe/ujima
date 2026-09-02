@@ -17,7 +17,7 @@
 ;; the stick is only a token when its key is the one THIS machine holds
 (defn- circle-holds! [token]
   (let [dir (str (fs/create-temp-dir))]
-    (control/init! {:storage dir :tmp dir :converge-targets []})
+    (control/init! {:storage dir :tmp dir})
     (control/settings! :circle [:circle :token] token)))
 
 (use-fixtures :each (fn [run] (circle-holds! "abc") (run)))

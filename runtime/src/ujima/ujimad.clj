@@ -5,7 +5,6 @@
             [ujima.device         :as device]
             [ujima.device.ab      :as ab]
             [ujima.control        :as control]
-            [ujima.linux.converge :as linux]
             [lib.shell :as shell]
 
             [lib.http       :as http]
@@ -13,13 +12,11 @@
             [ujima.api.auth :as auth]
 
             [ujima.desktop          :as desktop]
-            [ujima.desktop.eww      :as eww]
             [ujima.desktop.http     :as shell-http]
             [ujima.desktop.http.converge :as shell-http-converge]
             [ujima.desktop.app      :as app]
             [ujima.desktop.app.catalog.loader :as loader]
             [ujima.storage          :as storage]
-            [ujima.events.token     :as token-events]
             [ujima.events           :as events]))
 
 
@@ -41,18 +38,15 @@
 
     (device/init! disk)   ; machine reality first: the disk stamp
 
+    ;; the planes; events/init! connects them
     (shell-http-converge/init!)
-    (control/init!     (merge (get-in env [:control] {})
-                              {:converge-targets [linux/converge! shell-http-converge/converge-ui!]}))
+    (control/init! (get-in env [:control] {}))
     (desktop/await-x!)
-    (control/converge-fresh!)
 
     (app/init! (merge (select-keys app-cfg [:open-web-app-bin :serve-web-app-bin])
-                      {:catalog app-catalog :converge-targets [shell-http-converge/converge-apps! eww/converge!]}))
+                      {:catalog app-catalog}))
 
-    ;; the console follows a circle token on removable storage
-    (storage/init! (merge (get-in env [:storage] {})
-                          {:converge-targets [token-events/on-storage!]}))
+    (storage/init! (get-in env [:storage] {}))
 
     (let [{system-disk-id :system-disk-id :as disk-info} (ab/ujima-disk-info disk)
 
@@ -74,8 +68,11 @@
                          {:endpoints {"ujima-desktop" (shell-http/endpoints ui-http)}
                           :log       log/log!}))
 
-    ;; the taps, last: a handler may touch any surface above — the console needs /api serving
+    ;; every arrow, last: handlers need /api serving
     (events/init! (get-in env [:events] {}))
+
+    ;; the boot converge, ports attached
+    (control/converge-fresh!)
 
     (try
       (desktop/init!! (get-in env [:desktop] {}))

@@ -72,8 +72,8 @@
   (reset! world*  {:wins wins :focused-ws focused-ws :scopes scopes})
   (reset! fx*     [])
   (reset! pushed* [])
-  (app/init! {:catalog          test-catalog
-              :converge-targets [(fn [next _] (swap! pushed* conj next))]}))
+  (app/init! {:catalog test-catalog})
+  (app/on-converge! (fn [next _] (swap! pushed* conj next))))
 
 (defn- stubbed [f]
   (with-redefs [i3/get-tree!          (fn [] (tree (:wins @world*)))

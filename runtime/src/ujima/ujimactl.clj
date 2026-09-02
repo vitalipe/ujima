@@ -23,9 +23,8 @@
 
 (defn- init-control! []
   (let [cfg (io/slurp-config "config" "ujimad")]
-    (control/init! {:storage          (get-in cfg [:control :storage])
-                    :tmp              (get-in cfg [:control :tmp])
-                    :converge-targets []})))
+    (control/init! {:storage (get-in cfg [:control :storage])
+                    :tmp     (get-in cfg [:control :tmp])})))
 
 
 (defn export!

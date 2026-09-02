@@ -2,8 +2,9 @@
   "Per-app systemd --user scopes: the process-liveness + kill handle. The i3 tree owns identity
    and display; a scope only answers 'is this app's family alive?' and 'kill it.' Unit names are
    launch-unique (<id>-<millis>) so a relaunch never collides with a still-deactivating unit."
-  (:require [clojure.string :as str]
-            [lib.shell :as shell]))
+  (:require [clojure.core.async :as async]
+            [clojure.string     :as str]
+            [lib.shell          :as shell]))
 
 
 (def ^:private prefix "ujima-app-")
@@ -68,14 +69,15 @@
 
 
 (defn watch-scopes!
-  "Poll live scopes every interval; call (EMIT {:type :scope/died :app-id X}) for any app whose
-   scope disappeared. Pure event source — the crash/self-quit go-home backstop; holds only its
-   own previous snapshot."
-  [{:keys [interval-ms emit] :or {interval-ms 1000}}]
-  (future
-    (loop [prev #{}]
-      (let [cur (try (live-app-ids) (catch Throwable _ prev))]
-        (doseq [id prev :when (not (contains? cur id))]
-          (emit {:type :scope/died :app-id id}))
-        (Thread/sleep (long interval-ms))
-        (recur cur)))))
+  "Poll live scopes; emit {:type :scope/died :app-id X} for each that vanished. Fixed
+   buffer: every death matters."
+  [{:keys [interval-ms] :or {interval-ms 1000}}]
+  (let [ch (async/chan 64)]
+    (async/thread
+      (loop [prev #{}]
+        (let [cur (try (live-app-ids) (catch Throwable _ prev))]
+          (doseq [id prev :when (not (contains? cur id))]
+            (async/>!! ch {:type :scope/died :app-id id}))
+          (Thread/sleep (long interval-ms))
+          (recur cur))))
+    ch))

@@ -17,7 +17,7 @@
 
 (defn- fresh! []
   (let [dir (str (fs/create-temp-dir))]
-    (control/init! {:storage dir :tmp dir :converge-targets []})))
+    (control/init! {:storage dir :tmp dir})))
 
 (defn- call
   "One request through the real edge; BODY is json text or nil."

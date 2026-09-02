@@ -1,7 +1,7 @@
 (ns ujima.control
   "Control plane for the appliance: a pure settings machine — scopes, merge,
    persistence — that notifies its converge targets (the OS port, the GUI port;
-   passed at init! by ujima.ujimad) after every converge. It knows no port."
+   attached by ujima.events via on-converge!) after every converge. It knows no port."
 
   (:require [lib.util    :refer [index-by map-vals map-kv-vals]]
             [babashka.fs :refer [path]]
@@ -57,16 +57,9 @@
 
 
 (defn init!
-  "`:converge-targets` is the fixed set of ports this machine drives (the OS
-   port, the GUI port, …): each is called with (effective, previous-effective)
-   after EVERY converge, INSIDE the critical section — strictly ordered, in
-   vector order. previous is nil on external converges (boot, udev): assume
-   nothing, everything may have changed. The contract that keeps this safe:
-   targets are few, fast, one-way (ujima -> world), and NEVER write settings
-   (that recurses the converge). A target's failure is logged and never breaks
-   the converge itself."
-  [{storage :storage tmp :tmp targets :converge-targets}]
-  (reset! targets* (vec targets))
+  "A fresh machine: registry + scope files; ports come by on-converge!."
+  [{storage :storage tmp :tmp}]
+  (reset! targets* [])
   (reset! registry* (->registry {:settings defs/settings
                                  :scopes   defs/scopes}))
   (reset! storage* (->> defs/scopes
@@ -74,6 +67,14 @@
                      (map-vals :persist?)
                      (map-vals {true storage false tmp})
                      (map-kv-vals (fn [k v] (path v (str (name k) ".edn")))))))
+
+
+(defn on-converge!
+  "Attach a port: F gets (effective, previous) after every converge, inside the lock,
+   in attach order; previous is nil on external converges. Ports never write settings."
+  [f]
+  (swap! targets* conj f)
+  nil)
 
 
 (defn settings

@@ -23,7 +23,7 @@
 
 (defonce ^:private partitions* (atom {}))   ; uuid -> {:facts f :task t}
 (defonce ^:private prev*       (atom nil))  ; last projection, the prev of (next prev)
-(defonce ^:private cfg*        (atom {}))   ; :mounts-dir :targets — set once by init!
+(defonce ^:private cfg*        (atom {}))   ; :mounts-dir by init!, :targets by on-converge!
 (defonce ^:private lock        (Object.))   ; every write path holds this
 
 
@@ -161,14 +161,20 @@
       (doseq [m mounts] (release-mount! (str m))))))
 
 
-(defn init! [{:keys [mounts-dir converge-targets]}]
+(defn init! [{:keys [mounts-dir]}]
   (let [mounts-dir (or mounts-dir default-mounts-dir)]
     (reset! partitions* {})
     (reset! prev*       nil)
-    (reset! cfg*        {:mounts-dir mounts-dir
-                         :targets    (vec converge-targets)})
+    (reset! cfg*        {:mounts-dir mounts-dir :targets []})
     (release-all-mounts! mounts-dir)
     nil))
+
+
+(defn on-converge!
+  "Attach a target: F gets (next, prev) after every pass, under the lock."
+  [f]
+  (swap! cfg* update :targets conj f)
+  nil)
 
 
 (defn snapshot [] (or @prev* []))

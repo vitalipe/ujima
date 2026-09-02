@@ -53,6 +53,10 @@
   [{:keys [audio-poll-ms scope-poll-ms clock-save-ms]
     :or   {audio-poll-ms 1000 scope-poll-ms 1000 clock-save-ms 600000}}]
 
+  
+  (log/info "starting event listeners")
+
+
   ;; settings -> OS, UI
   (control/on-converge! linux/converge!)
   (control/on-converge! shell-http-converge/converge-ui!)
@@ -63,8 +67,6 @@
 
   ;; circle token on a stick -> console
   (storage/on-converge! token-events/on-storage!)
-
-  (log/info "starting event listeners")
 
   ;; plugged sinks -> [:audio :active]
   (listen! :audio-sinks

@@ -57,6 +57,8 @@ version truth; branch names and build labels may disagree.
   filling the disk can no longer squeeze the journal out. Settings and logs stop on the
   first filesystem error rather than writing on; the machine id moved to the control
   partition. Disks installed with the old layout must be re-installed.
+- The Console rescans the circle each time its home screen opens, so a machine that was
+  still coming up during the first sweep appears on its own instead of waiting for Rescan.
 
 ### Fixed
 

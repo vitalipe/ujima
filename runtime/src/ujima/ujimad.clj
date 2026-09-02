@@ -48,6 +48,10 @@
 
     (storage/init! (get-in env [:storage] {}))
 
+    ;; every arrow, then the boot converge — before anything serves
+    (events/init! (get-in env [:events] {}))
+    (control/converge-fresh!)
+
     (let [{system-disk-id :system-disk-id :as disk-info} (ab/ujima-disk-info disk)
 
           boot-rt      (device/system->boot-runtime) 
@@ -67,12 +71,6 @@
     (http/listen! (merge ui-http
                          {:endpoints {"ujima-desktop" (shell-http/endpoints ui-http)}
                           :log       log/log!}))
-
-    ;; every arrow, last: handlers need /api serving
-    (events/init! (get-in env [:events] {}))
-
-    ;; the boot converge, ports attached
-    (control/converge-fresh!)
 
     (try
       (desktop/init!! (get-in env [:desktop] {}))

@@ -16,39 +16,53 @@
 
 (defn- a-mount-with [filename content]
   (let [dir (str (fs/create-temp-dir))]
-    (when filename (spit (str (fs/path dir filename)) content))
+    (when filename
+      (fs/create-dirs (fs/path dir "ujima"))
+      (spit (str (fs/path dir "ujima" filename)) content))
     dir))
 
 
 ;; --- sweep ------------------------------------------------------------------
 
 (deftest a-marker-is-reported-with-its-parsed-value
-  (is (= [{:type :circle/secret :value {:key "abc" :circle "room-1"}}]
-         (sweep (a-mount-with ".ujima-admin-token"
+  (is (= {:circle/secret {:key "abc" :circle "room-1"}}
+         (sweep (a-mount-with "circle.json"
                               (json/generate-string {:key "abc" :circle "room-1"}))))))
 
 
-(deftest a-stick-without-markers-reports-nothing
-  (is (= [] (sweep (a-mount-with nil nil))))
-  (is (= [] (sweep (a-mount-with "holiday.jpg" "not a marker")))))
+(deftest a-pack-registration-is-a-token-like-any-other
+  (is (= {:ujima/pack {:pack "cool-game.pack" :label "Cool Game"}}
+         (sweep (a-mount-with "install.json"
+                              (json/generate-string {:pack  "cool-game.pack"
+                                                     :label "Cool Game"}))))
+      "the token is the data — whether the pack path exists is the install verb's question"))
+
+
+(deftest a-stick-without-the-ujima-dir-reports-nothing
+  (is (= {} (sweep (a-mount-with nil nil)))
+      "no ujima/ dir — the one stat that gates everything")
+  (let [dir (str (fs/create-temp-dir))]
+    (spit (str (fs/path dir "circle.json")) "{}")
+    (is (= {} (sweep dir))
+        "marker names at the mount ROOT are not markers — the clean cut from v0.4")))
 
 
 (deftest an-unreadable-marker-still-reports-itself
-  (is (= [{:type :circle/secret :value nil}]
-         (sweep (a-mount-with ".ujima-admin-token" "{not json")))
+  (is (= {:circle/secret nil}
+         (sweep (a-mount-with "circle.json" "{not json")))
       "presence is the finding — 'there is a token here and it is junk' beats silence"))
 
 
 (deftest an-absurd-marker-is-not-slurped
-  (let [dir (a-mount-with ".ujima-admin-token" (apply str (repeat 70000 "x")))]
-    (is (= [{:type :circle/secret :value nil}] (sweep dir))
+  (let [dir (a-mount-with "circle.json" (apply str (repeat 70000 "x")))]
+    (is (= {:circle/secret nil} (sweep dir))
         "over the cap the value is dropped — a 4GB file must never reach the daemon's heap")))
 
 
 (deftest a-directory-named-like-a-marker-is-not-a-marker
   (let [dir (str (fs/create-temp-dir))]
-    (fs/create-dirs (fs/path dir ".ujima-admin-token"))
-    (is (= [] (sweep dir)))))
+    (fs/create-dirs (fs/path dir "ujima" "circle.json"))
+    (is (= {} (sweep dir)))))
 
 
 ;; --- state derivation -------------------------------------------------------
@@ -71,10 +85,10 @@
 
 (deftest a-mounted-entry-carries-the-task-result
   (let [facts {:uuid "U" :disk "sda" :fstype "vfat"}
-        t     (doto (flow :t {:mount "/ujima/run/storage/U" :tokens [{:type :circle/secret}]})
+        t     (doto (flow :t {:mount "/ujima/run/storage/U" :tokens {:circle/secret {:key "abc"}}})
                 (task/run!!))]
     (is (= {:uuid "U" :disk "sda" :fstype "vfat" :state :mounted
-            :mount "/ujima/run/storage/U" :tokens [{:type :circle/secret}]}
+            :mount "/ujima/run/storage/U" :tokens {:circle/secret {:key "abc"}}}
            (->entry {:facts facts :task t})))))
 
 

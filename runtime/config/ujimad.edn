@@ -6,6 +6,8 @@
 
  :storage {:mounts-dir "/ujima/run/storage"}
 
+ :files   {:local "/ujima/storage/files"}
+
  :events  {:audio-poll-ms 1000
            :clock-save-ms 600000}
 

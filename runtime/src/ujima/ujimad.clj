@@ -39,7 +39,7 @@
     (device/init! disk)   ; machine reality first: the disk stamp
 
     ;; the planes; events/init! connects them
-    (shell-http-converge/init!)
+    (shell-http-converge/init! {:files-local (get-in env [:files :local])})
     (control/init! (get-in env [:control] {}))
     (desktop/await-x!)
 

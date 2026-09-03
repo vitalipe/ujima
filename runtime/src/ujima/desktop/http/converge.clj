@@ -47,15 +47,42 @@
              (sort-by #(pinned-app-order (:id %) 99)))})
 
 
-(defn converge-ui!   [settings _prv] (ndjson/publish! :ui/state (settings->ui settings @serial-tail)))
-(defn converge-apps! [snapshot _prv] (ndjson/publish! :ui/apps  (apps->ui snapshot)))
+;; --- places: the file model's projection ------------------------------------
+;; storage's raw partitions + the one :local place. :places never leaves the
+;; machine; shares join the blob when shares exist.
 
-(defn stream-ui   [req] (ndjson/subscribe! :ui/state req))
-(defn stream-apps [req] (ndjson/subscribe! :ui/apps  req))
+(def ^:private local-mount* (atom nil))
+
+(defn- entry->place [{:keys [uuid state mount label fstype tokens reason]}]
+  (let [state ({:mounted :ready :detected :mounting} state state)]
+    (cond-> {:id [:usb uuid] :kind :usb :state state :label label :fstype fstype}
+      (= :ready   state) (assoc :mount  mount   ; type names only — values never leave the
+                                :tokens (->> (keys tokens)   ; plane; "ns/name" strings because
+                                             (map #(str (symbol %)))  ; the encoder drops kw namespaces
+                                             (sort)
+                                             (vec)))
+      (= :invalid state) (assoc :reason reason))))
+
+(defn places->ui
+  "Storage entries -> the places blob. This is the wire contract."
+  [entries local-mount]
+  {:places (into [{:id [:local "files"] :kind :local :state :ready :mount local-mount}]
+                 (map entry->place entries))})
+
+
+(defn converge-ui!     [settings _prv] (ndjson/publish! :ui/state (settings->ui settings @serial-tail)))
+(defn converge-apps!   [snapshot _prv] (ndjson/publish! :ui/apps  (apps->ui snapshot)))
+(defn converge-places! [entries  _prv] (ndjson/publish! :ui/places (places->ui entries @local-mount*)))
+
+(defn stream-ui    [req] (ndjson/subscribe! :ui/state req))
+(defn stream-apps  [req] (ndjson/subscribe! :ui/apps  req))
+(defn stream-places [req] (ndjson/subscribe! :ui/places req))
 
 
 (defn init!
   "Declare the topics before anything serves or converges."
-  []
+  [{:keys [files-local]}]
+  (reset! local-mount* files-local)
   (ndjson/topic! :ui/state)
-  (ndjson/topic! :ui/apps {:running [] :pinned [] :current nil}))
+  (ndjson/topic! :ui/apps  {:running [] :pinned [] :current nil})
+  (ndjson/topic! :ui/places (places->ui [] files-local)))

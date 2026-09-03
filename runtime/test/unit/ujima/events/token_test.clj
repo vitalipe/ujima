@@ -8,11 +8,11 @@
             [ujima.events.token :as token]))
 
 
-(defn- mounted [& tokens]
-  [{:uuid "U" :state :mounted :mount "/ujima/run/storage/U" :tokens (vec tokens)}])
+(defn- mounted [& [tokens]]
+  [{:uuid "U" :state :mounted :mount "/ujima/run/storage/U" :tokens (or tokens {})}])
 
 
-(def ^:private secret {:type :circle/secret :value {:key "abc" :circle "room-1"}})
+(def ^:private secret {:circle/secret {:key "abc" :circle "room-1"}})
 
 ;; the stick is only a token when its key is the one THIS machine holds
 (defn- circle-holds! [token]
@@ -33,11 +33,11 @@
   (is (nil? (token/circle-token nil))       "no previous push at all")
   (is (nil? (token/circle-token [])))
   (is (nil? (token/circle-token (mounted))) "a stick with no markers")
-  (is (nil? (token/circle-token (mounted {:type :circle/secret :value nil})))
+  (is (nil? (token/circle-token (mounted {:circle/secret nil})))
       "present but unparseable — storage reports it, we do not act on it")
-  (is (nil? (token/circle-token (mounted {:type :circle/secret :value {:circle "room-1"}})))
+  (is (nil? (token/circle-token (mounted {:circle/secret {:circle "room-1"}})))
       "parsed but no :key")
-  (is (nil? (token/circle-token (mounted {:type :circle/secret :value {:key "   "}})))
+  (is (nil? (token/circle-token (mounted {:circle/secret {:key "   "}})))
       "blank key"))
 
 

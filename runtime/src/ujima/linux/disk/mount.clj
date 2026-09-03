@@ -39,6 +39,12 @@
   (:ok? (sudo$? umount -l [mnt])))
 
 
+;; fsck before rw mounts: best-effort auto-repair, never the arbiter — the mount is.
+(defn fsck-vfat!  [dev] (sudo$? fsck.fat -a [dev]))
+(defn fsck-exfat! [dev] (sudo$? fsck.exfat -y [dev]))
+(defn fsck-ext4!  [dev] (sudo$? e2fsck -p [dev]))
+
+
 (defn mount!
   "OPTS is a coll of -o flags or a ready comma string; DEVICE may be a map, glued to one token:
 

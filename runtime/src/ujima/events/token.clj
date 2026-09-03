@@ -28,9 +28,7 @@
    way, and deciding what counts is this namespace's job."
   [entries]
   (->> entries
-       (mapcat :tokens)
-       (filter #(= :circle/secret (:type %)))
-       (map (comp :key :value))
+       (map #(get-in % [:tokens :circle/secret :key]))
        (filter string?)
        (remove str/blank?)
        (first)))

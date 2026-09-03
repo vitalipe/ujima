@@ -53,13 +53,17 @@
 
 
 (defn- sweep
-  "Stat the known names — never enumerate, so a stick with 100k files costs the same as an
-   empty one. A present-but-unreadable marker still reports, with a nil value."
+  "Stat the known names under the ujima/ dir — one stat gates everything, and never
+   enumerate, so a stick with 100k files costs the same as an empty one. A
+   present-but-unreadable marker still reports, with a nil value."
   [mnt]
-  (vec (for [[filename type] schema/markers
-             :let  [path (fs/path mnt filename)]
-             :when (fs/regular-file? path)]
-         {:type type :value (marker-value path)})))
+  (let [dir (fs/path mnt schema/dir)]
+    (if (fs/directory? dir)
+      (into {} (for [[filename type] schema/markers
+                     :let  [path (fs/path dir filename)]
+                     :when (fs/regular-file? path)]
+                 [type (marker-value path)]))
+      {})))
 
 
 ;; --- state derivation -------------------------------------------------------
@@ -93,13 +97,34 @@
 (declare converge!)
 
 
+;; rw where repair exists and the semantics are ours; ro where they are not — ntfs3
+;; has no real linux fsck (ntfsfix only clears the dirty flag), and an unknown
+;; filesystem mounts ro because readable beats invisible.
+(def ^:private mount-opts
+  {"vfat"  ["rw" "uid=ujima" "gid=ujima" "utf8" "flush" "nosuid" "nodev" "noexec"]
+   "exfat" ["rw" "uid=ujima" "gid=ujima" "nosuid" "nodev" "noexec"]
+   "ext4"  ["rw" "nosuid" "nodev" "noexec"]
+   "ntfs"  ["ro" "nosuid" "nodev" "noexec"]})
+
+(def ^:private default-opts ["ro" "nosuid" "nodev" "noexec"])
+
+(def ^:private fsck-of
+  {"vfat"  mount/fsck-vfat!
+   "exfat" mount/fsck-exfat!
+   "ext4"  mount/fsck-ext4!})
+
+
 (defn- ->mount-task [fstype uuid mnt]
   (flow :storage/mount
     
     (fs/create-dirs mnt)
     
     (mount/umount-lazy! mnt)
-    (mount/mount! fstype {:UUID uuid} mnt ["ro" "nosuid" "nodev" "noexec"])
+    (when-let [fsck! (fsck-of fstype)]
+      (let [r (fsck! (str "/dev/disk/by-uuid/" uuid))]
+        (when-not (:ok? r)
+          (log/warn "storage: fsck did not come back clean" {:uuid uuid :fstype fstype}))))
+    (mount/mount! fstype {:UUID uuid} mnt (mount-opts fstype default-opts))
 
     ;; departed while we were mounting: observe! released the point before we took it
     (if (@partitions* uuid)

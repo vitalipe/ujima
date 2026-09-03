@@ -15,6 +15,7 @@
     ($! apt-get install -y --no-install-recommends
         "ca-certificates"
         "util-linux-extra"   ; hwclock — clock! persists a set clock to the RTC; Debian split it out of util-linux
+        "exfatprogs"         ; fsck.exfat — storage auto-repairs exFAT before its rw mounts; big sticks ship exFAT from the factory
         "avahi-utils")       ; avahi-browse — the console enumerates _ujima._tcp for peers the subnet sweep misses (some APs throttle it); the daemon itself rides the raspios base, so this is the client side only and pulls in nothing new
 
     ;; ESCAPE HATCH — the one static file this script writes, deliberately NOT a concern

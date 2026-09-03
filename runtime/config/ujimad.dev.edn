@@ -1,6 +1,7 @@
 {:log     {:level :debug}
  :control {:storage "/tmp/ujima/settings/"
            :tmp     "/tmp/ujima/settings/session"}
+ :files   {:local "/tmp/ujima/files"}
  :desktop {:launcher "desktop/bin/ujima-launcher"
            :http     {:static-root "desktop/shell"}
            :eww      {:eww-config "desktop/shell/eww"}

@@ -10,6 +10,10 @@ version truth; branch names and build labels may disagree.
 
 ### Added
 
+- A USB drive mounts read-write when plugged in — vfat, exFAT and ext4, checked
+  and repaired first when dirty; NTFS and everything else mounts read-only.
+- The desktop serves a places stream: the machine's Files area and every mounted
+  drive, with the tokens a drive carries (circle admin, a registered pack).
 - A machine upgrades itself: `bb dev upgrade <ip> <pack>` installs a pack into
   the device's inactive slot and carries its settings across; `bb dev boot <ip>`
   try-boots the prepared slot and commits it once the device comes back.
@@ -24,6 +28,9 @@ version truth; branch names and build labels may disagree.
 
 ### Changed
 
+- A stick's ujima cargo lives in one visible `ujima/` folder: the circle admin
+  token is `ujima/circle.json` (was `.ujima-admin-token` at the root, which no
+  longer counts), and `ujima/install.json` registers a pack by path.
 - ONLYOFFICE opens in a ujima theme — the desktop's charcoal and the office category
   colour around a light document editor.
 - The Web app's browser frame and tab strip follow the desktop's charcoal instead of

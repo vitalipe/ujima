@@ -68,6 +68,9 @@
   ;; circle token on a stick -> console
   (storage/on-converge! token-events/on-storage!)
 
+  ;; places (the files area + removable) -> the UI stream
+  (storage/on-converge! shell-http-converge/converge-places!)
+
   ;; plugged sinks -> [:audio :active]
   (listen! :audio-sinks
            (audio/watch-sinks! {:interval-ms audio-poll-ms})

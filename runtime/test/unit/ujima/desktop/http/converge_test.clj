@@ -1,5 +1,7 @@
 (ns ujima.desktop.http.converge-test
   (:require [clojure.test :refer [deftest is]]
+            [clojure.string :as str]
+            [lib.edn :refer [edn->json]]
             [ujima.desktop.app :as app]
             [ujima.desktop.http.converge :as converge]))
 
@@ -102,3 +104,50 @@
         out   (converge/apps->ui {:running [] :catalog leaky :current nil})]
     (is (not (re-find #"s3cret" (pr-str out)))
         "pinned select-keys the entry — assert over the WHOLE blob, not one field")))
+
+
+;; --- places -----------------------------------------------------------------
+
+(def ^:private mounted-entry
+  {:uuid "6962-5E15" :disk "sda" :label nil :fstype "vfat" :rm true
+   :state :mounted :mount "/ujima/run/storage/6962-5E15"
+   :tokens {:circle/secret {:key "abc"}}})
+
+(defn- usb-place [entry]
+  (second (:places (converge/places->ui [entry] "/f"))))
+
+
+(deftest places-lead-with-the-local-files-area
+  (is (= {:places [{:id [:local "files"] :kind :local :state :ready :mount "/f"}]}
+         (converge/places->ui [] "/f"))))
+
+
+(deftest a-mounted-partition-is-a-ready-usb-place
+  (is (= {:id     [:usb "6962-5E15"] :kind :usb :state :ready
+          :mount  "/ujima/run/storage/6962-5E15"
+          :label  nil :fstype "vfat"
+          :tokens ["circle/secret"]}
+         (usb-place mounted-entry))
+      "plane plumbing (:rm :disk) stays behind; tokens flatten to type names —
+       full ns/name strings, since the wire encoder drops keyword namespaces"))
+
+
+(deftest token-values-never-reach-the-wire
+  (let [rendered (edn->json (converge/places->ui [mounted-entry] "/f"))]
+    (is (str/includes? rendered "circle/secret") "the type is the finding")
+    (is (not (str/includes? rendered "abc"))
+        "no value survives serialization — asserted over the WHOLE rendered output,
+         so a later entry carrying a value cannot slip through a per-field check")))
+
+
+(deftest an-invalid-partition-carries-why-and-no-mount
+  (is (= {:id [:usb "X"] :kind :usb :state :invalid :label "KEYS" :fstype "vfat"
+          :reason "mount: fail"}
+         (usb-place {:uuid "X" :state :invalid :label "KEYS"
+                     :fstype "vfat" :reason "mount: fail"}))))
+
+
+(deftest in-flight-states-read-as-mounting
+  (is (= :mounting (:state (usb-place {:uuid "X" :state :detected})))
+      "detected is in flight by the time anyone sees it")
+  (is (= :mounting (:state (usb-place {:uuid "X" :state :mounting})))))

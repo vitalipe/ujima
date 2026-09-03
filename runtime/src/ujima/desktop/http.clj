@@ -62,6 +62,7 @@
      ;; the authoritative projections, pushed
      {"GET  /stream/state"  (fn [req] (converge/stream-ui   req))
       "GET  /stream/apps"   (fn [req] (converge/stream-apps req))
+      "GET  /stream/places" (fn [req] (converge/stream-places req))
 
       ;; interaction, not state: a coalesced gesture and a read the stream doesn't carry
       "POST /ui/volume/move"           (fn [{body :body}] (ui/volume-moved! (:value body))

@@ -23,9 +23,9 @@
 
 
 (defn circle-token
-  "The circle key a projection carries, nil when none. A marker that is present but
-   unparseable (nil value) or carries no :key is NOT a token — storage reports it either
-   way, and deciding what counts is this namespace's job."
+  "The circle key a projection carries, nil when none. Storage validates shapes and
+   skips junk before it ever projects, but deciding what counts as THE token — a
+   non-blank :key that matches this machine's — stays this namespace's job."
   [entries]
   (->> entries
        (map #(get-in % [:tokens :circle/secret :key]))

@@ -47,16 +47,24 @@
         "marker names at the mount ROOT are not markers — the clean cut from v0.4")))
 
 
-(deftest an-unreadable-marker-still-reports-itself
-  (is (= {:circle/secret nil}
-         (sweep (a-mount-with "circle.json" "{not json")))
-      "presence is the finding — 'there is a token here and it is junk' beats silence"))
+(deftest an-unreadable-marker-is-logged-and-skipped
+  (is (= {} (sweep (a-mount-with "circle.json" "{not json")))
+      "junk fails the shape gate — the warn log is the loudness, absence the contract"))
+
+
+(deftest a-marker-with-the-wrong-shape-is-logged-and-skipped
+  (is (= {} (sweep (a-mount-with "circle.json"
+                                 (json/generate-string {:circle "room-1"}))))
+      "parses fine, but no :key — nothing downstream ever sees a half-token")
+  (is (= {} (sweep (a-mount-with "install.json"
+                                 (json/generate-string {:pack 42}))))
+      "a pack registration whose path is not a string"))
 
 
 (deftest an-absurd-marker-is-not-slurped
   (let [dir (a-mount-with "circle.json" (apply str (repeat 70000 "x")))]
-    (is (= {:circle/secret nil} (sweep dir))
-        "over the cap the value is dropped — a 4GB file must never reach the daemon's heap")))
+    (is (= {} (sweep dir))
+        "over the cap the read yields nil, nil fails the shape — a 4GB file never reaches the heap")))
 
 
 (deftest a-directory-named-like-a-marker-is-not-a-marker

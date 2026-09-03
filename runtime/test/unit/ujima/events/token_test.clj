@@ -34,7 +34,7 @@
   (is (nil? (token/circle-token [])))
   (is (nil? (token/circle-token (mounted))) "a stick with no markers")
   (is (nil? (token/circle-token (mounted {:circle/secret nil})))
-      "present but unparseable — storage reports it, we do not act on it")
+      "storage validates and skips junk now, so nil cannot arrive — the consumer stays defensive anyway")
   (is (nil? (token/circle-token (mounted {:circle/secret {:circle "room-1"}})))
       "parsed but no :key")
   (is (nil? (token/circle-token (mounted {:circle/secret {:key "   "}})))

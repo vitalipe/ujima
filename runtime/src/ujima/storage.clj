@@ -12,6 +12,8 @@
             [lib.task               :as task]
             [lib.task.flow          :refer [flow]]
             [lib.task.timeline      :as timeline]
+            [malli.core             :as m]
+            [malli.error            :as me]
             [schema.ujima.storage   :as schema]
             [ujima.log              :as log]
             [ujima.linux.disk.mount :as mount]))
@@ -52,17 +54,32 @@
       nil)))
 
 
+(defn- valid-token?
+  "The shape gate: junk json, an over-cap read (both arrive as nil) and wrong shapes
+   all fail the same way — logged and skipped. The log is the loudness, absence the
+   contract; nothing downstream ever sees a half-token."
+  [type value path]
+  (let [shape (schema/shapes type)]
+    (or (m/validate shape value)
+        (do (log/warn "storage: invalid token — skipped"
+                      {:type type :path (str path)
+                       :reason (me/humanize (m/explain shape value))})
+            false))))
+
+
 (defn- sweep
   "Stat the known names under the ujima/ dir — one stat gates everything, and never
-   enumerate, so a stick with 100k files costs the same as an empty one. A
-   present-but-unreadable marker still reports, with a nil value."
+   enumerate, so a stick with 100k files costs the same as an empty one. Values are
+   validated against their type's shape on the way in."
   [mnt]
   (let [dir (fs/path mnt schema/dir)]
     (if (fs/directory? dir)
       (into {} (for [[filename type] schema/markers
                      :let  [path (fs/path dir filename)]
-                     :when (fs/regular-file? path)]
-                 [type (marker-value path)]))
+                     :when (fs/regular-file? path)
+                     :let  [value (marker-value path)]
+                     :when (valid-token? type value path)]
+                 [type value]))
       {})))
 
 
